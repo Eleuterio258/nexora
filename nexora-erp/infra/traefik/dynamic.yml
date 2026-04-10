@@ -82,4 +82,8 @@ http:
     gateway-dashboard-auth:
       basicAuth:
         users:
-          - "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/"
+          # ATENÇÃO: Altere estas credenciais antes de publicar!
+          # Para gerar um novo hash: htpasswd -nb <user> <password>
+          # Ou use uma ferramenta online: https://www.web2generators.com/apache-tools/htpasswd-generator
+          # Formato: "username:{HASH}"
+          - "admin:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/" # PADRÃO: admin/test - ALTERAR!
