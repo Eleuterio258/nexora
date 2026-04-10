@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.crm.rule=PathPrefix(`/api/crm`)
-      - traefik.http.routers.crm.entrypoints=web
+      - traefik.http.routers.crm.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/crm`)
+      - traefik.http.routers.crm.entrypoints=websecure
+      - traefik.http.routers.crm.tls=true
+      - traefik.http.routers.crm.tls.certresolver=le
       - traefik.http.routers.crm.middlewares=gateway-protected@file
       - traefik.http.services.crm.loadbalancer.server.port=3017
     networks:

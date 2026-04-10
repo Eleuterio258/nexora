@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.stock.rule=PathPrefix(`/api/stock`)
-      - traefik.http.routers.stock.entrypoints=web
+      - traefik.http.routers.stock.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/stock`)
+      - traefik.http.routers.stock.entrypoints=websecure
+      - traefik.http.routers.stock.tls=true
+      - traefik.http.routers.stock.tls.certresolver=le
       - traefik.http.routers.stock.middlewares=gateway-protected@file
       - traefik.http.services.stock.loadbalancer.server.port=3008
     networks:

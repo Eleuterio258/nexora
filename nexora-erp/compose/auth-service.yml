@@ -22,13 +22,17 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.auth-public.rule=Path(`/api/auth/login`) || Path(`/api/auth/refresh`) || Path(`/api/auth/forgot-password`) || Path(`/api/auth/reset-password`) || Path(`/api/auth/verify-email`)
-      - traefik.http.routers.auth-public.entrypoints=web
+      - traefik.http.routers.auth-public.rule=Host(`nexora-erp.e258tech.tech`) && (Path(`/api/auth/login`) || Path(`/api/auth/refresh`) || Path(`/api/auth/forgot-password`) || Path(`/api/auth/reset-password`) || Path(`/api/auth/verify-email`))
+      - traefik.http.routers.auth-public.entrypoints=websecure
+      - traefik.http.routers.auth-public.tls=true
+      - traefik.http.routers.auth-public.tls.certresolver=le
       - traefik.http.routers.auth-public.priority=200
       - traefik.http.routers.auth-public.middlewares=gateway-public@file
       - traefik.http.routers.auth-public.service=auth
-      - traefik.http.routers.auth.rule=PathPrefix(`/api/auth`)
-      - traefik.http.routers.auth.entrypoints=web
+      - traefik.http.routers.auth.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/auth`)
+      - traefik.http.routers.auth.entrypoints=websecure
+      - traefik.http.routers.auth.tls=true
+      - traefik.http.routers.auth.tls.certresolver=le
       - traefik.http.routers.auth.priority=100
       - traefik.http.routers.auth.middlewares=gateway-protected@file
       - traefik.http.services.auth.loadbalancer.server.port=3001

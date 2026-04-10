@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.compras.rule=PathPrefix(`/api/compras`)
-      - traefik.http.routers.compras.entrypoints=web
+      - traefik.http.routers.compras.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/compras`)
+      - traefik.http.routers.compras.entrypoints=websecure
+      - traefik.http.routers.compras.tls=true
+      - traefik.http.routers.compras.tls.certresolver=le
       - traefik.http.routers.compras.middlewares=gateway-protected@file
       - traefik.http.services.compras.loadbalancer.server.port=3011
     networks:

@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.configuracao.rule=PathPrefix(`/api/configuracao`)
-      - traefik.http.routers.configuracao.entrypoints=web
+      - traefik.http.routers.configuracao.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/configuracao`)
+      - traefik.http.routers.configuracao.entrypoints=websecure
+      - traefik.http.routers.configuracao.tls=true
+      - traefik.http.routers.configuracao.tls.certresolver=le
       - traefik.http.routers.configuracao.middlewares=gateway-protected@file
       - traefik.http.services.configuracao.loadbalancer.server.port=3015
     networks:

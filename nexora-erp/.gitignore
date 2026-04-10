@@ -4,3 +4,10 @@ dist/
 *.log
 .DS_Store
 coverage/
+
+# SSL Certificates (Let's Encrypt)
+infra/traefik/acme/acme.json
+
+# IDE
+.vscode/
+.idea/

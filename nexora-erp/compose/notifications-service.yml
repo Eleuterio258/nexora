@@ -48,8 +48,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.notifications.rule=PathPrefix(`/api/notifications`)
-      - traefik.http.routers.notifications.entrypoints=web
+      - traefik.http.routers.notifications.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/notifications`)
+      - traefik.http.routers.notifications.entrypoints=websecure
+      - traefik.http.routers.notifications.tls=true
+      - traefik.http.routers.notifications.tls.certresolver=le
       - traefik.http.routers.notifications.middlewares=gateway-protected@file
       - traefik.http.services.notifications.loadbalancer.server.port=3022
     networks:

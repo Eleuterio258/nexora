@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.logistica.rule=PathPrefix(`/api/logistica`)
-      - traefik.http.routers.logistica.entrypoints=web
+      - traefik.http.routers.logistica.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/logistica`)
+      - traefik.http.routers.logistica.entrypoints=websecure
+      - traefik.http.routers.logistica.tls=true
+      - traefik.http.routers.logistica.tls.certresolver=le
       - traefik.http.routers.logistica.middlewares=gateway-protected@file
       - traefik.http.services.logistica.loadbalancer.server.port=3023
     networks:

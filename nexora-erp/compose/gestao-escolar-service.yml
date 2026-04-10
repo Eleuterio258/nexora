@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.gestaoescolar.rule=PathPrefix(`/api/gestao-escolar`)
-      - traefik.http.routers.gestaoescolar.entrypoints=web
+      - traefik.http.routers.gestaoescolar.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/gestao-escolar`)
+      - traefik.http.routers.gestaoescolar.entrypoints=websecure
+      - traefik.http.routers.gestaoescolar.tls=true
+      - traefik.http.routers.gestaoescolar.tls.certresolver=le
       - traefik.http.routers.gestaoescolar.middlewares=gateway-protected@file
       - traefik.http.services.gestaoescolar.loadbalancer.server.port=3024
     networks:

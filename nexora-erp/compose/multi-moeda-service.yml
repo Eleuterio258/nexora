@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.multimoeda.rule=PathPrefix(`/api/multi-moeda`)
-      - traefik.http.routers.multimoeda.entrypoints=web
+      - traefik.http.routers.multimoeda.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/multi-moeda`)
+      - traefik.http.routers.multimoeda.entrypoints=websecure
+      - traefik.http.routers.multimoeda.tls=true
+      - traefik.http.routers.multimoeda.tls.certresolver=le
       - traefik.http.routers.multimoeda.middlewares=gateway-protected@file
       - traefik.http.services.multimoeda.loadbalancer.server.port=3014
     networks:

@@ -50,10 +50,26 @@ docker compose logs -f
 
 ### 4. Aceder às APIs
 
-- **API Gateway:** http://localhost
-- **Traefik Dashboard:** http://localhost:8080 (credenciais padrão: admin/test)
-- **RabbitMQ Management:** http://localhost:15672 (credenciais padrão: nexora/nexora_pass)
-- **PostgreSQL:** localhost:5433
+- **API Principal:** https://nexora-erp.e258tech.tech
+- **Traefik Dashboard:** https://nexora-erp.e258tech.tech/dashboard (requer autenticação)
+- **API Endpoints:**
+  - Auth: `https://nexora-erp.e258tech.tech/api/auth/...`
+  - Empresas: `https://nexora-erp.e258tech.tech/api/companies/...`
+  - Faturação: `https://nexora-erp.e258tech.tech/api/faturacao/...`
+  - (todos os 24 serviços disponíveis)
+
+### 5. Configurar DNS (Produção)
+
+Para usar o seu próprio domínio:
+
+1. Crie um registo DNS do tipo `A`:
+   - **Host:** `nexora-erp.e258tech.tech`
+   - **Valor:** `<IP do seu servidor>`
+
+2. O Traefik irá automaticamente:
+   - Solicitar certificado SSL da Let's Encrypt
+   - Redirecionar HTTP → HTTPS
+   - Gerir renovação automática de certificados
 
 ## 📦 Arquitetura
 

@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.tesouraria.rule=PathPrefix(`/api/tesouraria`)
-      - traefik.http.routers.tesouraria.entrypoints=web
+      - traefik.http.routers.tesouraria.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/tesouraria`)
+      - traefik.http.routers.tesouraria.entrypoints=websecure
+      - traefik.http.routers.tesouraria.tls=true
+      - traefik.http.routers.tesouraria.tls.certresolver=le
       - traefik.http.routers.tesouraria.middlewares=gateway-protected@file
       - traefik.http.services.tesouraria.loadbalancer.server.port=3010
     networks:

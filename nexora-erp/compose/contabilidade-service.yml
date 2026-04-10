@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.contabilidade.rule=PathPrefix(`/api/contabilidade`)
-      - traefik.http.routers.contabilidade.entrypoints=web
+      - traefik.http.routers.contabilidade.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/contabilidade`)
+      - traefik.http.routers.contabilidade.entrypoints=websecure
+      - traefik.http.routers.contabilidade.tls=true
+      - traefik.http.routers.contabilidade.tls.certresolver=le
       - traefik.http.routers.contabilidade.middlewares=gateway-protected@file
       - traefik.http.services.contabilidade.loadbalancer.server.port=3012
     networks:

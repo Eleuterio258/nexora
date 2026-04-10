@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.auditoria.rule=PathPrefix(`/api/auditoria`)
-      - traefik.http.routers.auditoria.entrypoints=web
+      - traefik.http.routers.auditoria.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/auditoria`)
+      - traefik.http.routers.auditoria.entrypoints=websecure
+      - traefik.http.routers.auditoria.tls=true
+      - traefik.http.routers.auditoria.tls.certresolver=le
       - traefik.http.routers.auditoria.middlewares=gateway-protected@file
       - traefik.http.services.auditoria.loadbalancer.server.port=3016
     networks:

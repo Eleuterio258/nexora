@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.faturacao.rule=PathPrefix(`/api/faturacao`)
-      - traefik.http.routers.faturacao.entrypoints=web
+      - traefik.http.routers.faturacao.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/faturacao`)
+      - traefik.http.routers.faturacao.entrypoints=websecure
+      - traefik.http.routers.faturacao.tls=true
+      - traefik.http.routers.faturacao.tls.certresolver=le
       - traefik.http.routers.faturacao.middlewares=gateway-protected@file
       - traefik.http.services.faturacao.loadbalancer.server.port=3003
     networks:

@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.impostos.rule=PathPrefix(`/api/impostos`)
-      - traefik.http.routers.impostos.entrypoints=web
+      - traefik.http.routers.impostos.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/impostos`)
+      - traefik.http.routers.impostos.entrypoints=websecure
+      - traefik.http.routers.impostos.tls=true
+      - traefik.http.routers.impostos.tls.certresolver=le
       - traefik.http.routers.impostos.middlewares=gateway-protected@file
       - traefik.http.services.impostos.loadbalancer.server.port=3007
     networks:

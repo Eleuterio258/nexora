@@ -12,6 +12,14 @@ services:
       - --entrypoints.websecure.address=:443
       - --ping=true
       - --accesslog=true
+      # Redirecionamento HTTP -> HTTPS
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.permanent=true
+      # Configuração ACME (Let's Encrypt)
+      - --certificatesresolvers.le.acme.email=admin@e258tech.tech
+      - --certificatesresolvers.le.acme.storage=/etc/traefik/acme/acme.json
+      - --certificatesresolvers.le.acme.tlschallenge=true
     ports:
       - "80:80"
       - "443:443"
@@ -19,10 +27,14 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./infra/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ./infra/traefik/acme:/etc/traefik/acme
     labels:
       - traefik.enable=true
-      - traefik.http.routers.traefik-dashboard.rule=PathPrefix(`/dashboard`) || PathPrefix(`/api/http`) || PathPrefix(`/api/overview`)
-      - traefik.http.routers.traefik-dashboard.entrypoints=web
+      # Dashboard acessível via domínio
+      - traefik.http.routers.traefik-dashboard.rule=Host(`nexora-erp.e258tech.tech`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api/http`) || PathPrefix(`/api/overview`))
+      - traefik.http.routers.traefik-dashboard.entrypoints=websecure
+      - traefik.http.routers.traefik-dashboard.tls=true
+      - traefik.http.routers.traefik-dashboard.tls.certresolver=le
       - traefik.http.routers.traefik-dashboard.service=api@internal
       - traefik.http.routers.traefik-dashboard.middlewares=gateway-dashboard-auth@file
     networks:

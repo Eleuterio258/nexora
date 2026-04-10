@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.assinaturas.rule=PathPrefix(`/api/assinaturas`)
-      - traefik.http.routers.assinaturas.entrypoints=web
+      - traefik.http.routers.assinaturas.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/assinaturas`)
+      - traefik.http.routers.assinaturas.entrypoints=websecure
+      - traefik.http.routers.assinaturas.tls=true
+      - traefik.http.routers.assinaturas.tls.certresolver=le
       - traefik.http.routers.assinaturas.middlewares=gateway-protected@file
       - traefik.http.services.assinaturas.loadbalancer.server.port=3021
     networks:

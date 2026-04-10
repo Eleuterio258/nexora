@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.centroscusto.rule=PathPrefix(`/api/centros-custo`)
-      - traefik.http.routers.centroscusto.entrypoints=web
+      - traefik.http.routers.centroscusto.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/centros-custo`)
+      - traefik.http.routers.centroscusto.entrypoints=websecure
+      - traefik.http.routers.centroscusto.tls=true
+      - traefik.http.routers.centroscusto.tls.certresolver=le
       - traefik.http.routers.centroscusto.middlewares=gateway-protected@file
       - traefik.http.services.centroscusto.loadbalancer.server.port=3019
     networks:

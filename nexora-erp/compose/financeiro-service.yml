@@ -16,8 +16,10 @@ services:
         condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.financeiro.rule=PathPrefix(`/api/financeiro`)
-      - traefik.http.routers.financeiro.entrypoints=web
+      - traefik.http.routers.financeiro.rule=Host(`nexora-erp.e258tech.tech`) && PathPrefix(`/api/financeiro`)
+      - traefik.http.routers.financeiro.entrypoints=websecure
+      - traefik.http.routers.financeiro.tls=true
+      - traefik.http.routers.financeiro.tls.certresolver=le
       - traefik.http.routers.financeiro.middlewares=gateway-protected@file
       - traefik.http.services.financeiro.loadbalancer.server.port=3009
     networks:
