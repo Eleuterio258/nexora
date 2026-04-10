@@ -1,0 +1,34 @@
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: nexora_traefik
+    command:
+      - --api.dashboard=true
+      - --api.insecure=false
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --ping=true
+      - --accesslog=true
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./infra/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik-dashboard.rule=PathPrefix(`/dashboard`) || PathPrefix(`/api/http`) || PathPrefix(`/api/overview`)
+      - traefik.http.routers.traefik-dashboard.entrypoints=web
+      - traefik.http.routers.traefik-dashboard.service=api@internal
+      - traefik.http.routers.traefik-dashboard.middlewares=gateway-dashboard-auth@file
+    networks:
+      - nexora_net
+    restart: unless-stopped
+
+networks:
+  nexora_net:
+    driver: bridge

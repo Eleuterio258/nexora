@@ -1,0 +1,29 @@
+services:
+  autorizacao-service:
+    build: ./services/autorizacao-service
+    container_name: nexora_autorizacao
+    environment:
+      PORT: 3004
+      DATABASE_URL: postgres://${DB_USER:-nexora}:${DB_PASSWORD:-nexora_pass}@db_postgres:5432/${DB_NAME:-nexora_erp}?options=-csearch_path%3Dautorizacao
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-nexora}:${RABBITMQ_PASS:-nexora_pass}@rabbitmq:5672
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      db_postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.autorizacao.rule=PathPrefix(`/api/autorizacao`)
+      - traefik.http.routers.autorizacao.entrypoints=web
+      - traefik.http.routers.autorizacao.middlewares=gateway-protected@file
+      - traefik.http.services.autorizacao.loadbalancer.server.port=3004
+    networks:
+      - nexora_net
+    restart: unless-stopped
+
+networks:
+  nexora_net:
+    driver: bridge

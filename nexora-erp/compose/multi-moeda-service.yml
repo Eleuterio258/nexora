@@ -1,0 +1,29 @@
+services:
+  multi-moeda-service:
+    build: ./services/multi-moeda-service
+    container_name: nexora_multi_moeda
+    environment:
+      PORT: 3014
+      DATABASE_URL: postgres://${DB_USER:-nexora}:${DB_PASSWORD:-nexora_pass}@db_postgres:5432/${DB_NAME:-nexora_erp}?options=-csearch_path%3Dmulti_moeda
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-nexora}:${RABBITMQ_PASS:-nexora_pass}@rabbitmq:5672
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      db_postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.multimoeda.rule=PathPrefix(`/api/multi-moeda`)
+      - traefik.http.routers.multimoeda.entrypoints=web
+      - traefik.http.routers.multimoeda.middlewares=gateway-protected@file
+      - traefik.http.services.multimoeda.loadbalancer.server.port=3014
+    networks:
+      - nexora_net
+    restart: unless-stopped
+
+networks:
+  nexora_net:
+    driver: bridge

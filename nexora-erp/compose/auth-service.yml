@@ -1,0 +1,41 @@
+services:
+  auth-service:
+    build: ./services/auth-service
+    container_name: nexora_auth
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgres://${DB_USER:-nexora}:${DB_PASSWORD:-nexora_pass}@db_postgres:5432/${DB_NAME:-nexora_erp}?options=-csearch_path%3Dauth
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-nexora}:${RABBITMQ_PASS:-nexora_pass}@rabbitmq:5672
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      NODE_ENV: ${NODE_ENV:-development}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_pass}@redis:6379
+    depends_on:
+      db_postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.auth-public.rule=Path(`/api/auth/login`) || Path(`/api/auth/refresh`) || Path(`/api/auth/forgot-password`) || Path(`/api/auth/reset-password`) || Path(`/api/auth/verify-email`)
+      - traefik.http.routers.auth-public.entrypoints=web
+      - traefik.http.routers.auth-public.priority=200
+      - traefik.http.routers.auth-public.middlewares=gateway-public@file
+      - traefik.http.routers.auth-public.service=auth
+      - traefik.http.routers.auth.rule=PathPrefix(`/api/auth`)
+      - traefik.http.routers.auth.entrypoints=web
+      - traefik.http.routers.auth.priority=100
+      - traefik.http.routers.auth.middlewares=gateway-protected@file
+      - traefik.http.services.auth.loadbalancer.server.port=3001
+    networks:
+      - nexora_net
+    restart: unless-stopped
+
+networks:
+  nexora_net:
+    driver: bridge

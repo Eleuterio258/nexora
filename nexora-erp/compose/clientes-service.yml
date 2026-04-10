@@ -1,0 +1,29 @@
+services:
+  clientes-service:
+    build: ./services/clientes-service
+    container_name: nexora_clientes
+    environment:
+      PORT: 3005
+      DATABASE_URL: postgres://${DB_USER:-nexora}:${DB_PASSWORD:-nexora_pass}@db_postgres:5432/${DB_NAME:-nexora_erp}?options=-csearch_path%3Dclientes
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-nexora}:${RABBITMQ_PASS:-nexora_pass}@rabbitmq:5672
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      db_postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.clientes.rule=PathPrefix(`/api/clientes`)
+      - traefik.http.routers.clientes.entrypoints=web
+      - traefik.http.routers.clientes.middlewares=gateway-protected@file
+      - traefik.http.services.clientes.loadbalancer.server.port=3005
+    networks:
+      - nexora_net
+    restart: unless-stopped
+
+networks:
+  nexora_net:
+    driver: bridge

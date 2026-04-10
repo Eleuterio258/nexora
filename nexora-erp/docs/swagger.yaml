@@ -1,0 +1,503 @@
+openapi: 3.0.3
+info:
+  title: Nexora ERP API
+  version: 1.0.0
+  description: >
+    Especificacao OpenAPI inicial do Nexora ERP. Esta versao cobre o API Gateway,
+    health checks e o notifications-service exposto via gateway.
+servers:
+  - url: http://localhost
+    description: API Gateway local
+tags:
+  - name: Gateway
+  - name: Health
+  - name: Notification Channels
+  - name: Notification Templates
+  - name: Notification Messages
+  - name: Notification Reports
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+      required:
+        - status
+        - service
+    NotificationChannel:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        tenant_id:
+          type: integer
+          format: int64
+        codigo:
+          type: string
+        nome:
+          type: string
+        tipo:
+          type: string
+          enum: [email, sms, whatsapp, push]
+        activo:
+          type: boolean
+        updated_by:
+          type: integer
+          format: int64
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    NotificationChannelUpsert:
+      type: object
+      properties:
+        codigo:
+          type: string
+        nome:
+          type: string
+        tipo:
+          type: string
+          enum: [email, sms, whatsapp, push]
+        configuracao:
+          type: object
+          additionalProperties: true
+          nullable: true
+        activo:
+          type: boolean
+      required:
+        - codigo
+        - nome
+        - tipo
+    NotificationTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        tenant_id:
+          type: integer
+          format: int64
+        codigo:
+          type: string
+        canal_tipo:
+          type: string
+          enum: [email, sms, whatsapp, push]
+        assunto:
+          type: string
+          nullable: true
+        corpo:
+          type: string
+        variaveis:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items:
+                type: string
+          nullable: true
+        activo:
+          type: boolean
+        updated_by:
+          type: integer
+          format: int64
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    NotificationTemplateUpsert:
+      type: object
+      properties:
+        codigo:
+          type: string
+        canal_tipo:
+          type: string
+          enum: [email, sms, whatsapp, push]
+        assunto:
+          type: string
+          nullable: true
+        corpo:
+          type: string
+        variaveis:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items:
+                type: string
+          nullable: true
+        activo:
+          type: boolean
+      required:
+        - codigo
+        - canal_tipo
+        - corpo
+    NotificationMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        tenant_id:
+          type: integer
+          format: int64
+        channel_id:
+          type: integer
+          format: int64
+          nullable: true
+        template_id:
+          type: integer
+          format: int64
+          nullable: true
+        canal_tipo:
+          type: string
+          enum: [email, sms, whatsapp, push]
+        destinatario:
+          type: string
+        assunto:
+          type: string
+          nullable: true
+        corpo:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+          nullable: true
+        referencia_tipo:
+          type: string
+          nullable: true
+        referencia_id:
+          type: integer
+          format: int64
+          nullable: true
+        status:
+          type: string
+          enum: [pendente, enviado, falha, cancelado]
+        tentativas:
+          type: integer
+        erro:
+          type: string
+          nullable: true
+        enviado_em:
+          type: string
+          format: date-time
+          nullable: true
+        created_by:
+          type: integer
+          format: int64
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    NotificationMessageCreate:
+      type: object
+      properties:
+        channel_id:
+          type: integer
+          format: int64
+          nullable: true
+        template_id:
+          type: integer
+          format: int64
+          nullable: true
+        canal_tipo:
+          type: string
+          enum: [email, sms, whatsapp, push]
+        destinatario:
+          type: string
+        assunto:
+          type: string
+          nullable: true
+        corpo:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+          nullable: true
+        referencia_tipo:
+          type: string
+          nullable: true
+        referencia_id:
+          type: integer
+          format: int64
+          nullable: true
+      required:
+        - canal_tipo
+        - destinatario
+        - corpo
+    NotificationMessageSend:
+      type: object
+      properties:
+        sucesso:
+          type: boolean
+          default: true
+        erro:
+          type: string
+          nullable: true
+    NotificationSummary:
+      type: object
+      properties:
+        total:
+          type: string
+        pendentes:
+          type: string
+        enviados:
+          type: string
+        falhas:
+          type: string
+        por_canal:
+          type: array
+          items:
+            type: object
+            properties:
+              canal_tipo:
+                type: string
+              total:
+                type: string
+paths:
+  /health:
+    get:
+      tags: [Gateway]
+      summary: Health do gateway
+      responses:
+        '404':
+          description: O gateway nao expoe health proprio por HTTP neste momento
+  /api/notifications/health:
+    get:
+      tags: [Health]
+      summary: Health check do notifications-service
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api/notifications/channels:
+    get:
+      tags: [Notification Channels]
+      summary: Listar canais
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Lista de canais
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationChannel'
+        '401':
+          description: Nao autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags: [Notification Channels]
+      summary: Criar ou atualizar canal
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationChannelUpsert'
+      responses:
+        '200':
+          description: Canal persistido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationChannel'
+        '400':
+          description: Payload invalido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/notifications/templates:
+    get:
+      tags: [Notification Templates]
+      summary: Listar templates
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: canal_tipo
+          schema:
+            type: string
+            enum: [email, sms, whatsapp, push]
+      responses:
+        '200':
+          description: Lista de templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationTemplate'
+        '401':
+          description: Nao autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags: [Notification Templates]
+      summary: Criar ou atualizar template
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationTemplateUpsert'
+      responses:
+        '200':
+          description: Template persistido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTemplate'
+        '400':
+          description: Payload invalido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/notifications/messages:
+    get:
+      tags: [Notification Messages]
+      summary: Listar mensagens
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pendente, enviado, falha, cancelado]
+        - in: query
+          name: canal_tipo
+          schema:
+            type: string
+            enum: [email, sms, whatsapp, push]
+      responses:
+        '200':
+          description: Lista de mensagens
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationMessage'
+        '401':
+          description: Nao autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags: [Notification Messages]
+      summary: Registar mensagem
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationMessageCreate'
+      responses:
+        '201':
+          description: Mensagem criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationMessage'
+        '400':
+          description: Payload invalido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/notifications/messages/{id}/send:
+    post:
+      tags: [Notification Messages]
+      summary: Atualizar estado de envio
+      description: >
+        Este endpoint nao envia para provider externo. Apenas atualiza o estado
+        da mensagem na base de dados.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationMessageSend'
+      responses:
+        '200':
+          description: Mensagem atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationMessage'
+        '404':
+          description: Mensagem nao encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/notifications/reports/summary:
+    get:
+      tags: [Notification Reports]
+      summary: Resumo de notificacoes do tenant
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Resumo agregado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSummary'
+        '401':
+          description: Nao autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

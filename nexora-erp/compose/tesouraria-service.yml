@@ -1,0 +1,29 @@
+services:
+  tesouraria-service:
+    build: ./services/tesouraria-service
+    container_name: nexora_tesouraria
+    environment:
+      PORT: 3010
+      DATABASE_URL: postgres://${DB_USER:-nexora}:${DB_PASSWORD:-nexora_pass}@db_postgres:5432/${DB_NAME:-nexora_erp}?options=-csearch_path%3Dtesouraria
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-nexora}:${RABBITMQ_PASS:-nexora_pass}@rabbitmq:5672
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      NODE_ENV: ${NODE_ENV:-development}
+    depends_on:
+      db_postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.tesouraria.rule=PathPrefix(`/api/tesouraria`)
+      - traefik.http.routers.tesouraria.entrypoints=web
+      - traefik.http.routers.tesouraria.middlewares=gateway-protected@file
+      - traefik.http.services.tesouraria.loadbalancer.server.port=3010
+    networks:
+      - nexora_net
+    restart: unless-stopped
+
+networks:
+  nexora_net:
+    driver: bridge

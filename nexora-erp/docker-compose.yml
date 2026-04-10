@@ -1,0 +1,31 @@
+include:
+  # --- Infrastructure ---
+  - compose/traefik.yml
+  - compose/rabbitmq.yml
+  - compose/redis.yml
+  - compose/db_postgres.yml
+  # --- Services ---
+  - compose/auth-service.yml
+  - compose/empresa-service.yml
+  - compose/faturacao-service.yml
+  - compose/autorizacao-service.yml
+  - compose/clientes-service.yml
+  - compose/produtos-service.yml
+  - compose/impostos-service.yml
+  - compose/stock-service.yml
+  - compose/financeiro-service.yml
+  - compose/tesouraria-service.yml
+  - compose/compras-service.yml
+  - compose/contabilidade-service.yml
+  - compose/recursos-humanos-service.yml
+  - compose/multi-moeda-service.yml
+  - compose/sistema-configuracao-service.yml
+  - compose/auditoria-service.yml
+  - compose/crm-service.yml
+  - compose/pos-service.yml
+  - compose/centros-custo-service.yml
+  - compose/seguranca-service.yml
+  - compose/assinaturas-service.yml
+  - compose/notifications-service.yml
+  - compose/logistica-service.yml
+  - compose/gestao-escolar-service.yml
