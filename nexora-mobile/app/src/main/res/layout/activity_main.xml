@@ -1,0 +1,554 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    tools:context=".MainActivity">
+
+    <!-- Top App Bar -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/primary_blue"
+        app:elevation="0dp">
+
+        <LinearLayout
+            android:id="@+id/normalHeader"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="20dp"
+            app:layout_scrollFlags="scroll|enterAlways">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Bom dia,"
+                    android:textColor="#CCE4FF"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tvUserName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Administrador"
+                    android:textColor="@color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/ivNotification"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Notificações"
+                android:padding="8dp"
+                android:src="@android:drawable/ic_dialog_info"
+                android:tint="@color/white" />
+
+            <ImageView
+                android:id="@+id/ivAvatar"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_avatar"
+                android:contentDescription="Perfil"
+                android:src="@android:drawable/ic_menu_my_calendar"
+                android:tint="@color/white" />
+
+        </LinearLayout>
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- Conteúdo principal -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/dashboardScroll"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <LinearLayout
+            android:id="@+id/mainContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="78dp">
+
+            <!-- Banner azul com saldo -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@color/primary_blue"
+                android:orientation="vertical"
+                android:paddingHorizontal="20dp"
+                android:paddingBottom="28dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Receita do Mês"
+                    android:textColor="#CCE4FF"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tvMonthRevenue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="245.800 MT"
+                    android:textColor="@color/white"
+                    android:textSize="30sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="↑ 12% em relação ao mês anterior"
+                    android:textColor="#99C4FF"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
+
+            <!-- KPI Cards -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="-16dp"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:background="@color/white"
+                    android:elevation="3dp"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Facturas"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/tvInvoiceCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="38"
+                        android:textColor="@color/text_primary"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="este mês"
+                        android:textColor="@color/text_hint"
+                        android:textSize="10sp" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="6dp"
+                    android:layout_weight="1"
+                    android:background="@color/white"
+                    android:elevation="3dp"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Clientes"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/tvClientCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="124"
+                        android:textColor="@color/text_primary"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="activos"
+                        android:textColor="@color/text_hint"
+                        android:textSize="10sp" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:background="@color/white"
+                    android:elevation="3dp"
+                    android:orientation="vertical"
+                    android:padding="14dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Pendentes"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+
+                    <TextView
+                        android:id="@+id/tvPendingCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="7"
+                        android:textColor="#D97706"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="por pagar"
+                        android:textColor="@color/text_hint"
+                        android:textSize="10sp" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Acesso Rápido -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="20dp"
+                android:layout_marginTop="28dp"
+                android:text="Acesso Rápido"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <androidx.gridlayout.widget.GridLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="12dp"
+                app:columnCount="4"
+                app:rowCount="2"
+                app:useDefaultMargins="true">
+
+                <include layout="@layout/item_quick_access"
+                    android:id="@+id/qaFacturas"
+                    app:layout_columnWeight="1" />
+
+                <include layout="@layout/item_quick_access"
+                    android:id="@+id/qaClientes"
+                    app:layout_columnWeight="1" />
+
+                <include layout="@layout/item_quick_access"
+                    android:id="@+id/qaEstoque"
+                    app:layout_columnWeight="1" />
+
+                <include layout="@layout/item_quick_access"
+                    android:id="@+id/qaRelatorios"
+                    app:layout_columnWeight="1" />
+
+                <include layout="@layout/item_quick_access"
+                    android:id="@+id/qaVendas"
+                    app:layout_columnWeight="1" />
+
+                <include layout="@layout/item_quick_access"
+                    android:id="@+id/qaFornecedores"
+                    app:layout_columnWeight="1" />
+
+                <include layout="@layout/item_quick_access"
+                    android:id="@+id/qaFuncionarios"
+                    app:layout_columnWeight="1" />
+
+                <include layout="@layout/item_quick_access"
+                    android:id="@+id/qaDefinicoes"
+                    app:layout_columnWeight="1" />
+
+            </androidx.gridlayout.widget.GridLayout>
+
+            <!-- Actividade Recente -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="20dp"
+                android:layout_marginTop="28dp"
+                android:text="Actividade Recente"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="12dp"
+                android:background="@color/white"
+                android:elevation="2dp"
+                android:orientation="vertical"
+                android:padding="4dp">
+
+                <include layout="@layout/item_activity_row"
+                    android:id="@+id/row1" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginHorizontal="16dp"
+                    android:background="@color/border_color" />
+
+                <include layout="@layout/item_activity_row"
+                    android:id="@+id/row2" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginHorizontal="16dp"
+                    android:background="@color/border_color" />
+
+                <include layout="@layout/item_activity_row"
+                    android:id="@+id/row3" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Internal Navigation Bar -->
+    <LinearLayout
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@color/white"
+        android:elevation="8dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="4dp"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:minHeight="@dimen/internal_nav_height">
+
+        <LinearLayout
+            android:id="@+id/navHome"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingHorizontal="2dp">
+
+            <ImageView
+                android:id="@+id/navHomeIcon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:contentDescription="Inicio"
+                android:src="@android:drawable/ic_menu_compass"
+                android:tint="@color/primary_blue" />
+
+            <TextView
+                android:id="@+id/navHomeLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:gravity="center"
+                android:maxLines="1"
+                android:text="Inicio"
+                android:textColor="@color/primary_blue"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navModules"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingHorizontal="2dp">
+
+            <ImageView
+                android:id="@+id/navModulesIcon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:contentDescription="Módulos"
+                android:src="@android:drawable/ic_dialog_dialer"
+                android:tint="@color/text_hint" />
+
+            <TextView
+                android:id="@+id/navModulesLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:gravity="center"
+                android:maxLines="1"
+                android:text="Módulos"
+                android:textColor="@color/text_hint"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navChat"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingHorizontal="2dp">
+
+            <ImageView
+                android:id="@+id/navChatIcon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:contentDescription="Chat"
+                android:src="@android:drawable/ic_dialog_email"
+                android:tint="@color/text_hint" />
+
+            <TextView
+                android:id="@+id/navChatLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:gravity="center"
+                android:maxLines="1"
+                android:text="Chat"
+                android:textColor="@color/text_hint"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navVacation"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingHorizontal="2dp">
+
+            <ImageView
+                android:id="@+id/navVacationIcon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:contentDescription="Férias"
+                android:src="@android:drawable/ic_menu_my_calendar"
+                android:tint="@color/text_hint" />
+
+            <TextView
+                android:id="@+id/navVacationLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:gravity="center"
+                android:maxLines="1"
+                android:text="Férias"
+                android:textColor="@color/text_hint"
+                android:textSize="9sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navAttendance"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingHorizontal="2dp">
+
+            <ImageView
+                android:id="@+id/navAttendanceIcon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:contentDescription="Assiduidade"
+                android:src="@android:drawable/ic_menu_recent_history"
+                android:tint="@color/text_hint" />
+
+            <TextView
+                android:id="@+id/navAttendanceLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:gravity="center"
+                android:maxLines="1"
+                android:text="Assiduidade"
+                android:textColor="@color/text_hint"
+                android:textSize="8sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/navProfile"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingHorizontal="2dp">
+
+            <ImageView
+                android:id="@+id/navProfileIcon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:contentDescription="Perfil"
+                android:src="@android:drawable/ic_menu_manage"
+                android:tint="@color/text_hint" />
+
+            <TextView
+                android:id="@+id/navProfileLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:gravity="center"
+                android:maxLines="1"
+                android:text="Perfil"
+                android:textColor="@color/text_hint"
+                android:textSize="9sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -1,0 +1,65 @@
+services:
+
+  # ── Aplicação PHP ────────────────────────────────────────────
+  web:
+    build: .
+    container_name: e258tech-web
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      NEXORA_API_URL: ${NEXORA_API_URL:-http://127.0.0.1:8080}
+    volumes:
+      - uploads:/var/www/html/uploads
+    networks:
+      - e258techmozambique
+    labels:
+      - "traefik.enable=true"
+      # HTTPS
+      - "traefik.http.routers.e258tech.rule=Host(`e258tech.tech`)"
+      - "traefik.http.routers.e258tech.entrypoints=websecure"
+      - "traefik.http.routers.e258tech.tls=true"
+      - "traefik.http.routers.e258tech.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.e258tech.middlewares=e258tech-sec"
+      - "traefik.http.services.e258tech.loadbalancer.server.port=80"
+      # ── Cabeçalhos de segurança (fonte única, no edge) ──────────
+      - "traefik.http.middlewares.e258tech-sec.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.e258tech-sec.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.e258tech-sec.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.e258tech-sec.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.e258tech-sec.headers.customFrameOptionsValue=SAMEORIGIN"
+      - "traefik.http.middlewares.e258tech-sec.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.e258tech-sec.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';"
+      - "traefik.http.middlewares.e258tech-sec.headers.customResponseHeaders.X-Powered-By="
+      - "traefik.http.middlewares.e258tech-sec.headers.customResponseHeaders.Server="
+      # Redirect HTTP → HTTPS (domínio principal)
+      - "traefik.http.routers.e258tech-http.rule=Host(`e258tech.tech`)"
+      - "traefik.http.routers.e258tech-http.entrypoints=web"
+      - "traefik.http.routers.e258tech-http.middlewares=e258tech-https"
+      - "traefik.http.middlewares.e258tech-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.e258tech-https.redirectscheme.permanent=true"
+      # ── Subdomínio nexora.e258tech.tech (área autenticada ERP) ──────
+      - "traefik.http.routers.nexora.rule=Host(`nexora.e258tech.tech`)"
+      - "traefik.http.routers.nexora.entrypoints=websecure"
+      - "traefik.http.routers.nexora.tls=true"
+      - "traefik.http.routers.nexora.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nexora.service=e258tech"
+      - "traefik.http.routers.nexora.middlewares=nexora-rootredir,e258tech-sec"
+      # Redireciona raiz → /nexora/ para aterrar directamente no dashboard
+      - "traefik.http.middlewares.nexora-rootredir.redirectregex.regex=^https://nexora\\.e258tech\\.tech/?$$"
+      - "traefik.http.middlewares.nexora-rootredir.redirectregex.replacement=https://nexora.e258tech.tech/nexora/"
+      - "traefik.http.middlewares.nexora-rootredir.redirectregex.permanent=false"
+      # Redirect HTTP → HTTPS (subdomínio nexora)
+      - "traefik.http.routers.nexora-http.rule=Host(`nexora.e258tech.tech`)"
+      - "traefik.http.routers.nexora-http.entrypoints=web"
+      - "traefik.http.routers.nexora-http.middlewares=e258tech-https"
+
+# ── Volumes ──────────────────────────────────────────────────
+# Os uploads ficam num volume Docker local.
+volumes:
+  uploads:
+    driver: local
+
+# ── Redes ────────────────────────────────────────────────────
+networks:
+  e258techmozambique:
+    external: true

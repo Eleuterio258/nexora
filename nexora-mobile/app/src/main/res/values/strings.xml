@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">Nexora ERP</string>
+    <string name="login_title">Nexora</string>
+    <string name="login_title_erp">ERP</string>
+    <string name="login_subtitle">Uma plataforma. Todas as suas operações.</string>
+    <string name="label_organization">Organização</string>
+    <string name="hint_organization">Acme Corporation</string>
+    <string name="hint_organization_helper">Selecione a organização que pretende aceder.</string>
+    <string name="label_email">Email</string>
+    <string name="hint_email">voce@exemplo.com</string>
+    <string name="label_password">Password</string>
+    <string name="hint_password">Insira a sua password</string>
+    <string name="remember_me">Lembrar-me</string>
+    <string name="forgot_password">Esqueceu a password?</string>
+    <string name="btn_enter">Entrar</string>
+    <string name="or_continue_with">ou continuar com</string>
+    <string name="btn_google">Google</string>
+    <string name="btn_microsoft">Microsoft</string>
+    <string name="new_to_nexora">Novo no Nexora ERP?</string>
+    <string name="contact_admin">Contacte o administrador</string>
+</resources>
