@@ -1,0 +1,26 @@
+# Variaveis de ambiente
+.env
+.env.*
+
+# Git
+.git/
+.gitignore
+
+# Uploads (volume Docker em runtime)
+uploads/
+
+# Ferramentas de desenvolvimento
+node_modules/
+.vscode/
+.idea/
+
+# Ficheiros temporarios
+*.log
+*.tmp
+Thumbs.db
+.DS_Store
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore

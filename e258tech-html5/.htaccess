@@ -1,0 +1,49 @@
+Options -Indexes
+DirectoryIndex index.php
+ServerSignature Off
+
+# MIME types explícitos (necessário com X-Content-Type-Options: nosniff)
+AddType text/css              .css
+AddType application/javascript .js
+AddType image/svg+xml         .svg
+AddType image/webp            .webp
+
+# Bloquear acesso a ficheiros sensíveis
+<FilesMatch "\.(env|sql|log|sh|json|lock)$">
+    Require all denied
+</FilesMatch>
+
+# RewriteEngine deve vir ANTES de qualquer RewriteRule
+RewriteEngine On
+
+# Bloquear acesso às pastas config, sql e uploads/cv
+RewriteRule ^(sql|uploads/cv|uploads/rh-contratos|uploads/rh-documentos|src)(/|$) - [F,L]
+
+# Tudo o que não seja ficheiro/directório real vai para o front controller
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
+
+# Os cabeçalhos de segurança (nosniff, X-Frame-Options, Referrer-Policy,
+# HSTS, CSP, X-XSS-Protection) são definidos pelo middleware `e258tech-sec`
+# do Traefik — fonte única, no edge. Ver docker-compose.yml.
+
+# Prevenir hotlinking — permite localhost e e258tech.tech
+<IfModule mod_rewrite.c>
+    RewriteCond %{HTTP_REFERER} !^$
+    RewriteCond %{HTTP_REFERER} !^https?://(www\.)?e258tech\.tech [NC]
+    RewriteCond %{HTTP_REFERER} !^https?://localhost [NC]
+    RewriteCond %{HTTP_REFERER} !^https?://127\.0\.0\.1 [NC]
+    RewriteRule \.(jpg|jpeg|png|gif|webp)$ - [F]
+</IfModule>
+
+# Cache de assets estáticos
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css              "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/png             "access plus 6 months"
+    ExpiresByType image/jpeg            "access plus 6 months"
+    ExpiresByType image/svg+xml         "access plus 6 months"
+    ExpiresByType image/webp            "access plus 6 months"
+</IfModule>

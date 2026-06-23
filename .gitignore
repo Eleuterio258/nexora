@@ -1,0 +1,151 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  Nexora ERP — .gitignore centralizado (monorepo)            ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+# ── Sistema Operativo ─────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+
+# ── IDEs ──────────────────────────────────────────────────────
+# IntelliJ / Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VS Code
+.vscode/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# ── Documentação (imagens grandes / rascunhos) ────────────────
+readme.md
+docs/*.png
+docs/*.jpg
+nexora_pure_ui.png
+
+# ═══════════════════════════════════════════════════════════════
+# BACKEND — Go  (backend/)
+# ═══════════════════════════════════════════════════════════════
+backend/*.exe
+backend/*.out
+backend/uploads/
+backend/vendor/
+backend/.env
+
+# ═══════════════════════════════════════════════════════════════
+# FRONTEND PHP — e258tech-html5/ e frontend/
+# ═══════════════════════════════════════════════════════════════
+frontend/.env
+frontend/backups/
+frontend/uploads/
+frontend/.claude/
+frontend/vendor/
+
+e258tech-html5/.env
+e258tech-html5/backups/
+e258tech-html5/uploads/
+e258tech-html5/vendor/
+
+# ═══════════════════════════════════════════════════════════════
+# MOBILE — Android / Kotlin  (mobile/ e nexora-mobile/)
+# ═══════════════════════════════════════════════════════════════
+*.iml
+.gradle/
+local.properties
+/captures
+.externalNativeBuild/
+.cxx/
+mobile/.idea/caches
+mobile/.idea/libraries
+mobile/.idea/modules.xml
+mobile/.idea/workspace.xml
+mobile/.idea/navEditor.xml
+mobile/.idea/assetWizardSettings.xml
+mobile/build/
+mobile/app/build/
+nexora-mobile/.idea/caches
+nexora-mobile/.idea/libraries
+nexora-mobile/.idea/modules.xml
+nexora-mobile/.idea/workspace.xml
+nexora-mobile/build/
+nexora-mobile/app/build/
+
+# ═══════════════════════════════════════════════════════════════
+# DESKTOP — Java / Maven  (desktop/)
+# ═══════════════════════════════════════════════════════════════
+*.class
+*.log
+*.ctxt
+.mtj.tmp/
+*.jar
+*.war
+*.nar
+*.ear
+hs_err_pid*
+
+# Maven
+desktop/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Gradle (desktop)
+desktop/build/
+!desktop/gradle/wrapper/gradle-wrapper.jar
+!desktop/**/src/main/**/build/
+!desktop/**/src/test/**/build/
+
+# Desktop specific
+desktop/data/
+desktop/backups/
+desktop/logs/
+desktop/dist/installers/*.exe
+desktop/dist/installers/*.msi
+desktop/dist/installers/*.deb
+desktop/dist/installers/*.rpm
+desktop/dist/installers/*.dmg
+libs/*.dll
+libs/*.so
+libs/*.dylib
+desktop/target/runtime-image/
+.factpro/config.json
+*.db
+*.sqlite
+*.sqlite3
+
+# ═══════════════════════════════════════════════════════════════
+# NEXORA-ERP (serviços Node.js / microservices)
+# ═══════════════════════════════════════════════════════════════
+node_modules/
+nexora-erp/dist/
+nexora-erp/coverage/
+nexora-erp/infra/traefik/acme/acme.json
+
+# ═══════════════════════════════════════════════════════════════
+# INFRA / Docker
+# ═══════════════════════════════════════════════════════════════
+.env
+.env.*
+!.env.example
