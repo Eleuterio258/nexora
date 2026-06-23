@@ -1,0 +1,980 @@
+{
+  "info": {
+    "name": "Nexora ERP — API Completa",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base", "value": "http://localhost:8080" },
+    { "key": "token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "tenant_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "🔍 Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{base}}/health" }
+        }
+      ]
+    },
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "var j = pm.response.json();",
+            "if(j.token) pm.collectionVariables.set('token', j.token);",
+            "if(j.refresh_token) pm.collectionVariables.set('refresh_token', j.refresh_token);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@empresa.co.mz\",\n  \"password\": \"senha123\"\n}" }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/auth/refresh",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}" }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/auth/me",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Meu Acesso (RBAC)",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/auth/me/acesso",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/auth/logout",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Mudar Password",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/auth/change-password",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"password_atual\": \"senha123\",\n  \"password_nova\": \"novaSenha456\"\n}" }
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/auth/forgot-password",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"user@empresa.co.mz\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👥 Utilizadores (Auth)",
+      "item": [
+        {
+          "name": "Listar Utilizadores",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/auth/utilizadores",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Criar Utilizador",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/auth/utilizadores",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"João Silva\",\n  \"email\": \"joao@empresa.co.mz\",\n  \"password\": \"senha123\",\n  \"tipo\": \"funcionario\"\n}" }
+          }
+        },
+        {
+          "name": "Obter Utilizador",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/auth/utilizadores/1",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Actualizar Utilizador",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/auth/utilizadores/1",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"João Actualizado\"\n}" }
+          }
+        },
+        {
+          "name": "Bloquear Utilizador",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/auth/utilizadores/1/bloquear",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Activar Utilizador",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/auth/utilizadores/1/activar",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Atribuir Cargo",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/auth/utilizadores/1/cargo",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"cargo_id\": 1\n}" }
+          }
+        },
+        {
+          "name": "Listar Permissões Directas",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/auth/utilizadores/1/permissoes",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Definir Permissões Directas",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/auth/utilizadores/1/permissoes",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"permissoes\": [1, 2, 3]\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🎖️ Cargos & Permissões",
+      "item": [
+        {
+          "name": "Listar Cargos",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/auth/cargos",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Criar Cargo",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/auth/cargos",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Vendedor\",\n  \"descricao\": \"Acesso ao módulo de vendas\"\n}" }
+          }
+        },
+        {
+          "name": "Definir Permissões do Cargo",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/auth/cargos/1/permissoes",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"permissoes\": [1, 2, 5, 6]\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏢 Empresas",
+      "item": [
+        {
+          "name": "Listar Empresas",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/companies",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Criar Empresa",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/companies",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Empresa Demo Lda\",\n  \"nuit\": \"400123456\",\n  \"email\": \"geral@empresa.co.mz\",\n  \"telefone\": \"+258 21 123456\",\n  \"pais\": \"Mocambique\"\n}" }
+          }
+        },
+        {
+          "name": "Obter Empresa",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/companies/1",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Listar Filiais",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/companies/1/branches",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Adicionar Filial",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/companies/1/branches",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Filial Maputo\",\n  \"codigo\": \"MAP01\",\n  \"endereco\": \"Av. 25 de Setembro, 1234\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "⚙️ Sistema/Config",
+      "item": [
+        {
+          "name": "Listar Settings",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/system/settings",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Guardar Setting",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/system/settings",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"chave\": \"moeda_padrao\",\n  \"valor\": \"MZN\"\n}" }
+          }
+        },
+        {
+          "name": "Listar Moedas",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/system/currencies",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Criar Moeda",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/system/currencies",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"MZN\",\n  \"nome\": \"Metical Moçambicano\",\n  \"simbolo\": \"MT\"\n}" }
+          }
+        },
+        {
+          "name": "Listar Países",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/system/countries",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "👤 Clientes",
+      "item": [
+        {
+          "name": "Listar Grupos",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/clientes/grupos",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Criar Grupo",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/clientes/grupos",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"RETL\",\n  \"nome\": \"Retalho\",\n  \"descricao\": \"Clientes de retalho\"\n}" }
+          }
+        },
+        {
+          "name": "Listar Clientes",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base}}/api/clientes?page=1&limit=20",
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "estado", "value": "ativo", "disabled": true }
+              ]
+            },
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Criar Cliente",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/clientes",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Maria Empresa Lda\",\n  \"nuit\": \"400987654\",\n  \"email\": \"maria@empresa.co.mz\",\n  \"telefone\": \"+258 82 111 2233\"\n}" }
+          }
+        },
+        {
+          "name": "Obter Cliente",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/clientes/1",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Actualizar Cliente",
+          "request": {
+            "method": "PUT",
+            "url": "{{base}}/api/clientes/1",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"telefone\": \"+258 82 999 8877\"\n}" }
+          }
+        },
+        {
+          "name": "Bloquear Cliente",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/clientes/1/bloquear",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Adicionar Contacto",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/clientes/1/contactos",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"António Gerente\",\n  \"cargo\": \"Gerente\",\n  \"telefone\": \"+258 84 555 6677\",\n  \"email\": \"antonio@empresa.co.mz\",\n  \"principal\": true\n}" }
+          }
+        },
+        {
+          "name": "Adicionar Endereço",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/clientes/1/enderecos",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"principal\",\n  \"pais\": \"Mocambique\",\n  \"provincia\": \"Maputo\",\n  \"cidade\": \"Maputo\",\n  \"endereco\": \"Av. Karl Marx, 456\",\n  \"principal\": true\n}" }
+          }
+        },
+        {
+          "name": "Obter Saldo",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/clientes/1/saldo",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Registar Pagamento",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/clientes/1/pagamentos",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"metodo\": \"transferencia\",\n  \"valor\": 5000.00,\n  \"referencia\": \"TRF-2026-001\"\n}" }
+          }
+        },
+        {
+          "name": "Histórico do Cliente",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/clientes/1/historico",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "📦 Produtos",
+      "item": [
+        {
+          "name": "Listar Categorias",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/produtos/categorias",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Criar Categoria",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/produtos/categorias",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"ELEC\",\n  \"nome\": \"Electrónica\"\n}" }
+          }
+        },
+        {
+          "name": "Listar Marcas",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/produtos/marcas",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Criar Marca",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/produtos/marcas",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Samsung\"\n}" }
+          }
+        },
+        {
+          "name": "Listar Unidades",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/produtos/unidades",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Criar Unidade",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/produtos/unidades",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Unidade\",\n  \"simbolo\": \"un\"\n}" }
+          }
+        },
+        {
+          "name": "Listar Produtos",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base}}/api/produtos?page=1&limit=20",
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "categoria_id", "value": "", "disabled": true }
+              ]
+            },
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Criar Produto",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/produtos",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"PROD-001\",\n  \"nome\": \"Televisor 55 Polegadas\",\n  \"product_category_id\": 1,\n  \"product_unit_id\": 1,\n  \"preco_venda\": 45000.00,\n  \"controla_stock\": true\n}" }
+          }
+        },
+        {
+          "name": "Obter Produto",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/produtos/1",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Definir Preço",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/produtos/1/precos",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"venda\",\n  \"valor\": 45000.00,\n  \"moeda\": \"MZN\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏭 Stock",
+      "item": [
+        {
+          "name": "Listar Armazéns",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/stock/warehouses",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Criar Armazém",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/stock/warehouses",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"ARM-001\",\n  \"nome\": \"Armazém Central Maputo\",\n  \"localizacao\": \"Av. de Moçambique, km 5\"\n}" }
+          }
+        },
+        {
+          "name": "Listar Localizações do Armazém",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/stock/warehouses/1/locations",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Criar Localização",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/stock/warehouses/1/locations",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"A-01-01\",\n  \"nome\": \"Prateleira A, Corredor 1\"\n}" }
+          }
+        },
+        {
+          "name": "Listar Stock Items",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base}}/api/stock/items?warehouse_id=1",
+              "query": [{ "key": "warehouse_id", "value": "1" }]
+            },
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Inicializar Stock Item",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/stock/items",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"product_id\": 1,\n  \"warehouse_id\": 1,\n  \"quantity\": 50,\n  \"minimum_quantity\": 5\n}" }
+          }
+        },
+        {
+          "name": "Listar Movimentos",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/stock/movements",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Registar Movimento",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/stock/movements",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"stock_item_id\": 1,\n  \"movement_type\": \"entrada\",\n  \"quantity\": 10,\n  \"reference_type\": \"compra\",\n  \"notes\": \"Entrada de stock inicial\"\n}" }
+          }
+        },
+        {
+          "name": "Criar Ajuste de Stock",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/stock/adjustments",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"stock_item_id\": 1,\n  \"adjustment_type\": \"contagem\",\n  \"quantity\": -2,\n  \"reason\": \"Correcção após inventário\"\n}" }
+          }
+        },
+        {
+          "name": "Criar Transferência",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/stock/transfers",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"numero\": \"TRF-2026-001\",\n  \"from_warehouse_id\": 1,\n  \"to_warehouse_id\": 2\n}" }
+          }
+        },
+        {
+          "name": "Listar Transferências",
+          "request": {
+            "method": "GET",
+            "url": "{{base}}/api/stock/transfers",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧾 Faturação",
+      "item": [
+        {
+          "name": "📋 Séries",
+          "item": [
+            {
+              "name": "Listar Séries",
+              "request": {
+                "method": "GET",
+                "url": "{{base}}/api/faturacao/series",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            },
+            {
+              "name": "Criar Série",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/series",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"FT\",\n  \"prefixo\": \"FT2026\",\n  \"ano\": 2026\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "📝 Orçamentos",
+          "item": [
+            {
+              "name": "Listar Orçamentos",
+              "request": {
+                "method": "GET",
+                "url": "{{base}}/api/faturacao/quotes",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            },
+            {
+              "name": "Criar Orçamento",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/quotes",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"customer_id\": 1,\n  \"numero\": \"ORC-2026-000001\",\n  \"moeda\": \"MZN\",\n  \"validade\": \"2026-05-31\",\n  \"observacoes\": \"Validade de 30 dias\"\n}" }
+              }
+            },
+            {
+              "name": "Obter Orçamento",
+              "request": {
+                "method": "GET",
+                "url": "{{base}}/api/faturacao/quotes/1",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            },
+            {
+              "name": "Adicionar Item ao Orçamento",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/quotes/1/items",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"product_id\": 1,\n  \"descricao\": \"Televisor 55 Polegadas\",\n  \"quantidade\": 2,\n  \"preco_unitario\": 45000.00,\n  \"desconto_percent\": 5,\n  \"imposto_percent\": 17\n}" }
+              }
+            },
+            {
+              "name": "Enviar Orçamento",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/quotes/1/enviar",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            },
+            {
+              "name": "Aprovar Orçamento",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/quotes/1/aprovar",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            }
+          ]
+        },
+        {
+          "name": "📦 Encomendas",
+          "item": [
+            {
+              "name": "Listar Encomendas",
+              "request": {
+                "method": "GET",
+                "url": "{{base}}/api/faturacao/orders",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            },
+            {
+              "name": "Criar Encomenda",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/orders",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"customer_id\": 1,\n  \"numero\": \"ENC-2026-000001\",\n  \"moeda\": \"MZN\",\n  \"observacoes\": \"Entrega urgente\"\n}" }
+              }
+            },
+            {
+              "name": "Confirmar Encomenda",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/orders/1/confirmar",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            },
+            {
+              "name": "Cancelar Encomenda",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/orders/1/cancelar",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            }
+          ]
+        },
+        {
+          "name": "🧾 Faturas",
+          "item": [
+            {
+              "name": "Listar Faturas",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base}}/api/faturacao/invoices?page=1&limit=20",
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" },
+                    { "key": "status", "value": "emitida", "disabled": true },
+                    { "key": "customer_id", "value": "", "disabled": true }
+                  ]
+                },
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            },
+            {
+              "name": "Criar Fatura",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/invoices",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"customer_id\": 1,\n  \"numero\": \"FT2026/000001\",\n  \"moeda\": \"MZN\",\n  \"due_date\": \"2026-05-31\",\n  \"observacoes\": \"Pagamento a 30 dias\"\n}" }
+              }
+            },
+            {
+              "name": "Obter Fatura",
+              "request": {
+                "method": "GET",
+                "url": "{{base}}/api/faturacao/invoices/1",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            },
+            {
+              "name": "Adicionar Item à Fatura",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/invoices/1/items",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"product_id\": 1,\n  \"descricao\": \"Televisor 55 Polegadas\",\n  \"quantidade\": 1,\n  \"preco_unitario\": 45000.00,\n  \"desconto_percent\": 0,\n  \"imposto_percent\": 17\n}" }
+              }
+            },
+            {
+              "name": "Emitir Fatura",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/invoices/1/emitir",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            },
+            {
+              "name": "Cancelar Fatura",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/invoices/1/cancelar",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            }
+          ]
+        },
+        {
+          "name": "💵 Recibos",
+          "item": [
+            {
+              "name": "Listar Recibos",
+              "request": {
+                "method": "GET",
+                "url": "{{base}}/api/faturacao/receipts",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            },
+            {
+              "name": "Criar Recibo",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/receipts",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"invoice_id\": 1,\n  \"numero\": \"REC-2026-000001\",\n  \"valor\": 52650.00,\n  \"referencia\": \"TRF-BCI-2026-001\",\n  \"observacoes\": \"Pagamento via transferência BCI\"\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "🔄 Notas de Crédito",
+          "item": [
+            {
+              "name": "Listar Notas de Crédito",
+              "request": {
+                "method": "GET",
+                "url": "{{base}}/api/faturacao/credit-notes",
+                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+              }
+            },
+            {
+              "name": "Criar Nota de Crédito",
+              "request": {
+                "method": "POST",
+                "url": "{{base}}/api/faturacao/credit-notes",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"customer_id\": 1,\n  \"invoice_id\": 1,\n  \"numero\": \"NC2026/000001\",\n  \"motivo\": \"Devolução de mercadoria com defeito\",\n  \"moeda\": \"MZN\"\n}" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📊 Auditoria",
+      "item": [
+        {
+          "name": "Listar Audit Logs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base}}/api/audit-logs?page=1&limit=20",
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+          }
+        },
+        {
+          "name": "Registar Audit Log",
+          "request": {
+            "method": "POST",
+            "url": "{{base}}/api/audit-logs",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"acao\": \"UPDATE\",\n  \"tabela\": \"invoices\",\n  \"record_id\": 1,\n  \"descricao\": \"Fatura emitida\"\n}" }
+          }
+        }
+      ]
+    }
+  ]
+}

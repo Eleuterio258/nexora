@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="primary_blue">#10B981</color>
+    <color name="primary_blue_dark">#059669</color>
+    <color name="text_primary">#111827</color>
+    <color name="text_secondary">#6B7280</color>
+    <color name="text_hint">#9CA3AF</color>
+    <color name="border_color">#E5E7EB</color>
+    <color name="background">#F1F5F9</color>
+    <color name="card_background">#FFFFFF</color>
+    <color name="google_red">#EA4335</color>
+    <color name="google_blue">#4285F4</color>
+    <color name="google_yellow">#FBBC05</color>
+    <color name="google_green">#34A853</color>
+    <color name="microsoft_red">#F25022</color>
+    <color name="microsoft_green">#7FBA00</color>
+    <color name="microsoft_blue">#00A4EF</color>
+    <color name="microsoft_yellow">#FFB900</color>
+</resources>

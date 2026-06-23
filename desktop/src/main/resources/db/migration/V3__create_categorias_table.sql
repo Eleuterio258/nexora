@@ -1,0 +1,9 @@
+CREATE TABLE categorias (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+    nome TEXT NOT NULL,
+    descricao TEXT,
+    cor TEXT,
+    ativo INTEGER DEFAULT 1,
+    criado_em DATETIME DEFAULT CURRENT_TIMESTAMP
+);

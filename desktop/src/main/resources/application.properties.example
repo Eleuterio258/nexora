@@ -1,0 +1,15 @@
+# FactPro - Configuração da Base de Dados
+# Este ficheiro é apenas exemplo. Use a interface gráfica para configurar.
+
+# Tipo de base de dados: SQLITE, MYSQL, POSTGRESQL
+database.type=SQLITE
+
+# SQLite (para modo local)
+database.sqlite.path=./data/factpro.db
+
+# MySQL/PostgreSQL (para modo servidor)
+database.host=localhost
+database.port=3306
+database.name=factpro
+database.user=factpro_user
+database.password=CHANGE_ME
