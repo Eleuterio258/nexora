@@ -1,32 +1,10 @@
 services:
 
-  # ── PostgreSQL ────────────────────────────────────────────────
-  postgres:
-    image: postgres:16-alpine
-    container_name: nexora-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: nexora_erp
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    networks:
-      - e258techmozambique
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d nexora_erp"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # ── API Go (backend) ──────────────────────────────────────────
   api:
     build: ./backend
     container_name: nexora-api
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
       DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD}@nexora-db:5432/nexora_erp?sslmode=disable
       JWT_SECRET: ${JWT_SECRET}
@@ -111,8 +89,6 @@ services:
 
 # ── Volumes ───────────────────────────────────────────────────
 volumes:
-  db_data:
-    driver: local
   api_uploads:
     driver: local
   api_avatars:
