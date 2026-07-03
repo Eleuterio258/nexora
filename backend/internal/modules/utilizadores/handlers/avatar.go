@@ -4,19 +4,19 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/storage"
 )
 
 func (h *Handler) ObterAvatar(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "userId")
 	var url string
-	err := h.db.QueryRow(r.Context(), `SELECT ficheiro_url FROM user_avatar WHERE user_id = $1`, userID).Scan(&url)
+	err := h.db.QueryRow(r.Context(), `SELECT ficheiro_url FROM utilizadores.user_avatar WHERE user_id = $1`, userID).Scan(&url)
 	if err != nil {
 		jsonErr(w, "Avatar não encontrado", http.StatusNotFound)
 		return
@@ -57,30 +57,27 @@ func (h *Handler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 		ext = ".png"
 	}
 
-	os.MkdirAll(h.cfg.AvatarDir, 0755)
 	filename := fmt.Sprintf("user_%s_%d%s", userID, time.Now().UnixMilli(), ext)
-	dest := filepath.Join(h.cfg.AvatarDir, filename)
+	key := storage.JoinPath("avatars", fmt.Sprintf("user-%s", userID), filename)
 
-	out, err := os.Create(dest)
+	data := make([]byte, header.Size)
+	if _, err := io.ReadFull(file, data); err != nil {
+		jsonErr(w, "Erro ao ler ficheiro", http.StatusInternalServerError)
+		return
+	}
+
+	url, err := h.storage.Put(r.Context(), key, data, mime)
 	if err != nil {
 		jsonErr(w, "Erro ao guardar ficheiro", http.StatusInternalServerError)
 		return
 	}
-	defer out.Close()
 
-	size, err := io.Copy(out, file)
-	if err != nil {
-		jsonErr(w, "Erro ao guardar ficheiro", http.StatusInternalServerError)
-		return
-	}
-
-	url := "/avatars/" + filename
 	_, err = h.db.Exec(r.Context(), `
-		INSERT INTO user_avatar (user_id, ficheiro_url, mime_type, tamanho_bytes)
+		INSERT INTO utilizadores.user_avatar (user_id, ficheiro_url, mime_type, tamanho_bytes)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (user_id) DO UPDATE SET
 		  ficheiro_url = $2, mime_type = $3, tamanho_bytes = $4`,
-		userID, url, mime, size)
+		userID, url, mime, header.Size)
 	if err != nil {
 		jsonErr(w, "Erro ao guardar avatar", http.StatusInternalServerError)
 		return
@@ -96,14 +93,13 @@ func (h *Handler) RemoverAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var url string
-	err := h.db.QueryRow(r.Context(), `DELETE FROM user_avatar WHERE user_id = $1 RETURNING ficheiro_url`, userID).Scan(&url)
+	err := h.db.QueryRow(r.Context(), `DELETE FROM utilizadores.user_avatar WHERE user_id = $1 RETURNING ficheiro_url`, userID).Scan(&url)
 	if err != nil {
 		jsonErr(w, "Avatar não encontrado", http.StatusNotFound)
 		return
 	}
-	// Remover ficheiro do disco (ignorar erro se já não existir)
-	if strings.HasPrefix(url, "/avatars/") {
-		os.Remove(filepath.Join(h.cfg.AvatarDir, filepath.Base(url)))
-	}
+	// Remover ficheiro do storage
+	key := storage.JoinPath("avatars", fmt.Sprintf("user-%s", userID), filepath.Base(url))
+	_ = h.storage.Delete(r.Context(), key)
 	w.WriteHeader(http.StatusNoContent)
 }

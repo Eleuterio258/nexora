@@ -20,7 +20,8 @@ final class PhpSessionAuthorization implements Authorization
 
         foreach ($_SESSION['nexora_modulos'] ?? [] as $permission) {
             if (($permission['modulo'] ?? '') === $module) {
-                return in_array($action, $permission['acoes'] ?? [], true);
+                $acoes = $permission['acoes'] ?? [];
+                return in_array($action, $acoes, true) || in_array('*', $acoes, true);
             }
         }
 

@@ -134,4 +134,59 @@ final class RecruitmentAdminService extends NexoraService
         $this->ensureSuccess($response, 'Erro ao actualizar vaga.');
         return ['ok' => true, 'ativa' => (bool) ($response->body['ativa'] ?? false)];
     }
+
+    public function saveCustomField(?int $id, array $payload): array
+    {
+        if (($payload['codigo'] ?? '') === '' || ($payload['label'] ?? '') === '') {
+            throw new OperationException('Codigo e label sao obrigatorios.');
+        }
+        if (!in_array($payload['tipo'] ?? '', ['texto','textarea','numero','data','select','multiselect','checkbox','ficheiro'], true)) {
+            throw new OperationException('Tipo de campo invalido.');
+        }
+
+        $response = $this->gateway->request(
+            $id ? 'PUT' : 'POST',
+            $id ? "/api/recrutamento/campos-custom/$id" : '/api/recrutamento/campos-custom',
+            $payload
+        );
+        $this->ensureSuccess($response, 'Erro ao guardar campo customizavel.');
+        return ['ok' => true, 'id' => $response->body['id'] ?? $id];
+    }
+
+    public function deleteCustomField(int $id): array
+    {
+        if ($id <= 0) {
+            throw new OperationException('ID invalido.');
+        }
+        $response = $this->gateway->request('DELETE', "/api/recrutamento/campos-custom/$id");
+        $this->ensureSuccess($response, 'Erro ao eliminar campo customizavel.');
+        return ['ok' => true];
+    }
+
+    public function saveNotificationConfig(array $payload): array
+    {
+        $response = $this->gateway->request('PUT', '/api/recrutamento/config-notificacoes', $payload);
+        $this->ensureSuccess($response, 'Erro ao guardar configuracao de notificacoes.');
+        return ['ok' => true];
+    }
+
+    public function markContactAsRead(int $id): array
+    {
+        if ($id <= 0) {
+            throw new OperationException('ID invalido.');
+        }
+        $response = $this->gateway->request('POST', "/api/recrutamento/contactos/$id/lido");
+        $this->ensureSuccess($response, 'Erro ao marcar contacto como lido.');
+        return ['ok' => true];
+    }
+
+    public function contratar(int $id): array
+    {
+        if ($id <= 0) {
+            throw new OperationException('ID invalido.');
+        }
+        $response = $this->gateway->request('POST', "/api/recrutamento/candidaturas/$id/contratar");
+        $this->ensureSuccess($response, 'Erro ao contratar candidato.');
+        return array_merge(['ok' => true], (array) ($response->body ?? []));
+    }
 }

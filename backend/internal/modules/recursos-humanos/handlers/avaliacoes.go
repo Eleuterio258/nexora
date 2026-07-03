@@ -25,8 +25,8 @@ func (h *Handler) ListarCriteriosAvaliacao(w http.ResponseWriter, r *http.Reques
 	user := mw.GetUser(r)
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT c.id, c.codigo, c.nome, c.descricao, c.peso, c.ativo,
-		       (SELECT COUNT(*) FROM avaliacao_criterios ac WHERE ac.criterio_id = c.id)
-		  FROM criterios_avaliacao c
+		       (SELECT COUNT(*) FROM rh.avaliacao_criterios ac WHERE ac.criterio_id = c.id)
+		  FROM rh.criterios_avaliacao c
 		 WHERE c.tenant_id=$1
 		 ORDER BY c.nome`, user.TenantID)
 	defer rows.Close()
@@ -58,7 +58,7 @@ func (h *Handler) CriarCriterioAvaliacao(w http.ResponseWriter, r *http.Request)
 	}
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO criterios_avaliacao (tenant_id, codigo, nome, descricao, peso)
+		INSERT INTO rh.criterios_avaliacao (tenant_id, codigo, nome, descricao, peso)
 		VALUES ($1,$2,$3,$4,$5) RETURNING id`,
 		user.TenantID, body.Codigo, body.Nome, body.Descricao, peso).Scan(&id)
 	if err != nil {
@@ -92,7 +92,7 @@ func (h *Handler) ActualizarCriterioAvaliacao(w http.ResponseWriter, r *http.Req
 		return
 	}
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE criterios_avaliacao SET
+		UPDATE rh.criterios_avaliacao SET
 		  codigo=COALESCE($1,codigo), nome=COALESCE($2,nome), descricao=COALESCE($3,descricao),
 		  peso=COALESCE($4,peso), ativo=COALESCE($5,ativo), updated_at=NOW()
 		WHERE id=$6 AND tenant_id=$7`,
@@ -117,7 +117,7 @@ func (h *Handler) RemoverCriterioAvaliacao(w http.ResponseWriter, r *http.Reques
 	id := chi.URLParam(r, "id")
 
 	var emUso bool
-	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM avaliacao_criterios ac JOIN criterios_avaliacao c ON c.id = ac.criterio_id WHERE ac.criterio_id=$1 AND c.tenant_id=$2)`, id, user.TenantID).Scan(&emUso); err != nil {
+	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM rh.avaliacao_criterios ac JOIN rh.criterios_avaliacao c ON c.id = ac.criterio_id WHERE ac.criterio_id=$1 AND c.tenant_id=$2)`, id, user.TenantID).Scan(&emUso); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
@@ -126,7 +126,7 @@ func (h *Handler) RemoverCriterioAvaliacao(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	tag, err := h.db.Exec(r.Context(), `DELETE FROM criterios_avaliacao WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), `DELETE FROM rh.criterios_avaliacao WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -148,7 +148,7 @@ func (h *Handler) SubmeterAvaliacao(w http.ResponseWriter, r *http.Request) {
 
 	var avaliadorID int64
 	if err := h.db.QueryRow(r.Context(), `
-		SELECT avaliador_id FROM avaliacoes WHERE id=$1 AND tenant_id=$2 AND estado='rascunho'`,
+		SELECT avaliador_id FROM rh.avaliacoes WHERE id=$1 AND tenant_id=$2 AND estado='rascunho'`,
 		id, user.TenantID).Scan(&avaliadorID); err != nil {
 		jsonErr(w, "Avaliação não encontrada ou já submetida", http.StatusConflict)
 		return
@@ -160,7 +160,7 @@ func (h *Handler) SubmeterAvaliacao(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE avaliacoes SET estado='submetida' WHERE id=$1 AND tenant_id=$2 AND estado='rascunho'`,
+		UPDATE rh.avaliacoes SET estado='submetida' WHERE id=$1 AND tenant_id=$2 AND estado='rascunho'`,
 		id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
@@ -182,7 +182,7 @@ func (h *Handler) AprovarAvaliacaoDesempenho(w http.ResponseWriter, r *http.Requ
 
 	var funcionarioID int64
 	if err := h.db.QueryRow(r.Context(), `
-		SELECT funcionario_id FROM avaliacoes WHERE id=$1 AND tenant_id=$2 AND estado='submetida'`,
+		SELECT funcionario_id FROM rh.avaliacoes WHERE id=$1 AND tenant_id=$2 AND estado='submetida'`,
 		id, user.TenantID).Scan(&funcionarioID); err != nil {
 		jsonErr(w, "Avaliação não encontrada ou não está submetida", http.StatusConflict)
 		return
@@ -194,7 +194,7 @@ func (h *Handler) AprovarAvaliacaoDesempenho(w http.ResponseWriter, r *http.Requ
 	}
 
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE avaliacoes SET estado='aprovada', aprovado_por=$1, aprovado_em=NOW()
+		UPDATE rh.avaliacoes SET estado='aprovada', aprovado_por=$1, aprovado_em=NOW()
 		 WHERE id=$2 AND tenant_id=$3 AND estado='submetida'`,
 		user.ID, id, user.TenantID)
 	if err != nil {

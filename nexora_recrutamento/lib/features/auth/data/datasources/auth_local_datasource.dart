@@ -1,0 +1,47 @@
+import 'dart:convert';
+import '../../../../core/error/exceptions.dart';
+import '../../../../core/storage/local_store.dart';
+import '../models/user_model.dart';
+
+abstract class AuthLocalDataSource {
+  Future<void> cacheUser(UserModel user);
+  Future<UserModel> getCachedUser();
+  Future<void> clearUser();
+  Future<String?> getToken();
+}
+
+class AuthLocalDataSourceImpl implements AuthLocalDataSource {
+  final LocalStore store;
+  static const _keyUser = 'cached_user';
+  static const _keyToken = 'auth_token';
+
+  const AuthLocalDataSourceImpl(this.store);
+
+  @override
+  Future<void> cacheUser(UserModel user) async {
+    await store.write(_keyUser, jsonEncode(user.toJson()));
+    await store.write(_keyToken, user.token);
+  }
+
+  @override
+  Future<UserModel> getCachedUser() async {
+    final raw = await store.read(_keyUser);
+    final token = await store.read(_keyToken);
+    if (raw == null) {
+      throw const CacheException('Utilizador não encontrado em cache.');
+    }
+    return UserModel.fromJson(
+      jsonDecode(raw) as Map<String, dynamic>,
+      token: token ?? '',
+    );
+  }
+
+  @override
+  Future<void> clearUser() async {
+    await store.delete(_keyUser);
+    await store.delete(_keyToken);
+  }
+
+  @override
+  Future<String?> getToken() => store.read(_keyToken);
+}

@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/storage"
 )
 
 type Candidatura struct {
@@ -46,9 +47,19 @@ type CandidaturaNota struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+type RespostaVaga struct {
+	CampoID    int64   `json:"campo_id"`
+	Codigo     string  `json:"codigo"`
+	Label      string  `json:"label"`
+	Tipo       string  `json:"tipo"`
+	Valor      *string `json:"valor"`
+	Ficheiro   *string `json:"ficheiro"`
+}
+
 type candidaturaDetalhe struct {
 	*Candidatura
-	Notas []CandidaturaNota `json:"notas"`
+	Notas        []CandidaturaNota `json:"notas"`
+	RespostasVaga []RespostaVaga   `json:"respostas_vaga"`
 }
 
 const candidaturaSelectCols = `id, vaga_id, nome, email, telefone, vaga_titulo, carta,
@@ -83,20 +94,14 @@ var scoreLabels = map[int16]string{
 	5: "Excelente",
 }
 
-func nullIfEmpty(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
 // parseEntrevistaData aceita RFC3339 ou "YYYY-MM-DDTHH:MM" (formato de <input type="datetime-local">).
+// Datas sem timezone são interpretadas como UTC.
 func parseEntrevistaData(s string) (time.Time, error) {
 	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t, nil
+		return t.UTC(), nil
 	}
 	if t, err := time.Parse("2006-01-02T15:04", s); err == nil {
-		return t, nil
+		return t.UTC(), nil
 	}
 	return time.Time{}, fmt.Errorf("formato de data inválido")
 }
@@ -125,6 +130,12 @@ func (h *Handler) ListarCandidaturas(w http.ResponseWriter, r *http.Request) {
 		args = append(args, "%"+s+"%")
 		n := strconv.Itoa(len(args))
 		where += " AND (nome ILIKE $" + n + " OR email ILIKE $" + n + ")"
+	}
+	if scoreStr := q.Get("score"); scoreStr != "" {
+		if score, err := strconv.ParseInt(scoreStr, 10, 16); err == nil && score >= 1 && score <= 5 {
+			args = append(args, int16(score))
+			where += " AND score=$" + strconv.Itoa(len(args))
+		}
 	}
 
 	countArgs := append([]any{}, args...)
@@ -182,7 +193,25 @@ func (h *Handler) ObterCandidatura(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	jsonOK(w, candidaturaDetalhe{Candidatura: c, Notas: notas}, http.StatusOK)
+	// Respostas dos campos por vaga
+	respostasVaga := []RespostaVaga{}
+	rowsRV, err := h.db.Query(ctx, `
+		SELECT vc.id, vc.codigo, vc.label, vc.tipo, rv.valor, rv.ficheiro
+		  FROM candidatura_respostas_vaga rv
+		  JOIN vaga_campos vc ON vc.id = rv.campo_id
+		 WHERE rv.candidatura_id = $1
+		 ORDER BY vc.ordem, vc.id`, id)
+	if err == nil {
+		defer rowsRV.Close()
+		for rowsRV.Next() {
+			var r RespostaVaga
+			if rowsRV.Scan(&r.CampoID, &r.Codigo, &r.Label, &r.Tipo, &r.Valor, &r.Ficheiro) == nil {
+				respostasVaga = append(respostasVaga, r)
+			}
+		}
+	}
+
+	jsonOK(w, candidaturaDetalhe{Candidatura: c, Notas: notas, RespostasVaga: respostasVaga}, http.StatusOK)
 }
 
 // ── Pipeline ─────────────────────────────────────────────────────────────────
@@ -232,6 +261,14 @@ func (h *Handler) MoverCandidatura(w http.ResponseWriter, r *http.Request) {
 			id, texto); err != nil {
 			jsonErr(w, "Erro ao actualizar.", http.StatusInternalServerError)
 			return
+		}
+
+		// Disparar notificação automática conforme novo estado
+		idInt, _ := strconv.ParseInt(id, 10, 64)
+		if evento := eventoParaEstado(body.Estado); evento != "" {
+			if err := h.notificarCandidatura(ctx, tx, user.TenantID, idInt, evento); err != nil {
+				// Não falhar a transição se a notificação falhar; registar erro silenciosamente
+			}
 		}
 	}
 
@@ -284,8 +321,13 @@ func (h *Handler) AvaliarCandidatura(w http.ResponseWriter, r *http.Request) {
 	if body.Nota != nil {
 		nota = strings.TrimSpace(*body.Nota)
 	}
-	if body.Score != nil && nota != "" {
-		texto := fmt.Sprintf("Avaliação: %s (%d/5)\n%s", scoreLabels[*body.Score], *body.Score, nota)
+	if body.Score != nil {
+		var texto string
+		if nota != "" {
+			texto = fmt.Sprintf("Avaliação: %s (%d/5)\n%s", scoreLabels[*body.Score], *body.Score, nota)
+		} else {
+			texto = fmt.Sprintf("Avaliação: %s (%d/5)", scoreLabels[*body.Score], *body.Score)
+		}
 		if _, err := tx.Exec(ctx,
 			"INSERT INTO candidatura_notas (candidatura_id, autor, tipo, conteudo) VALUES ($1,'admin','avaliacao',$2)",
 			id, texto); err != nil {
@@ -386,6 +428,11 @@ func (h *Handler) AgendarEntrevista(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	idInt, _ := strconv.ParseInt(id, 10, 64)
+	if err := h.notificarCandidatura(ctx, tx, user.TenantID, idInt, "entrevista_agendada"); err != nil {
+		// Não bloquear o agendamento se a notificação falhar
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		jsonErr(w, "Erro ao actualizar.", http.StatusInternalServerError)
 		return
@@ -458,14 +505,18 @@ func (h *Handler) downloadFicheiro(coluna string) http.HandlerFunc {
 			return
 		}
 
-		path := filepath.Join(h.cfg.UploadsDir, strings.TrimPrefix(*ficheiro, "uploads/"))
-		if _, err := os.Stat(path); err != nil {
+		key := storage.JoinPath("uploads", fmt.Sprintf("tenant-%d", user.TenantID), *ficheiro)
+		reader, size, err := h.storage.Get(r.Context(), key)
+		if err != nil {
 			jsonErr(w, "Ficheiro não encontrado.", http.StatusNotFound)
 			return
 		}
+		defer reader.Close()
 
-		w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(path)+`"`)
-		http.ServeFile(w, r, path)
+		filename := filepath.Base(*ficheiro)
+		w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", size))
+		io.Copy(w, reader)
 	}
 }
 
@@ -475,4 +526,15 @@ func (h *Handler) DownloadCV(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) DownloadCarta(w http.ResponseWriter, r *http.Request) {
 	h.downloadFicheiro("carta_ficheiro")(w, r)
+}
+
+func eventoParaEstado(estado string) string {
+	switch estado {
+	case "aprovada":
+		return "aprovada"
+	case "rejeitada":
+		return "rejeitada"
+	default:
+		return ""
+	}
 }

@@ -21,6 +21,7 @@
     }
     unset($v);
 
+    $canGerirVagas = $app->session->can('recrutamento', 'gerir_vagas');
     $pageTitle  = 'Gerir Vagas';
     $activePage = 'vagas';
     $breadcrumb = [['Admin', '/nexora/'], ['Vagas', '']];
@@ -30,6 +31,7 @@
 
 <div class="adm-page-header">
     <h1 class="adm-page-title">Vagas</h1>
+    <?php if ($canGerirVagas): ?>
     <div class="adm-page-header-actions">
         <a href="/nexora/recrutamento/vagas/form" class="adm-btn adm-btn-primary">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -38,6 +40,7 @@
             Nova Vaga
         </a>
     </div>
+    <?php endif; ?>
 </div>
 
 <?php if ($app->request->queryString('msg') !== ''): ?>
@@ -76,7 +79,7 @@
                     <th>Prazo</th>
                     <th>Candidaturas</th>
                     <th>Estado</th>
-                    <th>Ações</th>
+                    <?php if ($canGerirVagas): ?><th>Ações</th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -120,6 +123,7 @@
                     <?php endif; ?>
                 </td>
                 <td><span class="adm-badge <?php echo $estadoBadge[0] ?>"><?php echo $estadoBadge[1] ?></span></td>
+                <?php if ($canGerirVagas): ?>
                 <td>
                     <div class="adm-actions">
                         <a href="/nexora/recrutamento/vagas/form?id=<?php echo $v['id'] ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Editar">
@@ -149,6 +153,9 @@
                         </button>
                     </div>
                 </td>
+                <?php else: ?>
+                <td>—</td>
+                <?php endif; ?>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -162,7 +169,9 @@
         </svg>
         <p class="adm-empty-title">Nenhuma vaga criada</p>
         <p class="adm-empty-sub">Começa por criar a primeira vaga.</p>
+        <?php if ($canGerirVagas): ?>
         <a href="/nexora/recrutamento/vagas/form" class="adm-btn adm-btn-primary">Criar Vaga</a>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>

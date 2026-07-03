@@ -18,13 +18,16 @@ func (h *Handler) MeuPerfil(w http.ResponseWriter, r *http.Request) {
 		Email           string     `json:"email"`
 		Telefone        *string    `json:"telefone"`
 		// Dados do funcionário (se existir)
-		FuncionarioID   *int64     `json:"funcionario_id"`
-		NomeCompleto    *string    `json:"nome_completo"`
-		Cargo           *string    `json:"cargo"`
-		Departamento    *string    `json:"departamento"`
-		DataAdmissao    *time.Time `json:"data_admissao"`
-		TipoContrato    *string    `json:"tipo_contrato"`
-		UltimoLoginEm   *time.Time `json:"ultimo_login_em"`
+		FuncionarioID     *int64     `json:"funcionario_id"`
+		NumeroFuncionario *string    `json:"numero_funcionario"`
+		NomeCompleto      *string    `json:"nome_completo"`
+		Nuit              *string    `json:"nuit"`
+		Cargo             *string    `json:"cargo"`
+		Departamento      *string    `json:"departamento"`
+		UnidadeNome       *string    `json:"unidade_nome"`
+		DataAdmissao      *time.Time `json:"data_admissao"`
+		TipoContrato      *string    `json:"tipo_contrato"`
+		UltimoLoginEm     *time.Time `json:"ultimo_login_em"`
 	}
 
 	var p perfil
@@ -37,13 +40,14 @@ func (h *Handler) MeuPerfil(w http.ResponseWriter, r *http.Request) {
 
 	// Dados do funcionário
 	h.db.QueryRow(r.Context(), `
-		SELECT f.id, f.nome_completo, f.cargo, u.nome AS departamento,
+		SELECT f.id, f.numero_funcionario, f.nome_completo, f.nuit, f.cargo, u.nome AS departamento,
 		       f.data_admissao, f.tipo_contrato
 		  FROM rh.funcionarios f
 		  LEFT JOIN rh.unidades_organizacionais u ON u.id = f.unit_id
 		 WHERE f.user_id=$1 AND f.tenant_id=$2`, user.ID, user.TenantID).
-		Scan(&p.FuncionarioID, &p.NomeCompleto, &p.Cargo, &p.Departamento,
+		Scan(&p.FuncionarioID, &p.NumeroFuncionario, &p.NomeCompleto, &p.Nuit, &p.Cargo, &p.Departamento,
 			&p.DataAdmissao, &p.TipoContrato)
+	p.UnidadeNome = p.Departamento
 
 	jsonOK(w, p, http.StatusOK)
 }

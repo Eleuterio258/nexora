@@ -1,7 +1,10 @@
 <?php
 
     $resp   = $app->nexora->call('GET', '/api/faturacao/series');
-    $series = $resp['body'] ?? [];
+    $body   = $resp['body'] ?? [];
+    $series = is_array($body['data'] ?? null)
+        ? $body['data']
+        : (array_is_list($body) ? $body : []);
 
     $tipoLabels = [
         'ORC' => 'Orçamento',

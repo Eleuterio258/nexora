@@ -60,7 +60,7 @@ func (h *Handler) GuardarSetting(w http.ResponseWriter, r *http.Request) {
 	h.db.Exec(r.Context(), `
 		INSERT INTO settings (tenant_id, chave, valor, escopo)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT DO NOTHING`,
+		ON CONFLICT (tenant_id, chave) DO UPDATE SET valor = EXCLUDED.valor, escopo = EXCLUDED.escopo`,
 		user.TenantID, body.Chave, body.Valor, escopo)
 	w.WriteHeader(http.StatusNoContent)
 }

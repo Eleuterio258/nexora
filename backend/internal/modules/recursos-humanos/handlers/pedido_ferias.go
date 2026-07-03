@@ -17,7 +17,7 @@ func (h *Handler) ListarMeusPedidosFerias(w http.ResponseWriter, r *http.Request
 
 	var funcionarioID int64
 	err := h.db.QueryRow(r.Context(), `
-		SELECT id FROM funcionarios WHERE user_id=$1 AND tenant_id=$2`,
+		SELECT id FROM rh.funcionarios WHERE user_id=$1 AND tenant_id=$2`,
 		user.ID, user.TenantID).Scan(&funcionarioID)
 	if err != nil {
 		jsonErr(w, "Funcionário não encontrado para este utilizador", http.StatusNotFound)
@@ -26,8 +26,8 @@ func (h *Handler) ListarMeusPedidosFerias(w http.ResponseWriter, r *http.Request
 
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT a.id, ta.nome, a.data_inicio, a.data_fim, a.dias, a.motivo, a.estado, a.created_at
-		  FROM ausencias a
-		  LEFT JOIN tipos_ausencia ta ON ta.id = a.tipo_id
+		  FROM rh.ausencias a
+		  LEFT JOIN rh.tipos_ausencia ta ON ta.id = a.tipo_id
 		 WHERE a.funcionario_id=$1 AND a.tenant_id=$2
 		 ORDER BY a.created_at DESC`, funcionarioID, user.TenantID)
 	defer rows.Close()
@@ -58,7 +58,7 @@ func (h *Handler) CriarMeuPedidoFerias(w http.ResponseWriter, r *http.Request) {
 
 	var funcionarioID int64
 	err := h.db.QueryRow(r.Context(), `
-		SELECT id FROM funcionarios WHERE user_id=$1 AND tenant_id=$2`,
+		SELECT id FROM rh.funcionarios WHERE user_id=$1 AND tenant_id=$2`,
 		user.ID, user.TenantID).Scan(&funcionarioID)
 	if err != nil {
 		jsonErr(w, "Funcionário não encontrado para este utilizador", http.StatusNotFound)
@@ -77,7 +77,7 @@ func (h *Handler) CriarMeuPedidoFerias(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var tipoExiste bool
-	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM tipos_ausencia WHERE id=$1 AND tenant_id=$2 AND ativo)`, body.TipoID, user.TenantID).Scan(&tipoExiste); err != nil || !tipoExiste {
+	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM rh.tipos_ausencia WHERE id=$1 AND tenant_id=$2 AND ativo)`, body.TipoID, user.TenantID).Scan(&tipoExiste); err != nil || !tipoExiste {
 		jsonErr(w, "Tipo de ausência inválido", http.StatusBadRequest)
 		return
 	}
@@ -92,7 +92,7 @@ func (h *Handler) CriarMeuPedidoFerias(w http.ResponseWriter, r *http.Request) {
 
 	var id int64
 	if err := h.db.QueryRow(r.Context(), `
-		INSERT INTO ausencias (tenant_id, funcionario_id, tipo_id, data_inicio, data_fim, dias, motivo, estado)
+		INSERT INTO rh.ausencias (tenant_id, funcionario_id, tipo_id, data_inicio, data_fim, dias, motivo, estado)
 		VALUES ($1,$2,$3,$4::date,$5::date,$6,$7,'pendente') RETURNING id`,
 		user.TenantID, funcionarioID, body.TipoID, body.DataInicio, body.DataFim, dias, body.Motivo).Scan(&id); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
@@ -108,14 +108,14 @@ func (h *Handler) CancelarMeuPedidoFerias(w http.ResponseWriter, r *http.Request
 
 	var funcionarioID int64
 	if err := h.db.QueryRow(r.Context(), `
-		SELECT id FROM funcionarios WHERE user_id=$1 AND tenant_id=$2`,
+		SELECT id FROM rh.funcionarios WHERE user_id=$1 AND tenant_id=$2`,
 		user.ID, user.TenantID).Scan(&funcionarioID); err != nil {
 		jsonErr(w, "Funcionário não encontrado para este utilizador", http.StatusNotFound)
 		return
 	}
 
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE ausencias SET estado='cancelado'
+		UPDATE rh.ausencias SET estado='cancelado'
 		 WHERE id=$1 AND tenant_id=$2 AND funcionario_id=$3 AND estado='pendente'`,
 		id, user.TenantID, funcionarioID)
 	if err != nil {

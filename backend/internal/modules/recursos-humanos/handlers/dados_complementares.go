@@ -15,7 +15,7 @@ var tiposDocumentoValidos = map[string]bool{
 
 func (h *Handler) funcionarioPertenceTenant(ctx context.Context, funcionarioID int64, tenantID int64) bool {
 	var existe bool
-	h.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM funcionarios WHERE id=$1 AND tenant_id=$2)`, funcionarioID, tenantID).Scan(&existe)
+	h.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM rh.funcionarios WHERE id=$1 AND tenant_id=$2)`, funcionarioID, tenantID).Scan(&existe)
 	return existe
 }
 
@@ -40,7 +40,7 @@ func (h *Handler) CriarContactoEmergencia(w http.ResponseWriter, r *http.Request
 	}
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO contactos_emergencia (tenant_id, funcionario_id, nome, parentesco, telefone, email)
+		INSERT INTO rh.contactos_emergencia (tenant_id, funcionario_id, nome, parentesco, telefone, email)
 		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
 		user.TenantID, body.FuncionarioID, body.Nome, body.Parentesco, body.Telefone, body.Email).Scan(&id)
 	if err != nil {
@@ -54,7 +54,7 @@ func (h *Handler) RemoverContactoEmergencia(w http.ResponseWriter, r *http.Reque
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 
-	tag, err := h.db.Exec(r.Context(), `DELETE FROM contactos_emergencia WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), `DELETE FROM rh.contactos_emergencia WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -88,7 +88,7 @@ func (h *Handler) CriarDocumento(w http.ResponseWriter, r *http.Request) {
 	}
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO documentos_funcionario (tenant_id, funcionario_id, tipo, numero, data_emissao, data_validade, ficheiro_url)
+		INSERT INTO rh.documentos_funcionario (tenant_id, funcionario_id, tipo, numero, data_emissao, data_validade, ficheiro_url)
 		VALUES ($1,$2,$3,$4,$5::date,$6::date,$7) RETURNING id`,
 		user.TenantID, body.FuncionarioID, body.Tipo, body.Numero, body.DataEmissao, body.DataValidade, body.FicheiroURL).Scan(&id)
 	if err != nil {
@@ -104,7 +104,7 @@ func (h *Handler) RemoverDocumento(w http.ResponseWriter, r *http.Request) {
 
 	var ficheiroURL *string
 	err := h.db.QueryRow(r.Context(), `
-		DELETE FROM documentos_funcionario WHERE id=$1 AND tenant_id=$2 RETURNING ficheiro_url`, id, user.TenantID).Scan(&ficheiroURL)
+		DELETE FROM rh.documentos_funcionario WHERE id=$1 AND tenant_id=$2 RETURNING ficheiro_url`, id, user.TenantID).Scan(&ficheiroURL)
 	if err != nil {
 		jsonErr(w, "Documento não encontrado", http.StatusNotFound)
 		return

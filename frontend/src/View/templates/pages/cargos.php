@@ -4,6 +4,7 @@ $resp   = $app->nexora->call('GET', '/api/auth/cargos');
 $cargos = $resp['body'] ?? [];
 
 $csrf       = $app->security->csrfToken();
+$canGerirPerfis = $app->session->can('autorizacao', 'gerir_perfis');
 $pageTitle  = 'Cargos & Permissões';
 $activePage = 'cargos';
 $breadcrumb = [['Admin', '/nexora/'], ['Administração', ''], ['Cargos & Permissões', '']];
@@ -13,6 +14,7 @@ include dirname(__DIR__) . '/layouts/top.php';
 
 <div class="adm-page-header">
     <h1 class="adm-page-title">Cargos &amp; Permissões</h1>
+    <?php if ($canGerirPerfis): ?>
     <div class="adm-page-header-actions">
         <a href="/nexora/admin/cargos/form" class="adm-btn adm-btn-primary">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -21,6 +23,7 @@ include dirname(__DIR__) . '/layouts/top.php';
             Novo Cargo
         </a>
     </div>
+    <?php endif; ?>
 </div>
 
 <?php if ($app->request->queryString('msg') !== ''): ?>
@@ -40,7 +43,7 @@ include dirname(__DIR__) . '/layouts/top.php';
                     <th>Descrição</th>
                     <th>Estado</th>
                     <th>Criado em</th>
-                    <th>Ações</th>
+                    <?php if ($canGerirPerfis): ?><th>Ações</th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -56,6 +59,7 @@ include dirname(__DIR__) . '/layouts/top.php';
                     <?php endif; ?>
                 </td>
                 <td class="adm-text-muted"><?= date('d/m/Y', strtotime($c['created_at'])) ?></td>
+                <?php if ($canGerirPerfis): ?>
                 <td>
                     <div class="adm-actions">
                         <a href="/nexora/admin/cargos/form?id=<?= $c['id'] ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Editar">
@@ -77,6 +81,9 @@ include dirname(__DIR__) . '/layouts/top.php';
                         <?php endif; ?>
                     </div>
                 </td>
+                <?php else: ?>
+                <td>—</td>
+                <?php endif; ?>
             </tr>
             <?php endforeach; ?>
             </tbody>

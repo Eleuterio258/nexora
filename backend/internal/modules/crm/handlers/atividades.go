@@ -96,7 +96,7 @@ func (h *Handler) ListarAtividades(w http.ResponseWriter, r *http.Request) {
 	n := len(args)
 
 	rows, err := h.db.Query(r.Context(),
-		"SELECT "+atividadeSelectCols+" FROM atividades WHERE "+where+
+		"SELECT "+atividadeSelectCols+" FROM crm.atividades WHERE "+where+
 			" ORDER BY COALESCE(data_atividade, created_at) ASC LIMIT $"+strconv.Itoa(n-1)+" OFFSET $"+strconv.Itoa(n), args...)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
@@ -113,7 +113,7 @@ func (h *Handler) ListarAtividades(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var total int
-	h.db.QueryRow(r.Context(), "SELECT COUNT(*) FROM atividades WHERE "+where, countArgs...).Scan(&total)
+	h.db.QueryRow(r.Context(), "SELECT COUNT(*) FROM crm.atividades WHERE "+where, countArgs...).Scan(&total)
 	page, _ := strconv.Atoi(q.Get("page"))
 	if page < 1 {
 		page = 1
@@ -172,7 +172,7 @@ func (h *Handler) CriarAtividade(w http.ResponseWriter, r *http.Request) {
 
 	var id int64
 	err := h.db.QueryRow(ctx, `
-		INSERT INTO atividades (tenant_id, lead_id, oportunidade_id, tipo, titulo, descricao, data_atividade, responsavel)
+		INSERT INTO crm.atividades (tenant_id, lead_id, oportunidade_id, tipo, titulo, descricao, data_atividade, responsavel)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 		RETURNING id`,
 		user.TenantID, body.LeadID, body.OportunidadeID, tipo, body.Titulo, body.Descricao, dataAtividade, body.Responsavel,
@@ -187,7 +187,7 @@ func (h *Handler) CriarAtividade(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ObterAtividade(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
-	row := h.db.QueryRow(r.Context(), "SELECT "+atividadeSelectCols+" FROM atividades WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
+	row := h.db.QueryRow(r.Context(), "SELECT "+atividadeSelectCols+" FROM crm.atividades WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
 	a, err := scanAtividade(row)
 	if err != nil {
 		jsonErr(w, "Atividade não encontrada.", http.StatusNotFound)
@@ -232,7 +232,7 @@ func (h *Handler) ActualizarAtividade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE atividades SET
+		UPDATE crm.atividades SET
 			titulo=$1,
 			tipo=COALESCE($2, tipo),
 			descricao=COALESCE($3, descricao),
@@ -257,7 +257,7 @@ func (h *Handler) RemoverAtividade(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 
-	tag, err := h.db.Exec(r.Context(), "DELETE FROM atividades WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), "DELETE FROM crm.atividades WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro ao eliminar.", http.StatusInternalServerError)
 		return
@@ -273,7 +273,7 @@ func (h *Handler) ConcluirAtividade(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 
-	tag, err := h.db.Exec(r.Context(), "UPDATE atividades SET concluida=TRUE, updated_at=NOW() WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), "UPDATE crm.atividades SET concluida=TRUE, updated_at=NOW() WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro ao actualizar.", http.StatusInternalServerError)
 		return

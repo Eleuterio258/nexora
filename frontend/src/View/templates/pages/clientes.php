@@ -27,6 +27,7 @@
     ];
 
     $csrf       = $app->security->csrfToken();
+    $canGerirClientes = $app->session->can('clientes', 'gerir_clientes');
     $pageTitle  = 'Clientes';
     $activePage = 'clientes';
     $breadcrumb = [['Admin', '/nexora/'], ['Clientes', '']];
@@ -36,6 +37,7 @@
 
 <div class="adm-page-header">
     <h1 class="adm-page-title">Clientes</h1>
+    <?php if ($canGerirClientes): ?>
     <div class="adm-page-header-actions">
         <button class="adm-btn adm-btn-outline" onclick="openGruposModal()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -51,6 +53,7 @@
             Novo Cliente
         </a>
     </div>
+    <?php endif; ?>
 </div>
 
 <?php if ($app->request->queryString('msg') !== ''): ?>
@@ -94,7 +97,7 @@
                     <th>Contacto</th>
                     <th>Grupo</th>
                     <th>Estado</th>
-                    <th>Ações</th>
+                    <?php if ($canGerirClientes): ?><th>Ações</th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -114,6 +117,7 @@
                 </td>
                 <td><?php echo $grupoNome ? htmlspecialchars($grupoNome) : '—' ?></td>
                 <td><span class="adm-badge <?php echo $estadoBadge[0] ?>"><?php echo $estadoBadge[1] ?></span></td>
+                <?php if ($canGerirClientes): ?>
                 <td>
                     <div class="adm-actions">
                         <a href="<?php echo htmlspecialchars($app->routes->path('cliente_form', ['id' => $c['id']])) ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Ver / Editar">
@@ -130,6 +134,9 @@
                         <?php endif; ?>
                     </div>
                 </td>
+                <?php else: ?>
+                <td>—</td>
+                <?php endif; ?>
             </tr>
             <?php endforeach; ?>
             </tbody>

@@ -11,6 +11,7 @@ $meta  = $resp['body']['meta'] ?? ['total' => 0, 'page' => $page, 'limit' => $li
 $totalPages = max(1, (int) ceil($meta['total'] / $limit));
 
 $csrf = $app->security->csrfToken();
+$canGerirUtilizadores = $app->session->can('autorizacao', 'gerir_utilizadores');
 $pageTitle  = 'Utilizadores';
 $activePage = 'utilizadores';
 $breadcrumb = [['Admin', '/nexora/'], ['Administração', ''], ['Utilizadores', '']];
@@ -20,6 +21,7 @@ include dirname(__DIR__) . '/layouts/top.php';
 
 <div class="adm-page-header">
     <h1 class="adm-page-title">Utilizadores</h1>
+    <?php if ($canGerirUtilizadores): ?>
     <div class="adm-page-header-actions">
         <a href="/nexora/admin/utilizadores/form" class="adm-btn adm-btn-primary">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -28,6 +30,7 @@ include dirname(__DIR__) . '/layouts/top.php';
             Novo Utilizador
         </a>
     </div>
+    <?php endif; ?>
 </div>
 
 <?php if ($app->request->queryString('msg') !== ''): ?>
@@ -65,9 +68,10 @@ include dirname(__DIR__) . '/layouts/top.php';
                     <th>Email</th>
                     <th>Telefone</th>
                     <th>Estado</th>
+                    <th>Escopo</th>
                     <th>Último login</th>
                     <th>Criado em</th>
-                    <th>Ações</th>
+                    <?php if ($canGerirUtilizadores): ?><th>Ações</th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -78,14 +82,20 @@ include dirname(__DIR__) . '/layouts/top.php';
                     'pendente'  => ['adm-badge--yellow', 'Pendente'],
                     default     => ['adm-badge--gray',   'Inativo'],
                 };
+                $escopoBadge = match ($u['escopo'] ?? 'erp') {
+                    'escola' => ['adm-badge--blue',  'Escola'],
+                    default  => ['adm-badge--gray',  'ERP'],
+                };
             ?>
             <tr>
                 <td><div class="adm-fw-600"><?= htmlspecialchars($u['nome']) ?></div></td>
                 <td><?= htmlspecialchars($u['email']) ?></td>
                 <td><?= htmlspecialchars($u['telefone'] ?? '—') ?></td>
                 <td><span class="adm-badge <?= $estadoBadge[0] ?>"><?= $estadoBadge[1] ?></span></td>
+                <td><span class="adm-badge <?= $escopoBadge[0] ?>"><?= $escopoBadge[1] ?></span></td>
                 <td class="adm-text-muted"><?= $u['ultimo_login_em'] ? date('d/m/Y H:i', strtotime($u['ultimo_login_em'])) : '—' ?></td>
                 <td class="adm-text-muted"><?= date('d/m/Y', strtotime($u['created_at'])) ?></td>
+                <?php if ($canGerirUtilizadores): ?>
                 <td>
                     <div class="adm-actions">
                         <a href="/nexora/admin/utilizadores/form?id=<?= $u['id'] ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Editar">
@@ -114,6 +124,9 @@ include dirname(__DIR__) . '/layouts/top.php';
                         <?php endif; ?>
                     </div>
                 </td>
+                <?php else: ?>
+                <td>—</td>
+                <?php endif; ?>
             </tr>
             <?php endforeach; ?>
             </tbody>

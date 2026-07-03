@@ -29,6 +29,7 @@
     ];
 
     $csrf       = $app->security->csrfToken();
+    $canEmitirFaturas = $app->session->can('faturacao', 'emitir_faturas');
     $pageTitle  = 'Faturas';
     $activePage = 'faturas';
     $breadcrumb = [['Admin', '/nexora/'], ['Faturação', ''], ['Faturas', '']];
@@ -38,6 +39,7 @@
 
 <div class="adm-page-header">
     <h1 class="adm-page-title">Faturas</h1>
+    <?php if ($canEmitirFaturas): ?>
     <div class="adm-page-header-actions">
         <a href="<?php echo htmlspecialchars($app->routes->path('fatura_form')) ?>" class="adm-btn adm-btn-primary">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -46,6 +48,7 @@
             Nova Fatura
         </a>
     </div>
+    <?php endif; ?>
 </div>
 
 <div class="adm-card">
@@ -84,7 +87,7 @@
                     <th>Total</th>
                     <th>Imposto</th>
                     <th>Estado</th>
-                    <th>Ações</th>
+                    <?php if ($canEmitirFaturas): ?><th>Ações</th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -102,6 +105,7 @@
                 <td class="adm-fw-600"><?php echo number_format((float) $f['total'], 2, ',', '.') ?> <?php echo htmlspecialchars($f['moeda']) ?></td>
                 <td><?php echo number_format((float) $f['imposto_total'], 2, ',', '.') ?></td>
                 <td><span class="adm-badge <?php echo $estadoBadge[0] ?>"><?php echo $estadoBadge[1] ?></span></td>
+                <?php if ($canEmitirFaturas): ?>
                 <td>
                     <div class="adm-actions">
                         <a href="<?php echo htmlspecialchars($app->routes->path('fatura_form', ['id' => $f['id']])) ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Ver / Editar">
@@ -123,6 +127,9 @@
                         <?php endif; ?>
                     </div>
                 </td>
+                <?php else: ?>
+                <td>—</td>
+                <?php endif; ?>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -136,7 +143,9 @@
         </svg>
         <p class="adm-empty-title">Nenhuma fatura criada</p>
         <p class="adm-empty-sub">Começa por criar a primeira fatura.</p>
+        <?php if ($canEmitirFaturas): ?>
         <a href="<?php echo htmlspecialchars($app->routes->path('fatura_form')) ?>" class="adm-btn adm-btn-primary">Criar Fatura</a>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>

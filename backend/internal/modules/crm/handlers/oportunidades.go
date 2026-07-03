@@ -14,21 +14,22 @@ import (
 )
 
 type Oportunidade struct {
-	ID                int64     `json:"id"`
-	Titulo            string    `json:"titulo"`
-	LeadID            *int64    `json:"lead_id"`
-	ClienteID         *int64    `json:"cliente_id"`
-	Estagio           string    `json:"estagio"`
-	ValorEstimado     float64   `json:"valor_estimado"`
-	Moeda             string    `json:"moeda"`
-	Probabilidade     int16     `json:"probabilidade"`
-	DataFechoPrevista *string   `json:"data_fecho_prevista"`
-	DataFechoReal     *string   `json:"data_fecho_real"`
-	MotivoPerda       *string   `json:"motivo_perda"`
-	Responsavel       *string   `json:"responsavel"`
-	Descricao         *string   `json:"descricao"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                int64      `json:"id"`
+	Titulo            string     `json:"titulo"`
+	LeadID            *int64     `json:"lead_id"`
+	ClienteID         *int64     `json:"cliente_id"`
+	Estagio           string     `json:"estagio"`
+	ValorEstimado     float64    `json:"valor_estimado"`
+	Moeda             string     `json:"moeda"`
+	Probabilidade     int16      `json:"probabilidade"`
+	DataFechoPrevista *string    `json:"data_fecho_prevista"`
+	DataFechoReal     *string    `json:"data_fecho_real"`
+	MotivoPerda       *string    `json:"motivo_perda"`
+	Responsavel       *string    `json:"responsavel"`
+	ResponsavelID     *int64     `json:"responsavel_id"`
+	Descricao         *string    `json:"descricao"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 type oportunidadeInput struct {
@@ -41,6 +42,7 @@ type oportunidadeInput struct {
 	Probabilidade     *int16   `json:"probabilidade"`
 	DataFechoPrevista *string  `json:"data_fecho_prevista"`
 	Responsavel       *string  `json:"responsavel"`
+	ResponsavelID     *int64   `json:"responsavel_id"`
 	Descricao         *string  `json:"descricao"`
 }
 
@@ -55,13 +57,13 @@ var oportunidadeEstagios = map[string]string{
 
 const oportunidadeSelectCols = `id, titulo, lead_id, cliente_id, estagio, valor_estimado, moeda, probabilidade,
 	to_char(data_fecho_prevista, 'YYYY-MM-DD'), to_char(data_fecho_real, 'YYYY-MM-DD'), motivo_perda,
-	responsavel, descricao, created_at, updated_at`
+	responsavel, responsavel_id, descricao, created_at, updated_at`
 
 func scanOportunidade(row pgx.Row) (*Oportunidade, error) {
 	var o Oportunidade
 	if err := row.Scan(&o.ID, &o.Titulo, &o.LeadID, &o.ClienteID, &o.Estagio, &o.ValorEstimado, &o.Moeda,
 		&o.Probabilidade, &o.DataFechoPrevista, &o.DataFechoReal, &o.MotivoPerda,
-		&o.Responsavel, &o.Descricao, &o.CreatedAt, &o.UpdatedAt); err != nil {
+		&o.Responsavel, &o.ResponsavelID, &o.Descricao, &o.CreatedAt, &o.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &o, nil
@@ -85,6 +87,12 @@ func (h *Handler) ListarOportunidades(w http.ResponseWriter, r *http.Request) {
 		args = append(args, resp)
 		where += " AND responsavel=$" + strconv.Itoa(len(args))
 	}
+	if respIDStr := q.Get("responsavel_id"); respIDStr != "" {
+		if respID, err := strconv.ParseInt(respIDStr, 10, 64); err == nil {
+			args = append(args, respID)
+			where += " AND responsavel_id=$" + strconv.Itoa(len(args))
+		}
+	}
 	if leadIDStr := q.Get("lead_id"); leadIDStr != "" {
 		if leadID, err := strconv.ParseInt(leadIDStr, 10, 64); err == nil {
 			args = append(args, leadID)
@@ -107,7 +115,7 @@ func (h *Handler) ListarOportunidades(w http.ResponseWriter, r *http.Request) {
 	n := len(args)
 
 	rows, err := h.db.Query(r.Context(),
-		"SELECT "+oportunidadeSelectCols+" FROM oportunidades WHERE "+where+
+		"SELECT "+oportunidadeSelectCols+" FROM crm.oportunidades WHERE "+where+
 			" ORDER BY created_at DESC LIMIT $"+strconv.Itoa(n-1)+" OFFSET $"+strconv.Itoa(n), args...)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
@@ -124,7 +132,7 @@ func (h *Handler) ListarOportunidades(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var total int
-	h.db.QueryRow(r.Context(), "SELECT COUNT(*) FROM oportunidades WHERE "+where, countArgs...).Scan(&total)
+	h.db.QueryRow(r.Context(), "SELECT COUNT(*) FROM crm.oportunidades WHERE "+where, countArgs...).Scan(&total)
 	page, _ := strconv.Atoi(q.Get("page"))
 	if page < 1 {
 		page = 1
@@ -175,15 +183,20 @@ func (h *Handler) CriarOportunidade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if body.ResponsavelID != nil && body.Responsavel == nil {
+		body.Responsavel = h.resolveResponsavelNome(r, *body.ResponsavelID)
+	}
+
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO oportunidades
+		INSERT INTO crm.oportunidades
 			(tenant_id, titulo, lead_id, cliente_id, estagio, valor_estimado, moeda, probabilidade,
-			 data_fecho_prevista, responsavel, descricao)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			 data_fecho_prevista, responsavel, responsavel_id, descricao)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		RETURNING id`,
 		user.TenantID, body.Titulo, body.LeadID, body.ClienteID, estagio, valor,
-		strDefault(body.Moeda, "MZN"), probabilidade, dataFechoPrevista, body.Responsavel, body.Descricao,
+		strDefault(body.Moeda, "MZN"), probabilidade, dataFechoPrevista,
+		body.Responsavel, body.ResponsavelID, body.Descricao,
 	).Scan(&id)
 	if err != nil {
 		jsonErr(w, "Erro ao guardar na base de dados.", http.StatusInternalServerError)
@@ -195,7 +208,7 @@ func (h *Handler) CriarOportunidade(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ObterOportunidade(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
-	row := h.db.QueryRow(r.Context(), "SELECT "+oportunidadeSelectCols+" FROM oportunidades WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
+	row := h.db.QueryRow(r.Context(), "SELECT "+oportunidadeSelectCols+" FROM crm.oportunidades WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
 	o, err := scanOportunidade(row)
 	if err != nil {
 		jsonErr(w, "Oportunidade não encontrada.", http.StatusNotFound)
@@ -245,13 +258,17 @@ func (h *Handler) ActualizarOportunidade(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if body.ResponsavelID != nil && body.Responsavel == nil {
+		body.Responsavel = h.resolveResponsavelNome(r, *body.ResponsavelID)
+	}
+
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE oportunidades SET
+		UPDATE crm.oportunidades SET
 			titulo=$1, lead_id=$2, cliente_id=$3, valor_estimado=$4, moeda=$5, probabilidade=$6,
-			data_fecho_prevista=$7, responsavel=$8, descricao=$9, updated_at=NOW()
-		WHERE id=$10 AND tenant_id=$11`,
+			data_fecho_prevista=$7, responsavel=$8, responsavel_id=$9, descricao=$10, updated_at=NOW()
+		WHERE id=$11 AND tenant_id=$12`,
 		body.Titulo, body.LeadID, body.ClienteID, valor, strDefault(body.Moeda, "MZN"),
-		probabilidade, dataFechoPrevista, body.Responsavel, body.Descricao, id, user.TenantID,
+		probabilidade, dataFechoPrevista, body.Responsavel, body.ResponsavelID, body.Descricao, id, user.TenantID,
 	)
 	if err != nil {
 		jsonErr(w, "Erro ao actualizar na base de dados.", http.StatusInternalServerError)
@@ -268,7 +285,7 @@ func (h *Handler) RemoverOportunidade(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 
-	tag, err := h.db.Exec(r.Context(), "DELETE FROM oportunidades WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), "DELETE FROM crm.oportunidades WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro ao eliminar.", http.StatusInternalServerError)
 		return
@@ -310,7 +327,7 @@ func (h *Handler) MoverOportunidade(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(ctx)
 
 	var estagioAtual string
-	if err := tx.QueryRow(ctx, "SELECT estagio FROM oportunidades WHERE id=$1 AND tenant_id=$2 FOR UPDATE", id, user.TenantID).Scan(&estagioAtual); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT estagio FROM crm.oportunidades WHERE id=$1 AND tenant_id=$2 FOR UPDATE", id, user.TenantID).Scan(&estagioAtual); err != nil {
 		jsonErr(w, "Oportunidade não encontrada.", http.StatusNotFound)
 		return
 	}
@@ -321,7 +338,7 @@ func (h *Handler) MoverOportunidade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := tx.Exec(ctx, `
-		UPDATE oportunidades SET
+		UPDATE crm.oportunidades SET
 			estagio=$1::varchar,
 			data_fecho_real = CASE WHEN $1::varchar IN ('ganho','perdido') THEN CURRENT_DATE ELSE data_fecho_real END,
 			probabilidade = CASE WHEN $1::varchar='ganho' THEN 100 WHEN $1::varchar='perdido' THEN 0 ELSE probabilidade END,
@@ -334,7 +351,7 @@ func (h *Handler) MoverOportunidade(w http.ResponseWriter, r *http.Request) {
 	if estagioAtual != body.Estagio {
 		texto := fmt.Sprintf("Estágio alterado: %s → %s", oportunidadeEstagios[estagioAtual], novoLabel)
 		if _, err := tx.Exec(ctx,
-			"INSERT INTO atividades (tenant_id, oportunidade_id, tipo, titulo, descricao, concluida) VALUES ($1,$2,'nota','Estágio alterado',$3,TRUE)",
+			"INSERT INTO crm.atividades (tenant_id, oportunidade_id, tipo, titulo, descricao, concluida) VALUES ($1,$2,'nota','Estágio alterado',$3,TRUE)",
 			user.TenantID, id, texto); err != nil {
 			jsonErr(w, "Erro ao actualizar.", http.StatusInternalServerError)
 			return
@@ -373,7 +390,7 @@ func (h *Handler) MarcarPerdida(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(ctx)
 
 	var estagioAtual string
-	if err := tx.QueryRow(ctx, "SELECT estagio FROM oportunidades WHERE id=$1 AND tenant_id=$2 FOR UPDATE", id, user.TenantID).Scan(&estagioAtual); err != nil {
+	if err := tx.QueryRow(ctx, "SELECT estagio FROM crm.oportunidades WHERE id=$1 AND tenant_id=$2 FOR UPDATE", id, user.TenantID).Scan(&estagioAtual); err != nil {
 		jsonErr(w, "Oportunidade não encontrada.", http.StatusNotFound)
 		return
 	}
@@ -383,7 +400,7 @@ func (h *Handler) MarcarPerdida(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := tx.Exec(ctx, `
-		UPDATE oportunidades SET
+		UPDATE crm.oportunidades SET
 			estagio='perdido', data_fecho_real=CURRENT_DATE, probabilidade=0,
 			motivo_perda=$1, updated_at=NOW()
 		WHERE id=$2`, nullIfEmpty(motivo), id); err != nil {
@@ -396,7 +413,7 @@ func (h *Handler) MarcarPerdida(w http.ResponseWriter, r *http.Request) {
 		texto += "\nMotivo: " + motivo
 	}
 	if _, err := tx.Exec(ctx,
-		"INSERT INTO atividades (tenant_id, oportunidade_id, tipo, titulo, descricao, concluida) VALUES ($1,$2,'nota','Estágio alterado',$3,TRUE)",
+		"INSERT INTO crm.atividades (tenant_id, oportunidade_id, tipo, titulo, descricao, concluida) VALUES ($1,$2,'nota','Estágio alterado',$3,TRUE)",
 		user.TenantID, id, texto); err != nil {
 		jsonErr(w, "Erro ao actualizar.", http.StatusInternalServerError)
 		return

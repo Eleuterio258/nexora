@@ -87,6 +87,48 @@ final class RecursosHumanosService extends NexoraService
         return ['ok' => true, 'msg' => 'Funcionario desligado com sucesso.'];
     }
 
+    public function getEmployee(int $id): array
+    {
+        if ($id <= 0) {
+            throw new OperationException('Funcionario invalido.');
+        }
+
+        $response = $this->gateway->request('GET', "/api/rh/funcionarios/$id");
+        $this->ensureSuccess($response, 'Erro ao obter funcionario.');
+
+        return $response->body;
+    }
+
+    public function getContract(int $id): array
+    {
+        if ($id <= 0) {
+            throw new OperationException('Contrato invalido.');
+        }
+
+        $response = $this->gateway->request('GET', "/api/rh/contratos/$id");
+        $this->ensureSuccess($response, 'Erro ao obter contrato.');
+
+        return $response->body;
+    }
+
+    public function downloadContractPdf(int $id): array
+    {
+        if ($id <= 0) {
+            throw new OperationException('Contrato invalido.');
+        }
+
+        $response = $this->gateway->download("/api/rh/contratos/$id/pdf");
+        if ($response->status === 404) {
+            throw new OperationException('PDF do contrato nao encontrado.');
+        }
+
+        return [
+            'status' => $response->status,
+            'body'   => $response->body,
+            'contentType' => $response->contentType,
+        ];
+    }
+
     public function createContract(array $payload): array
     {
         if (($payload['funcionario_id'] ?? 0) <= 0) {
@@ -130,6 +172,23 @@ final class RecursosHumanosService extends NexoraService
         $this->ensureSuccess($response, 'Erro ao renovar o contrato.');
 
         return ['ok' => true, 'msg' => 'Contrato renovado com sucesso.', 'id' => $response->body['id'] ?? null];
+    }
+
+    public function saveContractPdf(int $contractId, string $pdfBytes): array
+    {
+        if ($contractId <= 0) {
+            throw new OperationException('Contrato inválido.');
+        }
+        if ($pdfBytes === '') {
+            throw new OperationException('O PDF do contrato está vazio.');
+        }
+
+        $result = $this->gateway->uploadBinary("/api/rh/contratos/$contractId/pdf", $pdfBytes, 'application/pdf');
+        if (($result['status'] ?? 0) < 200 || ($result['status'] ?? 0) >= 300) {
+            throw new OperationException($result['body']['erro'] ?? $result['body']['error'] ?? 'Erro ao guardar o PDF do contrato.');
+        }
+
+        return ['ok' => true, 'url' => $result['body']['url'] ?? null];
     }
 
     public function terminateContract(int $id, array $payload): array
@@ -992,13 +1051,13 @@ final class RecursosHumanosService extends NexoraService
         return ['ok' => true, 'msg' => 'Folha de pagamento processada com sucesso.'];
     }
 
-    public function payPayrollRun(int $id): array
+    public function payPayrollRun(int $id, array $payload = []): array
     {
         if ($id <= 0) {
             throw new OperationException('Folha de pagamento inválida.');
         }
 
-        $response = $this->gateway->request('POST', "/api/rh/folhas-pagamento/$id/pagar");
+        $response = $this->gateway->request('POST', "/api/rh/folhas-pagamento/$id/pagar", $payload);
         $this->ensureSuccess($response, 'Erro ao marcar a folha de pagamento como paga.');
 
         return ['ok' => true, 'msg' => 'Folha de pagamento marcada como paga.'];
@@ -1038,5 +1097,102 @@ final class RecursosHumanosService extends NexoraService
         $this->ensureSuccess($response, 'Erro ao obter o recibo de vencimento.');
 
         return $response->body ?? [];
+    }
+
+    public function listarIrpsEscaloes(?int $ano): array
+    {
+        $query = $ano ? "?ano=$ano" : '';
+        $r = $this->gateway->request('GET', "/api/rh/irps-escaloes$query");
+        $this->ensureSuccess($r, 'Erro ao listar escalões IRPS.');
+        return $r->body ?? [];
+    }
+
+    public function criarIrpsEscalao(array $payload): array
+    {
+        $r = $this->gateway->request('POST', '/api/rh/irps-escaloes', $payload);
+        $this->ensureSuccess($r, 'Erro ao criar escalão IRPS.');
+        return ['ok' => true, 'msg' => 'Escalão criado com sucesso.'];
+    }
+
+    public function actualizarIrpsEscalao(int $id, array $payload): array
+    {
+        $r = $this->gateway->request('PUT', "/api/rh/irps-escaloes/$id", $payload);
+        $this->ensureSuccess($r, 'Erro ao actualizar escalão IRPS.');
+        return ['ok' => true, 'msg' => 'Escalão actualizado com sucesso.'];
+    }
+
+    public function eliminarIrpsEscalao(int $id): array
+    {
+        $r = $this->gateway->request('DELETE', "/api/rh/irps-escaloes/$id");
+        $this->ensureSuccess($r, 'Erro ao eliminar escalão IRPS.');
+        return ['ok' => true, 'msg' => 'Escalão eliminado.'];
+    }
+
+    public function seedIrpsMozambique2024(): array
+    {
+        $r = $this->gateway->request('POST', '/api/rh/irps-escaloes/seed-mozambique-2024');
+        $this->ensureSuccess($r, 'Erro ao carregar escalões padrão.');
+        return $r->body ?? ['ok' => true, 'msg' => 'Escalões carregados.'];
+    }
+
+    public function getProximoNumero(): array
+    {
+        $response = $this->gateway->request('GET', '/api/rh/funcionarios/proximo-numero');
+        $this->ensureSuccess($response, 'Erro ao obter o próximo número de funcionário.');
+        return $response->body ?? [];
+    }
+
+    public function criarAdiantamento(int $funcionarioId, array $payload): array
+    {
+        if ($funcionarioId <= 0 || ($payload['valor_total'] ?? 0) <= 0) {
+            throw new OperationException('Funcionário e valor são obrigatórios.');
+        }
+        $r = $this->gateway->request('POST', "/api/rh/funcionarios/$funcionarioId/adiantamentos", $payload);
+        $this->ensureSuccess($r, 'Erro ao registar o adiantamento.');
+        return ['ok' => true, 'msg' => 'Adiantamento registado com sucesso.'];
+    }
+
+    public function cancelarAdiantamento(int $id): array
+    {
+        $r = $this->gateway->request('POST', "/api/rh/adiantamentos/$id/cancelar");
+        $this->ensureSuccess($r, 'Erro ao cancelar o adiantamento.');
+        return ['ok' => true, 'msg' => 'Adiantamento cancelado.'];
+    }
+
+    public function criarEmprestimo(int $funcionarioId, array $payload): array
+    {
+        if ($funcionarioId <= 0 || ($payload['valor_total'] ?? 0) <= 0) {
+            throw new OperationException('Funcionário e valor são obrigatórios.');
+        }
+        $r = $this->gateway->request('POST', "/api/rh/funcionarios/$funcionarioId/emprestimos", $payload);
+        $this->ensureSuccess($r, 'Erro ao registar o empréstimo.');
+        return ['ok' => true, 'msg' => 'Empréstimo registado com sucesso.'];
+    }
+
+    public function cancelarEmprestimo(int $id): array
+    {
+        $r = $this->gateway->request('POST', "/api/rh/emprestimos/$id/cancelar");
+        $this->ensureSuccess($r, 'Erro ao cancelar o empréstimo.');
+        return ['ok' => true, 'msg' => 'Empréstimo cancelado.'];
+    }
+
+    public function getConfig(): array
+    {
+        $response = $this->gateway->request('GET', '/api/rh/configuracoes');
+        $this->ensureSuccess($response, 'Erro ao obter as configurações de RH.');
+        return $response->body ?? [];
+    }
+
+    public function saveConfig(string $chave, ?string $valor): array
+    {
+        if ($chave === '') {
+            throw new OperationException('A chave de configuração é obrigatória.');
+        }
+        $response = $this->gateway->request('POST', '/api/rh/configuracoes', [
+            'chave' => $chave,
+            'valor' => $valor,
+        ]);
+        $this->ensureSuccess($response, 'Erro ao guardar a configuração de RH.');
+        return ['ok' => true, 'msg' => 'Configuração guardada com sucesso.'];
     }
 }

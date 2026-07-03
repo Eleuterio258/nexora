@@ -22,7 +22,7 @@ final readonly class AdminAuthController
     public function login(): void
     {
         if ($this->session->isAuthenticated()) {
-            header('Location: ' . $this->session->homeUrl());
+            header('Location: /nexora/destino');
             exit;
         }
 
@@ -40,10 +40,86 @@ final readonly class AdminAuthController
 
     public function logout(): never
     {
-        $this->session->logout();
+        try {
+            $this->session->logout();
+        } catch (HttpClientException $exception) {
+            // Mesmo que a API falhe, limpa a sessão local.
+            error_log('[admin-logout] Falha na API Nexora: ' . $exception->getMessage());
+        }
         $this->session->clear();
         header('Location: /nexora/login');
         exit;
+    }
+
+    public function destino(): void
+    {
+        if (!$this->session->isAuthenticated()) {
+            header('Location: /nexora/login');
+            exit;
+        }
+
+        $destinos = [
+            [
+                'escopo' => 'erp',
+                'titulo' => 'ERP',
+                'descricao' => 'Area restrita para funcionarios do ERP.',
+                'url' => '/nexora/',
+                'icone' => 'briefcase',
+                'ativo' => $this->session->hasEscopo('erp'),
+            ],
+            [
+                'escopo' => 'escola',
+                'titulo' => 'Escola',
+                'descricao' => 'Area restrita para funcionarios da escola.',
+                'url' => '/escola',
+                'icone' => 'school',
+                'ativo' => $this->session->hasEscopo('escola') && !$this->session->isProfessor(),
+            ],
+            [
+                'escopo' => 'portal_professor',
+                'titulo' => 'Portal do Professor',
+                'descricao' => 'Area dedicada aos professores.',
+                'url' => '/portal/professor',
+                'icone' => 'chalkboard',
+                'ativo' => $this->session->isProfessor(),
+            ],
+            [
+                'escopo' => 'portal_aluno',
+                'titulo' => 'Portal do Aluno',
+                'descricao' => 'Area dedicada aos alunos.',
+                'url' => '/portal/aluno',
+                'icone' => 'graduation',
+                'ativo' => $this->session->hasEscopo('portal_aluno'),
+            ],
+            [
+                'escopo' => 'portal_encarregado',
+                'titulo' => 'Portal do Encarregado',
+                'descricao' => 'Area dedicada aos encarregados de educacao.',
+                'url' => '/portal/encarregado',
+                'icone' => 'users',
+                'ativo' => $this->session->hasEscopo('portal_encarregado'),
+            ],
+            [
+                'escopo' => 'superadmin',
+                'titulo' => 'Superadmin',
+                'descricao' => 'Area de administracao e configuracao global.',
+                'url' => '/nexora/superadmin',
+                'icone' => 'shield',
+                'ativo' => $this->session->isSuperAdmin(),
+            ],
+        ];
+
+        $destinos = array_values(array_filter($destinos, static fn(array $destino): bool => $destino['ativo']));
+
+        // Se o utilizador tem apenas um destino disponível, redireciona directamente.
+        // Sem destinos activos: termina a sessão por segurança.
+        if (count($destinos) === 0) {
+            $this->session->clear();
+            header('Location: /nexora/login');
+            exit;
+        }
+
+        require $this->viewRoot . '/pages/destino.php';
     }
 
     private function attemptLogin(): string
@@ -74,9 +150,24 @@ final readonly class AdminAuthController
                 session_regenerate_id(true);
                 $this->session->store($resp['body']);
 
-                $next = $this->request->queryString('next', $this->session->homeUrl());
-                if (!preg_match('#^/nexora#', $next)) {
-                    $next = $this->session->homeUrl();
+                $next = $this->request->queryString('next', '/nexora/destino');
+                // Só aceita redireccionamentos internos conhecidos.
+                if (!preg_match('#^/(nexora|escola|portal/aluno|portal/encarregado|portal/professor)(/|$)#', $next)) {
+                    $next = '/nexora/destino';
+                }
+                // Restringir ao escopo do utilizador.
+                if ($next !== '/nexora/destino') {
+                    if ($this->session->isProfessor() && !str_starts_with($next, '/portal/professor')) {
+                        $next = '/nexora/destino';
+                    } elseif ($this->session->isSchoolOnly() && !$this->session->isProfessor() && !str_starts_with($next, '/escola')) {
+                        $next = '/nexora/destino';
+                    } elseif ($this->session->isErpOnly() && !str_starts_with($next, '/nexora')) {
+                        $next = '/nexora/destino';
+                    } elseif ($this->session->hasEscopo('portal_aluno') && !str_starts_with($next, '/portal/aluno')) {
+                        $next = '/nexora/destino';
+                    } elseif ($this->session->hasEscopo('portal_encarregado') && !str_starts_with($next, '/portal/encarregado')) {
+                        $next = '/nexora/destino';
+                    }
                 }
                 header('Location: ' . $next);
                 exit;

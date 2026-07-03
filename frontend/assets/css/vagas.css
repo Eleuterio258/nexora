@@ -14,6 +14,30 @@
 .vagas-empty h2 { font-size: 1.35rem; font-weight: 700; color: var(--gray-700, #374151); }
 .vagas-empty p  { font-size: 0.95rem; color: var(--gray-500, #6b7280); max-width: 440px; }
 
+.btn-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.5rem;
+    border-radius: 99px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1.5px solid rgba(255,255,255,.45);
+    color: rgba(255,255,255,.9);
+    background: rgba(255,255,255,.08);
+    transition: background .2s, border-color .2s, color .2s, transform .15s;
+    white-space: nowrap;
+}
+
+.btn-outline:hover {
+    background: rgba(255,255,255,.18);
+    border-color: rgba(255,255,255,.75);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
 .vagas-pill-live--closed {
     background: rgba(255,255,255,.1);
     border-color: rgba(255,255,255,.15);
@@ -516,18 +540,18 @@
 }
 
 .form-group label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: #6b7280;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #374151;
+    letter-spacing: 0;
 }
 
 .req-star   { color: #ef4444; }
 .form-optional { font-weight: 400; text-transform: none; letter-spacing: 0; color: #9ca3af; font-size: 0.7rem; }
 
 .form-group input,
-.form-group textarea {
+.form-group textarea,
+.form-group select {
     width: 100%;
     padding: 0.6rem 0.85rem;
     border: 1.5px solid #e5e7eb;
@@ -538,10 +562,21 @@
     background: #fff;
     transition: border-color .2s, box-shadow .2s;
     box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.form-group select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2.2rem;
+    cursor: pointer;
 }
 
 .form-group input:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group select:focus {
     outline: none;
     border-color: #10b981;
     box-shadow: 0 0 0 3px rgba(16,185,129,.12);
@@ -657,3 +692,300 @@
 
 .vagas-footer a { text-decoration: none; transition: color .2s; }
 .vagas-footer a:hover { color: #fff; }
+
+/* ═══════════════════════════════════════
+   NOVO LAYOUT: LISTA DE VAGAS + DETALHE
+═══════════════════════════════════════ */
+
+/* Layout principal: lista à esquerda, detalhe à direita */
+.vagas-layout--split {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 2rem;
+    align-items: start;
+    padding: 2.5rem 0 5rem;
+}
+
+@media (max-width: 1100px) {
+    .vagas-layout--split {
+        grid-template-columns: 300px 1fr;
+        gap: 1.5rem;
+    }
+}
+
+@media (max-width: 900px) {
+    .vagas-layout--split {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Lista de vagas (coluna esquerda) ── */
+.vagas-lista {
+    position: sticky;
+    top: 90px;
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+    padding: var(--space-4, 1rem);
+    background: var(--gray-50, #f9fafb);
+    border-radius: var(--radius-xl, 1.5rem);
+}
+
+.vagas-lista::-webkit-scrollbar {
+    width: 6px;
+}
+
+.vagas-lista::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.vagas-lista::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 99px;
+}
+
+.vagas-lista-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.vagas-lista-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.vagas-lista-count {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #065f46;
+    background: #d1fae5;
+    padding: 0.25rem 0.7rem;
+    border-radius: 99px;
+}
+
+.vagas-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Card individual de vaga — estilo clean igual homepage */
+.vaga-card {
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-lg, 1rem);
+    padding: var(--space-5, 1.25rem) var(--space-6, 1.5rem);
+    cursor: pointer;
+    transition: transform .25s, background .2s, box-shadow .2s;
+    position: relative;
+    font-family: var(--font-body, 'Plus Jakarta Sans', sans-serif);
+}
+
+.vaga-card:hover {
+    background: var(--white, #fff);
+    box-shadow: var(--shadow-md, 0 4px 16px rgba(0,0,0,.08));
+    transform: translateY(-3px);
+}
+
+.vaga-card.active {
+    background: var(--green-xlight, #ecfdf5);
+    box-shadow: var(--shadow-green, 0 4px 16px rgba(16,185,129,.25));
+}
+
+.vaga-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: var(--space-4, 1rem);
+}
+
+.vaga-card-area {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md, 0.75rem);
+    background: var(--green-xlight, #ecfdf5);
+    color: var(--green, #10b981);
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    flex-shrink: 0;
+}
+
+.vaga-card-prazo {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--radius-pill, 99px);
+    white-space: nowrap;
+    background: var(--gray-100, #f3f4f6);
+    color: var(--gray-600, #4b5563);
+}
+
+.vaga-card-prazo.vaga-prazo-badge--aviso {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.vaga-card-prazo.vaga-prazo-badge--urgente {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.vaga-card-title {
+    font-family: var(--font-heading, 'Outfit', sans-serif);
+    font-size: var(--text-base, 1rem);
+    font-weight: 700;
+    color: var(--gray-900, #111827);
+    line-height: 1.35;
+    margin-bottom: var(--space-2, 0.5rem);
+}
+
+.vaga-card-area-tag {
+    display: inline-flex;
+    width: fit-content;
+    background: transparent;
+    color: var(--green, #10b981);
+    border: 1px solid var(--green-light, #d1fae5);
+    padding: 0.15rem 0.55rem;
+    border-radius: var(--radius-pill, 99px);
+    font-size: 0.72rem;
+    font-weight: 600;
+    margin-bottom: var(--space-3, 0.75rem);
+}
+
+.vaga-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+}
+
+.vaga-card-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    color: var(--gray-500, #6b7280);
+}
+
+.vaga-card-meta-item svg {
+    color: var(--gray-400, #9ca3af);
+    flex-shrink: 0;
+}
+
+.vaga-card-arrow {
+    position: absolute;
+    right: var(--space-4, 1rem);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gray-400, #9ca3af);
+    transition: color .2s, transform .2s;
+}
+
+.vaga-card:hover .vaga-card-arrow {
+    color: var(--green, #10b981);
+    transform: translateY(-50%) translateX(2px);
+}
+
+.vaga-card.active .vaga-card-arrow {
+    color: var(--green, #10b981);
+}
+
+/* ── Painel de detalhe (coluna direita) ── */
+.vaga-detalhe {
+    min-width: 0;
+}
+
+.vaga-detalhe .vagas-panels {
+    margin-bottom: 0;
+}
+
+.vaga-detalhe .vaga-sidebar {
+    position: static;
+    top: auto;
+    margin-top: 2rem;
+}
+
+/* Ajustes no painel de detalhes */
+.vaga-detalhe .vaga-header {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 1.1rem;
+    padding: 1.75rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+
+.vaga-detalhe .vaga-section {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 1.1rem;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+
+.vaga-detalhe .vaga-section-title {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0.75rem;
+    font-size: 1.05rem;
+}
+
+/* Ajuste responsivo mobile: lista acima, detalhe abaixo */
+@media (max-width: 900px) {
+    .vagas-lista {
+        position: static;
+        max-height: none;
+        overflow-y: visible;
+        padding: var(--space-4, 1rem);
+    }
+
+    .vagas-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 0.5rem;
+    }
+
+    .vaga-card {
+        padding: var(--space-4, 1rem);
+        background: var(--white, #fff);
+        box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,.08));
+    }
+
+    .vaga-card:hover,
+    .vaga-card.active {
+        background: var(--green-xlight, #ecfdf5);
+    }
+
+    .vaga-card-arrow {
+        display: none;
+    }
+
+    .vaga-detalhe .vaga-sidebar {
+        margin-top: 1.5rem;
+    }
+}
+
+/* Esconde tabs antigos em desktop se lista estiver presente */
+@media (min-width: 901px) {
+    .vagas-hero .vagas-tabs {
+        display: none;
+    }
+}
+
+@media (max-width: 900px) {
+    .vagas-hero .vagas-tabs {
+        display: flex;
+        margin-top: 1.5rem;
+    }
+}

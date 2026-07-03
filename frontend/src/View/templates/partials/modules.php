@@ -46,16 +46,6 @@ return [
         ],
     ],
 
-    'vendas' => [
-        'nome'  => 'Vendas',
-        'cor'   => '#3B82F6',
-        'acoes' => [
-            'ver_vendas'      => 'Ver Vendas',
-            'criar_vendas'    => 'Registar Vendas',
-            'cancelar_vendas' => 'Cancelar Vendas',
-        ],
-    ],
-
     'faturacao' => [
         'nome'  => 'Faturação',
         'cor'   => '#6366F1',
@@ -182,16 +172,20 @@ return [
         'nome'  => 'Recursos Humanos',
         'cor'   => '#EC4899',
         'acoes' => [
-            'ver_funcionarios'   => 'Ver Funcionários',
-            'gerir_funcionarios' => 'Criar & Editar Funcionários',
-            'gerir_contratos'    => 'Gerir Contratos',
-            'gerir_horarios'     => 'Gerir Horários de Trabalho',
-            'aprovar_ausencias'  => 'Aprovar / Rejeitar Ausências',
-            'processar_salarios' => 'Processamento Salarial',
-            'gerir_avaliacoes'   => 'Avaliações de Desempenho',
-            'gerir_formacoes'    => 'Formações',
-            'gerir_beneficios'   => 'Benefícios',
-            'ver_relatorios'     => 'Relatórios RH',
+            'ver_funcionarios'             => 'Ver Funcionários',
+            'gerir_funcionarios'           => 'Criar & Editar Funcionários',
+            'gerir_contratos'              => 'Gerir Contratos',
+            'gerir_horarios'               => 'Gerir Horários de Trabalho',
+            'aprovar_ausencias'            => 'Aprovar / Rejeitar Ausências',
+            'processar_salarios'           => 'Processamento Salarial',
+            'ver_salarios'                 => 'Ver Salários & Componentes',
+            'ver_recibos'                  => 'Ver Recibos de Vencimento',
+            'ver_beneficios'               => 'Ver Benefícios',
+            'ver_processos_disciplinares'  => 'Ver Processos Disciplinares',
+            'gerir_avaliacoes'             => 'Avaliações de Desempenho',
+            'gerir_formacoes'              => 'Formações',
+            'gerir_beneficios'             => 'Gerir Benefícios',
+            'ver_relatorios'               => 'Relatórios RH',
         ],
     ],
 
@@ -257,7 +251,8 @@ return [
         'nome'  => 'Auditoria',
         'cor'   => '#64748B',
         'acoes' => [
-            'ver_logs' => 'Ver Logs de Auditoria',
+            'ver_logs'   => 'Ver Logs de Auditoria',
+            'gerir_logs' => 'Gerir Logs de Auditoria',
         ],
     ],
 
@@ -282,17 +277,45 @@ return [
         ],
     ],
 
+    'superadmin' => [
+        'nome'  => 'Super Admin',
+        'cor'   => '#1E293B',
+        'sem_atribuicao' => true,
+        'acoes' => [
+            'ver_dashboard'                => 'Ver Dashboard Global',
+            'gerir_tenants'                => 'Gerir Tenants',
+            'gerir_planos'                 => 'Gerir Planos',
+            'gerir_modulos'                => 'Gerir Módulos por Tenant',
+            'gerir_utilizadores_globais'   => 'Gerir Utilizadores Globais',
+            'gerir_configuracoes_globais'  => 'Gerir Configurações Globais',
+        ],
+    ],
+
     'recrutamento' => [
         'nome'  => 'Recrutamento',
         'cor'   => '#16A34A',
         'acoes' => [
-            'ver_vagas'           => 'Ver Vagas',
-            'gerir_vagas'         => 'Criar & Editar Vagas',
-            'ver_candidaturas'    => 'Ver Candidaturas',
-            'gerir_candidaturas'  => 'Gerir Candidaturas',
-            'gerir_pipeline'      => 'Mover no Pipeline de Seleção',
-            'avaliar_candidatos'  => 'Avaliar & Entrevistar Candidatos',
-            'ver_relatorios'      => 'Relatórios de Recrutamento',
+            'ver_vagas'              => 'Ver Vagas',
+            'gerir_vagas'            => 'Criar & Editar Vagas',
+            'ver_candidaturas'       => 'Ver Candidaturas',
+            'gerir_candidaturas'     => 'Gerir Candidaturas',
+            'gerir_pipeline'         => 'Mover no Pipeline de Seleção',
+            'avaliar_candidatos'     => 'Avaliar & Entrevistar Candidatos',
+            'ver_relatorios'         => 'Relatórios de Recrutamento',
+            'configurar_recrutamento'=> 'Configurar Campos & Notificações',
+        ],
+    ],
+
+    'tarefas' => [
+        'nome'  => 'Tarefas',
+        'cor'   => '#F59E0B',
+        'acoes' => [
+            'ver_quadros'      => 'Ver Quadros',
+            'gerir_quadros'    => 'Criar & Editar Quadros',
+            'gerir_listas'     => 'Gerir Colunas',
+            'gerir_cartoes'    => 'Criar & Editar Cartões',
+            'mover_cartoes'    => 'Mover Cartões no Kanban',
+            'eliminar_cartoes' => 'Eliminar Cartões',
         ],
     ],
 

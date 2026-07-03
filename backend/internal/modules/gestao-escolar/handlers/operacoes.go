@@ -1,6 +1,11 @@
 package handlers
 
 import (
+	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -12,6 +17,12 @@ func (h *Handler) ListarPlanosPropinas(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetUser(r)
 	h.schoolList(w, r, `SELECT COALESCE(jsonb_agg(to_jsonb(p) ORDER BY p.nome),'[]')
 		FROM gestao_escolar.school_fee_plans p WHERE tenant_id=$1`, u.TenantID)
+}
+
+func (h *Handler) ObterPlanoPropina(w http.ResponseWriter, r *http.Request) {
+	u := mw.GetUser(r)
+	h.schoolOne(w, r, `SELECT to_jsonb(p) FROM gestao_escolar.school_fee_plans p
+		WHERE p.id=$1 AND p.tenant_id=$2`, chi.URLParam(r, "id"), u.TenantID)
 }
 
 func (h *Handler) CriarPlanoPropina(w http.ResponseWriter, r *http.Request) {
@@ -81,25 +92,35 @@ func (h *Handler) EmitirCobrancaAluno(w http.ResponseWriter, r *http.Request) {
 		WHERE id=$1 AND tenant_id=$2 AND status='pendente'`, chi.URLParam(r, "id"), u.TenantID)
 }
 
-func (h *Handler) AplicarDescontoCobranca(w http.ResponseWriter, r *http.Request) {
-	u := mw.GetUser(r)
-	body, err := schoolBody(r)
-	if err != nil {
-		jsonErr(w, "JSON invalido", 400)
-		return
-	}
-	h.schoolUpdate(w, r, `UPDATE gestao_escolar.school_fees SET
-		desconto=($1::jsonb->>'valor')::numeric,desconto_motivo=$1::jsonb->>'motivo',updated_at=NOW()
-		WHERE id=$2 AND tenant_id=$3 AND ($1::jsonb->>'valor')::numeric BETWEEN 0 AND valor_total`,
-		body, chi.URLParam(r, "id"), u.TenantID)
-}
-
-func (h *Handler) RegistarPagamentoEscolar(w http.ResponseWriter, r *http.Request) {
-	h.registarPagamento(w, r, false)
-}
-
 func (h *Handler) CallbackPagamentoEscolar(w http.ResponseWriter, r *http.Request) {
+	// Validar assinatura HMAC-SHA256 do gateway quando segredo configurado
+	if h.cfg.GatewayWebhookSecret != "" {
+		rawBody, err := io.ReadAll(io.LimitReader(r.Body, 2<<20))
+		if err != nil {
+			jsonErr(w, "Erro ao ler corpo", http.StatusBadRequest)
+			return
+		}
+		// Repor body para leitura posterior por registarPagamento
+		r.Body = io.NopCloser(bytes.NewReader(rawBody))
+
+		sig := r.Header.Get("X-Signature")
+		if !validarAssinaturaWebhook(rawBody, sig, h.cfg.GatewayWebhookSecret) {
+			jsonErr(w, "Assinatura inválida", http.StatusUnauthorized)
+			return
+		}
+	}
 	h.registarPagamento(w, r, true)
+}
+
+// validarAssinaturaWebhook verifica HMAC-SHA256 no formato "sha256=<hex>".
+func validarAssinaturaWebhook(body []byte, signature, secret string) bool {
+	if len(signature) < 7 || signature[:7] != "sha256=" {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	expected := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(signature[7:]), []byte(expected))
 }
 
 func (h *Handler) registarPagamento(w http.ResponseWriter, r *http.Request, callback bool) {

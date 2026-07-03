@@ -64,6 +64,101 @@ return [
             ['name' => 'carga_horaria', 'label' => 'Carga horária', 'type' => 'number'],
         ]],
     ],
+    'teachers' => [
+        'label' => 'Professores', 'path' => '/api/escolar/teachers',
+        'columns' => [['codigo|id', 'Código'], ['nome_completo', 'Nome'], ['especialidade', 'Especialidade'], ['status', 'Estado']],
+        'create' => ['operation' => 'teacher.create', 'label' => 'Novo professor', 'fields' => [
+            ['name' => 'codigo', 'label' => 'Código', 'required' => true],
+            ['name' => 'nome_completo', 'label' => 'Nome completo', 'required' => true],
+            ['name' => 'especialidade', 'label' => 'Especialidade'],
+            ['name' => 'email', 'label' => 'Email', 'type' => 'email'],
+            ['name' => 'telefone', 'label' => 'Telefone'],
+            ['name' => 'carga_horaria_maxima_semanal', 'label' => 'Carga horária máxima/semana', 'type' => 'number'],
+        ]],
+        'actions' => [
+            ['operation' => 'teacher.view', 'label' => 'Detalhes', 'result' => true],
+            ['operation' => 'teacher.update', 'label' => 'Actualizar', 'fields' => [
+                ['name' => 'codigo', 'label' => 'Código'],
+                ['name' => 'nome_completo', 'label' => 'Nome completo'],
+                ['name' => 'especialidade', 'label' => 'Especialidade'],
+                ['name' => 'email', 'label' => 'Email', 'type' => 'email'],
+                ['name' => 'telefone', 'label' => 'Telefone'],
+                ['name' => 'carga_horaria_maxima_semanal', 'label' => 'Carga horária máxima/semana', 'type' => 'number'],
+                ['name' => 'status', 'label' => 'Estado', 'type' => 'select', 'options' => ['activo', 'inactivo', 'suspenso']],
+            ]],
+            ['operation' => 'teacher.delete', 'label' => 'Remover', 'confirm' => 'Remover este professor?'],
+        ],
+    ],
+    'levels' => [
+        'label' => 'Níveis de ensino', 'path' => '/api/escolar/levels',
+        'columns' => [['codigo|id', 'Código'], ['nome', 'Nível'], ['sistema_avaliacao', 'Avaliação'], ['numero_periodos_padrao', 'Períodos'], ['activo', 'Activo']],
+        'create' => ['operation' => 'level.create', 'label' => 'Novo nível', 'fields' => [
+            ['name' => 'codigo', 'label' => 'Código', 'required' => true],
+            ['name' => 'nome', 'label' => 'Nome', 'required' => true],
+            ['name' => 'nota_minima_aprovacao', 'label' => 'Nota mínima', 'type' => 'number'],
+            ['name' => 'escala_maxima', 'label' => 'Escala máxima', 'type' => 'number'],
+            ['name' => 'sistema_avaliacao', 'label' => 'Sistema', 'type' => 'select', 'options' => ['0-20', '0-100', 'A-F', 'ECTS']],
+            ['name' => 'numero_periodos_padrao', 'label' => 'N.º períodos', 'type' => 'number'],
+            ['name' => 'nomenclatura_periodo', 'label' => 'Nome do período'],
+            ['name' => 'nomenclatura_serie', 'label' => 'Nome da série'],
+        ]],
+        'actions' => [
+            ['operation' => 'level.view', 'label' => 'Detalhes', 'result' => true],
+            ['operation' => 'level.update', 'label' => 'Actualizar', 'fields' => [
+                ['name' => 'codigo', 'label' => 'Código'],
+                ['name' => 'nome', 'label' => 'Nome'],
+                ['name' => 'nota_minima_aprovacao', 'label' => 'Nota mínima', 'type' => 'number'],
+                ['name' => 'escala_maxima', 'label' => 'Escala máxima', 'type' => 'number'],
+                ['name' => 'sistema_avaliacao', 'label' => 'Sistema', 'type' => 'select', 'options' => ['0-20', '0-100', 'A-F', 'ECTS']],
+                ['name' => 'activo', 'label' => 'Activo', 'type' => 'select', 'options' => ['true', 'false']],
+            ]],
+            ['operation' => 'level.delete', 'label' => 'Remover', 'confirm' => 'Remover este nível?'],
+        ],
+    ],
+    'series' => [
+        'label' => 'Séries', 'path' => '/api/escolar/series',
+        'columns' => [['codigo|id', 'Código'], ['nome', 'Série'], ['level_id', 'Nível (ID)'], ['ordem', 'Ordem'], ['activo', 'Activo']],
+        'create' => ['operation' => 'series.create', 'label' => 'Nova série', 'fields' => [
+            ['name' => 'level_id', 'label' => 'Nível (ID)', 'type' => 'number', 'required' => true],
+            ['name' => 'codigo', 'label' => 'Código', 'required' => true],
+            ['name' => 'nome', 'label' => 'Nome', 'required' => true],
+            ['name' => 'ordem', 'label' => 'Ordem', 'type' => 'number'],
+        ]],
+        'actions' => [
+            ['operation' => 'series.view', 'label' => 'Detalhes', 'result' => true],
+            ['operation' => 'series.update', 'label' => 'Actualizar', 'fields' => [
+                ['name' => 'level_id', 'label' => 'Nível (ID)', 'type' => 'number'],
+                ['name' => 'codigo', 'label' => 'Código'],
+                ['name' => 'nome', 'label' => 'Nome'],
+                ['name' => 'ordem', 'label' => 'Ordem', 'type' => 'number'],
+                ['name' => 'activo', 'label' => 'Activo', 'type' => 'select', 'options' => ['true', 'false']],
+            ]],
+            ['operation' => 'series.delete', 'label' => 'Remover', 'confirm' => 'Remover esta série?'],
+        ],
+    ],
+    'courses' => [
+        'label' => 'Cursos', 'path' => '/api/escolar/courses',
+        'columns' => [['codigo|id', 'Código'], ['nome', 'Curso'], ['level_id', 'Nível (ID)'], ['duracao_anos', 'Duração'], ['modalidade', 'Modalidade'], ['activo', 'Activo']],
+        'create' => ['operation' => 'course.create', 'label' => 'Novo curso', 'fields' => [
+            ['name' => 'level_id', 'label' => 'Nível (ID)', 'type' => 'number', 'required' => true],
+            ['name' => 'codigo', 'label' => 'Código', 'required' => true],
+            ['name' => 'nome', 'label' => 'Nome', 'required' => true],
+            ['name' => 'duracao_anos', 'label' => 'Duração (anos)', 'type' => 'number'],
+            ['name' => 'modalidade', 'label' => 'Modalidade', 'type' => 'select', 'options' => ['presencial', 'distancia', 'pos_laboral', 'hibrido']],
+        ]],
+        'actions' => [
+            ['operation' => 'course.view', 'label' => 'Detalhes', 'result' => true],
+            ['operation' => 'course.update', 'label' => 'Actualizar', 'fields' => [
+                ['name' => 'level_id', 'label' => 'Nível (ID)', 'type' => 'number'],
+                ['name' => 'codigo', 'label' => 'Código'],
+                ['name' => 'nome', 'label' => 'Nome'],
+                ['name' => 'duracao_anos', 'label' => 'Duração (anos)', 'type' => 'number'],
+                ['name' => 'modalidade', 'label' => 'Modalidade', 'type' => 'select', 'options' => ['presencial', 'distancia', 'pos_laboral', 'hibrido']],
+                ['name' => 'activo', 'label' => 'Activo', 'type' => 'select', 'options' => ['true', 'false']],
+            ]],
+            ['operation' => 'course.delete', 'label' => 'Remover', 'confirm' => 'Remover este curso?'],
+        ],
+    ],
     'teacher_assignments' => [
         'label' => 'Atribuições', 'path' => null,
         'description' => 'Associe professores a turmas e disciplinas.',
@@ -98,6 +193,18 @@ return [
                 ['name' => 'contacto', 'label' => 'Contacto', 'required' => true],
                 ['name' => 'email', 'label' => 'Email', 'type' => 'email'],
             ]],
+            ['operation' => 'portal.status',     'label' => 'Estado portal', 'result' => true],
+            ['operation' => 'portal.activate',   'label' => 'Activar portal', 'fields' => [
+                ['name' => 'email',    'label' => 'Email de acesso', 'type' => 'email',    'required' => true],
+                ['name' => 'password', 'label' => 'Senha inicial',   'type' => 'password', 'required' => true],
+            ]],
+            ['operation' => 'portal.invite', 'label' => 'Enviar convite', 'result' => true, 'fields' => [
+                ['name' => 'email', 'label' => 'Email do aluno', 'type' => 'email', 'required' => true],
+            ]],
+            ['operation' => 'portal.reset_senha', 'label' => 'Reset senha portal', 'fields' => [
+                ['name' => 'password', 'label' => 'Nova senha', 'type' => 'password', 'required' => true],
+            ]],
+            ['operation' => 'portal.deactivate', 'label' => 'Desactivar portal', 'confirm' => 'Desactivar acesso ao portal deste aluno?'],
         ],
     ],
     'enrollments' => [
@@ -157,6 +264,77 @@ return [
                 ['name' => 'data_fim', 'label' => 'Fim', 'type' => 'date'],
             ]],
             ['operation' => 'teacher.role.revoke', 'label' => 'Revogar', 'confirm' => 'Revogar este cargo?'],
+        ],
+    ],
+    'timetable' => [
+        'label' => 'Horários', 'path' => null,
+        'description' => 'Gestão de horários escolares.',
+        'create' => ['operation' => 'timetable.create', 'label' => 'Nova aula', 'fields' => [
+            ['name' => 'school_year_id', 'label' => 'Ano lectivo (ID)', 'type' => 'number', 'required' => true],
+            ['name' => 'class_id', 'label' => 'Turma (ID)', 'type' => 'number', 'required' => true],
+            ['name' => 'subject_id', 'label' => 'Disciplina (ID)', 'type' => 'number', 'required' => true],
+            ['name' => 'teacher_id', 'label' => 'Professor (ID)', 'type' => 'number', 'required' => true],
+            ['name' => 'time_slot_id', 'label' => 'Slot (ID)', 'type' => 'number', 'required' => true],
+            ['name' => 'dia_semana', 'label' => 'Dia da semana (1-7)', 'type' => 'number', 'required' => true],
+            ['name' => 'sala', 'label' => 'Sala'],
+        ]],
+        'tools' => [
+            ['operation' => 'timetable.class.view', 'label' => 'Horário por turma', 'result' => true, 'fields' => [
+                ['name' => 'class_id', 'label' => 'Turma (ID)', 'type' => 'number', 'required' => true],
+            ]],
+            ['operation' => 'timetable.teacher.view', 'label' => 'Horário por professor', 'result' => true, 'fields' => [
+                ['name' => 'teacher_id', 'label' => 'Professor (ID)', 'type' => 'number', 'required' => true],
+            ]],
+        ],
+    ],
+    'time_slots' => [
+        'label' => 'Slots horários', 'path' => '/api/escolar/time-slots',
+        'columns' => [['codigo|id', 'Código'], ['nome', 'Nome'], ['hora_inicio', 'Início'], ['hora_fim', 'Fim'], ['ordem', 'Ordem']],
+        'create' => ['operation' => 'time.slot.create', 'label' => 'Novo slot', 'fields' => [
+            ['name' => 'codigo', 'label' => 'Código', 'required' => true],
+            ['name' => 'nome', 'label' => 'Nome'],
+            ['name' => 'hora_inicio', 'label' => 'Início (HH:MM)', 'required' => true],
+            ['name' => 'hora_fim', 'label' => 'Fim (HH:MM)', 'required' => true],
+            ['name' => 'ordem', 'label' => 'Ordem', 'type' => 'number'],
+        ]],
+    ],
+    'calendar' => [
+        'label' => 'Calendário', 'path' => '/api/escolar/calendar-events',
+        'columns' => [['titulo|id', 'Título'], ['data_inicio', 'Início'], ['publico_alvo', 'Público'], ['dia_todo', 'Dia todo']],
+        'create' => ['operation' => 'calendar.event.create', 'label' => 'Novo evento', 'fields' => [
+            ['name' => 'school_year_id', 'label' => 'Ano lectivo (ID)', 'type' => 'number', 'required' => true],
+            ['name' => 'titulo', 'label' => 'Título', 'required' => true],
+            ['name' => 'descricao', 'label' => 'Descrição', 'type' => 'textarea'],
+            ['name' => 'data_inicio', 'label' => 'Data início', 'type' => 'date', 'required' => true],
+            ['name' => 'data_fim', 'label' => 'Data fim', 'type' => 'date'],
+            ['name' => 'publico_alvo', 'label' => 'Público', 'type' => 'select', 'options' => ['todos', 'alunos', 'professores', 'turma', 'curso']],
+        ]],
+        'actions' => [
+            ['operation' => 'calendar.event.view', 'label' => 'Detalhes', 'result' => true],
+            ['operation' => 'calendar.event.update', 'label' => 'Actualizar', 'fields' => [
+                ['name' => 'titulo', 'label' => 'Título'],
+                ['name' => 'descricao', 'label' => 'Descrição', 'type' => 'textarea'],
+                ['name' => 'data_inicio', 'label' => 'Data início', 'type' => 'date'],
+                ['name' => 'data_fim', 'label' => 'Data fim', 'type' => 'date'],
+            ]],
+            ['operation' => 'calendar.event.delete', 'label' => 'Remover', 'confirm' => 'Remover este evento?'],
+        ],
+    ],
+    'incidents' => [
+        'label' => 'Ocorrências', 'path' => '/api/escolar/incidents',
+        'columns' => [['data_ocorrencia', 'Data'], ['student_id', 'Aluno (ID)'], ['descricao', 'Descrição'], ['status', 'Estado']],
+        'create' => ['operation' => 'incident.create', 'label' => 'Registar ocorrência', 'fields' => [
+            ['name' => 'school_year_id', 'label' => 'Ano lectivo (ID)', 'type' => 'number', 'required' => true],
+            ['name' => 'student_id', 'label' => 'Aluno (ID)', 'type' => 'number', 'required' => true],
+            ['name' => 'descricao', 'label' => 'Descrição', 'type' => 'textarea', 'required' => true],
+            ['name' => 'data_ocorrencia', 'label' => 'Data', 'type' => 'date', 'required' => true],
+        ]],
+        'actions' => [
+            ['operation' => 'incident.view', 'label' => 'Detalhes', 'result' => true],
+            ['operation' => 'incident.update', 'label' => 'Actualizar', 'fields' => [
+                ['name' => 'descricao', 'label' => 'Descrição', 'type' => 'textarea'],
+                ['name' => 'status', 'label' => 'Estado', 'type' => 'select', 'options' => ['registada', 'em_analise', 'resolvida', 'arquivada']],
+            ]],
         ],
     ],
     'attendance' => [

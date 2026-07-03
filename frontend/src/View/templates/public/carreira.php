@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="/assets/css/styles.css">
     <link rel="stylesheet" href="/assets/css/vagas.css">
 </head>
@@ -36,6 +37,13 @@
 
             <h1 class="vagas-hero-title">Faz parte da equipa<br><span class="vagas-hero-accent">e258tech</span></h1>
             <p class="vagas-hero-sub">Estágios presenciais em Maputo. Cresce connosco.</p>
+
+            <div class="vagas-hero-actions" style="margin-top:1.5rem;display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+                <a href="#sidebar-form" id="btn-candidatar-publico" class="btn-primary" onclick="setCandidaturaTipo('publica')">Candidatar-me</a>
+                <a href="/carreira/candidato/login?returnTo=/vagas" id="btn-candidatar-conta" class="btn-primary" style="background:#047857;">Entrar e candidatar-me</a>
+                <a href="/carreira/estado" class="btn-outline">Consultar estado</a>
+                <a href="/carreira/candidato/login" class="btn-outline">Área do candidato</a>
+            </div>
 
             <?php if ($totalVagas > 0): ?>
             <div class="vagas-tabs" role="tablist">
@@ -72,7 +80,48 @@
     <?php else: ?>
     <!-- ═══════════════ CONTEÚDO ═══════════════ -->
     <div class="container">
-        <div class="vagas-layout">
+        <div class="vagas-layout vagas-layout--split">
+
+<!-- ═══════════════ LISTA DE VAGAS (ESQUERDA) ═══════════════ -->
+<aside class="vagas-lista" id="vagas-lista">
+<div class="vagas-lista-header">
+<h2 class="vagas-lista-title">Vagas em aberto</h2>
+<span class="vagas-lista-count"><?php echo count($vagas) ?> vaga<?php echo count($vagas) !== 1 ? 's' : '' ?></span>
+</div>
+<div class="vagas-cards" role="tablist" aria-label="Vagas disponíveis">
+<?php foreach ($vagas as $i => $v):
+    $slug = $view->vacancySlug($v['area']);
+    $prazoFmt = $view->vacancyDeadline($v['prazo'] ?? null);
+    $dias = isset($v['dias_restantes']) ? (int) $v['dias_restantes'] : null;
+    $deadlineClass = $view->vacancyDeadlineClass($dias);
+    $deadlineLabel = $view->vacancyDeadlineLabel($prazoFmt, $dias);
+?>
+<button class="vaga-card <?php echo $i === 0 ? 'active' : '' ?>"
+        id="card-<?php echo $slug ?>"
+        role="tab"
+        aria-selected="<?php echo $i === 0 ? 'true' : 'false' ?>"
+        aria-controls="vaga-<?php echo $slug ?>"
+        onclick="showVaga('<?php echo $slug ?>', this)">
+    <div class="vaga-card-top">
+        <span class="vaga-card-area" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        </span>
+        <span class="vaga-card-prazo <?php echo $deadlineClass ?>"><?php echo $deadlineLabel ?></span>
+    </div>
+    <h3 class="vaga-card-title"><?php echo htmlspecialchars($v['titulo']) ?></h3>
+    <p class="vaga-card-area-tag"><?php echo htmlspecialchars($v['area']) ?></p>
+    <div class="vaga-card-meta">
+        <span class="vaga-card-meta-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><?php echo htmlspecialchars($v['local']) ?></span>
+        <span class="vaga-card-meta-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><?php echo htmlspecialchars($v['tipo']) ?></span>
+    </div>
+    <span class="vaga-card-arrow" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+</button>
+<?php endforeach; ?>
+</div>
+</aside>
+
+<!-- ═══════════════ DETALHE + FORMULÁRIO (DIREITA) ═══════════════ -->
+<div class="vaga-detalhe" id="vaga-detalhe">
 
             <!-- Painéis das vagas -->
             <div class="vagas-panels">
@@ -268,6 +317,7 @@
                         <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
                         <input type="hidden" name="vaga_id" id="f-vaga-id" value="">
                         <input type="hidden" name="vaga_titulo" id="f-vaga-titulo" value="">
+                        <input type="hidden" name="tipo_candidatura" id="f-tipo-candidatura" value="publica">
 
                         <div class="form-group">
                             <label for="f-nome">Nome completo <span class="req-star">*</span></label>
@@ -281,6 +331,52 @@
                             <label for="f-telefone">Telefone</label>
                             <input type="tel" id="f-telefone" name="telefone" maxlength="30" placeholder="+258 84 000 0000">
                         </div>
+                        <div class="form-group">
+                            <label for="f-linkedin">LinkedIn</label>
+                            <input type="url" id="f-linkedin" name="linkedin" maxlength="255" placeholder="https://linkedin.com/in/...">
+                        </div>
+                        <div class="form-group">
+                            <label for="f-portfolio">Portfólio / Website</label>
+                            <input type="url" id="f-portfolio" name="portfolio" maxlength="255" placeholder="https://...">
+                        </div>
+                        <div class="form-group">
+                            <label for="f-cidade">Cidade</label>
+                            <input type="text" id="f-cidade" name="cidade" maxlength="100" placeholder="Maputo">
+                        </div>
+                        <div class="form-group">
+                            <label for="f-anos-experiencia">Anos de experiência</label>
+                            <input type="number" id="f-anos-experiencia" name="anos_experiencia" min="0" max="50" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="f-pretensao-salarial">Pretensão salarial (MZN)</label>
+                            <input type="number" id="f-pretensao-salarial" name="pretensao_salarial" min="0" placeholder="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="f-disponibilidade">Disponibilidade</label>
+                            <select id="f-disponibilidade" name="disponibilidade">
+                                <option value="">— Seleccionar —</option>
+                                <option value="imediata">Imediata</option>
+                                <option value="15_dias">15 dias</option>
+                                <option value="1_mes">1 mês</option>
+                                <option value="2_meses">2 meses</option>
+                                <option value="outro">Outro</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-como-conheceu">Como conheceu a vaga?</label>
+                            <input type="text" id="f-como-conheceu" name="como_conheceu" maxlength="100" placeholder="LinkedIn, site, indicação...">
+                        </div>
+                        <div class="form-group">
+                            <label for="f-necessidades-especiais">Necessidades especiais / Observações</label>
+                            <textarea id="f-necessidades-especiais" name="necessidades_especiais" rows="2" maxlength="1000" placeholder="Indique se necessita de algum acomodo especial..."></textarea>
+                        </div>
+
+                        <!-- Campos específicos desta vaga (Form Builder) -->
+                        <div id="campos-vaga-container"></div>
+
+                        <!-- Campos customizáveis do tenant -->
+                        <div id="campos-custom-container"></div>
+
                         <div class="form-group">
                             <label>CV (PDF, máx. 3 MB) <span class="req-star">*</span></label>
                             <label class="file-label" id="cv-label">
@@ -321,8 +417,9 @@
 
             </aside>
 
-        </div><!-- /vagas-layout -->
-    </div>
+        </div><!-- /vaga-detalhe -->
+    </div><!-- /vagas-layout -->
+</div><!-- /container -->
     <?php endif; ?>
 
     <!-- ═══════════════ FOOTER ═══════════════ -->
@@ -341,15 +438,17 @@
         const VAGAS = {};
         <?php foreach ($vagas as $v): $slug = $view->vacancySlug($v['area']); ?>
             VAGAS[<?php echo json_encode($slug) ?>] = <?php echo json_encode([
-                'id'          => (int)$v['id'],
-                'titulo'      => $v['titulo'],
-                'local'       => $v['local'],
-                'regime'      => $v['regime'],
-                'tipo'        => $v['tipo'],
-                'num_vagas'   => (int)$v['num_vagas'],
-                'prazo'       => $view->vacancyDeadline($v['prazo'] ?? null),
-                'prazo_label' => $view->vacancyDeadlineLabel($view->vacancyDeadline($v['prazo'] ?? null), isset($v['dias_restantes']) ? (int)$v['dias_restantes'] : null),
-                'prazo_class' => $view->vacancyDeadlineClass(isset($v['dias_restantes']) ? (int)$v['dias_restantes'] : null),
+                'id'              => (int)$v['id'],
+                'titulo'          => $v['titulo'],
+                'local'           => $v['local'],
+                'regime'          => $v['regime'],
+                'tipo'            => $v['tipo'],
+                'num_vagas'       => (int)$v['num_vagas'],
+                'prazo'           => $view->vacancyDeadline($v['prazo'] ?? null),
+                'prazo_label'     => $view->vacancyDeadlineLabel($view->vacancyDeadline($v['prazo'] ?? null), isset($v['dias_restantes']) ? (int)$v['dias_restantes'] : null),
+                'prazo_class'     => $view->vacancyDeadlineClass(isset($v['dias_restantes']) ? (int)$v['dias_restantes'] : null),
+                'permite_publica' => (bool)($v['permite_publica'] ?? true),
+                'permite_conta'   => (bool)($v['permite_conta'] ?? true),
             ]) ?>;
         <?php endforeach; ?>
 
@@ -369,6 +468,15 @@
             }
             document.getElementById('f-vaga-id').value     = d.id;
             document.getElementById('f-vaga-titulo').value = d.titulo;
+
+            // Mostrar/ocultar botões conforme tipos permitidos
+            const btnPublica = document.getElementById('btn-candidatar-publico');
+            const btnConta   = document.getElementById('btn-candidatar-conta');
+            if (btnPublica) btnPublica.style.display = d.permite_publica ? '' : 'none';
+            if (btnConta)   btnConta.style.display   = d.permite_conta   ? '' : 'none';
+
+            // Carregar campos específicos desta vaga
+            carregarCamposVaga(d.id);
         }
 
         function showVaga(key, btn) {
@@ -380,21 +488,118 @@
                 b.classList.remove('active');
                 b.setAttribute('aria-selected', 'false');
             });
+            document.querySelectorAll('.vaga-card').forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', 'false');
+            });
             document.getElementById('vaga-' + key).classList.add('active');
             document.getElementById('vaga-' + key).removeAttribute('aria-hidden');
             btn.classList.add('active');
             btn.setAttribute('aria-selected', 'true');
+
+            const card = document.getElementById('card-' + key);
+            if (card && card !== btn) {
+                card.classList.add('active');
+                card.setAttribute('aria-selected', 'true');
+            }
+
             updateSidebar(key);
             const msg = document.getElementById('form-msg');
             msg.style.display = 'none';
             msg.className = 'form-msg';
+
+            if (window.innerWidth <= 900) {
+                document.getElementById('vaga-detalhe')?.scrollIntoView({behavior: 'smooth', block: 'start'});
+            }
+        }
+
+        // Carregar campos específicos da vaga seleccionada
+        async function carregarCamposVaga(vagaId) {
+            const container = document.getElementById('campos-vaga-container');
+            if (!container) return;
+            container.innerHTML = '';
+            if (!vagaId) return;
+            try {
+                const res = await fetch(`/api/public/recrutamento/vagas/${vagaId}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const campos = data.campos || [];
+                campos.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'form-group';
+                    const req = c.obrigatorio ? ' <span class="req-star">*</span>' : '';
+                    let input = '';
+                    const name = `vaga_${c.codigo}`;
+                    switch (c.tipo) {
+                        case 'textarea':
+                            input = `<textarea id="${name}" name="${name}" rows="3" ${c.obrigatorio ? 'required' : ''}></textarea>`;
+                            break;
+                        case 'select':
+                            input = `<select id="${name}" name="${name}" ${c.obrigatorio ? 'required' : ''}><option value="">— Seleccionar —</option>${(c.opcoes||[]).map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;
+                            break;
+                        case 'multiselect':
+                            input = `<select id="${name}" name="${name}" multiple ${c.obrigatorio ? 'required' : ''}>${(c.opcoes||[]).map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;
+                            break;
+                        case 'checkbox':
+                            input = `<label class="checkbox-label"><input type="checkbox" id="${name}" name="${name}" value="Sim" ${c.obrigatorio ? 'required' : ''}> ${c.label}</label>`;
+                            break;
+                        case 'numero':
+                            input = `<input type="number" id="${name}" name="${name}" ${c.obrigatorio ? 'required' : ''}>`;
+                            break;
+                        case 'data':
+                            input = `<input type="date" id="${name}" name="${name}" ${c.obrigatorio ? 'required' : ''}>`;
+                            break;
+                        case 'ficheiro':
+                            input = `<input type="file" id="${name}" name="${name}" ${c.obrigatorio ? 'required' : ''}>`;
+                            break;
+                        default:
+                            input = `<input type="text" id="${name}" name="${name}" maxlength="255" ${c.obrigatorio ? 'required' : ''}>`;
+                    }
+                    div.innerHTML = c.tipo !== 'checkbox'
+                        ? `<label for="${name}">${c.label}${req}</label>${input}`
+                        : input;
+                    container.appendChild(div);
+                });
+            } catch(e) { console.error('Erro ao carregar campos da vaga', e); }
+        }
+
+        // Definir tipo de candidatura
+        function setCandidaturaTipo(tipo) {
+            const el = document.getElementById('f-tipo-candidatura');
+            if (el) el.value = tipo;
         }
 
         const firstKey = Object.keys(VAGAS)[0];
         if (firstKey) updateSidebar(firstKey);
 
+        // Pré-preencher formulário se candidato autenticado via conta
+        (function preFillCandidato() {
+            const id    = localStorage.getItem('candidato_id');
+            const nome  = localStorage.getItem('candidato_nome');
+            const email = localStorage.getItem('candidato_email');
+            const tel   = localStorage.getItem('candidato_telefone');
+            if (!id) return;
+
+            const elNome  = document.getElementById('f-nome');
+            const elEmail = document.getElementById('f-email');
+            const elTel   = document.getElementById('f-telefone');
+            if (elNome  && !elNome.value  && nome)  elNome.value  = nome;
+            if (elEmail && !elEmail.value && email) elEmail.value = email;
+            if (elTel   && !elTel.value   && tel)   elTel.value   = tel;
+
+            // Definir tipo candidatura via conta automaticamente
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('tipo') === 'conta') {
+                setCandidaturaTipo('conta');
+                // Scroll para o formulário
+                setTimeout(() => document.getElementById('sidebar-form')?.scrollIntoView({behavior:'smooth'}), 300);
+            }
+        })();
+
         function filePreview(inputId, spanId, labelId) {
-            document.getElementById(inputId).addEventListener('change', function() {
+            const el = document.getElementById(inputId);
+            if (!el) return;
+            el.addEventListener('change', function() {
                 const name = this.files[0]?.name;
                 document.getElementById(spanId).textContent = name || 'Escolher ficheiro…';
                 document.getElementById(labelId).classList.toggle('has-file', !!name);
@@ -403,7 +608,59 @@
         filePreview('f-cv', 'cv-name', 'cv-label');
         filePreview('f-carta', 'carta-name', 'carta-label');
 
-        document.getElementById('form-candidatura').addEventListener('submit', async function(e) {
+        async function carregarCamposCustom() {
+            try {
+                const container = document.getElementById('campos-custom-container');
+                if (!container) return;
+                const res = await fetch('/api/public/recrutamento/campos-custom');
+                if (!res.ok) return;
+                const campos = await res.json();
+                if (!Array.isArray(campos)) return;
+                container.innerHTML = '';
+                campos.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'form-group';
+                    let inputHtml = '';
+                    const req = c.obrigatorio ? ' <span class="req-star">*</span>' : '';
+                    switch (c.tipo) {
+                        case 'textarea':
+                            inputHtml = `<textarea id="custom-${c.codigo}" name="custom_${c.codigo}" rows="3" ${c.obrigatorio ? 'required' : ''}></textarea>`;
+                            break;
+                        case 'select':
+                            inputHtml = `<select id="custom-${c.codigo}" name="custom_${c.codigo}" ${c.obrigatorio ? 'required' : ''}><option value="">— Seleccionar —</option>${(c.opcoes || []).map(o => `<option value="${o}">${o}</option>`).join('')}</select>`;
+                            break;
+                        case 'multiselect':
+                            inputHtml = `<select id="custom-${c.codigo}" name="custom_${c.codigo}" multiple ${c.obrigatorio ? 'required' : ''}>${(c.opcoes || []).map(o => `<option value="${o}">${o}</option>`).join('')}</select>`;
+                            break;
+                        case 'checkbox':
+                            inputHtml = `<label class="checkbox-label"><input type="checkbox" id="custom-${c.codigo}" name="custom_${c.codigo}" value="Sim" ${c.obrigatorio ? 'required' : ''}> ${c.label}</label>`;
+                            break;
+                        case 'numero':
+                            inputHtml = `<input type="number" id="custom-${c.codigo}" name="custom_${c.codigo}" ${c.obrigatorio ? 'required' : ''}>`;
+                            break;
+                        case 'data':
+                            inputHtml = `<input type="date" id="custom-${c.codigo}" name="custom_${c.codigo}" ${c.obrigatorio ? 'required' : ''}>`;
+                            break;
+                        case 'ficheiro':
+                            inputHtml = `<input type="file" id="custom-${c.codigo}" name="custom_${c.codigo}" ${c.obrigatorio ? 'required' : ''}>`;
+                            break;
+                        default:
+                            inputHtml = `<input type="text" id="custom-${c.codigo}" name="custom_${c.codigo}" maxlength="255" ${c.obrigatorio ? 'required' : ''}>`;
+                    }
+                    if (c.tipo !== 'checkbox') {
+                        div.innerHTML = `<label for="custom-${c.codigo}">${c.label}${req}</label>${inputHtml}`;
+                    } else {
+                        div.innerHTML = inputHtml;
+                    }
+                    container.appendChild(div);
+                });
+            } catch (e) {
+                console.error('Erro ao carregar campos customizáveis', e);
+            }
+        }
+        carregarCamposCustom();
+
+        document.getElementById('form-candidatura')?.addEventListener('submit', async function(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-submit');
             const msg = document.getElementById('form-msg');
@@ -413,7 +670,7 @@
             msg.style.display = 'none';
 
             try {
-                const res = await fetch('/api/candidatura', {
+                const res = await fetch('/api/public/recrutamento/candidaturas', {
                     method: 'POST',
                     body: new FormData(this)
                 });
@@ -421,15 +678,19 @@
 
                 if (data.sucesso) {
                     msg.className = 'form-msg sucesso';
-                    msg.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> ${data.sucesso}`;
+                    msg.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> ${data.sucesso}<br><strong>Código de acompanhamento: ${data.codigo_acompanhamento}</strong><br><a href="/carreira/estado?codigo=${data.codigo_acompanhamento}" style="color:inherit;text-decoration:underline;">Consultar estado</a>`;
+                    const codigos = JSON.parse(localStorage.getItem('codigos_acompanhamento') || '[]');
+                    codigos.unshift(data.codigo_acompanhamento);
+                    localStorage.setItem('codigos_acompanhamento', JSON.stringify(codigos.slice(0, 20)));
                     this.reset();
                     document.getElementById('cv-name').textContent = 'Escolher ficheiro…';
                     document.getElementById('carta-name').textContent = 'Escolher ficheiro…';
                     document.getElementById('cv-label').classList.remove('has-file');
                     document.getElementById('carta-label').classList.remove('has-file');
+                    carregarCamposCustom();
                 } else {
                     msg.className = 'form-msg erro';
-                    msg.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> ${data.erro || 'Erro ao enviar candidatura.'}`;
+                    msg.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> ${data.error || 'Erro ao enviar candidatura.'}`;
                 }
             } catch {
                 msg.className = 'form-msg erro';

@@ -33,7 +33,7 @@ func (h *Handler) ListarProcessosDisciplinaresFuncionario(w http.ResponseWriter,
 
 	rows, err := h.db.Query(r.Context(), `
 		SELECT id, tipo, motivo, descricao, data_ocorrencia, data_abertura, estado, decisao, data_decisao, aberto_por, decidido_por, created_at
-		  FROM processos_disciplinares
+		  FROM rh.processos_disciplinares
 		 WHERE funcionario_id=$1 AND tenant_id=$2
 		 ORDER BY data_ocorrencia DESC`, funcionarioID, user.TenantID)
 	if err != nil {
@@ -91,7 +91,7 @@ func (h *Handler) CriarProcessoDisciplinarFuncionario(w http.ResponseWriter, r *
 
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO processos_disciplinares (tenant_id, funcionario_id, tipo, motivo, descricao, data_ocorrencia, aberto_por)
+		INSERT INTO rh.processos_disciplinares (tenant_id, funcionario_id, tipo, motivo, descricao, data_ocorrencia, aberto_por)
 		VALUES ($1,$2,$3,$4,$5,$6::date,$7) RETURNING id`,
 		user.TenantID, funcionarioID, body.Tipo, body.Motivo, body.Descricao, body.DataOcorrencia, user.ID).Scan(&id)
 	if err != nil {
@@ -136,7 +136,7 @@ func (h *Handler) ActualizarProcessoDisciplinarFuncionario(w http.ResponseWriter
 	}
 
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE processos_disciplinares SET
+		UPDATE rh.processos_disciplinares SET
 		  estado=COALESCE($1,estado), decisao=COALESCE($2,decisao), data_decisao=COALESCE($3::date,data_decisao),
 		  descricao=COALESCE($4,descricao), decidido_por=COALESCE($5,decidido_por)
 		WHERE id=$6 AND funcionario_id=$7 AND tenant_id=$8`,
@@ -158,7 +158,7 @@ func (h *Handler) RemoverProcessoDisciplinarFuncionario(w http.ResponseWriter, r
 	registoID := chi.URLParam(r, "registoId")
 
 	tag, err := h.db.Exec(r.Context(), `
-		DELETE FROM processos_disciplinares
+		DELETE FROM rh.processos_disciplinares
 		 WHERE id=$1 AND funcionario_id=$2 AND tenant_id=$3`,
 		registoID, funcionarioID, user.TenantID)
 	if err != nil {

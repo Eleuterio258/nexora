@@ -9,6 +9,7 @@ use E258Tech\Infrastructure\Security\WebSecurity;
 use E258Tech\Http\ApiResult;
 use E258Tech\Http\Request;
 use E258Tech\Http\ServerRequest;
+use E258Tech\Model\Exception\OperationException;
 use Throwable;
 
 final class AdminApiKernel
@@ -53,6 +54,8 @@ final class AdminApiKernel
             }
 
             $this->respond($result->body, $result->status);
+        } catch (OperationException $exception) {
+            $this->respond([$errorKey => $exception->getMessage()], $exception->status);
         } catch (HttpClientException $exception) {
             error_log('[admin-api] ' . $exception->getMessage());
             $this->respond([$errorKey => 'Servico Nexora temporariamente indisponivel.'], 503);

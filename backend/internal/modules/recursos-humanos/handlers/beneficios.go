@@ -25,8 +25,8 @@ func (h *Handler) ListarBeneficios(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT b.id, b.codigo, b.nome, b.descricao, b.valor_padrao, b.ativo,
-		       (SELECT COUNT(*) FROM funcionario_beneficios fb WHERE fb.beneficio_id = b.id)
-		  FROM beneficios b
+		       (SELECT COUNT(*) FROM rh.funcionario_beneficios fb WHERE fb.beneficio_id = b.id)
+		  FROM rh.beneficios b
 		 WHERE b.tenant_id=$1
 		 ORDER BY b.nome`, user.TenantID)
 	defer rows.Close()
@@ -54,7 +54,7 @@ func (h *Handler) CriarBeneficio(w http.ResponseWriter, r *http.Request) {
 	}
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO beneficios (tenant_id, codigo, nome, descricao, valor_padrao)
+		INSERT INTO rh.beneficios (tenant_id, codigo, nome, descricao, valor_padrao)
 		VALUES ($1,$2,$3,$4,$5) RETURNING id`,
 		user.TenantID, body.Codigo, body.Nome, body.Descricao, body.ValorPadrao).Scan(&id)
 	if err != nil {
@@ -88,7 +88,7 @@ func (h *Handler) ActualizarBeneficio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE beneficios SET
+		UPDATE rh.beneficios SET
 		  codigo=COALESCE($1,codigo), nome=COALESCE($2,nome), descricao=COALESCE($3,descricao),
 		  valor_padrao=COALESCE($4,valor_padrao), ativo=COALESCE($5,ativo), updated_at=NOW()
 		WHERE id=$6 AND tenant_id=$7`,
@@ -113,7 +113,7 @@ func (h *Handler) RemoverBeneficio(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	var emUso bool
-	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM funcionario_beneficios WHERE beneficio_id=$1 AND tenant_id=$2)`, id, user.TenantID).Scan(&emUso); err != nil {
+	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM rh.funcionario_beneficios WHERE beneficio_id=$1 AND tenant_id=$2)`, id, user.TenantID).Scan(&emUso); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
@@ -122,7 +122,7 @@ func (h *Handler) RemoverBeneficio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tag, err := h.db.Exec(r.Context(), `DELETE FROM beneficios WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), `DELETE FROM rh.beneficios WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return

@@ -9,15 +9,23 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
+	"nexora/internal/storage"
 )
 
-type Handler struct {
-	db  *pgxpool.Pool
-	cfg *config.Config
+// NotificationHub permite ao handler empurrar eventos WS aos utilizadores.
+type NotificationHub interface {
+	SendToUser(userID int64, payload []byte)
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config) *Handler {
-	return &Handler{db: db, cfg: cfg}
+type Handler struct {
+	db      *pgxpool.Pool
+	cfg     *config.Config
+	storage storage.Provider
+	hub     NotificationHub
+}
+
+func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider, hub NotificationHub) *Handler {
+	return &Handler{db: db, cfg: cfg, storage: st, hub: hub}
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {

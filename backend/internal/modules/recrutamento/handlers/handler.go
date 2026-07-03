@@ -9,15 +9,17 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
+	"nexora/internal/storage"
 )
 
 type Handler struct {
-	db  *pgxpool.Pool
-	cfg *config.Config
+	db      *pgxpool.Pool
+	cfg     *config.Config
+	storage storage.Provider
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config) *Handler {
-	return &Handler{db: db, cfg: cfg}
+func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider) *Handler {
+	return &Handler{db: db, cfg: cfg, storage: st}
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {
@@ -62,4 +64,31 @@ func filterList(items []string) []string {
 		}
 	}
 	return out
+}
+
+func nullIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func parseOptionalInt(s string) *int {
+	if s == "" {
+		return nil
+	}
+	if v, err := strconv.Atoi(s); err == nil {
+		return &v
+	}
+	return nil
+}
+
+func parseOptionalFloat(s string) *float64 {
+	if s == "" {
+		return nil
+	}
+	if v, err := strconv.ParseFloat(s, 64); err == nil {
+		return &v
+	}
+	return nil
 }

@@ -87,6 +87,16 @@ include dirname(__DIR__) . '/layouts/top.php';
                     <input class="adm-input" type="text" id="f-telefone" name="telefone" maxlength="30" placeholder="ex: +258 84 000 0000">
                 </div>
             </div>
+            <div class="adm-form-row">
+                <div class="adm-form-group">
+                    <label class="adm-label" for="f-escopo">Escopo de acesso <span style="color:var(--adm-red)">*</span></label>
+                    <select class="adm-select" id="f-escopo" name="escopo" required>
+                        <option value="erp" selected>ERP Geral</option>
+                        <option value="escola">Painel da Escola</option>
+                    </select>
+                    <p class="adm-input-hint">Define quais painéis o utilizador pode aceder.</p>
+                </div>
+            </div>
         </div>
     </div>
     <div style="display:flex;gap:var(--adm-sp-3);justify-content:flex-end;padding-bottom:var(--adm-sp-8)">
@@ -148,6 +158,17 @@ include dirname(__DIR__) . '/layouts/top.php';
                     <div class="adm-form-group">
                         <label class="adm-label">Criado em</label>
                         <input class="adm-input" type="text" value="<?= date('d/m/Y H:i', strtotime($user['created_at'])) ?>" disabled>
+                    </div>
+                </div>
+                <div class="adm-form-row">
+                    <div class="adm-form-group">
+                        <label class="adm-label" for="f-escopo">Escopo de acesso <span style="color:var(--adm-red)">*</span></label>
+                        <select class="adm-select" id="f-escopo" name="escopo" required>
+                            <?php $currentEscopo = $user['escopo'] ?? 'erp'; ?>
+                            <option value="erp" <?= $currentEscopo === 'erp' ? 'selected' : '' ?>>ERP Geral</option>
+                            <option value="escola" <?= $currentEscopo === 'escola' ? 'selected' : '' ?>>Painel da Escola</option>
+                        </select>
+                        <p class="adm-input-hint">Define quais painéis o utilizador pode aceder.</p>
                     </div>
                 </div>
                 <div class="adm-form-group" style="margin-bottom:0;max-width:280px">
@@ -284,8 +305,8 @@ include dirname(__DIR__) . '/layouts/top.php';
                 Permissões atribuídas automaticamente a todos os utilizadores do tipo <strong><?= htmlspecialchars($tipoUtilizador) ?></strong>, sem necessidade de configuração manual.
             </p>
             <div style="display:flex;flex-wrap:wrap;gap:var(--adm-sp-2)">
-                <span class="adm-badge adm-badge--green"><i class="fa-solid fa-umbrella-beach"></i> pedido-ferias · ver</span>
-                <span class="adm-badge adm-badge--green"><i class="fa-solid fa-umbrella-beach"></i> pedido-ferias · criar</span>
+                <span class="adm-badge adm-badge--green"><i class="fa-solid fa-umbrella-beach"></i> pedido-ferias · ver_pedidos</span>
+                <span class="adm-badge adm-badge--green"><i class="fa-solid fa-umbrella-beach"></i> pedido-ferias · submeter_pedido</span>
             </div>
             <p class="adm-input-hint" style="margin-top:var(--adm-sp-3)">
                 Para adicionar mais permissões automáticas ao tipo, edite a tabela <code>auth.permissoes_tipo</code>.

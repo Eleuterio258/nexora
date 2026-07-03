@@ -6,7 +6,6 @@ namespace E258Tech\Controller\Admin\Api;
 use E258Tech\Controller\Admin\AdminApiDependencies;
 use E258Tech\Http\ApiResult;
 use E258Tech\Http\Request;
-use E258Tech\Infrastructure\Auth\PhpSessionAuthorization;
 
 final class CrmController
 {
@@ -18,10 +17,6 @@ final class CrmController
     public function atividadeSave(Request $request, AdminApiDependencies $d): ApiResult
     {
         $id = $request->int('id');
-        $action = $id ? 'editar' : 'criar';
-        if (!(new PhpSessionAuthorization())->can('crm', $action)) {
-            return new ApiResult(['erro' => 'Sem permissao para executar esta acao.'], 403);
-        }
 
         $payload = [
             'lead_id' => $request->int('lead_id'),
@@ -80,12 +75,6 @@ final class CrmController
     public function leadSave(Request $request, AdminApiDependencies $d): ApiResult
     {
         $id = $request->int('id');
-        $action = $id ? 'editar' : 'criar';
-
-        $authorization = new PhpSessionAuthorization();
-        if (!$authorization->can('crm', $action)) {
-            return new ApiResult(['erro' => 'Sem permissao para executar esta acao.'], 403);
-        }
 
         $payload = [
             'nome' => $request->string('nome'),
@@ -128,10 +117,6 @@ final class CrmController
     public function oportunidadeSave(Request $request, AdminApiDependencies $d): ApiResult
     {
         $id = $request->int('id');
-        $action = $id ? 'editar' : 'criar';
-        if (!(new PhpSessionAuthorization())->can('crm', $action)) {
-            return new ApiResult(['erro' => 'Sem permissao para executar esta acao.'], 403);
-        }
 
         $payload = [
             'titulo' => $request->string('titulo'),

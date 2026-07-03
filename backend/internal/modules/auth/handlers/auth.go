@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"time"
 
@@ -18,24 +19,100 @@ import (
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-func (h *Handler) signAccess(userID, tenantID int64, tipo string) (string, error) {
+const (
+	portalJWTExpiry      = 8 * time.Hour
+	encarregadoJWTExpiry = 8 * time.Hour
+	candidatoJWTExpiry   = 30 * 24 * time.Hour
+)
+
+func (h *Handler) signAccess(userID, tenantID int64, tipo, escopo string) (string, error) {
+	if escopo == "" {
+		escopo = "erp"
+	}
+	jti, err := randomJTI()
+	if err != nil {
+		return "", err
+	}
 	claims := jwt.MapClaims{
-		"sub":  userID,
-		"tid":  tenantID,
-		"tipo": tipo,
-		"exp":  time.Now().Add(h.cfg.JWTExpiresIn).Unix(),
-		"iat":  time.Now().Unix(),
+		"sub":    userID,
+		"tid":    tenantID,
+		"tipo":   tipo,
+		"escopo": escopo,
+		"jti":    jti,
+		"exp":    time.Now().Add(h.cfg.JWTExpiresIn).Unix(),
+		"iat":    time.Now().Unix(),
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.cfg.JWTSecret))
 }
 
 func (h *Handler) signRefresh(userID int64) (string, error) {
+	jti, err := randomJTI()
+	if err != nil {
+		return "", err
+	}
 	claims := jwt.MapClaims{
 		"sub": userID,
+		"jti": jti,
 		"exp": time.Now().Add(h.cfg.JWTRefreshExpiresIn).Unix(),
 		"iat": time.Now().Unix(),
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.cfg.JWTRefreshSecret))
+}
+
+func (h *Handler) signAlunoToken(studentID, tenantID int64) (string, error) {
+	jti, err := randomJTI()
+	if err != nil {
+		return "", err
+	}
+	claims := jwt.MapClaims{
+		"sub":  studentID,
+		"tid":  tenantID,
+		"tipo": "aluno",
+		"jti":  jti,
+		"exp":  time.Now().Add(portalJWTExpiry).Unix(),
+		"iat":  time.Now().Unix(),
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.cfg.JWTSecret))
+}
+
+func (h *Handler) signEncarregadoToken(email string, tenantID int64) (string, error) {
+	jti, err := randomJTI()
+	if err != nil {
+		return "", err
+	}
+	claims := jwt.MapClaims{
+		"email": email,
+		"tid":   tenantID,
+		"tipo":  "encarregado",
+		"jti":   jti,
+		"exp":   time.Now().Add(encarregadoJWTExpiry).Unix(),
+		"iat":   time.Now().Unix(),
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.cfg.JWTSecret))
+}
+
+func (h *Handler) signCandidatoToken(candidatoID, tenantID int64) (string, error) {
+	jti, err := randomJTI()
+	if err != nil {
+		return "", err
+	}
+	claims := jwt.MapClaims{
+		"sub":  candidatoID,
+		"tid":  tenantID,
+		"tipo": "candidato",
+		"jti":  jti,
+		"exp":  time.Now().Add(candidatoJWTExpiry).Unix(),
+		"iat":  time.Now().Unix(),
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.cfg.JWTSecret))
+}
+
+// clientIP devolve o IP sem porta, para colunas do tipo inet (ex.: candidato_sessions.ip).
+func clientIP(r *http.Request) string {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }
 
 func (h *Handler) insertSession(r *http.Request, userID int64, tokenHash string, expiresAt time.Time) error {
@@ -70,14 +147,17 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		passwordHash string
 		estado       string
 		tipo         string
+		escopo       string
 	)
 
-	// tenant_id e tipo vêm sempre da base de dados — nunca do cliente
+	// tenant_id vem da membership — superadmins não têm membership (tenant_id = 0)
 	err := h.db.QueryRow(r.Context(), `
-		SELECT id, tenant_id, nome, password_hash, estado, tipo
-		  FROM users WHERE email = LOWER($1)`,
+		SELECT u.id, COALESCE(m.tenant_id, 0), u.nome, u.password_hash, u.estado, u.tipo, COALESCE(NULLIF(m.escopo, ''), 'erp')
+		  FROM users u
+		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
+		 WHERE u.email = LOWER($1)`,
 		body.Email,
-	).Scan(&userID, &tenantID, &nome, &passwordHash, &estado, &tipo)
+	).Scan(&userID, &tenantID, &nome, &passwordHash, &estado, &tipo, &escopo)
 
 	found := err == nil
 	var pwOk bool
@@ -90,7 +170,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		INSERT INTO login_history (user_id, tenant_id, email_tentado, sucesso, ip_address, user_agent, motivo_falha)
 		VALUES ($1, $2, LOWER($3), $4, $5, $6, $7)`,
 		nullInt(userID, found && pwOk),
-		tenantID,
+		nullInt(tenantID, tenantID > 0),
 		body.Email,
 		found && pwOk,
 		r.RemoteAddr,
@@ -106,8 +186,20 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Conta "+estado, http.StatusForbidden)
 		return
 	}
+	switch tipo {
+	case "aluno":
+		h.loginAluno(w, r, userID, nome)
+	case "encarregado":
+		h.loginEncarregado(w, r, userID, nome)
+	case "candidato":
+		h.LoginCandidato(w, r, userID, nome)
+	default:
+		h.loginFuncionario(w, r, userID, tenantID, nome, body.Email, tipo, escopo)
+	}
+}
 
-	accessToken, err := h.signAccess(userID, tenantID, tipo)
+func (h *Handler) loginFuncionario(w http.ResponseWriter, r *http.Request, userID, tenantID int64, nome, email, tipo, escopo string) {
+	accessToken, err := h.signAccess(userID, tenantID, tipo, escopo)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -126,13 +218,27 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, userID)
 
-	// Carregar permissões organizadas por módulo
-	access, _ := models.LoadUserAccess(r.Context(), h.db, userID)
+	// Carregar cargo, módulos e features para enriquecer a resposta do login.
+	userAccess, _ := models.LoadUserAccess(r.Context(), h.db, userID)
+
+	userObj := map[string]interface{}{
+		"id":     userID,
+		"nome":   nome,
+		"email":  email,
+		"escopo": escoposPorTipoEscopo(tipo, escopo),
+	}
 	modulos := []models.ModuloAcesso{}
-	var cargoNome interface{} = nil
-	if access != nil {
-		modulos = access.Modulos
-		cargoNome = access.CargoNome
+	features := []string{}
+	if userAccess != nil {
+		userObj["tenant_id"] = userAccess.TenantID
+		userObj["cargo_id"] = userAccess.CargoID
+		if userAccess.CargoNome != nil {
+			userObj["cargo"] = *userAccess.CargoNome
+		}
+		modulos = userAccess.Modulos
+		features = userAccess.Features
+	} else {
+		userObj["tenant_id"] = tenantID
 	}
 
 	jsonOK(w, map[string]interface{}{
@@ -141,13 +247,184 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		"token_type":    "Bearer",
 		"expires_in":    int(h.cfg.JWTExpiresIn.Seconds()),
 		"tipo":          tipo,
-		"user": map[string]interface{}{
-			"id":    userID,
-			"nome":  nome,
-			"email": body.Email,
-			"cargo": cargoNome,
+		"escopo":        escoposPorTipoEscopo(tipo, escopo),
+		"user":          userObj,
+		"modulos":       modulos,
+		"features":      features,
+	}, http.StatusOK)
+}
+
+func (h *Handler) loginAluno(w http.ResponseWriter, r *http.Request, userID int64, nome string) {
+	var studentID, tenantID int64
+	var codigo string
+	if err := h.db.QueryRow(r.Context(), `
+		SELECT id, tenant_id, codigo
+		  FROM gestao_escolar.school_students
+		 WHERE user_id = $1
+		 LIMIT 1`,
+		userID,
+	).Scan(&studentID, &tenantID, &codigo); err != nil {
+		jsonErr(w, "Aluno não encontrado", http.StatusForbidden)
+		return
+	}
+
+	accessToken, err := h.signAlunoToken(studentID, tenantID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	refreshToken, err := h.signRefresh(userID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	expiresAt := time.Now().Add(portalJWTExpiry)
+	_, err = h.db.Exec(r.Context(), `
+		INSERT INTO gestao_escolar.portal_sessions
+			(student_id, tenant_id, token_hash, ip_address, user_agent, expira_em)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		studentID, tenantID, mw.HashToken(accessToken),
+		r.RemoteAddr, r.Header.Get("User-Agent"), expiresAt,
+	)
+	if err != nil {
+		jsonErr(w, "Erro ao criar sessão", http.StatusInternalServerError)
+		return
+	}
+
+	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, userID)
+
+	jsonOK(w, map[string]interface{}{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+		"token_type":    "Bearer",
+		"expires_in":    int(portalJWTExpiry.Seconds()),
+		"tipo":          "aluno",
+		"escopo":        escoposPorTipoEscopo("aluno", ""),
+		"aluno": map[string]interface{}{
+			"id":     studentID,
+			"nome":   nome,
+			"codigo": codigo,
+			"escopo": escoposPorTipoEscopo("aluno", ""),
 		},
-		"modulos": modulos,
+	}, http.StatusOK)
+}
+
+func (h *Handler) loginEncarregado(w http.ResponseWriter, r *http.Request, userID int64, nome string) {
+	var tenantID int64
+	var email string
+	if err := h.db.QueryRow(r.Context(), `
+		SELECT tenant_id, portal_email
+		  FROM gestao_escolar.school_guardians
+		 WHERE user_id = $1 AND portal_ativo = true
+		 ORDER BY principal DESC
+		 LIMIT 1`,
+		userID,
+	).Scan(&tenantID, &email); err != nil {
+		jsonErr(w, "Portal do encarregado não activado", http.StatusForbidden)
+		return
+	}
+
+	accessToken, err := h.signEncarregadoToken(email, tenantID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	refreshToken, err := h.signRefresh(userID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	expiresAt := time.Now().Add(encarregadoJWTExpiry)
+	_, err = h.db.Exec(r.Context(), `
+		INSERT INTO gestao_escolar.guardian_portal_sessions
+			(guardian_email, tenant_id, token_hash, ip_address, user_agent, expira_em)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		email, tenantID, mw.HashToken(accessToken),
+		r.RemoteAddr, r.Header.Get("User-Agent"), expiresAt,
+	)
+	if err != nil {
+		jsonErr(w, "Erro ao criar sessão", http.StatusInternalServerError)
+		return
+	}
+
+	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, userID)
+
+	jsonOK(w, map[string]interface{}{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+		"token_type":    "Bearer",
+		"expires_in":    int(encarregadoJWTExpiry.Seconds()),
+		"tipo":          "encarregado",
+		"escopo":        escoposPorTipoEscopo("encarregado", ""),
+		"encarregado": map[string]interface{}{
+			"nome":      nome,
+			"email":     email,
+			"tenant_id": tenantID,
+			"escopo":    escoposPorTipoEscopo("encarregado", ""),
+		},
+	}, http.StatusOK)
+}
+
+func (h *Handler) LoginCandidato(w http.ResponseWriter, r *http.Request, userID int64, nome string) {
+	var candidatoID, tenantID int64
+	var email string
+	var ativo bool
+	if err := h.db.QueryRow(r.Context(), `
+		SELECT id, tenant_id, email, ativo
+		  FROM recrutamento.candidatos
+		 WHERE user_id = $1
+		 ORDER BY updated_at DESC
+		 LIMIT 1`,
+		userID,
+	).Scan(&candidatoID, &tenantID, &email, &ativo); err != nil {
+		jsonErr(w, "Conta de candidato não encontrada", http.StatusForbidden)
+		return
+	}
+	if !ativo {
+		jsonErr(w, "Conta de candidato inactiva", http.StatusForbidden)
+		return
+	}
+
+	accessToken, err := h.signCandidatoToken(candidatoID, tenantID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	refreshToken, err := h.signRefresh(userID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	expiresAt := time.Now().Add(candidatoJWTExpiry)
+	_, err = h.db.Exec(r.Context(), `
+		INSERT INTO recrutamento.candidato_sessions (candidato_id, token_hash, ip, user_agent, expira_em)
+		VALUES ($1, $2, $3, $4, $5)`,
+		candidatoID, mw.HashToken(accessToken), clientIP(r), r.Header.Get("User-Agent"), expiresAt,
+	)
+	if err != nil {
+		jsonErr(w, "Erro ao criar sessão", http.StatusInternalServerError)
+		return
+	}
+
+	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, userID)
+
+	jsonOK(w, map[string]interface{}{
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+		"token_type":    "Bearer",
+		"expires_in":    int(candidatoJWTExpiry.Seconds()),
+		"tipo":          "candidato",
+		"escopo":        escoposPorTipoEscopo("candidato", ""),
+		"candidato": map[string]interface{}{
+			"id":        candidatoID,
+			"nome":      nome,
+			"email":     email,
+			"tenant_id": tenantID,
+			"escopo":    escoposPorTipoEscopo("candidato", ""),
+		},
 	}, http.StatusOK)
 }
 
@@ -183,27 +460,186 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	userID := int64(claims["sub"].(float64))
 
 	var tenantID int64
-	var estado, tipo string
-	err = h.db.QueryRow(r.Context(), `SELECT tenant_id, estado, tipo FROM users WHERE id = $1`, userID).
-		Scan(&tenantID, &estado, &tipo)
+	var estado, tipo, escopo string
+	err = h.db.QueryRow(r.Context(), `
+		SELECT COALESCE(m.tenant_id, 0), u.estado, u.tipo, COALESCE(NULLIF(m.escopo, ''), 'erp')
+		  FROM users u LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
+		 WHERE u.id = $1`, userID).
+		Scan(&tenantID, &estado, &tipo, &escopo)
 	if err == pgx.ErrNoRows || estado != "ativo" {
 		jsonErr(w, "Utilizador inactivo", http.StatusUnauthorized)
 		return
 	}
 
-	accessToken, err := h.signAccess(userID, tenantID, tipo)
+	switch tipo {
+	case "aluno":
+		h.refreshAluno(w, r, userID)
+	case "encarregado":
+		h.refreshEncarregado(w, r, userID)
+	case "candidato":
+		h.refreshCandidato(w, r, userID)
+	default:
+		accessToken, err := h.signAccess(userID, tenantID, tipo, escopo)
+		if err != nil {
+			jsonErr(w, "Erro interno", http.StatusInternalServerError)
+			return
+		}
+		expiresAt := time.Now().Add(h.cfg.JWTExpiresIn)
+		h.insertSession(r, userID, mw.HashToken(accessToken), expiresAt)
+
+		jsonOK(w, map[string]interface{}{
+			"access_token": accessToken,
+			"token_type":   "Bearer",
+			"expires_in":   int(h.cfg.JWTExpiresIn.Seconds()),
+			"escopo":       escoposPorTipoEscopo(tipo, escopo),
+		}, http.StatusOK)
+	}
+}
+
+func (h *Handler) refreshAluno(w http.ResponseWriter, r *http.Request, userID int64) {
+	var studentID, tenantID int64
+	var nome, codigo string
+	if err := h.db.QueryRow(r.Context(), `
+		SELECT id, tenant_id, nome, codigo
+		  FROM gestao_escolar.school_students
+		 WHERE user_id = $1
+		 LIMIT 1`,
+		userID,
+	).Scan(&studentID, &tenantID, &nome, &codigo); err != nil {
+		jsonErr(w, "Aluno não encontrado", http.StatusForbidden)
+		return
+	}
+
+	accessToken, err := h.signAlunoToken(studentID, tenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
-
-	expiresAt := time.Now().Add(h.cfg.JWTExpiresIn)
-	h.insertSession(r, userID, mw.HashToken(accessToken), expiresAt)
+	expiresAt := time.Now().Add(portalJWTExpiry)
+	_, err = h.db.Exec(r.Context(), `
+		INSERT INTO gestao_escolar.portal_sessions
+			(student_id, tenant_id, token_hash, ip_address, user_agent, expira_em)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		studentID, tenantID, mw.HashToken(accessToken),
+		r.RemoteAddr, r.Header.Get("User-Agent"), expiresAt,
+	)
+	if err != nil {
+		jsonErr(w, "Erro ao criar sessão", http.StatusInternalServerError)
+		return
+	}
 
 	jsonOK(w, map[string]interface{}{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
-		"expires_in":   int(h.cfg.JWTExpiresIn.Seconds()),
+		"expires_in":   int(portalJWTExpiry.Seconds()),
+		"tipo":         "aluno",
+		"escopo":       escoposPorTipoEscopo("aluno", ""),
+		"aluno": map[string]interface{}{
+			"id":     studentID,
+			"nome":   nome,
+			"codigo": codigo,
+			"escopo": escoposPorTipoEscopo("aluno", ""),
+		},
+	}, http.StatusOK)
+}
+
+func (h *Handler) refreshEncarregado(w http.ResponseWriter, r *http.Request, userID int64) {
+	var tenantID int64
+	var nome, email string
+	if err := h.db.QueryRow(r.Context(), `
+		SELECT tenant_id, nome, portal_email
+		  FROM gestao_escolar.school_guardians
+		 WHERE user_id = $1 AND portal_ativo = true
+		 ORDER BY principal DESC
+		 LIMIT 1`,
+		userID,
+	).Scan(&tenantID, &nome, &email); err != nil {
+		jsonErr(w, "Portal do encarregado não activado", http.StatusForbidden)
+		return
+	}
+
+	accessToken, err := h.signEncarregadoToken(email, tenantID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	expiresAt := time.Now().Add(encarregadoJWTExpiry)
+	_, err = h.db.Exec(r.Context(), `
+		INSERT INTO gestao_escolar.guardian_portal_sessions
+			(guardian_email, tenant_id, token_hash, ip_address, user_agent, expira_em)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		email, tenantID, mw.HashToken(accessToken),
+		r.RemoteAddr, r.Header.Get("User-Agent"), expiresAt,
+	)
+	if err != nil {
+		jsonErr(w, "Erro ao criar sessão", http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w, map[string]interface{}{
+		"access_token": accessToken,
+		"token_type":   "Bearer",
+		"expires_in":   int(encarregadoJWTExpiry.Seconds()),
+		"tipo":         "encarregado",
+		"escopo":       escoposPorTipoEscopo("encarregado", ""),
+		"encarregado": map[string]interface{}{
+			"nome":      nome,
+			"email":     email,
+			"tenant_id": tenantID,
+			"escopo":    escoposPorTipoEscopo("encarregado", ""),
+		},
+	}, http.StatusOK)
+}
+
+func (h *Handler) refreshCandidato(w http.ResponseWriter, r *http.Request, userID int64) {
+	var candidatoID, tenantID int64
+	var nome, email string
+	var ativo bool
+	if err := h.db.QueryRow(r.Context(), `
+		SELECT id, tenant_id, nome, email, ativo
+		  FROM recrutamento.candidatos
+		 WHERE user_id = $1
+		 ORDER BY updated_at DESC
+		 LIMIT 1`,
+		userID,
+	).Scan(&candidatoID, &tenantID, &nome, &email, &ativo); err != nil {
+		jsonErr(w, "Conta de candidato não encontrada", http.StatusForbidden)
+		return
+	}
+	if !ativo {
+		jsonErr(w, "Conta de candidato inactiva", http.StatusForbidden)
+		return
+	}
+
+	accessToken, err := h.signCandidatoToken(candidatoID, tenantID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	expiresAt := time.Now().Add(candidatoJWTExpiry)
+	_, err = h.db.Exec(r.Context(), `
+		INSERT INTO recrutamento.candidato_sessions (candidato_id, token_hash, ip, user_agent, expira_em)
+		VALUES ($1, $2, $3, $4, $5)`,
+		candidatoID, mw.HashToken(accessToken), clientIP(r), r.Header.Get("User-Agent"), expiresAt,
+	)
+	if err != nil {
+		jsonErr(w, "Erro ao criar sessão", http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w, map[string]interface{}{
+		"access_token": accessToken,
+		"token_type":   "Bearer",
+		"expires_in":   int(candidatoJWTExpiry.Seconds()),
+		"tipo":         "candidato",
+		"escopo":       escoposPorTipoEscopo("candidato", ""),
+		"candidato": map[string]interface{}{
+			"id":        candidatoID,
+			"nome":      nome,
+			"email":     email,
+			"tenant_id": tenantID,
+			"escopo":    escoposPorTipoEscopo("candidato", ""),
+		},
 	}, http.StatusOK)
 }
 
@@ -212,8 +648,12 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	row := h.db.QueryRow(r.Context(), `
-		SELECT id, tenant_id, nome, email, telefone, estado, email_verificado, ultimo_login_em, created_at
-		  FROM users WHERE id = $1`, user.ID)
+		SELECT u.id, COALESCE(m.tenant_id, 0), u.nome, u.email, u.telefone,
+		       u.estado, u.email_verificado, u.ultimo_login_em, u.created_at,
+		       COALESCE(NULLIF(m.escopo, ''), 'erp')
+		  FROM users u
+		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true AND m.ativo = true
+		 WHERE u.id = $1`, user.ID)
 
 	var u struct {
 		ID              int64      `json:"id"`
@@ -225,9 +665,10 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		EmailVerificado bool       `json:"email_verificado"`
 		UltimoLoginEm   *time.Time `json:"ultimo_login_em"`
 		CreatedAt       time.Time  `json:"created_at"`
+		Escopo          string     `json:"escopo"`
 	}
 	if err := row.Scan(&u.ID, &u.TenantID, &u.Nome, &u.Email, &u.Telefone,
-		&u.Estado, &u.EmailVerificado, &u.UltimoLoginEm, &u.CreatedAt); err != nil {
+		&u.Estado, &u.EmailVerificado, &u.UltimoLoginEm, &u.CreatedAt, &u.Escopo); err != nil {
 		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
 		return
 	}
@@ -380,9 +821,12 @@ func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GatewayValidate(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	var id, tenantID int64
-	var nome, email string
-	err := h.db.QueryRow(r.Context(), `SELECT id, tenant_id, nome, email FROM users WHERE id = $1`, user.ID).
-		Scan(&id, &tenantID, &nome, &email)
+	var nome, email, escopo string
+	err := h.db.QueryRow(r.Context(), `
+		SELECT u.id, COALESCE(m.tenant_id, 0), u.nome, u.email, COALESCE(NULLIF(m.escopo, ''), 'erp')
+		  FROM users u LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
+		 WHERE u.id = $1`, user.ID).
+		Scan(&id, &tenantID, &nome, &email, &escopo)
 	if err != nil {
 		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
 		return
@@ -392,6 +836,7 @@ func (h *Handler) GatewayValidate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Auth-Session-Id", itoa(user.SessionID))
 	w.Header().Set("X-Auth-User-Email", email)
 	w.Header().Set("X-Auth-User-Name", nome)
+	w.Header().Set("X-Auth-User-Scope", escopo)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -412,4 +857,33 @@ func loginFailReason(found, pwOk bool) interface{} {
 		return "utilizador não encontrado"
 	}
 	return "password incorrecta"
+}
+
+func randomJTI() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+func escoposPorTipoEscopo(tipo, escopo string) []string {
+	switch tipo {
+	case "superadmin":
+		return []string{"superadmin"}
+	case "aluno":
+		return []string{"portal_aluno"}
+	case "encarregado":
+		return []string{"portal_encarregado"}
+	case "candidato":
+		return []string{"portal_candidato"}
+	}
+	switch escopo {
+	case "escola":
+		return []string{"escola"}
+	case "portal_professor":
+		return []string{"portal_professor"}
+	default:
+		return []string{"erp"}
+	}
 }

@@ -18,13 +18,8 @@ final readonly class CarreiraController
     ) {
     }
 
-    public function render(): void
+    private function fetchVagas(): array
     {
-        $activePage = 'carreira';
-        $csrf       = $this->security->csrfToken();
-        $view       = $this->view;
-        $app        = (object) ['openVacancies' => $this->openVacancies];
-
         try {
             $resp  = $this->nexora->callPublic('GET', '/api/public/recrutamento/vagas', null, ['limit' => 100]);
             $vagas = $resp['body']['data'] ?? [];
@@ -40,9 +35,59 @@ final readonly class CarreiraController
                 : null;
         }
         unset($v);
+        return $vagas;
+    }
 
+    public function render(): void
+    {
+        $activePage = 'carreira';
+        $csrf       = $this->security->csrfToken();
+        $view       = $this->view;
+        $app        = (object) ['openVacancies' => $this->openVacancies];
+
+        $vagas      = $this->fetchVagas();
         $totalVagas = array_sum(array_column($vagas, 'num_vagas'));
 
         require $this->viewRoot . '/public/carreira.php';
+    }
+
+    public function estado(): void
+    {
+        $activePage = 'carreira';
+        $csrf       = $this->security->csrfToken();
+        $view       = $this->view;
+        $app        = (object) ['openVacancies' => $this->openVacancies];
+
+        require $this->viewRoot . '/public/carreira_estado.php';
+    }
+
+    public function loginCandidato(): void
+    {
+        $activePage = 'carreira';
+        $csrf       = $this->security->csrfToken();
+        $view       = $this->view;
+        $app        = (object) ['openVacancies' => $this->openVacancies];
+
+        require $this->viewRoot . '/public/carreira_login.php';
+    }
+
+    public function registarCandidato(): void
+    {
+        $activePage = 'carreira';
+        $csrf       = $this->security->csrfToken();
+        $view       = $this->view;
+        $app        = (object) ['openVacancies' => $this->openVacancies];
+
+        require $this->viewRoot . '/public/carreira_registar.php';
+    }
+
+    public function areaCandidato(): void
+    {
+        $activePage = 'carreira';
+        $csrf       = $this->security->csrfToken();
+        $view       = $this->view;
+        $app        = (object) ['openVacancies' => $this->openVacancies];
+
+        require $this->viewRoot . '/public/carreira_area.php';
     }
 }

@@ -240,7 +240,8 @@ func (h *Handler) DefinirPermissoesCargo(w http.ResponseWriter, r *http.Request)
 	// Sinalizar todos os utilizadores com este cargo para refresh imediato de permissões
 	h.db.Exec(r.Context(), `
 		UPDATE users SET permissoes_atualizadas_em = NOW()
-		WHERE cargo_id = $1 AND tenant_id = $2`, id, user.TenantID)
+		WHERE id IN (SELECT user_id FROM auth.memberships WHERE cargo_id = $1 AND tenant_id = $2)`,
+		id, user.TenantID)
 
 	w.WriteHeader(http.StatusNoContent)
 }

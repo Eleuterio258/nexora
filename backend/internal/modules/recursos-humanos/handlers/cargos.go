@@ -23,8 +23,8 @@ func (h *Handler) ListarCargos(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT c.id, c.codigo, c.nome, c.descricao, c.salario_min, c.salario_max, c.ativo,
-		       (SELECT COUNT(*) FROM funcionarios f WHERE f.cargo_id = c.id)
-		  FROM cargos c
+		       (SELECT COUNT(*) FROM rh.funcionarios f WHERE f.cargo_id = c.id)
+		  FROM rh.cargos c
 		 WHERE c.tenant_id=$1
 		 ORDER BY c.nome`, user.TenantID)
 	defer rows.Close()
@@ -57,7 +57,7 @@ func (h *Handler) CriarCargo(w http.ResponseWriter, r *http.Request) {
 	}
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO cargos (tenant_id, codigo, nome, descricao, salario_min, salario_max)
+		INSERT INTO rh.cargos (tenant_id, codigo, nome, descricao, salario_min, salario_max)
 		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
 		user.TenantID, body.Codigo, body.Nome, body.Descricao, body.SalarioMin, body.SalarioMax).Scan(&id)
 	if err != nil {
@@ -92,7 +92,7 @@ func (h *Handler) ActualizarCargo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE cargos SET
+		UPDATE rh.cargos SET
 		  codigo=COALESCE($1,codigo), nome=COALESCE($2,nome), descricao=COALESCE($3,descricao),
 		  salario_min=COALESCE($4,salario_min), salario_max=COALESCE($5,salario_max),
 		  ativo=COALESCE($6,ativo), updated_at=NOW()
@@ -118,7 +118,7 @@ func (h *Handler) RemoverCargo(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	var temFuncionarios bool
-	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM funcionarios WHERE cargo_id=$1 AND tenant_id=$2)`, id, user.TenantID).Scan(&temFuncionarios); err != nil {
+	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM rh.funcionarios WHERE cargo_id=$1 AND tenant_id=$2)`, id, user.TenantID).Scan(&temFuncionarios); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
@@ -127,7 +127,7 @@ func (h *Handler) RemoverCargo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tag, err := h.db.Exec(r.Context(), `DELETE FROM cargos WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), `DELETE FROM rh.cargos WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return

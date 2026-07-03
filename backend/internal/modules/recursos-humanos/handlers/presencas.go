@@ -18,7 +18,7 @@ func (h *Handler) ListarPresencas(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.db.Query(r.Context(), `
 		SELECT id, data, hora_entrada, hora_saida, horas_extra, observacoes
-		  FROM presencas
+		  FROM rh.presencas
 		 WHERE funcionario_id=$1 AND tenant_id=$2
 		 ORDER BY data DESC`, funcionarioID, user.TenantID)
 	if err != nil {
@@ -79,7 +79,7 @@ func (h *Handler) CriarPresenca(w http.ResponseWriter, r *http.Request) {
 
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO presencas (tenant_id, funcionario_id, data, hora_entrada, hora_saida, horas_extra, observacoes)
+		INSERT INTO rh.presencas (tenant_id, funcionario_id, data, hora_entrada, hora_saida, horas_extra, observacoes)
 		VALUES ($1,$2,$3::date,$4,$5,$6,$7)
 		ON CONFLICT (funcionario_id, data) DO UPDATE SET
 		  hora_entrada=EXCLUDED.hora_entrada, hora_saida=EXCLUDED.hora_saida,
@@ -99,7 +99,7 @@ func (h *Handler) RemoverPresenca(w http.ResponseWriter, r *http.Request) {
 	presencaID := chi.URLParam(r, "presencaId")
 
 	tag, err := h.db.Exec(r.Context(), `
-		DELETE FROM presencas
+		DELETE FROM rh.presencas
 		 WHERE id=$1 AND funcionario_id=$2 AND tenant_id=$3`,
 		presencaID, funcionarioID, user.TenantID)
 	if err != nil {

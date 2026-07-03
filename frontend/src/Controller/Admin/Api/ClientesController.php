@@ -6,7 +6,6 @@ namespace E258Tech\Controller\Admin\Api;
 use E258Tech\Controller\Admin\AdminApiDependencies;
 use E258Tech\Http\ApiResult;
 use E258Tech\Http\Request;
-use E258Tech\Infrastructure\Auth\PhpSessionAuthorization;
 
 final class ClientesController
 {
@@ -95,12 +94,6 @@ final class ClientesController
     public function clienteGrupoSave(Request $request, AdminApiDependencies $d): ApiResult
     {
         $id = $request->int('id');
-        $action = $id ? 'editar' : 'criar';
-
-        $authorization = new PhpSessionAuthorization();
-        if (!$authorization->can('clientes', $action)) {
-            return new ApiResult(['erro' => 'Sem permissao para executar esta acao.'], 403);
-        }
 
         $payload = $id
             ? [
@@ -134,12 +127,6 @@ final class ClientesController
     public function clienteSave(Request $request, AdminApiDependencies $d): ApiResult
     {
         $id = $request->int('id');
-        $action = $id ? 'editar' : 'criar';
-
-        $authorization = new PhpSessionAuthorization();
-        if (!$authorization->can('clientes', $action)) {
-            return new ApiResult(['erro' => 'Sem permissao para executar esta acao.'], 403);
-        }
 
         $payload = [
             'codigo' => $request->string('codigo') ?: null,

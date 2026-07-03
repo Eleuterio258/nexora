@@ -19,6 +19,7 @@
     ];
 
     $csrf       = $app->security->csrfToken();
+    $canEmitirNotasCredito = $app->session->can('faturacao', 'emitir_notas_credito');
     $pageTitle  = 'Notas de Crédito';
     $activePage = 'notas_credito';
     $breadcrumb = [['Admin', '/nexora/'], ['Faturação', ''], ['Notas de Crédito', '']];
@@ -28,6 +29,7 @@
 
 <div class="adm-page-header">
     <h1 class="adm-page-title">Notas de Crédito</h1>
+    <?php if ($canEmitirNotasCredito): ?>
     <div class="adm-page-header-actions">
         <button class="adm-btn adm-btn-primary" onclick="openNotaModal()">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -36,6 +38,7 @@
             Nova Nota de Crédito
         </button>
     </div>
+    <?php endif; ?>
 </div>
 
 <div class="adm-card">
@@ -84,6 +87,7 @@
     <?php endif; ?>
 </div>
 
+<?php if ($canEmitirNotasCredito): ?>
 <!-- Nova Nota de Crédito Modal -->
 <div class="adm-modal-overlay" id="notaModal">
     <div class="adm-modal" style="max-width:560px">
@@ -133,6 +137,7 @@
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <script>
 const CSRF = '<?php echo $csrf ?>';

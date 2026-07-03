@@ -15,6 +15,8 @@
     $documentos  = $resp['body']['documentos'] ?? [];
 
     $unidades = $app->nexora->call('GET', '/api/rh/unidades')['body'] ?? [];
+    $centrosCustoRaw = $app->nexora->call('GET', '/api/centros-custo/cost-centers');
+    $centrosCusto = (is_array($centrosCustoRaw['body'] ?? null) && array_is_list($centrosCustoRaw['body'])) ? $centrosCustoRaw['body'] : [];
     $utilizadores = $app->nexora->call('GET', '/api/auth/utilizadores', null, ['limit' => 100])['body']['data'] ?? [];
     $podeAprovar = $resp['body']['pode_aprovar'] ?? false;
     $podeVerSalarios = $app->session->can('recursos-humanos', 'processar_salarios');
@@ -50,6 +52,13 @@
     $processosDisciplinares = $app->nexora->call('GET', "/api/rh/funcionarios/$id/processos-disciplinares")['body'] ?? [];
 
     $recibosVencimento = $app->nexora->call('GET', "/api/rh/funcionarios/$id/recibos-vencimento")['body'] ?? [];
+
+    $adiantamentos = $podeVerSalarios
+        ? ($app->nexora->call('GET', "/api/rh/funcionarios/$id/adiantamentos")['body'] ?? [])
+        : [];
+    $emprestimos = $podeVerSalarios
+        ? ($app->nexora->call('GET', "/api/rh/funcionarios/$id/emprestimos")['body'] ?? [])
+        : [];
 
     $presencas = $app->nexora->call('GET', "/api/rh/funcionarios/$id/presencas")['body'] ?? [];
 
@@ -89,6 +98,7 @@
 
     $tipoContratoLabels = [
         'efetivo'           => 'Efetivo',
+        'indeterminado'     => 'Indeterminado',
         'termo_certo'       => 'Termo Certo',
         'termo_incerto'     => 'Termo Incerto',
         'estagio'           => 'Estágio',
@@ -201,70 +211,35 @@
 <div>
 
 <div class="adm-tabs" id="mainTabs">
-    <button class="adm-tab active" onclick="switchTab('dados',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        Dados
-    </button>
-    <button class="adm-tab" onclick="switchTab('contratos',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        Contratos
-        <?php if (count($contratos)): ?><span class="adm-tab-badge"><?php echo count($contratos) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('historico-salarial',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        Histórico Salarial
-        <?php if (count($historicoSalarial)): ?><span class="adm-tab-badge"><?php echo count($historicoSalarial) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('componentes-salariais',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-        Componentes Salariais
-        <?php if (count($componentesFuncionario)): ?><span class="adm-tab-badge"><?php echo count($componentesFuncionario) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('beneficios',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
-        Benefícios
-        <?php if (count($beneficiosFuncionario)): ?><span class="adm-tab-badge"><?php echo count($beneficiosFuncionario) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('presencas',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Presenças
-        <?php if (count($presencas)): ?><span class="adm-tab-badge"><?php echo count($presencas) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('ausencias',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        Ausências
-        <?php if (count($ausencias)): ?><span class="adm-tab-badge"><?php echo count($ausencias) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('avaliacoes',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"/></svg>
-        Avaliações
-        <?php if (count($avaliacoes)): ?><span class="adm-tab-badge"><?php echo count($avaliacoes) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('formacoes',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-        Formações
-        <?php if (count($formacoesFuncionario)): ?><span class="adm-tab-badge"><?php echo count($formacoesFuncionario) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('processos-disciplinares',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        Processos Disciplinares
-        <?php if (count($processosDisciplinares)): ?><span class="adm-tab-badge"><?php echo count($processosDisciplinares) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('recibos-vencimento',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        Recibos de Vencimento
-        <?php if (count($recibosVencimento)): ?><span class="adm-tab-badge"><?php echo count($recibosVencimento) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('contactos',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-        Contactos de Emergência
-        <?php if (count($contactosEmergencia)): ?><span class="adm-tab-badge"><?php echo count($contactosEmergencia) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('documentos',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        Documentos
-        <?php if (count($documentos)): ?><span class="adm-tab-badge"><?php echo count($documentos) ?></span><?php endif; ?>
-    </button>
+    <?php
+    // Helper: renderiza um botão de tab com data-tab para navegação robusta
+    $tab = fn(string $name, string $label, string $svgPath, int $badge = 0, bool $show = true, bool $active = false) =>
+        $show ? sprintf(
+            '<button class="adm-tab%s" data-tab="%s" onclick="switchTab(\'%s\',this)">%s %s%s</button>',
+            $active ? ' active' : '',
+            $name, $name,
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'.$svgPath.'</svg>',
+            $label,
+            $badge > 0 ? '<span class="adm-tab-badge">'.$badge.'</span>' : ''
+        ) : '';
+    $aAtivos = count(array_filter($adiantamentos, fn($a) => $a['estado'] === 'ativo'));
+    $eAtivos = count(array_filter($emprestimos,   fn($e) => $e['estado'] === 'ativo'));
+    echo $tab('dados',                  'Dados',                   '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',                                                                                              0,                               true,             true);
+    echo $tab('contratos',              'Contratos',               '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',                                                                          count($contratos));
+    echo $tab('historico-salarial',     'Hist. Salarial',          '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',                                                                               count($historicoSalarial),       $podeVerSalarios);
+    echo $tab('componentes-salariais',  'Componentes Sal.',        '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',                                                                            count($componentesFuncionario),  $podeVerSalarios);
+    echo $tab('adiantamentos',          'Adiantamentos',           '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',                                                                               $aAtivos,                        $podeVerSalarios);
+    echo $tab('emprestimos',            'Empréstimos',             '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',                                                                               $eAtivos,                        $podeVerSalarios);
+    echo $tab('recibos-vencimento',     'Recibos',                 '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',count($recibosVencimento),       $podeVerSalarios);
+    echo $tab('beneficios',             'Benefícios',              '<path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>',                                             count($beneficiosFuncionario));
+    echo $tab('presencas',              'Presenças',               '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',                                                                                                               count($presencas));
+    echo $tab('ausencias',              'Ausências',               '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',                    count($ausencias));
+    echo $tab('avaliacoes',             'Avaliações',              '<path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"/>',                                                                                                              count($avaliacoes));
+    echo $tab('formacoes',              'Formações',               '<path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>',                                                                                                       count($formacoesFuncionario));
+    echo $tab('processos-disciplinares','Proc. Disciplinares',     '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',count($processosDisciplinares));
+    echo $tab('contactos',              'Contactos Emerg.',        '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>',count($contactosEmergencia));
+    echo $tab('documentos',             'Documentos',              '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',count($documentos));
+    ?>
 </div>
 
 <!-- ── Dados ──────────────────────────────────────────────── -->
@@ -272,7 +247,7 @@
     <div class="adm-card">
         <div class="adm-card-header"><h2 class="adm-card-title">Dados do Funcionário</h2></div>
         <div class="adm-card-body">
-            <div class="adm-form-row-3">
+            <div class="adm-form-row-1">
                 <div class="adm-form-group">
                     <label class="adm-label" for="f-nome">Nome Completo <span style="color:var(--adm-red)">*</span></label>
                     <input class="adm-input" type="text" id="f-nome" maxlength="150" value="<?php echo htmlspecialchars($funcionario['nome_completo']) ?>">
@@ -290,8 +265,17 @@
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <div class="adm-form-group">
+                    <label class="adm-label" for="f-centro-custo">Centro de Custo</label>
+                    <select class="adm-select" id="f-centro-custo">
+                        <option value="">— Nenhum —</option>
+                        <?php foreach ($centrosCusto as $cc): ?>
+                        <option value="<?php echo (int) $cc['id'] ?>" <?php echo ((int) ($funcionario['centro_custo_id'] ?? 0)) === (int) $cc['id'] ? 'selected' : '' ?>><?php echo htmlspecialchars($cc['codigo']) ?> — <?php echo htmlspecialchars($cc['nome']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
             </div>
-            <div class="adm-form-row-3">
+            <div class="adm-form-row-1">
                 <div class="adm-form-group">
                     <label class="adm-label" for="f-cargo">Cargo</label>
                     <input class="adm-input" type="text" id="f-cargo" maxlength="120" value="<?php echo htmlspecialchars($funcionario['cargo'] ?? '') ?>">
@@ -313,7 +297,7 @@
                     </select>
                 </div>
             </div>
-            <div class="adm-form-row-3">
+            <div class="adm-form-row-1">
                 <div class="adm-form-group">
                     <label class="adm-label" for="f-data-admissao">Data de Admissão</label>
                     <input class="adm-input" type="date" id="f-data-admissao" value="<?php echo $funcionario['data_admissao'] ? date('Y-m-d', strtotime($funcionario['data_admissao'])) : '' ?>">
@@ -332,7 +316,7 @@
                     </select>
                 </div>
             </div>
-            <div class="adm-form-row-3">
+            <div class="adm-form-row-1">
                 <div class="adm-form-group">
                     <label class="adm-label" for="f-nuit">NUIT</label>
                     <input class="adm-input" type="text" id="f-nuit" maxlength="30" value="<?php echo htmlspecialchars($funcionario['nuit'] ?? '') ?>">
@@ -346,7 +330,7 @@
                     <input class="adm-input" type="email" id="f-email" maxlength="150" value="<?php echo htmlspecialchars($funcionario['email'] ?? '') ?>">
                 </div>
             </div>
-            <div class="adm-form-row-3">
+            <div class="adm-form-row-1">
                 <div class="adm-form-group">
                     <label class="adm-label" for="f-endereco">Endereço</label>
                     <input class="adm-input" type="text" id="f-endereco" maxlength="255" value="<?php echo htmlspecialchars($funcionario['endereco'] ?? '') ?>">
@@ -369,7 +353,7 @@
                     </select>
                 </div>
             </div>
-            <div class="adm-form-row-3">
+            <div class="adm-form-row-1">
                 <div class="adm-form-group">
                     <label class="adm-label" for="f-provincia">Província</label>
                     <input class="adm-input" type="text" id="f-provincia" maxlength="60" value="<?php echo htmlspecialchars($funcionario['provincia'] ?? '') ?>">
@@ -414,11 +398,14 @@
                     <td><span class="adm-badge <?php echo $cBadge[0] ?>"><?php echo $cBadge[1] ?></span></td>
                     <td>
                         <?php if (!empty($c['ficheiro_url'])): ?>
-                        <a href="/nexora/api/rh_contrato_ficheiro?path=<?php echo urlencode($c['ficheiro_url']) ?>" target="_blank" class="adm-btn adm-btn-ghost adm-btn-sm">Ver ficheiro</a>
+                        <a href="/nexora/api/rh_contrato_pdf?id=<?php echo (int) $c['id'] ?>" target="_blank" class="adm-btn adm-btn-ghost adm-btn-sm">Ver PDF</a>
                         <?php else: ?>—<?php endif; ?>
                     </td>
                     <td style="white-space:nowrap">
                         <button class="adm-btn adm-btn-ghost adm-btn-sm" type="button" onclick="editarContrato(<?php echo (int) $c['id'] ?>)">Editar</button>
+                        <?php if (!empty($c['ficheiro_url'])): ?>
+                        <button class="adm-btn adm-btn-ghost adm-btn-sm" type="button" onclick="enviarContratoAssinatura(<?php echo (int) $c['id'] ?>)" title="Criar documento de assinatura digital">Assinatura Digital</button>
+                        <?php endif; ?>
                         <?php if ($c['estado'] === 'ativo'): ?>
                             <?php if ($cDataFim): ?>
                             <button class="adm-btn adm-btn-ghost adm-btn-sm" type="button" onclick="openRenovarContrato(<?php echo (int) $c['id'] ?>, '<?php echo $cDataFim ?>')">Renovar</button>
@@ -477,6 +464,14 @@
                 <div class="adm-form-group">
                     <label class="adm-label" for="c-ficheiro">Ficheiro do Contrato</label>
                     <input class="adm-input" type="file" id="c-ficheiro" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                </div>
+            </div>
+            <div class="adm-form-row-3">
+                <div class="adm-form-group">
+                    <label class="adm-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" id="c-participacao" value="1" style="width:auto">
+                        Com participação societária (50% das quotas)
+                    </label>
                 </div>
             </div>
             <div style="display:flex;gap:var(--adm-sp-3)">
@@ -1135,25 +1130,64 @@
 
 <!-- ── Recibos de Vencimento ──────────────────────────────── -->
 <div class="adm-tab-panel" id="tab-recibos-vencimento">
+    <?php
+    // Info: adiantamentos e empréstimos activos que serão descontados no próximo processamento
+    $aAtivosInfo = array_values(array_filter($adiantamentos ?? [], fn($a) => $a['estado'] === 'ativo'));
+    $eAtivosInfo = array_values(array_filter($emprestimos   ?? [], fn($e) => $e['estado'] === 'ativo'));
+    if ($podeVerSalarios && ($aAtivosInfo || $eAtivosInfo)):
+    ?>
+    <div class="adm-card adm-mb-4" style="border-left:3px solid var(--adm-blue)">
+        <div class="adm-card-body" style="padding:var(--adm-sp-4) var(--adm-sp-5)">
+            <p class="adm-fw-600" style="margin-bottom:var(--adm-sp-2);font-size:.85rem">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Descontos activos para o próximo processamento
+            </p>
+            <div style="display:flex;gap:var(--adm-sp-4);flex-wrap:wrap">
+                <?php foreach ($aAtivosInfo as $a): ?>
+                <span class="adm-badge adm-badge--blue">
+                    <?php echo htmlspecialchars($a['descricao'] ?? 'Adiantamento') ?>:
+                    <?php echo number_format((float)$a['prestacao_valor'],2,',','.') ?> MT/mês
+                    (<?php echo (int)$a['prestacoes_pagas']?>/<?php echo (int)$a['num_prestacoes']?>)
+                </span>
+                <?php endforeach; ?>
+                <?php foreach ($eAtivosInfo as $e): ?>
+                <span class="adm-badge adm-badge--indigo">
+                    <?php echo htmlspecialchars($e['descricao'] ?? 'Empréstimo') ?>:
+                    <?php echo number_format((float)$e['prestacao_valor'],2,',','.') ?> MT/mês
+                    (<?php echo (int)$e['prestacoes_pagas']?>/<?php echo (int)$e['num_prestacoes']?>)
+                </span>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <div class="adm-card adm-mb-6">
         <div class="adm-card-header"><h2 class="adm-card-title">Recibos de Vencimento</h2></div>
         <?php if ($recibosVencimento): ?>
         <div class="adm-table-wrap">
             <table class="adm-table">
                 <thead>
-                    <tr><th>Período</th><th>Salário Base</th><th>Total Proventos</th><th>Total Descontos</th><th>Salário Líquido</th><th>Estado</th></tr>
+                    <tr><th>Período</th><th>Salário Base</th><th>Proventos</th><th>Descontos</th><th>Líquido</th><th>Estado</th><th></th></tr>
                 </thead>
                 <tbody>
                 <?php foreach ($recibosVencimento as $rv):
-                    $rvBadge = $reciboEstadoBadges[$rv['estado']] ?? ['adm-badge--gray', $rv['estado']];
+                    $rvBadge  = $reciboEstadoBadges[$rv['estado']] ?? ['adm-badge--gray', $rv['estado']];
+                    $periodo  = ($mesesLabels[$rv['mes']] ?? $rv['mes']) . ' ' . (int)$rv['ano'];
                 ?>
                 <tr>
-                    <td class="adm-fw-600"><?php echo htmlspecialchars($mesesLabels[$rv['mes']] ?? (string) $rv['mes']) ?> de <?php echo (int) $rv['ano'] ?></td>
-                    <td class="adm-text-muted"><?php echo rhValorSalarial($rv['salario_base'] !== null ? (float) $rv['salario_base'] : null, $podeVerSalarios) ?></td>
-                    <td class="adm-text-muted"><?php echo rhValorSalarial($rv['total_proventos'] !== null ? (float) $rv['total_proventos'] : null, $podeVerSalarios) ?></td>
-                    <td class="adm-text-muted"><?php echo rhValorSalarial($rv['total_descontos'] !== null ? (float) $rv['total_descontos'] : null, $podeVerSalarios) ?></td>
-                    <td class="adm-fw-600"><?php echo rhValorSalarial($rv['salario_liquido'] !== null ? (float) $rv['salario_liquido'] : null, $podeVerSalarios) ?></td>
+                    <td class="adm-fw-600"><?php echo htmlspecialchars($periodo) ?></td>
+                    <td class="adm-text-muted"><?php echo rhValorSalarial($rv['salario_base'] !== null ? (float)$rv['salario_base'] : null, $podeVerSalarios) ?></td>
+                    <td class="adm-text-muted"><?php echo rhValorSalarial($rv['total_proventos'] !== null ? (float)$rv['total_proventos'] : null, $podeVerSalarios) ?></td>
+                    <td class="adm-text-muted"><?php echo rhValorSalarial($rv['total_descontos'] !== null ? (float)$rv['total_descontos'] : null, $podeVerSalarios) ?></td>
+                    <td class="adm-fw-600"><?php echo rhValorSalarial($rv['salario_liquido'] !== null ? (float)$rv['salario_liquido'] : null, $podeVerSalarios) ?></td>
                     <td><span class="adm-badge <?php echo $rvBadge[0] ?>"><?php echo $rvBadge[1] ?></span></td>
+                    <td>
+                        <a class="adm-btn adm-btn-ghost adm-btn-sm" href="/nexora/rh/recibo-vencimento?id=<?php echo (int)$rv['id'] ?>">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                            Ver
+                        </a>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -1162,11 +1196,138 @@
         <?php else: ?>
         <div class="adm-empty">
             <p class="adm-empty-title">Nenhum recibo de vencimento registado</p>
-            <p class="adm-empty-sub">Os recibos são gerados ao processar uma folha de pagamento.</p>
+            <p class="adm-empty-sub">Os recibos são gerados ao processar uma folha de pagamento em <a href="/nexora/rh/processamento-salarial" class="adm-link">Processamento Salarial</a>.</p>
         </div>
         <?php endif; ?>
     </div>
 </div>
+
+<!-- ── Adiantamentos ──────────────────────────────────────── -->
+<?php if ($podeVerSalarios): ?>
+<div class="adm-tab-panel" id="tab-adiantamentos">
+    <div class="adm-card adm-mb-6">
+        <div class="adm-card-header"><h2 class="adm-card-title">Adiantamentos</h2></div>
+        <?php if ($adiantamentos): ?>
+        <div class="adm-table-wrap">
+            <table class="adm-table">
+                <thead><tr><th>Descrição</th><th>Valor Total</th><th>Prestação</th><th>Prestações</th><th>Estado</th><th></th></tr></thead>
+                <tbody>
+                <?php foreach ($adiantamentos as $a):
+                    $aBadge = ['ativo'=>['adm-badge--blue','Ativo'],'quitado'=>['adm-badge--green','Quitado'],'cancelado'=>['adm-badge--gray','Cancelado']][$a['estado']] ?? ['adm-badge--gray',$a['estado']];
+                ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($a['descricao'] ?? 'Adiantamento') ?></td>
+                    <td class="adm-fw-600"><?php echo number_format((float)$a['valor_total'],2,',','.') ?> MT</td>
+                    <td><?php echo number_format((float)$a['prestacao_valor'],2,',','.') ?> MT</td>
+                    <td><?php echo (int)$a['prestacoes_pagas'] ?> / <?php echo (int)$a['num_prestacoes'] ?></td>
+                    <td><span class="adm-badge <?php echo $aBadge[0] ?>"><?php echo $aBadge[1] ?></span></td>
+                    <td>
+                        <?php if ($a['estado'] === 'ativo'): ?>
+                        <button class="adm-btn adm-btn-ghost adm-btn-sm" style="color:var(--adm-red)" type="button"
+                            onclick="cancelarAdiantamento(<?php echo (int)$a['id'] ?>)">Cancelar</button>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php else: ?>
+        <div class="adm-empty"><p class="adm-empty-title">Nenhum adiantamento registado</p></div>
+        <?php endif; ?>
+    </div>
+    <div class="adm-card adm-mb-6">
+        <div class="adm-card-header"><h2 class="adm-card-title">Registar Adiantamento</h2></div>
+        <div class="adm-card-body">
+            <div class="adm-form-row-3">
+                <div class="adm-form-group">
+                    <label class="adm-label">Valor Total (MT) *</label>
+                    <input class="adm-input" type="number" id="adt-valor" step="0.01" min="0.01" placeholder="ex: 5000.00">
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label">Nº de Prestações *</label>
+                    <input class="adm-input" type="number" id="adt-prestacoes" min="1" max="36" value="1">
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label">Data de Início</label>
+                    <input class="adm-input" type="date" id="adt-data" value="<?php echo date('Y-m-d') ?>">
+                </div>
+            </div>
+            <div class="adm-form-group adm-mb-4">
+                <label class="adm-label">Descrição</label>
+                <input class="adm-input" type="text" id="adt-descricao" maxlength="200" placeholder="ex: Adiantamento de salário — Agosto 2026">
+            </div>
+            <button class="adm-btn adm-btn-primary" type="button" onclick="saveAdiantamento()">Registar Adiantamento</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Empréstimos ─────────────────────────────────────────── -->
+<div class="adm-tab-panel" id="tab-emprestimos">
+    <div class="adm-card adm-mb-6">
+        <div class="adm-card-header"><h2 class="adm-card-title">Empréstimos</h2></div>
+        <?php if ($emprestimos): ?>
+        <div class="adm-table-wrap">
+            <table class="adm-table">
+                <thead><tr><th>Descrição</th><th>Valor</th><th>Prestação</th><th>Juros</th><th>Prestações</th><th>Estado</th><th></th></tr></thead>
+                <tbody>
+                <?php foreach ($emprestimos as $e):
+                    $eBadge = ['ativo'=>['adm-badge--blue','Ativo'],'quitado'=>['adm-badge--green','Quitado'],'cancelado'=>['adm-badge--gray','Cancelado']][$e['estado']] ?? ['adm-badge--gray',$e['estado']];
+                ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($e['descricao'] ?? 'Empréstimo') ?></td>
+                    <td class="adm-fw-600"><?php echo number_format((float)$e['valor_total'],2,',','.') ?> MT</td>
+                    <td><?php echo number_format((float)$e['prestacao_valor'],2,',','.') ?> MT</td>
+                    <td><?php echo number_format((float)$e['taxa_juros']*100,1) ?>%</td>
+                    <td><?php echo (int)$e['prestacoes_pagas'] ?> / <?php echo (int)$e['num_prestacoes'] ?></td>
+                    <td><span class="adm-badge <?php echo $eBadge[0] ?>"><?php echo $eBadge[1] ?></span></td>
+                    <td>
+                        <?php if ($e['estado'] === 'ativo'): ?>
+                        <button class="adm-btn adm-btn-ghost adm-btn-sm" style="color:var(--adm-red)" type="button"
+                            onclick="cancelarEmprestimo(<?php echo (int)$e['id'] ?>)">Cancelar</button>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php else: ?>
+        <div class="adm-empty"><p class="adm-empty-title">Nenhum empréstimo registado</p></div>
+        <?php endif; ?>
+    </div>
+    <div class="adm-card adm-mb-6">
+        <div class="adm-card-header"><h2 class="adm-card-title">Registar Empréstimo</h2></div>
+        <div class="adm-card-body">
+            <div class="adm-form-row-3">
+                <div class="adm-form-group">
+                    <label class="adm-label">Valor Total (MT) *</label>
+                    <input class="adm-input" type="number" id="emp-valor" step="0.01" min="0.01" placeholder="ex: 20000.00">
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label">Nº de Prestações *</label>
+                    <input class="adm-input" type="number" id="emp-prestacoes" min="1" max="60" value="12">
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label">Taxa de Juros (%)</label>
+                    <input class="adm-input" type="number" id="emp-juros" step="0.1" min="0" value="0" placeholder="0 = sem juros">
+                </div>
+            </div>
+            <div class="adm-form-row">
+                <div class="adm-form-group">
+                    <label class="adm-label">Descrição</label>
+                    <input class="adm-input" type="text" id="emp-descricao" maxlength="200" placeholder="ex: Empréstimo pessoal">
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label">Data de Início</label>
+                    <input class="adm-input" type="date" id="emp-data" value="<?php echo date('Y-m-d') ?>">
+                </div>
+            </div>
+            <button class="adm-btn adm-btn-primary" type="button" onclick="saveEmprestimo()">Registar Empréstimo</button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- ── Contactos de Emergência ────────────────────────────── -->
 <div class="adm-tab-panel" id="tab-contactos">
@@ -1416,18 +1577,21 @@ const FUNC_ID = <?php echo (int) $funcionario['id'] ?>;
 
 // ── Tabs ─────────────────────────────────────────────────────
 function switchTab(name, btn) {
+    const panel = document.getElementById('tab-' + name);
+    if (!panel) return; // tab não existe no DOM (ex: sem permissão)
     document.querySelectorAll('.adm-tab-panel').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
-    document.getElementById('tab-' + name).classList.add('active');
-    btn.classList.add('active');
+    document.querySelectorAll('#mainTabs .adm-tab').forEach(b => b.classList.remove('active'));
+    panel.classList.add('active');
+    // Usa o botão passado directamente, ou encontra pelo data-tab
+    const activeBtn = btn || document.querySelector(`#mainTabs .adm-tab[data-tab="${name}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
+    history.replaceState(null, '', location.pathname + location.search + '#' + name);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const tabs = ['dados', 'contratos', 'historico-salarial', 'componentes-salariais', 'beneficios', 'presencas', 'ausencias', 'avaliacoes', 'formacoes', 'processos-disciplinares', 'recibos-vencimento', 'contactos', 'documentos'];
     const hash = location.hash.replace('#', '');
-    const idx  = tabs.indexOf(hash);
-    if (idx > 0) {
-        const btn = document.querySelectorAll('#mainTabs .adm-tab')[idx];
+    if (hash) {
+        const btn = document.querySelector(`#mainTabs .adm-tab[data-tab="${hash}"]`);
         if (btn) switchTab(hash, btn);
     }
 });
@@ -1440,7 +1604,9 @@ async function postJSON(url, payload, tab) {
         const data = await res.json();
         if (data.ok) {
             showToast(data.msg || 'Guardado com sucesso.');
-            if (tab) location.hash = tab;
+            // Preserva a tab após reload usando o parâmetro passado ou a tab actualmente activa
+            const targetTab = tab || location.hash.replace('#','') || 'dados';
+            location.hash = targetTab;
             setTimeout(() => location.reload(), 700);
         } else {
             showToast(data.erro || 'Erro', 'error');
@@ -1463,6 +1629,7 @@ function saveFuncionario() {
         nome_completo: nome,
         numero_funcionario: document.getElementById('f-numero').value.trim() || null,
         unit_id: unidade ? Number(unidade) : null,
+        centro_custo_id: document.getElementById('f-centro-custo').value ? Number(document.getElementById('f-centro-custo').value) : null,
         cargo: document.getElementById('f-cargo').value.trim() || null,
         tipo_contrato: document.getElementById('f-tipo-contrato').value,
         estado: document.getElementById('f-estado').value,
@@ -1522,6 +1689,7 @@ async function saveContrato() {
     fd.append('data_inicio', dataInicio);
     fd.append('data_fim', document.getElementById('c-data-fim').value);
     fd.append('salario', document.getElementById('c-salario').value);
+    fd.append('participacao', document.getElementById('c-participacao').checked ? '1' : '0');
     fd.append('csrf', CSRF);
 
     const ficheiro = document.getElementById('c-ficheiro').files[0];
@@ -1538,6 +1706,16 @@ async function saveContrato() {
             showToast(data.erro || 'Erro', 'error');
         }
     } catch { showToast('Erro de ligação', 'error'); }
+}
+
+async function enviarContratoAssinatura(id) {
+    if (!confirm('Criar documento de assinatura digital a partir deste contrato?')) return;
+    const r = await postJSON('/nexora/api/rh_contrato_enviar_assinatura', { id, csrf: CSRF }, 'contratos');
+    if (r.doc_id) {
+        window.open('/nexora/assinatura-digital?doc_id=' + r.doc_id, '_blank');
+    } else {
+        alert(r.erro || 'Erro ao criar documento de assinatura.');
+    }
 }
 
 function editarContrato(id) {
@@ -1566,6 +1744,7 @@ function cancelarEdicaoContrato() {
     document.getElementById('c-data-inicio').value = '<?php echo date('Y-m-d') ?>';
     document.getElementById('c-data-fim').value = '';
     document.getElementById('c-ficheiro').value = '';
+    document.getElementById('c-participacao').checked = false;
 
     document.getElementById('contrato-form-title').textContent = 'Novo Contrato';
     document.getElementById('contrato-submit-btn').textContent = 'Adicionar Contrato';
@@ -1651,6 +1830,49 @@ function removerComponenteFuncionario(componenteId) {
             componente_id: componenteId,
             csrf: CSRF
         }, 'componentes-salariais');
+    });
+}
+
+// ── Adiantamentos ─────────────────────────────────────────────
+async function saveAdiantamento() {
+    const valor     = document.getElementById('adt-valor').value;
+    const prestacoes = document.getElementById('adt-prestacoes').value;
+    if (!valor || Number(valor) <= 0) { showToast('Valor é obrigatório.', 'error'); return; }
+    await postJSON('/nexora/api/rh_adiantamento_save', {
+        funcionario_id: FUNC_ID,
+        valor_total:    Number(valor),
+        num_prestacoes: Number(prestacoes) || 1,
+        descricao:      document.getElementById('adt-descricao').value || null,
+        data_inicio:    document.getElementById('adt-data').value || null,
+        csrf: CSRF
+    }, 'adiantamentos');
+}
+
+function cancelarAdiantamento(id) {
+    openConfirm('Cancelar adiantamento', 'Pretende cancelar este adiantamento? As prestações futuras não serão descontadas.', async () => {
+        await postJSON('/nexora/api/rh_adiantamento_cancelar', { id, csrf: CSRF }, 'adiantamentos');
+    });
+}
+
+// ── Empréstimos ───────────────────────────────────────────────
+async function saveEmprestimo() {
+    const valor     = document.getElementById('emp-valor').value;
+    const prestacoes = document.getElementById('emp-prestacoes').value;
+    if (!valor || Number(valor) <= 0) { showToast('Valor é obrigatório.', 'error'); return; }
+    await postJSON('/nexora/api/rh_emprestimo_save', {
+        funcionario_id: FUNC_ID,
+        valor_total:    Number(valor),
+        num_prestacoes: Number(prestacoes) || 1,
+        taxa_juros:     Number(document.getElementById('emp-juros').value || 0) / 100,
+        descricao:      document.getElementById('emp-descricao').value || null,
+        data_inicio:    document.getElementById('emp-data').value || null,
+        csrf: CSRF
+    }, 'emprestimos');
+}
+
+function cancelarEmprestimo(id) {
+    openConfirm('Cancelar empréstimo', 'Pretende cancelar este empréstimo? As prestações futuras não serão descontadas.', async () => {
+        await postJSON('/nexora/api/rh_emprestimo_cancelar', { id, csrf: CSRF }, 'emprestimos');
     });
 }
 

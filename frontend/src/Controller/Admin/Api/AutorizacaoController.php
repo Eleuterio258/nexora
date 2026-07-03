@@ -6,7 +6,6 @@ namespace E258Tech\Controller\Admin\Api;
 use E258Tech\Controller\Admin\AdminApiDependencies;
 use E258Tech\Http\ApiResult;
 use E258Tech\Http\Request;
-use E258Tech\Infrastructure\Auth\PhpSessionAuthorization;
 
 final class AutorizacaoController
 {
@@ -43,10 +42,6 @@ final class AutorizacaoController
     public function cargoSave(Request $request, AdminApiDependencies $d): ApiResult
     {
         $id = $request->int('id');
-        $action = $id ? 'editar' : 'criar';
-        if (!(new PhpSessionAuthorization())->can('autorizacao', $action)) {
-            return new ApiResult(['error' => 'Sem permissao para executar esta acao.'], 403);
-        }
 
         return $d->result(
             fn() => $d->authorization->saveRole(
@@ -99,15 +94,17 @@ final class AutorizacaoController
     public function utilizadorSave(Request $request, AdminApiDependencies $d): ApiResult
     {
         $id = $request->int('id');
-        $action = $id ? 'editar' : 'criar';
-        if (!(new PhpSessionAuthorization())->can('autorizacao', $action)) {
-            return new ApiResult(['error' => 'Sem permissao para executar esta acao.'], 403);
-        }
 
         $payload = [
             'nome' => $request->string('nome'),
             'telefone' => $request->string('telefone') ?: null,
         ];
+
+        $escopo = $request->string('escopo');
+        if (in_array($escopo, ['erp', 'escola'], true)) {
+            $payload['escopo'] = $escopo;
+        }
+
         if (!$id) {
             $payload['email'] = $request->string('email');
             $payload['password'] = $request->string('password');

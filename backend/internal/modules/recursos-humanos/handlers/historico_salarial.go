@@ -18,7 +18,7 @@ func (h *Handler) ListarHistoricoSalarial(w http.ResponseWriter, r *http.Request
 
 	rows, err := h.db.Query(r.Context(), `
 		SELECT id, salario_anterior, salario_novo, data_efectiva, motivo, created_at
-		  FROM historico_salarial
+		  FROM rh.historico_salarial
 		 WHERE funcionario_id=$1 AND tenant_id=$2
 		 ORDER BY data_efectiva DESC, id DESC`, funcionarioID, user.TenantID)
 	if err != nil {
@@ -79,14 +79,14 @@ func (h *Handler) CriarAlteracaoSalarial(w http.ResponseWriter, r *http.Request)
 
 	var salarioAnterior *float64
 	if err := tx.QueryRow(r.Context(), `
-		SELECT salario_base FROM funcionarios WHERE id=$1 AND tenant_id=$2`,
+		SELECT salario_base FROM rh.funcionarios WHERE id=$1 AND tenant_id=$2`,
 		funcionarioID, user.TenantID).Scan(&salarioAnterior); err != nil {
 		jsonErr(w, "Funcionário não encontrado", http.StatusNotFound)
 		return
 	}
 
 	if _, err := tx.Exec(r.Context(), `
-		UPDATE funcionarios SET salario_base=$1, updated_at=NOW() WHERE id=$2 AND tenant_id=$3`,
+		UPDATE rh.funcionarios SET salario_base=$1, updated_at=NOW() WHERE id=$2 AND tenant_id=$3`,
 		body.SalarioNovo, funcionarioID, user.TenantID); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -94,7 +94,7 @@ func (h *Handler) CriarAlteracaoSalarial(w http.ResponseWriter, r *http.Request)
 
 	var id int64
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO historico_salarial (tenant_id, funcionario_id, salario_anterior, salario_novo, data_efectiva, motivo)
+		INSERT INTO rh.historico_salarial (tenant_id, funcionario_id, salario_anterior, salario_novo, data_efectiva, motivo)
 		VALUES ($1,$2,$3,$4,$5::date,$6) RETURNING id`,
 		user.TenantID, funcionarioID, salarioAnterior, body.SalarioNovo, body.DataEfectiva, body.Motivo).Scan(&id)
 	if err != nil {

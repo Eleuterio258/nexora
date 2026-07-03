@@ -8,7 +8,10 @@
     if ($filtroCliente) $query['customer_id'] = $filtroCliente;
 
     $resp       = $app->nexora->call('GET', '/api/faturacao/orders', null, $query);
-    $encomendas = $resp['body'] ?? [];
+    $body       = $resp['body'] ?? [];
+    $encomendas = is_array($body['data'] ?? null)
+        ? $body['data']
+        : (array_is_list($body) ? $body : []);
 
     $clientesResp = $app->nexora->call('GET', '/api/clientes', null, ['limit' => 200]);
     $clientes     = $clientesResp['body']['data'] ?? [];

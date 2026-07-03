@@ -51,8 +51,8 @@ func (h *Handler) ListarHorarios(w http.ResponseWriter, r *http.Request) {
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT h.id, h.codigo, h.nome, h.descricao, h.hora_entrada, h.hora_saida,
 		       h.intervalo_inicio, h.intervalo_fim, h.dias_semana, h.carga_semanal_horas, h.ativo,
-		       (SELECT COUNT(*) FROM funcionarios f WHERE f.horario_id = h.id)
-		  FROM horarios_trabalho h
+		       (SELECT COUNT(*) FROM rh.funcionarios f WHERE f.horario_id = h.id)
+		  FROM rh.horarios_trabalho h
 		 WHERE h.tenant_id=$1
 		 ORDER BY h.nome`, user.TenantID)
 	defer rows.Close()
@@ -105,7 +105,7 @@ func (h *Handler) CriarHorario(w http.ResponseWriter, r *http.Request) {
 	}
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO horarios_trabalho (tenant_id, codigo, nome, descricao, hora_entrada, hora_saida, intervalo_inicio, intervalo_fim, dias_semana, carga_semanal_horas)
+		INSERT INTO rh.horarios_trabalho (tenant_id, codigo, nome, descricao, hora_entrada, hora_saida, intervalo_inicio, intervalo_fim, dias_semana, carga_semanal_horas)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
 		user.TenantID, body.Codigo, body.Nome, body.Descricao, body.HoraEntrada, body.HoraSaida,
 		body.IntervaloInicio, body.IntervaloFim, body.DiasSemana, body.CargaSemanalHoras).Scan(&id)
@@ -165,7 +165,7 @@ func (h *Handler) ActualizarHorario(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE horarios_trabalho SET
+		UPDATE rh.horarios_trabalho SET
 		  codigo=COALESCE($1,codigo), nome=COALESCE($2,nome), descricao=COALESCE($3,descricao),
 		  hora_entrada=COALESCE($4,hora_entrada), hora_saida=COALESCE($5,hora_saida),
 		  intervalo_inicio=COALESCE($6,intervalo_inicio), intervalo_fim=COALESCE($7,intervalo_fim),
@@ -194,7 +194,7 @@ func (h *Handler) RemoverHorario(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	var temFuncionarios bool
-	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM funcionarios WHERE horario_id=$1 AND tenant_id=$2)`, id, user.TenantID).Scan(&temFuncionarios); err != nil {
+	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM rh.funcionarios WHERE horario_id=$1 AND tenant_id=$2)`, id, user.TenantID).Scan(&temFuncionarios); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
@@ -203,7 +203,7 @@ func (h *Handler) RemoverHorario(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tag, err := h.db.Exec(r.Context(), `DELETE FROM horarios_trabalho WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), `DELETE FROM rh.horarios_trabalho WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return

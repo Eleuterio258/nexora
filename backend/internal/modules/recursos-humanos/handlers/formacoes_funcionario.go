@@ -25,8 +25,8 @@ func (h *Handler) ListarFormacoesFuncionario(w http.ResponseWriter, r *http.Requ
 
 	rows, err := h.db.Query(r.Context(), `
 		SELECT ff.id, f.id, f.codigo, f.nome, f.categoria, ff.data_inicio, ff.data_fim, ff.estado, ff.nota, ff.certificado_url, ff.observacoes
-		  FROM funcionario_formacoes ff
-		  JOIN formacoes f ON f.id = ff.formacao_id
+		  FROM rh.funcionario_formacoes ff
+		  JOIN rh.formacoes f ON f.id = ff.formacao_id
 		 WHERE ff.funcionario_id=$1 AND ff.tenant_id=$2
 		 ORDER BY ff.data_inicio DESC`, funcionarioID, user.TenantID)
 	if err != nil {
@@ -84,14 +84,14 @@ func (h *Handler) AdicionarFormacaoFuncionario(w http.ResponseWriter, r *http.Re
 	}
 
 	var existe bool
-	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM formacoes WHERE id=$1 AND tenant_id=$2 AND ativo)`, body.FormacaoID, user.TenantID).Scan(&existe); err != nil || !existe {
+	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM rh.formacoes WHERE id=$1 AND tenant_id=$2 AND ativo)`, body.FormacaoID, user.TenantID).Scan(&existe); err != nil || !existe {
 		jsonErr(w, "Formação inválida", http.StatusBadRequest)
 		return
 	}
 
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO funcionario_formacoes (tenant_id, funcionario_id, formacao_id, data_inicio, data_fim, observacoes)
+		INSERT INTO rh.funcionario_formacoes (tenant_id, funcionario_id, formacao_id, data_inicio, data_fim, observacoes)
 		VALUES ($1,$2,$3,$4::date,$5::date,$6) RETURNING id`,
 		user.TenantID, funcionarioID, body.FormacaoID, body.DataInicio, body.DataFim, body.Observacoes).Scan(&id)
 	if err != nil {
@@ -126,7 +126,7 @@ func (h *Handler) ActualizarFormacaoFuncionario(w http.ResponseWriter, r *http.R
 	}
 
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE funcionario_formacoes SET
+		UPDATE rh.funcionario_formacoes SET
 		  data_fim=COALESCE($1::date,data_fim), estado=COALESCE($2,estado), nota=COALESCE($3,nota),
 		  certificado_url=COALESCE($4,certificado_url), observacoes=COALESCE($5,observacoes)
 		WHERE id=$6 AND funcionario_id=$7 AND tenant_id=$8`,
@@ -148,7 +148,7 @@ func (h *Handler) RemoverFormacaoFuncionario(w http.ResponseWriter, r *http.Requ
 	registoID := chi.URLParam(r, "registoId")
 
 	tag, err := h.db.Exec(r.Context(), `
-		DELETE FROM funcionario_formacoes
+		DELETE FROM rh.funcionario_formacoes
 		 WHERE id=$1 AND funcionario_id=$2 AND tenant_id=$3`,
 		registoID, funcionarioID, user.TenantID)
 	if err != nil {

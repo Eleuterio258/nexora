@@ -27,10 +27,10 @@ type unidadeRow struct {
 
 const unidadeSelect = `
 	SELECT u.id, u.codigo, u.nome, u.tipo, u.descricao, u.parent_id, p.nome, u.responsavel_id, f.nome_completo, u.ativo,
-	       (SELECT COUNT(*) FROM funcionarios fu WHERE fu.unit_id = u.id)
-	  FROM unidades_organizacionais u
-	  LEFT JOIN funcionarios f ON f.id = u.responsavel_id
-	  LEFT JOIN unidades_organizacionais p ON p.id = u.parent_id
+	       (SELECT COUNT(*) FROM rh.funcionarios fu WHERE fu.unit_id = u.id)
+	  FROM rh.unidades_organizacionais u
+	  LEFT JOIN rh.funcionarios f ON f.id = u.responsavel_id
+	  LEFT JOIN rh.unidades_organizacionais p ON p.id = u.parent_id
 `
 
 func scanUnidades(rows pgx.Rows) []unidadeRow {
@@ -72,10 +72,10 @@ type caminhoItem struct {
 func (h *Handler) caminhoUnidade(ctx context.Context, tenantID int64, id string) []caminhoItem {
 	rows, _ := h.db.Query(ctx, `
 		WITH RECURSIVE caminho AS (
-			SELECT id, nome, parent_id, 0 AS nivel FROM unidades_organizacionais WHERE id=$1 AND tenant_id=$2
+			SELECT id, nome, parent_id, 0 AS nivel FROM rh.unidades_organizacionais WHERE id=$1 AND tenant_id=$2
 			UNION ALL
 			SELECT p.id, p.nome, p.parent_id, c.nivel+1
-			  FROM unidades_organizacionais p
+			  FROM rh.unidades_organizacionais p
 			  JOIN caminho c ON p.id = c.parent_id
 		)
 		SELECT id, nome FROM caminho ORDER BY nivel DESC`, id, tenantID)
@@ -121,8 +121,8 @@ func (h *Handler) RemoverUnidade(w http.ResponseWriter, r *http.Request) {
 
 	var temFilhos, temFuncionarios bool
 	err := h.db.QueryRow(r.Context(), `
-		SELECT EXISTS(SELECT 1 FROM unidades_organizacionais WHERE parent_id=$1 AND tenant_id=$2),
-		       EXISTS(SELECT 1 FROM funcionarios WHERE unit_id=$1 AND tenant_id=$2)`,
+		SELECT EXISTS(SELECT 1 FROM rh.unidades_organizacionais WHERE parent_id=$1 AND tenant_id=$2),
+		       EXISTS(SELECT 1 FROM rh.funcionarios WHERE unit_id=$1 AND tenant_id=$2)`,
 		id, user.TenantID).Scan(&temFilhos, &temFuncionarios)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
@@ -133,7 +133,7 @@ func (h *Handler) RemoverUnidade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tag, err := h.db.Exec(r.Context(), `DELETE FROM unidades_organizacionais WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), `DELETE FROM rh.unidades_organizacionais WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -158,9 +158,9 @@ func (h *Handler) ListarSubarvoreUnidade(w http.ResponseWriter, r *http.Request)
 	id := chi.URLParam(r, "id")
 	rows, _ := h.db.Query(r.Context(), `
 		WITH RECURSIVE sub AS (
-			SELECT id FROM unidades_organizacionais WHERE id=$1 AND tenant_id=$2
+			SELECT id FROM rh.unidades_organizacionais WHERE id=$1 AND tenant_id=$2
 			UNION ALL
-			SELECT u.id FROM unidades_organizacionais u JOIN sub s ON u.parent_id = s.id
+			SELECT u.id FROM rh.unidades_organizacionais u JOIN sub s ON u.parent_id = s.id
 		)
 		`+unidadeSelect+` WHERE u.id IN (SELECT id FROM sub) AND u.id != $1 ORDER BY u.nome`, id, user.TenantID)
 	defer rows.Close()
@@ -183,7 +183,7 @@ func (h *Handler) ListarFuncionariosUnidade(w http.ResponseWriter, r *http.Reque
 	id := chi.URLParam(r, "id")
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT f.id, f.numero_funcionario, f.nome_completo, f.cargo, f.estado
-		  FROM funcionarios f
+		  FROM rh.funcionarios f
 		 WHERE f.unit_id=$1 AND f.tenant_id=$2
 		 ORDER BY f.nome_completo`, id, user.TenantID)
 	defer rows.Close()
@@ -195,12 +195,12 @@ func (h *Handler) ListarFuncionariosSubarvore(w http.ResponseWriter, r *http.Req
 	id := chi.URLParam(r, "id")
 	rows, _ := h.db.Query(r.Context(), `
 		WITH RECURSIVE sub AS (
-			SELECT id FROM unidades_organizacionais WHERE id=$1 AND tenant_id=$2
+			SELECT id FROM rh.unidades_organizacionais WHERE id=$1 AND tenant_id=$2
 			UNION ALL
-			SELECT u.id FROM unidades_organizacionais u JOIN sub s ON u.parent_id = s.id
+			SELECT u.id FROM rh.unidades_organizacionais u JOIN sub s ON u.parent_id = s.id
 		)
 		SELECT f.id, f.numero_funcionario, f.nome_completo, f.cargo, f.estado
-		  FROM funcionarios f
+		  FROM rh.funcionarios f
 		 WHERE f.unit_id IN (SELECT id FROM sub) AND f.tenant_id=$2
 		 ORDER BY f.nome_completo`, id, user.TenantID)
 	defer rows.Close()
@@ -229,9 +229,9 @@ func (h *Handler) MoverUnidade(w http.ResponseWriter, r *http.Request) {
 		var ehDescendente bool
 		h.db.QueryRow(r.Context(), `
 			WITH RECURSIVE sub AS (
-				SELECT id FROM unidades_organizacionais WHERE id=$1 AND tenant_id=$2
+				SELECT id FROM rh.unidades_organizacionais WHERE id=$1 AND tenant_id=$2
 				UNION ALL
-				SELECT u.id FROM unidades_organizacionais u JOIN sub s ON u.parent_id = s.id
+				SELECT u.id FROM rh.unidades_organizacionais u JOIN sub s ON u.parent_id = s.id
 			)
 			SELECT EXISTS(SELECT 1 FROM sub WHERE id=$3 AND id != $1)`,
 			id, user.TenantID, *body.ParentID).Scan(&ehDescendente)
@@ -242,7 +242,7 @@ func (h *Handler) MoverUnidade(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE unidades_organizacionais SET parent_id=$1, updated_at=NOW() WHERE id=$2 AND tenant_id=$3`,
+		UPDATE rh.unidades_organizacionais SET parent_id=$1, updated_at=NOW() WHERE id=$2 AND tenant_id=$3`,
 		body.ParentID, id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)

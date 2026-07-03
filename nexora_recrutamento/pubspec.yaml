@@ -1,0 +1,65 @@
+name: nexora_recrutamento
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.4
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  flutter_bloc: ^9.1.1
+  equatable: ^2.0.7
+  dartz: ^0.10.1
+  http: ^1.4.0
+  shared_preferences: ^2.5.3
+  flutter_secure_storage: ^9.2.4
+  get_it: ^8.0.3
+  flutter_svg: ^2.0.10+1
+  dio: ^5.8.0+1
+  hive_flutter: ^1.1.0
+  path_provider: ^2.1.5
+  path: ^1.9.1
+
+  flutter_native_splash: ^2.4.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+  hive_generator: ^2.0.1
+  build_runner: ^2.4.13
+  flutter_launcher_icons: ^0.14.3
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/logo-512x512.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/logo-512x512.png"
+  min_sdk_android: 21
+  web:
+    generate: false
+
+flutter_native_splash:
+  color: "#2CB87A"
+  android: true
+  ios: true
+  fullscreen: true
+  android_12:
+    color: "#2CB87A"
+    image: "assets/images/logo-512x512.png"
+    icon_background_color: "#2CB87A"
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icons/
+    - assets/illustrations/
+    - assets/images/
+    - assets/logos/

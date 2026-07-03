@@ -4,7 +4,7 @@ $sessResp = $app->nexora->call('GET', '/api/pos/sessoes/atual');
 $sessao   = $sessResp['status'] === 200 ? $sessResp['body'] : null;
 
 $termResp    = $app->nexora->call('GET', '/api/pos/terminais');
-$terminais   = $termResp['body'] ?? [];
+$terminais   = $termResp['status'] === 200 ? ($termResp['body'] ?? []) : [];
 $terminalMap = [];
 foreach ($terminais as $t) $terminalMap[(int) $t['id']] = $t;
 $terminaisAtivos = array_filter($terminais, static fn ($t) => (bool) $t['activo']);

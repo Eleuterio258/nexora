@@ -1,16 +1,19 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/contracts"
 )
 
 func schoolBody(r *http.Request) ([]byte, error) {
@@ -165,30 +168,54 @@ func (h *Handler) CriarPeriodoLectivo(w http.ResponseWriter, r *http.Request) {
 // Turmas, disciplinas e atribuicoes.
 func (h *Handler) ListarTurmas(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetUser(r)
+	q := r.URL.Query()
 	where := "c.tenant_id=$1"
 	args := []any{u.TenantID}
-	appendSchoolFilter(&where, &args, "c.school_year_id", r.URL.Query().Get("year_id"))
-	appendSchoolFilter(&where, &args, "c.activo", r.URL.Query().Get("activo"))
-	h.schoolList(w, r, `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.nome),'[]') FROM (
+	appendSchoolFilter(&where, &args, "c.school_year_id", q.Get("year_id"))
+	appendSchoolFilter(&where, &args, "c.activo", q.Get("activo"))
+	appendSchoolFilter(&where, &args, "c.turno", q.Get("turno"))
+	appendSchoolFilter(&where, &args, "c.level_id", q.Get("level_id"))
+
+	porPagina := 25
+	if pp, err := strconv.Atoi(q.Get("por_pagina")); err == nil && pp > 0 && pp <= 200 {
+		porPagina = pp
+	}
+	pagina := 1
+	if pg, err := strconv.Atoi(q.Get("pagina")); err == nil && pg > 0 {
+		pagina = pg
+	}
+	offset := (pagina - 1) * porPagina
+
+	var total int
+	_ = h.db.QueryRow(r.Context(),
+		`SELECT COUNT(*) FROM gestao_escolar.school_classes c WHERE `+where, args...).Scan(&total)
+
+	dataArgs := append(append([]any{}, args...), porPagina, offset)
+	ppIdx := strconv.Itoa(len(dataArgs) - 1)
+	offIdx := strconv.Itoa(len(dataArgs))
+
+	var raw []byte
+	if err := h.db.QueryRow(r.Context(), `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.nome),'[]') FROM (
 		SELECT c.*,y.nome ano_lectivo_nome,(SELECT COUNT(*) FROM gestao_escolar.school_enrollments e
 		WHERE e.class_id=c.id AND e.status='activa') alunos FROM gestao_escolar.school_classes c
-		LEFT JOIN gestao_escolar.school_years y ON y.id=c.school_year_id WHERE `+where+`) x`, args...)
-}
-
-func (h *Handler) CriarTurma(w http.ResponseWriter, r *http.Request) {
-	u := mw.GetUser(r)
-	body, err := schoolBody(r)
-	if err != nil {
-		jsonErr(w, "JSON invalido", 400)
+		LEFT JOIN gestao_escolar.school_years y ON y.id=c.school_year_id WHERE `+where+
+		` LIMIT $`+ppIdx+` OFFSET $`+offIdx+`) x`, dataArgs...).Scan(&raw); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
-	h.schoolCreate(w, r, `INSERT INTO gestao_escolar.school_classes
-		(tenant_id,codigo,nome,nivel,ano_lectivo,turma,capacidade,school_year_id,sala,horario)
-		SELECT $1,j.codigo,j.nome,j.nivel,COALESCE(y.codigo,j.ano_lectivo),j.turma,j.capacidade,y.id,j.sala,COALESCE(j.horario,'[]')
-		FROM jsonb_to_record($2::jsonb) AS j(codigo text,nome text,nivel text,ano_lectivo text,
-		turma text,capacidade int,year_id bigint,sala text,horario jsonb)
-		LEFT JOIN gestao_escolar.school_years y ON y.id=j.year_id AND y.tenant_id=$1
-		WHERE j.codigo<>'' AND j.nome<>'' RETURNING id`, u.TenantID, body)
+
+	paginas := (total + porPagina - 1) / porPagina
+	if paginas < 1 {
+		paginas = 1
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"data":       json.RawMessage(raw),
+		"total":      total,
+		"pagina":     pagina,
+		"por_pagina": porPagina,
+		"paginas":    paginas,
+	})
 }
 
 func (h *Handler) ObterTurma(w http.ResponseWriter, r *http.Request) {
@@ -201,21 +228,6 @@ func (h *Handler) ObterTurma(w http.ResponseWriter, r *http.Request) {
 		FROM gestao_escolar.school_teacher_assignments a JOIN gestao_escolar.school_subjects d ON d.id=a.subject_id
 		WHERE a.class_id=c.id AND a.activo),'[]'))
 		FROM gestao_escolar.school_classes c WHERE c.id=$1 AND c.tenant_id=$2`, chi.URLParam(r, "id"), u.TenantID)
-}
-
-func (h *Handler) ActualizarTurma(w http.ResponseWriter, r *http.Request) {
-	u := mw.GetUser(r)
-	body, err := schoolBody(r)
-	if err != nil {
-		jsonErr(w, "JSON invalido", 400)
-		return
-	}
-	h.schoolUpdate(w, r, `UPDATE gestao_escolar.school_classes SET
-		nome=COALESCE(NULLIF($1::jsonb->>'nome',''),nome),nivel=COALESCE($1::jsonb->>'nivel',nivel),
-		turma=COALESCE($1::jsonb->>'turma',turma),capacidade=COALESCE(($1::jsonb->>'capacidade')::int,capacidade),
-		sala=COALESCE($1::jsonb->>'sala',sala),horario=COALESCE($1::jsonb->'horario',horario),
-		activo=COALESCE(($1::jsonb->>'activo')::bool,activo),updated_at=NOW()
-		WHERE id=$2 AND tenant_id=$3`, body, chi.URLParam(r, "id"), u.TenantID)
 }
 
 func (h *Handler) AssociarProfessorDirector(w http.ResponseWriter, r *http.Request) {
@@ -249,6 +261,12 @@ func (h *Handler) CriarDisciplina(w http.ResponseWriter, r *http.Request) {
 		SELECT $1,j.codigo,j.nome,j.descricao,j.carga_horaria,COALESCE(j.nota_minima,10)
 		FROM jsonb_to_record($2::jsonb) AS j(codigo text,nome text,descricao text,carga_horaria int,nota_minima numeric)
 		WHERE j.codigo<>'' AND j.nome<>'' RETURNING id`, u.TenantID, body)
+}
+
+func (h *Handler) ObterDisciplina(w http.ResponseWriter, r *http.Request) {
+	u := mw.GetUser(r)
+	h.schoolOne(w, r, `SELECT to_jsonb(s) FROM gestao_escolar.school_subjects s
+		WHERE s.id=$1 AND s.tenant_id=$2`, chi.URLParam(r, "id"), u.TenantID)
 }
 
 func (h *Handler) AtribuirProfessor(w http.ResponseWriter, r *http.Request) {
@@ -331,30 +349,54 @@ func (h *Handler) AdicionarEncarregado(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "JSON invalido", 400)
 		return
 	}
-	h.schoolCreate(w, r, `INSERT INTO gestao_escolar.school_guardians
+
+	var guardianID int64
+	if err := h.db.QueryRow(r.Context(), `INSERT INTO gestao_escolar.school_guardians
 		(tenant_id,student_id,nome,parentesco,telefone,email,nuit,endereco,principal,autorizado_recolher)
 		SELECT $1,s.id,j.nome,j.parentesco,j.telefone,j.email,j.nuit,j.endereco,COALESCE(j.principal,false),COALESCE(j.autorizado_recolher,true)
 		FROM gestao_escolar.school_students s,jsonb_to_record($3::jsonb)
 		AS j(nome text,parentesco text,telefone text,email text,nuit text,endereco text,principal bool,autorizado_recolher bool)
 		WHERE s.id=$2 AND s.tenant_id=$1 AND j.nome<>'' AND j.telefone<>'' RETURNING school_guardians.id`,
-		u.TenantID, chi.URLParam(r, "id"), body)
-}
-
-func (h *Handler) CriarMatricula(w http.ResponseWriter, r *http.Request) {
-	u := mw.GetUser(r)
-	body, err := schoolBody(r)
-	if err != nil {
-		jsonErr(w, "JSON invalido", 400)
+		u.TenantID, chi.URLParam(r, "id"), body,
+	).Scan(&guardianID); err != nil {
+		jsonErr(w, "Dados invalidos ou registo duplicado", http.StatusUnprocessableEntity)
 		return
 	}
-	h.schoolCreate(w, r, `INSERT INTO gestao_escolar.school_enrollments
-		(tenant_id,student_id,class_id,school_year_id,numero,data_matricula,observacoes,created_by)
-		SELECT $1,s.id,c.id,COALESCE(j.year_id,c.school_year_id),j.numero,COALESCE(j.data_matricula,CURRENT_DATE),j.observacoes,$3
-		FROM jsonb_to_record($2::jsonb) AS j(student_id bigint,class_id bigint,year_id bigint,numero text,data_matricula date,observacoes text)
-		JOIN gestao_escolar.school_students s ON s.id=j.student_id AND s.tenant_id=$1
-		JOIN gestao_escolar.school_classes c ON c.id=j.class_id AND c.tenant_id=$1
-		WHERE j.numero<>'' AND NOT EXISTS(SELECT 1 FROM gestao_escolar.school_enrollments e WHERE e.student_id=s.id AND e.status='activa')
-		RETURNING school_enrollments.id`, u.TenantID, body, u.ID)
+
+	// Registar encarregado como cliente no módulo Gestão de Clientes (assíncrono)
+	if h.client != nil {
+		tenantID := u.TenantID
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+
+			var nome, email, telefone, nuit string
+			_ = h.db.QueryRow(ctx, `
+				SELECT nome, COALESCE(email,''), COALESCE(telefone,''), COALESCE(nuit,'')
+				FROM gestao_escolar.school_guardians WHERE id=$1`, guardianID,
+			).Scan(&nome, &email, &telefone, &nuit)
+
+			if nome == "" {
+				return
+			}
+			clientID, err := h.client.CreateClient(ctx, contracts.ClientData{
+				TenantID: tenantID,
+				Nome:     nome,
+				Email:    email,
+				Telefone: telefone,
+				Nuit:     nuit,
+				Tipo:     "encarregado",
+			})
+			if err != nil || clientID == 0 {
+				return
+			}
+			_, _ = h.db.Exec(ctx, `
+				UPDATE gestao_escolar.school_guardians
+				SET client_id = $1 WHERE id = $2`, clientID, guardianID)
+		}()
+	}
+
+	jsonOK(w, map[string]any{"id": guardianID}, http.StatusCreated)
 }
 
 func (h *Handler) ObterMatricula(w http.ResponseWriter, r *http.Request) {
@@ -366,22 +408,18 @@ func (h *Handler) ObterMatricula(w http.ResponseWriter, r *http.Request) {
 		WHERE e.id=$1 AND e.tenant_id=$2`, chi.URLParam(r, "id"), u.TenantID)
 }
 
-func (h *Handler) TransferirMatricula(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ListarMatriculas(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetUser(r)
-	body, err := schoolBody(r)
-	if err != nil {
-		jsonErr(w, "JSON invalido", 400)
-		return
-	}
-	h.schoolUpdate(w, r, `UPDATE gestao_escolar.school_enrollments e SET
-		class_id=c.id,transferred_at=NOW(),observacoes=COALESCE($1::jsonb->>'motivo',e.observacoes),updated_at=NOW()
-		FROM gestao_escolar.school_classes c WHERE e.id=$2 AND e.tenant_id=$3 AND e.status='activa'
-		AND c.id=($1::jsonb->>'class_id')::bigint AND c.tenant_id=e.tenant_id`,
-		body, chi.URLParam(r, "id"), u.TenantID)
+	where := "e.tenant_id=$1"
+	args := []any{u.TenantID}
+	appendSchoolFilter(&where, &args, "e.class_id", r.URL.Query().Get("class_id"))
+	appendSchoolFilter(&where, &args, "e.student_id", r.URL.Query().Get("student_id"))
+	appendSchoolFilter(&where, &args, "e.status", r.URL.Query().Get("status"))
+	appendSchoolFilter(&where, &args, "e.school_year_id", r.URL.Query().Get("year_id"))
+	h.schoolList(w, r, `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.created_at DESC),'[]') FROM (
+		SELECT e.*,s.nome aluno,c.nome turma FROM gestao_escolar.school_enrollments e
+		JOIN gestao_escolar.school_students s ON s.id=e.student_id
+		JOIN gestao_escolar.school_classes c ON c.id=e.class_id WHERE `+where+`) x`, args...)
 }
 
-func (h *Handler) CancelarMatricula(w http.ResponseWriter, r *http.Request) {
-	u := mw.GetUser(r)
-	h.schoolUpdate(w, r, `UPDATE gestao_escolar.school_enrollments SET status='cancelada',cancelled_at=NOW(),updated_at=NOW()
-		WHERE id=$1 AND tenant_id=$2 AND status='activa'`, chi.URLParam(r, "id"), u.TenantID)
-}
+

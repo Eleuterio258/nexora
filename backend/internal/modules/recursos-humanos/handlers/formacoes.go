@@ -34,8 +34,8 @@ func (h *Handler) ListarFormacoes(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT f.id, f.codigo, f.nome, f.descricao, f.categoria, f.duracao_horas, f.entidade_formadora, f.ativo,
-		       (SELECT COUNT(*) FROM funcionario_formacoes ff WHERE ff.formacao_id = f.id)
-		  FROM formacoes f
+		       (SELECT COUNT(*) FROM rh.funcionario_formacoes ff WHERE ff.formacao_id = f.id)
+		  FROM rh.formacoes f
 		 WHERE f.tenant_id=$1
 		 ORDER BY f.nome`, user.TenantID)
 	defer rows.Close()
@@ -72,7 +72,7 @@ func (h *Handler) CriarFormacao(w http.ResponseWriter, r *http.Request) {
 	}
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO formacoes (tenant_id, codigo, nome, descricao, categoria, duracao_horas, entidade_formadora)
+		INSERT INTO rh.formacoes (tenant_id, codigo, nome, descricao, categoria, duracao_horas, entidade_formadora)
 		VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
 		user.TenantID, body.Codigo, body.Nome, body.Descricao, body.Categoria, body.DuracaoHoras, body.EntidadeFormadora).Scan(&id)
 	if err != nil {
@@ -112,7 +112,7 @@ func (h *Handler) ActualizarFormacao(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE formacoes SET
+		UPDATE rh.formacoes SET
 		  codigo=COALESCE($1,codigo), nome=COALESCE($2,nome), descricao=COALESCE($3,descricao),
 		  categoria=COALESCE($4,categoria), duracao_horas=COALESCE($5,duracao_horas),
 		  entidade_formadora=COALESCE($6,entidade_formadora), ativo=COALESCE($7,ativo), updated_at=NOW()
@@ -138,7 +138,7 @@ func (h *Handler) RemoverFormacao(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	var emUso bool
-	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM funcionario_formacoes WHERE formacao_id=$1 AND tenant_id=$2)`, id, user.TenantID).Scan(&emUso); err != nil {
+	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM rh.funcionario_formacoes WHERE formacao_id=$1 AND tenant_id=$2)`, id, user.TenantID).Scan(&emUso); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
@@ -147,7 +147,7 @@ func (h *Handler) RemoverFormacao(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tag, err := h.db.Exec(r.Context(), `DELETE FROM formacoes WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), `DELETE FROM rh.formacoes WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return

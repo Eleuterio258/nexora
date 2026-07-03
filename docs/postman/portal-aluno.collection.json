@@ -1,0 +1,421 @@
+{
+  "info": {
+    "_postman_id": "nexora-portal-aluno-001",
+    "name": "Nexora ERP - Portal do Aluno",
+    "description": "Collection das rotas do portal de auto-serviço do aluno. Todas as rotas autenticadas usam o token obtido em `Login`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Autenticação",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"aluno.teste@nexora.test\",\n  \"password\": \"outrasenha456\"\n}"
+            },
+            "description": "Autentica o aluno em auth.users e devolve o access_token do portal."
+          },
+          "response": []
+        },
+        {
+          "name": "Definir Senha (convite)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/definir-senha",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "definir-senha"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"token_do_convite_aqui\",\n  \"password\": \"nova_senha_123\"\n}"
+            },
+            "description": "Primeiro acesso via link de convite."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "logout"]
+            },
+            "description": "Revoga a sessão actual do aluno."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Perfil",
+      "item": [
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me"]
+            },
+            "description": "Dados pessoais do aluno, matrícula activa e encarregados."
+          },
+          "response": []
+        },
+        {
+          "name": "Alterar Senha",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/alterar-senha",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "alterar-senha"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senha_actual\": \"outrasenha456\",\n  \"nova_senha\": \"nova_senha_123\"\n}"
+            },
+            "description": "Altera a senha do aluno em auth.users."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Académico",
+      "item": [
+        {
+          "name": "Boletim",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me/boletim",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me", "boletim"]
+            },
+            "description": "Boletim do aluno."
+          },
+          "response": []
+        },
+        {
+          "name": "Notas (detalhes)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me/notas",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me", "notas"]
+            },
+            "description": "Detalhes de notas do aluno."
+          },
+          "response": []
+        },
+        {
+          "name": "Horário",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me/horario",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me", "horario"]
+            },
+            "description": "Horário de aulas do aluno."
+          },
+          "response": []
+        },
+        {
+          "name": "Presenças",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me/presencas",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me", "presencas"]
+            },
+            "description": "Registo de presenças do aluno."
+          },
+          "response": []
+        },
+        {
+          "name": "Ocorrências",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me/ocorrencias",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me", "ocorrencias"]
+            },
+            "description": "Ocorrências disciplinares do aluno."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Financeiro",
+      "item": [
+        {
+          "name": "Cobranças",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me/cobrancas",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me", "cobrancas"]
+            },
+            "description": "Lista de cobranças do aluno."
+          },
+          "response": []
+        },
+        {
+          "name": "Recibo de Cobrança",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me/cobrancas/{{cobranca_id}}/recibo",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me", "cobrancas", "{{cobranca_id}}", "recibo"]
+            },
+            "description": "Recibo/segunda via de uma cobrança."
+          },
+          "response": []
+        },
+        {
+          "name": "Iniciar Pagamento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me/cobrancas/{{cobranca_id}}/pagar",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me", "cobrancas", "{{cobranca_id}}", "pagar"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "description": "Inicia o pagamento de uma cobrança."
+          },
+          "response": []
+        },
+        {
+          "name": "Status Pagamento",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me/cobrancas/{{cobranca_id}}/pagamento/{{gtid}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me", "cobrancas", "{{cobranca_id}}", "pagamento", "{{gtid}}"]
+            },
+            "description": "Verifica estado de um pagamento iniciado."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Comunicação",
+      "item": [
+        {
+          "name": "Mensagens",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me/mensagens",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me", "mensagens"]
+            },
+            "description": "Mensagens dirigidas ao aluno."
+          },
+          "response": []
+        },
+        {
+          "name": "Eventos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me/eventos",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me", "eventos"]
+            },
+            "description": "Eventos/calendário escolar do aluno."
+          },
+          "response": []
+        },
+        {
+          "name": "Biblioteca",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/portal/aluno/me/biblioteca",
+              "host": ["{{base_url}}"],
+              "path": ["api", "portal", "aluno", "me", "biblioteca"]
+            },
+            "description": "Empréstimos e recursos da biblioteca."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Guarda automaticamente o access_token após login",
+          "if (pm.request.url.path.join('/').includes('login') && pm.response.code === 200) {",
+          "    const json = pm.response.json();",
+          "    if (json.access_token) {",
+          "        pm.collectionVariables.set('access_token', json.access_token);",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "cobranca_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "gtid",
+      "value": "gtid_exemplo",
+      "type": "string"
+    }
+  ]
+}

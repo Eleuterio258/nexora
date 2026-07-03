@@ -7,13 +7,15 @@ import (
 
 // Event types enviados ao cliente
 const (
-	EvtMessage     = "message"
-	EvtTyping      = "typing"
-	EvtStopTyping  = "stop_typing"
-	EvtJoined      = "joined"
-	EvtUserOnline  = "user_online"
-	EvtUserOffline = "user_offline"
-	EvtError       = "error"
+	EvtMessage           = "message"
+	EvtTyping            = "typing"
+	EvtStopTyping        = "stop_typing"
+	EvtJoined            = "joined"
+	EvtUserOnline        = "user_online"
+	EvtUserOffline       = "user_offline"
+	EvtError             = "error"
+	EvtNotification      = "notification"
+	EvtNotificationCount = "notification_count"
 )
 
 // Envelope é o envelope JSON de todos os eventos WebSocket.
@@ -91,6 +93,20 @@ func (h *Hub) BroadcastRoom(conversaID int64, msg []byte) {
 		case c.send <- msg:
 		default:
 			close(c.send)
+		}
+	}
+}
+
+// SendToUser envia para todas as ligações WS do utilizador com o userID dado.
+func (h *Hub) SendToUser(userID int64, msg []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for c := range h.clients {
+		if c.UserID == userID {
+			select {
+			case c.send <- msg:
+			default:
+			}
 		}
 	}
 }

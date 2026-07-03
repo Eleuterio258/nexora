@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -31,6 +32,8 @@ type Vaga struct {
 	Ativa             bool      `json:"ativa"`
 	NumVagas          int16     `json:"num_vagas"`
 	Prazo             *string   `json:"prazo"`
+	PermitePublica    bool      `json:"permite_publica"`
+	PermiteConta      bool      `json:"permite_conta"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
@@ -50,11 +53,14 @@ type vagaInput struct {
 	Ativa             *bool    `json:"ativa"`
 	NumVagas          *int16   `json:"num_vagas"`
 	Prazo             *string  `json:"prazo"`
+	PermitePublica    *bool    `json:"permite_publica"`
+	PermiteConta      *bool    `json:"permite_conta"`
 }
 
 var dateFormatRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
-// parsePrazo valida e converte "YYYY-MM-DD" em *time.Time. Devolve ok=false se o formato for invalido.
+// parsePrazo valida e converte "YYYY-MM-DD" em *time.Time.
+// Devolve ok=false se o formato for inválido ou a data for anterior a hoje.
 func parsePrazo(s *string) (*time.Time, bool) {
 	if s == nil || strings.TrimSpace(*s) == "" {
 		return nil, true
@@ -64,6 +70,10 @@ func parsePrazo(s *string) (*time.Time, bool) {
 	}
 	t, err := time.Parse("2006-01-02", *s)
 	if err != nil {
+		return nil, false
+	}
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	if t.UTC().Before(today) {
 		return nil, false
 	}
 	return &t, true
@@ -82,13 +92,13 @@ func strDefault(s *string, def string) string {
 
 const vagaSelectCols = `id, titulo, area, local, regime, tipo, descricao, sobre_funcao,
 	responsabilidades, req_obrigatorios, req_preferenciais, oferece, ativa, num_vagas,
-	to_char(prazo, 'YYYY-MM-DD'), created_at, updated_at`
+	to_char(prazo, 'YYYY-MM-DD'), permite_publica, permite_conta, created_at, updated_at`
 
 func scanVaga(row pgx.Row, extra ...any) (*Vaga, error) {
 	var v Vaga
 	dest := []any{&v.ID, &v.Titulo, &v.Area, &v.Local, &v.Regime, &v.Tipo, &v.Descricao,
 		&v.SobreFuncao, &v.Responsabilidades, &v.ReqObrigatorios, &v.ReqPreferenciais, &v.Oferece,
-		&v.Ativa, &v.NumVagas, &v.Prazo, &v.CreatedAt, &v.UpdatedAt}
+		&v.Ativa, &v.NumVagas, &v.Prazo, &v.PermitePublica, &v.PermiteConta, &v.CreatedAt, &v.UpdatedAt}
 	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return nil, err
 	}
@@ -186,14 +196,22 @@ func (h *Handler) CriarVaga(w http.ResponseWriter, r *http.Request) {
 	if body.Ativa != nil {
 		ativa = *body.Ativa
 	}
+	permitePublica := true
+	if body.PermitePublica != nil {
+		permitePublica = *body.PermitePublica
+	}
+	permiteConta := true
+	if body.PermiteConta != nil {
+		permiteConta = *body.PermiteConta
+	}
 
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
 		INSERT INTO vagas
 			(tenant_id, titulo, area, local, regime, tipo, descricao, sobre_funcao,
 			 responsabilidades, req_obrigatorios, req_preferenciais, oferece,
-			 ativa, num_vagas, prazo)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+			 ativa, num_vagas, prazo, permite_publica, permite_conta)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 		RETURNING id`,
 		user.TenantID, body.Titulo, body.Area,
 		strDefault(body.Local, "Maputo, Moçambique"),
@@ -202,7 +220,7 @@ func (h *Handler) CriarVaga(w http.ResponseWriter, r *http.Request) {
 		body.Descricao, body.SobreFuncao,
 		filterList(body.Responsabilidades), filterList(body.ReqObrigatorios),
 		filterList(body.ReqPreferenciais), filterList(body.Oferece),
-		ativa, numVagas, prazo,
+		ativa, numVagas, prazo, permitePublica, permiteConta,
 	).Scan(&id)
 	if err != nil {
 		jsonErr(w, "Erro ao guardar na base de dados.", http.StatusInternalServerError)
@@ -257,13 +275,21 @@ func (h *Handler) ActualizarVaga(w http.ResponseWriter, r *http.Request) {
 	if body.Ativa != nil {
 		ativa = *body.Ativa
 	}
+	permitePublica := true
+	if body.PermitePublica != nil {
+		permitePublica = *body.PermitePublica
+	}
+	permiteConta := true
+	if body.PermiteConta != nil {
+		permiteConta = *body.PermiteConta
+	}
 
 	tag, err := h.db.Exec(r.Context(), `
 		UPDATE vagas SET
 			titulo=$1, area=$2, local=$3, regime=$4, tipo=$5, descricao=$6, sobre_funcao=$7,
 			responsabilidades=$8, req_obrigatorios=$9, req_preferenciais=$10, oferece=$11,
-			ativa=$12, num_vagas=$13, prazo=$14, updated_at=NOW()
-		WHERE id=$15 AND tenant_id=$16`,
+			ativa=$12, num_vagas=$13, prazo=$14, permite_publica=$15, permite_conta=$16, updated_at=NOW()
+		WHERE id=$17 AND tenant_id=$18`,
 		body.Titulo, body.Area,
 		strDefault(body.Local, "Maputo, Moçambique"),
 		strDefault(body.Regime, "Presencial / Híbrido"),
@@ -271,7 +297,7 @@ func (h *Handler) ActualizarVaga(w http.ResponseWriter, r *http.Request) {
 		body.Descricao, body.SobreFuncao,
 		filterList(body.Responsabilidades), filterList(body.ReqObrigatorios),
 		filterList(body.ReqPreferenciais), filterList(body.Oferece),
-		ativa, numVagas, prazo, id, user.TenantID,
+		ativa, numVagas, prazo, permitePublica, permiteConta, id, user.TenantID,
 	)
 	if err != nil {
 		jsonErr(w, "Erro ao actualizar na base de dados.", http.StatusInternalServerError)
@@ -336,8 +362,18 @@ func (h *Handler) RemoverVaga(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	uploadsDir := filepath.Clean(h.cfg.UploadsDir)
 	for _, f := range files {
-		os.Remove(filepath.Join(h.cfg.UploadsDir, strings.TrimPrefix(f, "uploads/")))
+		rel := filepath.Clean(strings.TrimPrefix(f, "uploads/"))
+		abs := filepath.Join(uploadsDir, rel)
+		// garantir que o ficheiro está dentro do directório de uploads
+		if !strings.HasPrefix(abs, uploadsDir+string(filepath.Separator)) {
+			log.Printf("RemoverVaga: path fora de uploads ignorado: %s", abs)
+			continue
+		}
+		if err := os.Remove(abs); err != nil && !os.IsNotExist(err) {
+			log.Printf("RemoverVaga: erro ao remover ficheiro %s: %v", abs, err)
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)

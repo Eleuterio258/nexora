@@ -22,6 +22,7 @@
         'convertido'     => ['adm-badge--green',  'Convertido'],
     ];
 
+    $canGerirLeads = $app->session->can('crm', 'gerir_leads');
     $pageTitle  = 'Leads';
     $activePage = 'crm_leads';
     $breadcrumb = [['Admin', '/nexora/'], ['CRM', ''], ['Leads', '']];
@@ -40,12 +41,14 @@
             </svg>
             Vista Kanban
         </a>
+        <?php if ($canGerirLeads): ?>
         <a href="/nexora/crm/leads/form" class="adm-btn adm-btn-primary">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
             Novo Lead
         </a>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -84,7 +87,7 @@
                     <th>Origem</th>
                     <th>Responsável</th>
                     <th>Estado</th>
-                    <th>Ações</th>
+                    <?php if ($canGerirLeads): ?><th>Ações</th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -107,6 +110,7 @@
                 <td><?php echo htmlspecialchars($origemLabels[$l['origem']] ?? $l['origem']) ?></td>
                 <td><?php echo htmlspecialchars($l['responsavel'] ?? '—') ?></td>
                 <td><span class="adm-badge <?php echo $estadoBadge[0] ?>"><?php echo $estadoBadge[1] ?></span></td>
+                <?php if ($canGerirLeads): ?>
                 <td>
                     <div class="adm-actions">
                         <a href="/nexora/crm/leads/form?id=<?php echo $l['id'] ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Ver / Editar">
@@ -127,6 +131,9 @@
                         </button>
                     </div>
                 </td>
+                <?php else: ?>
+                <td>—</td>
+                <?php endif; ?>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -141,7 +148,9 @@
         </svg>
         <p class="adm-empty-title">Nenhum lead criado</p>
         <p class="adm-empty-sub">Começa por criar o primeiro lead.</p>
+        <?php if ($canGerirLeads): ?>
         <a href="/nexora/crm/leads/form" class="adm-btn adm-btn-primary">Criar Lead</a>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>

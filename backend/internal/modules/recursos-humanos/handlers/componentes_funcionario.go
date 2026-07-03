@@ -17,8 +17,8 @@ func (h *Handler) ListarComponentesFuncionario(w http.ResponseWriter, r *http.Re
 
 	rows, err := h.db.Query(r.Context(), `
 		SELECT c.id, c.codigo, c.nome, c.tipo, c.forma_calculo, fc.valor
-		  FROM funcionario_componentes_salariais fc
-		  JOIN componentes_salariais c ON c.id = fc.componente_id
+		  FROM rh.funcionario_componentes_salariais fc
+		  JOIN rh.componentes_salariais c ON c.id = fc.componente_id
 		 WHERE fc.funcionario_id=$1 AND fc.tenant_id=$2
 		 ORDER BY c.tipo, c.nome`, funcionarioID, user.TenantID)
 	if err != nil {
@@ -64,14 +64,14 @@ func (h *Handler) AdicionarComponenteFuncionario(w http.ResponseWriter, r *http.
 	}
 
 	var existe bool
-	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM componentes_salariais WHERE id=$1 AND tenant_id=$2 AND ativo)`, body.ComponenteID, user.TenantID).Scan(&existe); err != nil || !existe {
+	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM rh.componentes_salariais WHERE id=$1 AND tenant_id=$2 AND ativo)`, body.ComponenteID, user.TenantID).Scan(&existe); err != nil || !existe {
 		jsonErr(w, "Componente salarial inválido", http.StatusBadRequest)
 		return
 	}
 
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO funcionario_componentes_salariais (tenant_id, funcionario_id, componente_id, valor)
+		INSERT INTO rh.funcionario_componentes_salariais (tenant_id, funcionario_id, componente_id, valor)
 		VALUES ($1,$2,$3,$4)
 		ON CONFLICT (funcionario_id, componente_id) DO UPDATE SET valor=EXCLUDED.valor
 		RETURNING id`,
@@ -89,7 +89,7 @@ func (h *Handler) RemoverComponenteFuncionario(w http.ResponseWriter, r *http.Re
 	componenteID := chi.URLParam(r, "componenteId")
 
 	tag, err := h.db.Exec(r.Context(), `
-		DELETE FROM funcionario_componentes_salariais
+		DELETE FROM rh.funcionario_componentes_salariais
 		 WHERE funcionario_id=$1 AND componente_id=$2 AND tenant_id=$3`,
 		funcionarioID, componenteID, user.TenantID)
 	if err != nil {

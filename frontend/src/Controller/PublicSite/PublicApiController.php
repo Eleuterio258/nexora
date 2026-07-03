@@ -67,43 +67,36 @@ final readonly class PublicApiController
             $this->security->jsonResponse(['erro' => 'Token de segurança inválido.'], 403);
         }
 
-        $name = $this->security->sanitize($this->request->postString('nome'), 150);
-        $phone = $this->security->sanitize($this->request->postString('telefone'), 30);
-        $vacancyId = $this->request->postInt('vaga_id');
-        $vacancyTitle = $this->security->sanitize($this->request->postString('vaga_titulo'), 200);
-        $letter = $this->security->sanitize($this->request->postString('carta'), 3000);
-        $email = $this->security->sanitizeEmail($this->request->postString('email'));
-        $errors = [];
+        // Passar todos os campos do formulário ao backend (excepto o token CSRF)
+        $fields = [];
+        foreach ($_POST as $key => $value) {
+            if ($key === 'csrf_token') {
+                continue;
+            }
+            $fields[$key] = is_array($value) ? implode(',', $value) : (string) $value;
+        }
 
-        if (strlen($name) < 2) {
-            $errors[] = 'Nome inválido.';
-        }
-        if (!$email) {
-            $errors[] = 'Email inválido.';
-        }
-        if ($vacancyTitle === '') {
-            $errors[] = 'Vaga não identificada.';
-        }
-        if ($errors) {
-            $this->security->jsonResponse(['erro' => implode(' ', $errors)], 422);
+        // Passar todos os ficheiros enviados
+        $files = [];
+        foreach ($_FILES as $key => $file) {
+            $files[$key] = $file;
         }
 
         $response = $this->nexora->uploadPublicData(
             '/api/public/recrutamento/candidaturas',
-            [
-                'nome' => $name,
-                'email' => $email,
-                'telefone' => $phone,
-                'vaga_id' => (string) ($vacancyId ?: ''),
-                'vaga_titulo' => $vacancyTitle,
-                'carta' => $letter,
-            ],
-            [
-                'cv' => $this->request->file('cv'),
-                'carta_ficheiro' => $this->request->file('carta_ficheiro'),
-            ]
+            $fields,
+            $files
         );
         $this->respond($response, 'Erro ao guardar candidatura. Tente novamente.');
+    }
+
+    public function proxyGet(string $uri): never
+    {
+        $response = $this->nexora->callPublic('GET', $uri, null, $_GET);
+        header('Content-Type: application/json');
+        http_response_code($response['status'] ?: 200);
+        echo json_encode($response['body']);
+        exit;
     }
 
     private function respond(array $response, string $fallback): never

@@ -4,7 +4,7 @@ declare(strict_types=1);
 $_escolar   = include dirname(__DIR__) . '/partials/escolar_resources.php';
 $pageTitle  = 'Resumo Financeiro';
 $activePage = 'escolar_resumo_financeiro';
-$breadcrumb = [['Admin', '/nexora/'], ['Gestão Escolar', '/nexora/gestao-escolar'], ['Resumo Financeiro', '']];
+$breadcrumb = $app->routes->escolarBreadcrumb([['Resumo Financeiro', '']]);
 
 $workspace = [
     'title'     => 'Resumo Financeiro',

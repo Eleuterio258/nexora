@@ -14,7 +14,7 @@ import (
 // Devolve nil se o utilizador não tiver um funcionário associado.
 func (h *Handler) GetUserFuncionario(ctx context.Context, tenantID, userID int64) (*int64, error) {
 	var funcionarioID int64
-	err := h.db.QueryRow(ctx, `SELECT id FROM funcionarios WHERE tenant_id=$1 AND user_id=$2`, tenantID, userID).Scan(&funcionarioID)
+	err := h.db.QueryRow(ctx, `SELECT id FROM rh.funcionarios WHERE tenant_id=$1 AND user_id=$2`, tenantID, userID).Scan(&funcionarioID)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, nil
@@ -32,12 +32,12 @@ func (h *Handler) IsResponsavelHierarquico(ctx context.Context, tenantID, funcio
 	err := h.db.QueryRow(ctx, `
 		WITH RECURSIVE hierarquia AS (
 			SELECT u.id, u.parent_id, u.responsavel_id
-			  FROM funcionarios f
-			  JOIN unidades_organizacionais u ON u.id = f.unit_id
+			  FROM rh.funcionarios f
+			  JOIN rh.unidades_organizacionais u ON u.id = f.unit_id
 			 WHERE f.id = $1 AND f.tenant_id = $2
 			UNION ALL
 			SELECT p.id, p.parent_id, p.responsavel_id
-			  FROM unidades_organizacionais p
+			  FROM rh.unidades_organizacionais p
 			  JOIN hierarquia h ON p.id = h.parent_id
 		)
 		SELECT EXISTS (SELECT 1 FROM hierarquia WHERE responsavel_id = $3)`,
@@ -67,7 +67,7 @@ func (h *Handler) podeGerirFuncionario(r *http.Request, targetFuncionarioID int6
 
 // PodeVerSalarios indica se o utilizador autenticado pode visualizar dados
 // salariais (RNF02 — confidencialidade salarial): superadmins e
-// utilizadores com a permissão (recursos-humanos, gerir).
+// utilizadores com a permissão (recursos-humanos, processar_salarios).
 func (h *Handler) PodeVerSalarios(r *http.Request) bool {
 	user := mw.GetUser(r)
 	if user.Tipo == "superadmin" {
@@ -77,5 +77,5 @@ func (h *Handler) PodeVerSalarios(r *http.Request) bool {
 	if err != nil {
 		return false
 	}
-	return access.Can("recursos-humanos", "gerir")
+	return access.Can("recursos-humanos", "processar_salarios")
 }

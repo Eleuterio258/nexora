@@ -144,7 +144,7 @@ final class NexoraClient implements NexoraGateway
     {
         $postFields = $fields;
         foreach ($files as $field => $file) {
-            if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+            if (empty($file['tmp_name']) || !is_readable($file['tmp_name'])) {
                 continue;
             }
             $postFields[$field] = new CURLFile(
@@ -174,6 +174,66 @@ final class NexoraClient implements NexoraGateway
     {
         $response = $this->uploadPublic($path, $fields, $files);
         return ['status' => $response->status, 'body' => $response->body];
+    }
+
+    public function uploadMultipart(string $path, array $fields, array $files): array
+    {
+        $postFields = $fields;
+        foreach ($files as $field => $file) {
+            if (empty($file['tmp_name']) || !is_readable($file['tmp_name'])) {
+                continue;
+            }
+            $postFields[$field] = new CURLFile(
+                $file['tmp_name'],
+                $file['type'] ?? '',
+                $file['name'] ?? ''
+            );
+        }
+
+        $options = [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $postFields,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+                'Authorization: Bearer ' . $this->tokens->accessToken(),
+            ],
+            CURLOPT_TIMEOUT => 60,
+        ];
+
+        $response = $this->raw($this->url($path, []), $options);
+        if ($response['status'] === 401) {
+            $options[CURLOPT_HTTPHEADER][1] = 'Authorization: Bearer ' . $this->tokens->accessToken(true);
+            $response = $this->raw($this->url($path, []), $options);
+        }
+
+        $body = json_decode($response['body'], true);
+        return ['status' => $response['status'], 'body' => is_array($body) ? $body : null];
+    }
+
+    /**
+     * Envia bytes crus (não JSON) autenticados por Bearer, ex.: um PDF gerado
+     * localmente para ser guardado no storage do backend.
+     */
+    public function uploadBinary(string $path, string $bytes, string $contentType): array
+    {
+        $options = [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $bytes,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: ' . $contentType,
+                'Authorization: Bearer ' . $this->tokens->accessToken(),
+            ],
+            CURLOPT_TIMEOUT => 60,
+        ];
+
+        $response = $this->raw($this->url($path, []), $options);
+        if ($response['status'] === 401) {
+            $options[CURLOPT_HTTPHEADER][1] = 'Authorization: Bearer ' . $this->tokens->accessToken(true);
+            $response = $this->raw($this->url($path, []), $options);
+        }
+
+        $body = json_decode($response['body'], true);
+        return ['status' => $response['status'], 'body' => is_array($body) ? $body : null];
     }
 
     private function json(

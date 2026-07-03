@@ -50,13 +50,46 @@ final class AdminPageGuard
             return;
         }
 
+        $this->deny('Não tem permissão para aceder a esta secção.');
+    }
+
+    /**
+     * Bloqueia o request se o utilizador não tiver um dos escopos indicados.
+     * Superadmin bypassa.
+     * Uso: $app->guard->requireEscopo('erp');
+     */
+    public function requireEscopo(string ...$escopos): void
+    {
+        if ($this->session->isSuperAdmin()) {
+            return;
+        }
+        if (in_array($this->session->escopo(), $escopos, true)) {
+            return;
+        }
+        $this->deny('O seu tipo de conta não tem acesso a esta secção.');
+    }
+
+    /**
+     * Bloqueia o request se a funcionalidade não estiver activa para o tenant.
+     * Uso: $app->guard->requireFeature('rh.ferias');
+     */
+    public function requireFeature(string $feature): void
+    {
+        if ($this->session->canFeature($feature)) {
+            return;
+        }
+        $this->deny('Esta funcionalidade não está disponível no seu plano.');
+    }
+
+    private function deny(string $message): void
+    {
         http_response_code(403);
         echo '<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8">'
             . '<meta name="viewport" content="width=device-width,initial-scale=1">'
             . '<title>Acesso negado</title><link rel="stylesheet" href="/assets/css/nexora.css"></head>'
             . '<body><main class="adm-denied"><h1>Acesso negado</h1>'
-            . '<p>Nao tem permissao para aceder a esta seccao.</p>'
-            . '<a href="/nexora/" class="adm-btn adm-btn-primary">Voltar ao inicio</a>'
+            . '<p>' . htmlspecialchars($message) . '</p>'
+            . '<a href="/nexora/" class="adm-btn adm-btn-primary">Voltar ao início</a>'
             . '</main></body></html>';
         exit;
     }

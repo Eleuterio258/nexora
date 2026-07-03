@@ -28,7 +28,7 @@ func (h *Handler) ListarPermissoesDiretas(w http.ResponseWriter, r *http.Request
 
 	// Confirmar que o utilizador pertence ao mesmo tenant
 	var exists bool
-	h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND tenant_id = $2)`,
+	h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM auth.memberships WHERE user_id = $1 AND tenant_id = $2)`,
 		targetID, user.TenantID).Scan(&exists)
 	if !exists {
 		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
@@ -67,7 +67,7 @@ func (h *Handler) DefinirPermissoesDiretas(w http.ResponseWriter, r *http.Reques
 	}
 
 	var exists bool
-	h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1 AND tenant_id = $2)`,
+	h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM auth.memberships WHERE user_id = $1 AND tenant_id = $2)`,
 		targetID, user.TenantID).Scan(&exists)
 	if !exists {
 		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
@@ -129,9 +129,10 @@ func (h *Handler) AtribuirCargo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE users SET cargo_id = $1, permissoes_atualizadas_em = NOW()
-		WHERE id = $2 AND tenant_id = $3`,
+		UPDATE auth.memberships SET cargo_id = $1, updated_at = NOW()
+		WHERE user_id = $2 AND tenant_id = $3`,
 		body.CargoID, targetID, user.TenantID)
+	h.db.Exec(r.Context(), `UPDATE users SET permissoes_atualizadas_em = NOW() WHERE id = $1`, targetID)
 	if err != nil || tag.RowsAffected() == 0 {
 		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
 		return

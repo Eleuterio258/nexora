@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
@@ -146,6 +145,16 @@ func (h *Handler) CorrigirFrequencia(w http.ResponseWriter, r *http.Request) {
 		WHERE id=$2 AND tenant_id=$3`, body, chi.URLParam(r, "id"), u.TenantID)
 }
 
+func (h *Handler) ObterFrequencia(w http.ResponseWriter, r *http.Request) {
+	u := mw.GetUser(r)
+	h.schoolOne(w, r, `SELECT to_jsonb(x) FROM (
+		SELECT a.*,s.nome aluno,c.nome turma,d.nome disciplina FROM gestao_escolar.school_attendance a
+		JOIN gestao_escolar.school_students s ON s.id=a.student_id
+		JOIN gestao_escolar.school_classes c ON c.id=a.class_id
+		LEFT JOIN gestao_escolar.school_subjects d ON d.id=a.subject_id
+		WHERE a.id=$1 AND a.tenant_id=$2) x`, chi.URLParam(r, "id"), u.TenantID)
+}
+
 func (h *Handler) ListarAvaliacoes(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetUser(r)
 	where := "g.tenant_id=$1"
@@ -159,82 +168,3 @@ func (h *Handler) ListarAvaliacoes(w http.ResponseWriter, r *http.Request) {
 		JOIN gestao_escolar.school_terms t ON t.id=g.term_id WHERE `+where+`) x`, args...)
 }
 
-func (h *Handler) CriarAvaliacao(w http.ResponseWriter, r *http.Request) {
-	u := mw.GetUser(r)
-	body, err := schoolBody(r)
-	if err != nil {
-		jsonErr(w, "JSON invalido", 400)
-		return
-	}
-	h.schoolCreate(w, r, `INSERT INTO gestao_escolar.school_grade_items
-		(tenant_id,class_id,subject_id,term_id,nome,tipo,data_avaliacao,nota_maxima,peso,created_by)
-		SELECT $1,c.id,s.id,j.term_id,j.nome,COALESCE(j.tipo,'teste'),j.data_avaliacao,
-		COALESCE(j.nota_maxima,20),COALESCE(j.peso,1),$3
-		FROM jsonb_to_record($2::jsonb) AS j(class_id bigint,subject_id bigint,term_id bigint,nome text,
-		tipo text,data_avaliacao date,nota_maxima numeric,peso numeric)
-		JOIN gestao_escolar.school_classes c ON c.id=j.class_id AND c.tenant_id=$1
-		JOIN gestao_escolar.school_subjects s ON s.id=j.subject_id AND s.tenant_id=$1
-		JOIN gestao_escolar.school_terms t ON t.id=j.term_id AND t.tenant_id=$1
-		WHERE j.nome<>'' RETURNING school_grade_items.id`, u.TenantID, body, u.ID)
-}
-
-func (h *Handler) LancarNotas(w http.ResponseWriter, r *http.Request) {
-	u := mw.GetUser(r)
-	body, err := schoolBody(r)
-	if err != nil {
-		jsonErr(w, "JSON invalido", 400)
-		return
-	}
-	var count int64
-	err = h.db.QueryRow(r.Context(), `WITH input AS (
-		SELECT ($2::jsonb->>'grade_item_id')::bigint item,$2::jsonb->'grades' grades
-	), ins AS (
-		INSERT INTO gestao_escolar.school_grades(tenant_id,grade_item_id,student_id,enrollment_id,nota,observacoes,lancado_por)
-		SELECT $1,i.item,(x->>'student_id')::bigint,(x->>'enrollment_id')::bigint,(x->>'nota')::numeric,x->>'observacoes',$3
-		FROM input i,jsonb_array_elements(i.grades) x
-		JOIN gestao_escolar.school_grade_items gi ON gi.id=i.item AND gi.tenant_id=$1
-		JOIN gestao_escolar.school_students s ON s.id=(x->>'student_id')::bigint AND s.tenant_id=$1
-		WHERE (x->>'nota')::numeric BETWEEN 0 AND gi.nota_maxima
-		ON CONFLICT(tenant_id,grade_item_id,student_id) DO UPDATE SET
-		nota=EXCLUDED.nota,observacoes=EXCLUDED.observacoes,lancado_por=EXCLUDED.lancado_por,updated_at=NOW()
-		RETURNING 1) SELECT COUNT(*) FROM ins`, u.TenantID, body, u.ID).Scan(&count)
-	if err != nil || count == 0 {
-		jsonErr(w, "Notas invalidas", http.StatusUnprocessableEntity)
-		return
-	}
-	jsonOK(w, map[string]any{"registos": count}, http.StatusCreated)
-}
-
-func (h *Handler) CorrigirNota(w http.ResponseWriter, r *http.Request) {
-	u := mw.GetUser(r)
-	body, err := schoolBody(r)
-	if err != nil {
-		jsonErr(w, "JSON invalido", 400)
-		return
-	}
-	h.schoolUpdate(w, r, `UPDATE gestao_escolar.school_grades g SET
-		nota=COALESCE(($1::jsonb->>'nota')::numeric,nota),observacoes=COALESCE($1::jsonb->>'observacoes',observacoes),
-		lancado_por=$4,updated_at=NOW() FROM gestao_escolar.school_grade_items i
-		WHERE g.id=$2 AND g.tenant_id=$3 AND i.id=g.grade_item_id
-		AND COALESCE(($1::jsonb->>'nota')::numeric,g.nota) BETWEEN 0 AND i.nota_maxima`,
-		body, chi.URLParam(r, "id"), u.TenantID, u.ID)
-}
-
-func (h *Handler) ObterBoletim(w http.ResponseWriter, r *http.Request) {
-	u := mw.GetUser(r)
-	term := r.URL.Query().Get("term_id")
-	if term == "" {
-		term = "0"
-	}
-	h.schoolOne(w, r, `SELECT jsonb_build_object('student',to_jsonb(s),'term_id',$3::bigint,
-		'disciplinas',COALESCE((SELECT jsonb_agg(to_jsonb(x) ORDER BY x.disciplina) FROM (
-		SELECT sub.id subject_id,sub.nome disciplina,ROUND(SUM(g.nota*i.peso)/NULLIF(SUM(i.peso),0),2) media,
-		COUNT(g.id) avaliacoes,BOOL_AND(g.nota>=sub.nota_minima) aprovado
-		FROM gestao_escolar.school_grades g JOIN gestao_escolar.school_grade_items i ON i.id=g.grade_item_id
-		JOIN gestao_escolar.school_subjects sub ON sub.id=i.subject_id
-		WHERE g.student_id=s.id AND i.term_id=$3 GROUP BY sub.id) x),'[]'))
-		FROM gestao_escolar.school_students s WHERE s.id=$1 AND s.tenant_id=$2`,
-		chi.URLParam(r, "student_id"), u.TenantID, term)
-}
-
-var _ = strconv.Itoa

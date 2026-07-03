@@ -4,7 +4,7 @@ declare(strict_types=1);
 $_escolar   = include dirname(__DIR__) . '/partials/escolar_resources.php';
 $pageTitle  = 'Anos Lectivos';
 $activePage = 'escolar_anos_lectivos';
-$breadcrumb = [['Admin', '/nexora/'], ['Gestão Escolar', '/nexora/gestao-escolar'], ['Anos Lectivos', '']];
+$breadcrumb = $app->routes->escolarBreadcrumb([['Anos Lectivos', '']]);
 
 $workspace = [
     'title'     => 'Anos Lectivos',

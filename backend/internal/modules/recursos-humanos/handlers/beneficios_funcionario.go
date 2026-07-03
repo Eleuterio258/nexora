@@ -18,8 +18,8 @@ func (h *Handler) ListarBeneficiosFuncionario(w http.ResponseWriter, r *http.Req
 
 	rows, err := h.db.Query(r.Context(), `
 		SELECT b.id, b.codigo, b.nome, fb.valor, fb.data_inicio, fb.data_fim, fb.observacoes
-		  FROM funcionario_beneficios fb
-		  JOIN beneficios b ON b.id = fb.beneficio_id
+		  FROM rh.funcionario_beneficios fb
+		  JOIN rh.beneficios b ON b.id = fb.beneficio_id
 		 WHERE fb.funcionario_id=$1 AND fb.tenant_id=$2
 		 ORDER BY b.nome`, funcionarioID, user.TenantID)
 	if err != nil {
@@ -64,7 +64,7 @@ func (h *Handler) AdicionarBeneficioFuncionario(w http.ResponseWriter, r *http.R
 	}
 
 	var existe bool
-	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM beneficios WHERE id=$1 AND tenant_id=$2 AND ativo)`, body.BeneficioID, user.TenantID).Scan(&existe); err != nil || !existe {
+	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM rh.beneficios WHERE id=$1 AND tenant_id=$2 AND ativo)`, body.BeneficioID, user.TenantID).Scan(&existe); err != nil || !existe {
 		jsonErr(w, "Benefício inválido", http.StatusBadRequest)
 		return
 	}
@@ -86,7 +86,7 @@ func (h *Handler) AdicionarBeneficioFuncionario(w http.ResponseWriter, r *http.R
 
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO funcionario_beneficios (tenant_id, funcionario_id, beneficio_id, valor, data_inicio, data_fim, observacoes)
+		INSERT INTO rh.funcionario_beneficios (tenant_id, funcionario_id, beneficio_id, valor, data_inicio, data_fim, observacoes)
 		VALUES ($1,$2,$3,$4,$5::date,$6::date,$7)
 		ON CONFLICT (funcionario_id, beneficio_id) DO UPDATE SET
 		  valor=EXCLUDED.valor, data_inicio=EXCLUDED.data_inicio, data_fim=EXCLUDED.data_fim, observacoes=EXCLUDED.observacoes
@@ -105,7 +105,7 @@ func (h *Handler) RemoverBeneficioFuncionario(w http.ResponseWriter, r *http.Req
 	beneficioID := chi.URLParam(r, "beneficioId")
 
 	tag, err := h.db.Exec(r.Context(), `
-		DELETE FROM funcionario_beneficios
+		DELETE FROM rh.funcionario_beneficios
 		 WHERE funcionario_id=$1 AND beneficio_id=$2 AND tenant_id=$3`,
 		funcionarioID, beneficioID, user.TenantID)
 	if err != nil {

@@ -5,6 +5,13 @@ $pageTitle = 'Gestão Escolar';
 $activePage = 'gestao_escolar';
 $breadcrumb = [['Admin', '/nexora/'], ['Gestão Escolar', '']];
 
+// Paginação por recurso: ?cp=2 (classes), ?sp=2 (students), ?ip=2 (invoices), ?ap=2 (attendance)
+$_cp = max(1, (int)($_GET['cp'] ?? 1));
+$_sp = max(1, (int)($_GET['sp'] ?? 1));
+$_ip = max(1, (int)($_GET['ip'] ?? 1));
+$_ap = max(1, (int)($_GET['ap'] ?? 1));
+$_turno = in_array($_GET['turno'] ?? '', ['manha','tarde','noite'], true) ? $_GET['turno'] : '';
+
 $workspace = [
     'title' => 'Gestão Escolar',
     'subtitle' => 'Administração académica, alunos, finanças, biblioteca e comunicação.',
@@ -40,7 +47,12 @@ $workspace = [
             ],
         ],
         'classes' => [
-            'label' => 'Turmas', 'path' => '/api/escolar/classes',
+            'label' => 'Turmas',
+            'path' => '/api/escolar/classes?' . http_build_query(array_filter(['pagina' => $_cp, 'por_pagina' => 25, 'turno' => $_turno])),
+            'pagina_param' => 'cp',
+            'filters' => [
+                ['name' => 'turno', 'label' => 'Turno', 'options' => ['' => 'Todos', 'manha' => 'Manhã', 'tarde' => 'Tarde', 'noite' => 'Noite'], 'current' => $_turno],
+            ],
             'columns' => [['codigo|id', 'Código'], ['nome', 'Turma'], ['nivel|classe', 'Nível'], ['turno', 'Turno'], ['teacher_name|professor_id', 'Director'], ['status', 'Estado']],
             'create' => ['operation' => 'class.create', 'label' => 'Nova turma', 'fields' => [
                 ['name' => 'school_year_id', 'label' => 'ID do ano lectivo', 'type' => 'number', 'required' => true],
@@ -82,7 +94,9 @@ $workspace = [
             ]],
         ],
         'students' => [
-            'label' => 'Alunos', 'path' => '/api/escolar/students',
+            'label' => 'Alunos',
+            'path' => '/api/escolar/students?pagina=' . $_sp . '&por_pagina=25',
+            'pagina_param' => 'sp',
             'columns' => [['numero|codigo|id', 'Número'], ['nome', 'Nome'], ['data_nascimento', 'Nascimento'], ['sexo', 'Sexo'], ['status', 'Estado']],
             'create' => ['operation' => 'student.create', 'label' => 'Novo aluno', 'fields' => [
                 ['name' => 'nome', 'label' => 'Nome completo', 'required' => true],
@@ -168,7 +182,9 @@ $workspace = [
             ],
         ],
         'attendance' => [
-            'label' => 'Frequência', 'path' => '/api/escolar/attendance',
+            'label' => 'Frequência',
+            'path' => '/api/escolar/attendance?pagina=' . $_ap . '&por_pagina=25',
+            'pagina_param' => 'ap',
             'columns' => [['data', 'Data'], ['student_name|student_id', 'Aluno'], ['class_name|class_id', 'Turma'], ['subject_name|subject_id', 'Disciplina'], ['status|presenca', 'Presença']],
             'create' => ['operation' => 'attendance.create', 'label' => 'Lançar frequência', 'fields' => [
                 ['name' => 'student_id', 'label' => 'ID do aluno', 'type' => 'number', 'required' => true],
@@ -233,7 +249,9 @@ $workspace = [
             ]],
         ],
         'student_invoices' => [
-            'label' => 'Cobranças', 'path' => '/api/escolar/student-invoices',
+            'label' => 'Cobranças',
+            'path' => '/api/escolar/student-invoices?pagina=' . $_ip . '&por_pagina=25',
+            'pagina_param' => 'ip',
             'columns' => [['numero|id', 'Número'], ['student_name|student_id', 'Aluno'], ['descricao', 'Descrição'], ['valor|total', 'Valor'], ['vencimento|due_date', 'Vencimento'], ['status', 'Estado']],
             'create' => ['operation' => 'student.invoice.create', 'label' => 'Gerar cobrança', 'fields' => [
                 ['name' => 'student_id', 'label' => 'ID do aluno', 'type' => 'number', 'required' => true],

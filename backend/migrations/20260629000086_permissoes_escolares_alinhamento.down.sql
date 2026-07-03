@@ -1,0 +1,8 @@
+-- ============================================================
+-- Down migration 086: não implementada
+-- ============================================================
+-- Esta migration alinhou permissões de cargos escolares padrão.
+-- Reverter de forma segura exigiria saber o estado anterior de cada
+-- cargo, o que não está disponível. O rollback manual deve ser feito
+-- via gestão de cargos na aplicação ou por script dedicado.
+-- ============================================================

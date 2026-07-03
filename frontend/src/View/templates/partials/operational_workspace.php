@@ -2,7 +2,8 @@
 declare(strict_types=1);
 
 $resources = $workspace['resources'] ?? [];
-$resourceData = [];
+$resourceData   = [];
+$paginationMeta = [];
 $normaliseRows = static function (mixed $body): array {
     if (!is_array($body)) {
         return [];
@@ -32,6 +33,14 @@ foreach ($resources as $key => $resource) {
         $response = $app->nexora->call('GET', $resource['path']);
         $body = $response['body'] ?? [];
         $resourceData[$key] = $normaliseRows($body);
+        if (isset($body['total'], $body['pagina'], $body['paginas'])) {
+            $paginationMeta[$key] = [
+                'total'      => (int) $body['total'],
+                'pagina'     => (int) $body['pagina'],
+                'paginas'    => (int) $body['paginas'],
+                'por_pagina' => (int) ($body['por_pagina'] ?? 25),
+            ];
+        }
     }
 }
 
@@ -46,7 +55,7 @@ $valueFor = static function (array $row, string $keys): mixed {
     return null;
 };
 
-include dirname(__DIR__) . '/layouts/top.php';
+include dirname(__DIR__) . '/layouts/' . (!empty($GLOBALS['_escolarPanel']) ? 'escola_top' : 'top') . '.php';
 ?>
 
 <div class="adm-page-header">
@@ -65,13 +74,14 @@ include dirname(__DIR__) . '/layouts/top.php';
             onclick="workspaceSwitch('<?php echo htmlspecialchars($key) ?>',this)">
         <?php echo htmlspecialchars($resource['label']) ?>
         <?php if (!empty($resource['path'])): ?>
-        <span class="adm-tab-badge"><?php echo count($resourceData[$key]) ?></span>
+        <span class="adm-tab-badge"><?php echo isset($paginationMeta[$key]) ? $paginationMeta[$key]['total'] : count($resourceData[$key]) ?></span>
         <?php endif; ?>
     </button>
     <?php endforeach; ?>
 </div>
 
 <?php foreach ($resources as $key => $resource): ?>
+<?php $pparam = $resource['pagina_param'] ?? 'pagina'; $baseUrl = strtok($_SERVER['REQUEST_URI'] ?? '', '?'); ?>
 <div class="adm-tab-panel <?php echo $key === $firstResource ? 'active' : '' ?>" id="workspace-<?php echo htmlspecialchars($key) ?>">
     <div class="adm-card">
         <div class="adm-card-header">
@@ -126,7 +136,23 @@ include dirname(__DIR__) . '/layouts/top.php';
                         <?php if (!empty($resource['actions'])): ?>
                         <td>
                             <div class="adm-row-actions">
-                            <?php foreach ($resource['actions'] as $action): ?>
+                            <?php foreach ($resource['actions'] as $action):
+                                if (isset($action['only_when'])) {
+                                    $show = true;
+                                    foreach ($action['only_when'] as $field => $allowed) {
+                                        $rowVal = (string) ($row[$field] ?? '');
+                                        $allowed = is_array($allowed) ? $allowed : [$allowed];
+                                        if (!in_array($rowVal, $allowed, true)) { $show = false; break; }
+                                    }
+                                    if (!$show) continue;
+                                }
+                                if (isset($action['link'])):
+                                    $href = str_replace('{id}', (string)(int)($row['id'] ?? 0), $action['link']);
+                            ?>
+                                <a class="adm-btn adm-btn-ghost adm-btn-sm" href="<?php echo htmlspecialchars($href) ?>">
+                                    <?php echo htmlspecialchars($action['label']) ?>
+                                </a>
+                            <?php else: ?>
                                 <button class="adm-btn adm-btn-ghost adm-btn-sm" type="button"
                                     onclick='workspaceRunAction(
                                         <?php echo json_encode($action, JSON_UNESCAPED_UNICODE) ?>,
@@ -134,6 +160,7 @@ include dirname(__DIR__) . '/layouts/top.php';
                                     )'>
                                     <?php echo htmlspecialchars($action['label']) ?>
                                 </button>
+                            <?php endif; ?>
                             <?php endforeach; ?>
                             </div>
                         </td>
@@ -143,10 +170,55 @@ include dirname(__DIR__) . '/layouts/top.php';
                 </tbody>
             </table>
         </div>
+        <?php if (!empty($paginationMeta[$key])): ?>
+        <?php $pm = $paginationMeta[$key]; ?>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--adm-sp-3) var(--adm-sp-4);border-top:1px solid var(--adm-border);gap:var(--adm-sp-3);flex-wrap:wrap">
+            <span class="adm-text-muted" style="font-size:.82rem">
+                <?php echo $pm['total'] ?> registos · Página <?php echo $pm['pagina'] ?> de <?php echo $pm['paginas'] ?>
+            </span>
+            <div style="display:flex;gap:var(--adm-sp-2);align-items:center">
+                <?php if ($pm['pagina'] > 1): ?>
+                <a href="<?php echo htmlspecialchars($baseUrl . '?' . http_build_query(array_merge($_GET, [$pparam => $pm['pagina'] - 1]))) ?>"
+                   class="adm-btn adm-btn-ghost adm-btn-sm">&#8592; Anterior</a>
+                <?php else: ?>
+                <button class="adm-btn adm-btn-ghost adm-btn-sm" disabled>&#8592; Anterior</button>
+                <?php endif; ?>
+                <?php for ($p = max(1, $pm['pagina'] - 2); $p <= min($pm['paginas'], $pm['pagina'] + 2); $p++): ?>
+                <a href="<?php echo htmlspecialchars($baseUrl . '?' . http_build_query(array_merge($_GET, [$pparam => $p]))) ?>"
+                   class="adm-btn adm-btn-sm <?php echo $p === $pm['pagina'] ? 'adm-btn-primary' : 'adm-btn-ghost' ?>"
+                   style="min-width:2rem;padding:0 .5rem"><?php echo $p ?></a>
+                <?php endfor; ?>
+                <?php if ($pm['pagina'] < $pm['paginas']): ?>
+                <a href="<?php echo htmlspecialchars($baseUrl . '?' . http_build_query(array_merge($_GET, [$pparam => $pm['pagina'] + 1]))) ?>"
+                   class="adm-btn adm-btn-ghost adm-btn-sm">Seguinte &#8594;</a>
+                <?php else: ?>
+                <button class="adm-btn adm-btn-ghost adm-btn-sm" disabled>Seguinte &#8594;</button>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
         <?php else: ?>
         <div class="adm-empty">
             <p class="adm-empty-title"><?php echo empty($resource['path']) ? 'Operação disponível' : 'Nenhum registo encontrado' ?></p>
             <p class="adm-empty-sub"><?php echo htmlspecialchars($resource['empty'] ?? 'Use o botão acima para criar o primeiro registo.') ?></p>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($resource['filters'])): ?>
+        <div style="display:flex;gap:var(--adm-sp-3);padding:var(--adm-sp-3) var(--adm-sp-4);background:var(--adm-bg);border-top:1px solid var(--adm-border);flex-wrap:wrap;align-items:center">
+            <span class="adm-text-muted" style="font-size:.82rem;font-weight:500">Filtrar:</span>
+            <?php foreach ($resource['filters'] as $filter): ?>
+            <div style="display:flex;gap:var(--adm-sp-1);align-items:center">
+                <label class="adm-label" style="margin:0;font-size:.8rem"><?php echo htmlspecialchars($filter['label']) ?></label>
+                <select class="adm-select adm-select-sm" style="font-size:.82rem;padding:.25rem .5rem"
+                        onchange="location.href='<?php echo htmlspecialchars($baseUrl) ?>?'+new URLSearchParams({...Object.fromEntries(new URLSearchParams('<?php echo htmlspecialchars(http_build_query(array_diff_key($_GET, [$pparam=>1, $filter['name']=>1]))) ?>')),<?php echo json_encode($filter['name']) ?>:this.value,<?php echo json_encode($pparam) ?>:1})">
+                    <?php foreach ($filter['options'] as $val => $lbl): ?>
+                    <option value="<?php echo htmlspecialchars((string)$val) ?>" <?php echo (string)($filter['current'] ?? '') === (string)$val ? 'selected' : '' ?>>
+                        <?php echo htmlspecialchars($lbl) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endforeach; ?>
         </div>
         <?php endif; ?>
     </div>
@@ -154,23 +226,29 @@ include dirname(__DIR__) . '/layouts/top.php';
 <?php endforeach; ?>
 
 <div class="adm-modal-overlay" id="workspaceModal">
-    <div class="adm-modal" style="max-width:760px">
-        <p class="adm-modal-title" id="workspaceModalTitle">Novo registo</p>
-        <div class="adm-modal-body" id="workspaceFields"></div>
-        <div class="adm-modal-footer">
-            <button class="adm-btn adm-btn-outline" type="button" onclick="workspaceClose()">Cancelar</button>
+    <div class="adm-modal-content" style="max-width:760px">
+        <div class="adm-modal-header">
+            <p class="adm-modal-title" id="workspaceModalTitle">Novo registo</p>
+            <button class="adm-btn adm-btn-ghost adm-btn-icon" type="button" onclick="workspaceClose()">&times;</button>
+        </div>
+        <div class="adm-modal-body" id="workspaceFields" style="max-height:70vh;overflow-y:auto;padding:var(--adm-sp-5) var(--adm-sp-6)"></div>
+        <div class="adm-modal-footer" style="padding:var(--adm-sp-4) var(--adm-sp-6)">
+            <button class="adm-btn adm-btn-ghost" type="button" onclick="workspaceClose()">Cancelar</button>
             <button class="adm-btn adm-btn-primary" type="button" onclick="workspaceSave()">Guardar</button>
         </div>
     </div>
 </div>
 
 <div class="adm-modal-overlay" id="workspaceResultModal">
-    <div class="adm-modal" style="max-width:900px">
-        <p class="adm-modal-title" id="workspaceResultTitle">Resultado</p>
-        <div class="adm-modal-body">
+    <div class="adm-modal-content" style="max-width:900px">
+        <div class="adm-modal-header">
+            <p class="adm-modal-title" id="workspaceResultTitle">Resultado</p>
+            <button class="adm-btn adm-btn-ghost adm-btn-icon" type="button" onclick="document.getElementById('workspaceResultModal').classList.remove('open')">&times;</button>
+        </div>
+        <div class="adm-modal-body" style="padding:var(--adm-sp-5) var(--adm-sp-6)">
             <pre id="workspaceResult" style="white-space:pre-wrap;max-height:60vh;overflow:auto;background:var(--adm-bg);padding:16px;border-radius:8px"></pre>
         </div>
-        <div class="adm-modal-footer">
+        <div class="adm-modal-footer" style="padding:var(--adm-sp-4) var(--adm-sp-6)">
             <button class="adm-btn adm-btn-primary" type="button" onclick="document.getElementById('workspaceResultModal').classList.remove('open')">Fechar</button>
         </div>
     </div>
@@ -199,12 +277,14 @@ function workspaceRenderFields(fields) {
         const required = field.required ? ' required' : '';
         let input;
         if (type === 'select') {
+            const defVal = String(field.default ?? '');
             input = '<select class="adm-select workspace-field" data-name="' + name + '"' + required + '>' +
-                '<option value="">— Seleccionar —</option>' +
+                (field.required ? '' : '<option value="">— Seleccionar —</option>') +
                 (field.options || []).map(option => {
                     const value = typeof option === 'object' ? option.value : option;
-                    const text = typeof option === 'object' ? option.label : option;
-                    return '<option value="' + workspaceEscape(value) + '">' + workspaceEscape(text) + '</option>';
+                    const text  = typeof option === 'object' ? option.label : option;
+                    const sel   = defVal && String(value) === defVal ? ' selected' : '';
+                    return '<option value="' + workspaceEscape(value) + '"' + sel + '>' + workspaceEscape(text) + '</option>';
                 }).join('') + '</select>';
         } else if (type === 'textarea') {
             input = '<textarea class="adm-textarea workspace-field" data-name="' + name + '"' + required + '></textarea>';
@@ -314,4 +394,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
-<?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+<?php include dirname(__DIR__) . '/layouts/' . (!empty($GLOBALS['_escolarPanel']) ? 'escola_bottom' : 'bottom') . '.php'; ?>

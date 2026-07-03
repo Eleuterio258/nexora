@@ -1,0 +1,40 @@
+name: nexora_school
+description: "A new Flutter project."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.4
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_native_splash: ^2.4.3
+  flutter_bloc: ^8.1.6
+  equatable: ^2.0.7
+  dio: ^5.7.0
+  get_it: ^7.7.0
+  dartz: ^0.10.1
+  flutter_secure_storage: ^9.2.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/logos/
+    - assets/illustrations/
+
+flutter_native_splash:
+  color: "#ffffff"
+  image: assets/logos/logo.png
+  android_12:
+    color: "#ffffff"
+    image: assets/logos/logo.png
+    icon_background_color: "#ffffff"
+  web: false

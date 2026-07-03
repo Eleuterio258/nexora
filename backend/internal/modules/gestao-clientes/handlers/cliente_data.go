@@ -9,13 +9,30 @@ import (
 	mw "nexora/internal/middleware"
 )
 
+// tenantOwnsCustomer verifica que o customer pertence ao tenant antes de operar.
+func (h *Handler) tenantOwnsCustomer(r *http.Request, customerID string, tenantID int64) bool {
+	var exists bool
+	h.db.QueryRow(r.Context(),
+		`SELECT EXISTS(SELECT 1 FROM customers WHERE id=$1 AND tenant_id=$2)`,
+		customerID, tenantID).Scan(&exists)
+	return exists
+}
+
 // ── Contactos ─────────────────────────────────────────────────────────────────
 
 func (h *Handler) ListarContactos(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
-	rows, _ := h.db.Query(r.Context(), `
-		SELECT id, nome, cargo, telefone, email, principal FROM customer_contacts
-		 WHERE customer_id=$1 ORDER BY principal DESC, nome`, id)
+	rows, err := h.db.Query(r.Context(), `
+		SELECT cc.id, cc.nome, cc.cargo, cc.telefone, cc.email, cc.principal
+		  FROM customer_contacts cc
+		  JOIN customers c ON c.id = cc.customer_id AND c.tenant_id = $2
+		 WHERE cc.customer_id = $1
+		 ORDER BY cc.principal DESC, cc.nome`, id, user.TenantID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
 	defer rows.Close()
 	type Row struct {
 		ID        int64   `json:"id"`
@@ -36,7 +53,12 @@ func (h *Handler) ListarContactos(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) AdicionarContacto(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
+	if !h.tenantOwnsCustomer(r, id, user.TenantID) {
+		jsonErr(w, "Cliente não encontrado", http.StatusNotFound)
+		return
+	}
 	var body struct {
 		Nome      string  `json:"nome"`
 		Cargo     *string `json:"cargo"`
@@ -49,12 +71,19 @@ func (h *Handler) AdicionarContacto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var cid int64
-	h.db.QueryRow(r.Context(), `INSERT INTO customer_contacts (customer_id,nome,cargo,telefone,email,principal) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+	h.db.QueryRow(r.Context(),
+		`INSERT INTO customer_contacts (customer_id,nome,cargo,telefone,email,principal) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
 		id, body.Nome, body.Cargo, body.Telefone, body.Email, body.Principal).Scan(&cid)
 	jsonOK(w, map[string]any{"id": cid}, http.StatusCreated)
 }
 
 func (h *Handler) ActualizarContacto(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+	if !h.tenantOwnsCustomer(r, id, user.TenantID) {
+		jsonErr(w, "Cliente não encontrado", http.StatusNotFound)
+		return
+	}
 	var body struct {
 		Nome      *string `json:"nome"`
 		Cargo     *string `json:"cargo"`
@@ -63,21 +92,43 @@ func (h *Handler) ActualizarContacto(w http.ResponseWriter, r *http.Request) {
 		Principal *bool   `json:"principal"`
 	}
 	json.NewDecoder(r.Body).Decode(&body)
-	h.db.Exec(r.Context(), `UPDATE customer_contacts SET nome=COALESCE($1,nome), cargo=COALESCE($2,cargo), telefone=COALESCE($3,telefone), email=COALESCE($4,email), principal=COALESCE($5,principal) WHERE id=$6 AND customer_id=$7`,
-		body.Nome, body.Cargo, body.Telefone, body.Email, body.Principal, chi.URLParam(r, "contactoId"), chi.URLParam(r, "id"))
+	h.db.Exec(r.Context(),
+		`UPDATE customer_contacts SET nome=COALESCE($1,nome), cargo=COALESCE($2,cargo),
+		 telefone=COALESCE($3,telefone), email=COALESCE($4,email), principal=COALESCE($5,principal)
+		 WHERE id=$6 AND customer_id=$7`,
+		body.Nome, body.Cargo, body.Telefone, body.Email, body.Principal,
+		chi.URLParam(r, "contactoId"), id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) RemoverContacto(w http.ResponseWriter, r *http.Request) {
-	h.db.Exec(r.Context(), `DELETE FROM customer_contacts WHERE id=$1 AND customer_id=$2`, chi.URLParam(r, "contactoId"), chi.URLParam(r, "id"))
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+	if !h.tenantOwnsCustomer(r, id, user.TenantID) {
+		jsonErr(w, "Cliente não encontrado", http.StatusNotFound)
+		return
+	}
+	h.db.Exec(r.Context(),
+		`DELETE FROM customer_contacts WHERE id=$1 AND customer_id=$2`,
+		chi.URLParam(r, "contactoId"), id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 // ── Endereços ─────────────────────────────────────────────────────────────────
 
 func (h *Handler) ListarEnderecos(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
-	rows, _ := h.db.Query(r.Context(), `SELECT id, tipo, pais, provincia, cidade, endereco, codigo_postal, principal FROM customer_addresses WHERE customer_id=$1 ORDER BY principal DESC`, id)
+	rows, err := h.db.Query(r.Context(), `
+		SELECT ca.id, ca.tipo, ca.pais, ca.provincia, ca.cidade, ca.endereco, ca.codigo_postal, ca.principal
+		  FROM customer_addresses ca
+		  JOIN customers c ON c.id = ca.customer_id AND c.tenant_id = $2
+		 WHERE ca.customer_id = $1
+		 ORDER BY ca.principal DESC`, id, user.TenantID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
 	defer rows.Close()
 	type Row struct {
 		ID           int64   `json:"id"`
@@ -100,7 +151,12 @@ func (h *Handler) ListarEnderecos(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) AdicionarEndereco(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
+	if !h.tenantOwnsCustomer(r, id, user.TenantID) {
+		jsonErr(w, "Cliente não encontrado", http.StatusNotFound)
+		return
+	}
 	var body struct {
 		Tipo         *string `json:"tipo"`
 		Pais         *string `json:"pais"`
@@ -115,12 +171,20 @@ func (h *Handler) AdicionarEndereco(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var eid int64
-	h.db.QueryRow(r.Context(), `INSERT INTO customer_addresses (customer_id,tipo,pais,provincia,cidade,endereco,codigo_postal,principal) VALUES ($1,COALESCE($2,'principal'),COALESCE($3,'Mocambique'),$4,$5,$6,$7,$8) RETURNING id`,
+	h.db.QueryRow(r.Context(),
+		`INSERT INTO customer_addresses (customer_id,tipo,pais,provincia,cidade,endereco,codigo_postal,principal)
+		 VALUES ($1,COALESCE($2,'principal'),COALESCE($3,'Mocambique'),$4,$5,$6,$7,$8) RETURNING id`,
 		id, body.Tipo, body.Pais, body.Provincia, body.Cidade, body.Endereco, body.CodigoPostal, body.Principal).Scan(&eid)
 	jsonOK(w, map[string]any{"id": eid}, http.StatusCreated)
 }
 
 func (h *Handler) ActualizarEndereco(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+	if !h.tenantOwnsCustomer(r, id, user.TenantID) {
+		jsonErr(w, "Cliente não encontrado", http.StatusNotFound)
+		return
+	}
 	var body struct {
 		Endereco  *string `json:"endereco"`
 		Cidade    *string `json:"cidade"`
@@ -128,13 +192,25 @@ func (h *Handler) ActualizarEndereco(w http.ResponseWriter, r *http.Request) {
 		Principal *bool   `json:"principal"`
 	}
 	json.NewDecoder(r.Body).Decode(&body)
-	h.db.Exec(r.Context(), `UPDATE customer_addresses SET endereco=COALESCE($1,endereco), cidade=COALESCE($2,cidade), provincia=COALESCE($3,provincia), principal=COALESCE($4,principal) WHERE id=$5 AND customer_id=$6`,
-		body.Endereco, body.Cidade, body.Provincia, body.Principal, chi.URLParam(r, "endId"), chi.URLParam(r, "id"))
+	h.db.Exec(r.Context(),
+		`UPDATE customer_addresses SET endereco=COALESCE($1,endereco), cidade=COALESCE($2,cidade),
+		 provincia=COALESCE($3,provincia), principal=COALESCE($4,principal)
+		 WHERE id=$5 AND customer_id=$6`,
+		body.Endereco, body.Cidade, body.Provincia, body.Principal,
+		chi.URLParam(r, "endId"), id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) RemoverEndereco(w http.ResponseWriter, r *http.Request) {
-	h.db.Exec(r.Context(), `DELETE FROM customer_addresses WHERE id=$1 AND customer_id=$2`, chi.URLParam(r, "endId"), chi.URLParam(r, "id"))
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+	if !h.tenantOwnsCustomer(r, id, user.TenantID) {
+		jsonErr(w, "Cliente não encontrado", http.StatusNotFound)
+		return
+	}
+	h.db.Exec(r.Context(),
+		`DELETE FROM customer_addresses WHERE id=$1 AND customer_id=$2`,
+		chi.URLParam(r, "endId"), id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -148,13 +224,19 @@ func (h *Handler) ObterLimiteCredito(w http.ResponseWriter, r *http.Request) {
 		Estado string  `json:"estado"`
 		Nuit   *string `json:"nuit"`
 	}
-	h.db.QueryRow(r.Context(), `SELECT nome, estado, nuit FROM customers WHERE id=$1 AND tenant_id=$2`, id, user.TenantID).
-		Scan(&c.Nome, &c.Estado, &c.Nuit)
-	// limite de crédito está na tabela customer_credit_limits se existir
+	h.db.QueryRow(r.Context(),
+		`SELECT nome, estado, nuit FROM customers WHERE id=$1 AND tenant_id=$2`,
+		id, user.TenantID).Scan(&c.Nome, &c.Estado, &c.Nuit)
 	jsonOK(w, c, http.StatusOK)
 }
 
 func (h *Handler) ActualizarLimiteCredito(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+	if !h.tenantOwnsCustomer(r, id, user.TenantID) {
+		jsonErr(w, "Cliente não encontrado", http.StatusNotFound)
+		return
+	}
 	var body struct {
 		Limite float64 `json:"limite"`
 		Motivo string  `json:"motivo"`
@@ -163,8 +245,6 @@ func (h *Handler) ActualizarLimiteCredito(w http.ResponseWriter, r *http.Request
 		jsonErr(w, "limite e motivo são obrigatórios", http.StatusBadRequest)
 		return
 	}
-	// Upsert na tabela customer_credit_limits
-	id := chi.URLParam(r, "id")
 	h.db.Exec(r.Context(), `
 		INSERT INTO customer_credit_limits (customer_id, limite, motivo) VALUES ($1,$2,$3)
 		ON CONFLICT (customer_id) DO UPDATE SET limite=$2, motivo=$3, updated_at=NOW()`,
@@ -173,6 +253,7 @@ func (h *Handler) ActualizarLimiteCredito(w http.ResponseWriter, r *http.Request
 }
 
 func (h *Handler) ObterSaldo(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 	var s struct {
 		SaldoDevedor      *float64   `json:"saldo_devedor"`
@@ -181,7 +262,12 @@ func (h *Handler) ObterSaldo(w http.ResponseWriter, r *http.Request) {
 		UltimaCompraEm    *time.Time `json:"ultima_compra_em"`
 		UltimoPagamentoEm *time.Time `json:"ultimo_pagamento_em"`
 	}
-	h.db.QueryRow(r.Context(), `SELECT saldo_devedor, total_compras, total_pago, ultima_compra_em, ultimo_pagamento_em FROM customer_balances WHERE customer_id=$1`, id).
+	h.db.QueryRow(r.Context(), `
+		SELECT cb.saldo_devedor, cb.total_compras, cb.total_pago,
+		       cb.ultima_compra_em, cb.ultimo_pagamento_em
+		  FROM customer_balances cb
+		  JOIN customers c ON c.id = cb.customer_id AND c.tenant_id = $2
+		 WHERE cb.customer_id = $1`, id, user.TenantID).
 		Scan(&s.SaldoDevedor, &s.TotalCompras, &s.TotalPago, &s.UltimaCompraEm, &s.UltimoPagamentoEm)
 	jsonOK(w, s, http.StatusOK)
 }
@@ -189,11 +275,19 @@ func (h *Handler) ObterSaldo(w http.ResponseWriter, r *http.Request) {
 // ── Pagamentos ────────────────────────────────────────────────────────────────
 
 func (h *Handler) ListarPagamentos(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 	limit, offset := pageParams(r)
-	rows, _ := h.db.Query(r.Context(), `
-		SELECT id, metodo, valor, referencia, pago_em FROM customer_payments
-		 WHERE customer_id=$1 ORDER BY pago_em DESC LIMIT $2 OFFSET $3`, id, limit, offset)
+	rows, err := h.db.Query(r.Context(), `
+		SELECT cp.id, cp.metodo, cp.valor, cp.referencia, cp.pago_em
+		  FROM customer_payments cp
+		  JOIN customers c ON c.id = cp.customer_id AND c.tenant_id = $2
+		 WHERE cp.customer_id = $1
+		 ORDER BY cp.pago_em DESC LIMIT $3 OFFSET $4`, id, user.TenantID, limit, offset)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
 	defer rows.Close()
 	type Row struct {
 		ID         int64     `json:"id"`
@@ -215,6 +309,10 @@ func (h *Handler) ListarPagamentos(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) RegistarPagamento(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
+	if !h.tenantOwnsCustomer(r, id, user.TenantID) {
+		jsonErr(w, "Cliente não encontrado", http.StatusNotFound)
+		return
+	}
 	var body struct {
 		Metodo     string  `json:"metodo"`
 		Valor      float64 `json:"valor"`
@@ -226,7 +324,8 @@ func (h *Handler) RegistarPagamento(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var pid int64
-	h.db.QueryRow(r.Context(), `INSERT INTO customer_payments (tenant_id,customer_id,metodo,valor,referencia,observacao) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+	h.db.QueryRow(r.Context(),
+		`INSERT INTO customer_payments (tenant_id,customer_id,metodo,valor,referencia,observacao) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
 		user.TenantID, id, body.Metodo, body.Valor, body.Referencia, body.Observacao).Scan(&pid)
 	jsonOK(w, map[string]any{"id": pid}, http.StatusCreated)
 }
@@ -234,11 +333,19 @@ func (h *Handler) RegistarPagamento(w http.ResponseWriter, r *http.Request) {
 // ── Histórico ─────────────────────────────────────────────────────────────────
 
 func (h *Handler) ListarHistorico(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 	limit, offset := pageParams(r)
-	rows, _ := h.db.Query(r.Context(), `
-		SELECT id, evento, descricao, referencia_tipo, referencia_id, created_at
-		  FROM customer_history WHERE customer_id=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`, id, limit, offset)
+	rows, err := h.db.Query(r.Context(), `
+		SELECT ch.id, ch.evento, ch.descricao, ch.referencia_tipo, ch.referencia_id, ch.created_at
+		  FROM customer_history ch
+		  JOIN customers c ON c.id = ch.customer_id AND c.tenant_id = $2
+		 WHERE ch.customer_id = $1
+		 ORDER BY ch.created_at DESC LIMIT $3 OFFSET $4`, id, user.TenantID, limit, offset)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
 	defer rows.Close()
 	type Row struct {
 		ID             int64     `json:"id"`

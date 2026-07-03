@@ -22,6 +22,7 @@ type Lead struct {
 	Origem       string     `json:"origem"`
 	Estado       string     `json:"estado"`
 	Responsavel  *string    `json:"responsavel"`
+	ResponsavelID *int64    `json:"responsavel_id"`
 	Notas        *string    `json:"notas"`
 	ClienteID    *int64     `json:"cliente_id"`
 	ConvertidoEm *time.Time `json:"convertido_em"`
@@ -30,14 +31,15 @@ type Lead struct {
 }
 
 type leadInput struct {
-	Nome        string  `json:"nome"`
-	Empresa     *string `json:"empresa"`
-	Email       *string `json:"email"`
-	Telefone    *string `json:"telefone"`
-	Origem      *string `json:"origem"`
-	Estado      *string `json:"estado"`
-	Responsavel *string `json:"responsavel"`
-	Notas       *string `json:"notas"`
+	Nome          string  `json:"nome"`
+	Empresa       *string `json:"empresa"`
+	Email         *string `json:"email"`
+	Telefone      *string `json:"telefone"`
+	Origem        *string `json:"origem"`
+	Estado        *string `json:"estado"`
+	Responsavel   *string `json:"responsavel"`
+	ResponsavelID *int64  `json:"responsavel_id"`
+	Notas         *string `json:"notas"`
 }
 
 var leadOrigens = map[string]bool{
@@ -53,16 +55,27 @@ var leadEstados = map[string]string{
 	"convertido":     "Convertido",
 }
 
-const leadSelectCols = `id, nome, empresa, email, telefone, origem, estado, responsavel, notas,
+const leadSelectCols = `id, nome, empresa, email, telefone, origem, estado, responsavel, responsavel_id, notas,
 	cliente_id, convertido_em, created_at, updated_at`
 
 func scanLead(row pgx.Row) (*Lead, error) {
 	var l Lead
 	if err := row.Scan(&l.ID, &l.Nome, &l.Empresa, &l.Email, &l.Telefone, &l.Origem, &l.Estado,
-		&l.Responsavel, &l.Notas, &l.ClienteID, &l.ConvertidoEm, &l.CreatedAt, &l.UpdatedAt); err != nil {
+		&l.Responsavel, &l.ResponsavelID, &l.Notas, &l.ClienteID, &l.ConvertidoEm, &l.CreatedAt, &l.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &l, nil
+}
+
+// resolveResponsavel devolve o nome do utilizador (para popular responsavel varchar) dado um user_id.
+func (h *Handler) resolveResponsavelNome(r *http.Request, userID int64) *string {
+	var nome string
+	if err := h.db.QueryRow(r.Context(),
+		`SELECT COALESCE(nome, '') FROM auth.users WHERE id=$1`, userID,
+	).Scan(&nome); err != nil || nome == "" {
+		return nil
+	}
+	return &nome
 }
 
 // ── Listagem / CRUD ──────────────────────────────────────────────────────────
@@ -87,6 +100,12 @@ func (h *Handler) ListarLeads(w http.ResponseWriter, r *http.Request) {
 		args = append(args, resp)
 		where += " AND responsavel=$" + strconv.Itoa(len(args))
 	}
+	if respIDStr := q.Get("responsavel_id"); respIDStr != "" {
+		if respID, err := strconv.ParseInt(respIDStr, 10, 64); err == nil {
+			args = append(args, respID)
+			where += " AND responsavel_id=$" + strconv.Itoa(len(args))
+		}
+	}
 	if s := q.Get("search"); s != "" {
 		args = append(args, "%"+s+"%")
 		n := strconv.Itoa(len(args))
@@ -98,7 +117,7 @@ func (h *Handler) ListarLeads(w http.ResponseWriter, r *http.Request) {
 	n := len(args)
 
 	rows, err := h.db.Query(r.Context(),
-		"SELECT "+leadSelectCols+" FROM leads WHERE "+where+
+		"SELECT "+leadSelectCols+" FROM crm.leads WHERE "+where+
 			" ORDER BY created_at DESC LIMIT $"+strconv.Itoa(n-1)+" OFFSET $"+strconv.Itoa(n), args...)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
@@ -115,7 +134,7 @@ func (h *Handler) ListarLeads(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var total int
-	h.db.QueryRow(r.Context(), "SELECT COUNT(*) FROM leads WHERE "+where, countArgs...).Scan(&total)
+	h.db.QueryRow(r.Context(), "SELECT COUNT(*) FROM crm.leads WHERE "+where, countArgs...).Scan(&total)
 	page, _ := strconv.Atoi(q.Get("page"))
 	if page < 1 {
 		page = 1
@@ -147,13 +166,18 @@ func (h *Handler) CriarLead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Resolver nome do responsável a partir do ID (se fornecido)
+	if body.ResponsavelID != nil && body.Responsavel == nil {
+		body.Responsavel = h.resolveResponsavelNome(r, *body.ResponsavelID)
+	}
+
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO leads (tenant_id, nome, empresa, email, telefone, origem, estado, responsavel, notas)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		INSERT INTO crm.leads (tenant_id, nome, empresa, email, telefone, origem, estado, responsavel, responsavel_id, notas)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 		RETURNING id`,
 		user.TenantID, body.Nome, body.Empresa, body.Email, body.Telefone,
-		origem, estado, body.Responsavel, body.Notas,
+		origem, estado, body.Responsavel, body.ResponsavelID, body.Notas,
 	).Scan(&id)
 	if err != nil {
 		jsonErr(w, "Erro ao guardar na base de dados.", http.StatusInternalServerError)
@@ -165,7 +189,7 @@ func (h *Handler) CriarLead(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ObterLead(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
-	row := h.db.QueryRow(r.Context(), "SELECT "+leadSelectCols+" FROM leads WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
+	row := h.db.QueryRow(r.Context(), "SELECT "+leadSelectCols+" FROM crm.leads WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
 	l, err := scanLead(row)
 	if err != nil {
 		jsonErr(w, "Lead não encontrado.", http.StatusNotFound)
@@ -194,11 +218,17 @@ func (h *Handler) ActualizarLead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if body.ResponsavelID != nil && body.Responsavel == nil {
+		body.Responsavel = h.resolveResponsavelNome(r, *body.ResponsavelID)
+	}
+
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE leads SET
-			nome=$1, empresa=$2, email=$3, telefone=$4, origem=$5, responsavel=$6, notas=$7, updated_at=NOW()
-		WHERE id=$8 AND tenant_id=$9`,
-		body.Nome, body.Empresa, body.Email, body.Telefone, origem, body.Responsavel, body.Notas, id, user.TenantID,
+		UPDATE crm.leads SET
+			nome=$1, empresa=$2, email=$3, telefone=$4, origem=$5,
+			responsavel=$6, responsavel_id=$7, notas=$8, updated_at=NOW()
+		WHERE id=$9 AND tenant_id=$10`,
+		body.Nome, body.Empresa, body.Email, body.Telefone, origem,
+		body.Responsavel, body.ResponsavelID, body.Notas, id, user.TenantID,
 	)
 	if err != nil {
 		jsonErr(w, "Erro ao actualizar na base de dados.", http.StatusInternalServerError)
@@ -234,7 +264,7 @@ func (h *Handler) MoverLead(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var estadoAtual string
-	if err := h.db.QueryRow(r.Context(), "SELECT estado FROM leads WHERE id=$1 AND tenant_id=$2", id, user.TenantID).Scan(&estadoAtual); err != nil {
+	if err := h.db.QueryRow(r.Context(), "SELECT estado FROM crm.leads WHERE id=$1 AND tenant_id=$2", id, user.TenantID).Scan(&estadoAtual); err != nil {
 		jsonErr(w, "Lead não encontrado.", http.StatusNotFound)
 		return
 	}
@@ -243,7 +273,7 @@ func (h *Handler) MoverLead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.db.Exec(r.Context(), "UPDATE leads SET estado=$1, updated_at=NOW() WHERE id=$2 AND tenant_id=$3", body.Estado, id, user.TenantID); err != nil {
+	if _, err := h.db.Exec(r.Context(), "UPDATE crm.leads SET estado=$1, updated_at=NOW() WHERE id=$2 AND tenant_id=$3", body.Estado, id, user.TenantID); err != nil {
 		jsonErr(w, "Erro ao actualizar.", http.StatusInternalServerError)
 		return
 	}
@@ -254,7 +284,7 @@ func (h *Handler) RemoverLead(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 
-	tag, err := h.db.Exec(r.Context(), "DELETE FROM leads WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), "DELETE FROM crm.leads WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro ao eliminar.", http.StatusInternalServerError)
 		return
@@ -297,12 +327,13 @@ func (h *Handler) ConverterLead(w http.ResponseWriter, r *http.Request) {
 
 	var nome string
 	var empresa, email, telefone, responsavel *string
+	var responsavelID *int64
 	var estado string
 	var clienteID *int64
 	if err := tx.QueryRow(ctx,
-		"SELECT nome, empresa, email, telefone, responsavel, estado, cliente_id FROM leads WHERE id=$1 AND tenant_id=$2 FOR UPDATE",
+		"SELECT nome, empresa, email, telefone, responsavel, responsavel_id, estado, cliente_id FROM crm.leads WHERE id=$1 AND tenant_id=$2 FOR UPDATE",
 		id, user.TenantID,
-	).Scan(&nome, &empresa, &email, &telefone, &responsavel, &estado, &clienteID); err != nil {
+	).Scan(&nome, &empresa, &email, &telefone, &responsavel, &responsavelID, &estado, &clienteID); err != nil {
 		jsonErr(w, "Lead não encontrado.", http.StatusNotFound)
 		return
 	}
@@ -332,7 +363,7 @@ func (h *Handler) ConverterLead(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := tx.Exec(ctx,
-		"UPDATE leads SET estado='convertido', cliente_id=$1, convertido_em=NOW(), updated_at=NOW() WHERE id=$2",
+		"UPDATE crm.leads SET estado='convertido', cliente_id=$1, convertido_em=NOW(), updated_at=NOW() WHERE id=$2",
 		clienteID, id,
 	); err != nil {
 		jsonErr(w, "Erro ao actualizar lead.", http.StatusInternalServerError)
@@ -350,10 +381,10 @@ func (h *Handler) ConverterLead(w http.ResponseWriter, r *http.Request) {
 
 		var novoOportunidadeID int64
 		if err := tx.QueryRow(ctx, `
-			INSERT INTO oportunidades (tenant_id, titulo, lead_id, cliente_id, estagio, valor_estimado, moeda, responsavel)
-			VALUES ($1,$2,$3,$4,'novo',$5,$6,$7)
+			INSERT INTO crm.oportunidades (tenant_id, titulo, lead_id, cliente_id, estagio, valor_estimado, moeda, responsavel, responsavel_id)
+			VALUES ($1,$2,$3,$4,'novo',$5,$6,$7,$8)
 			RETURNING id`,
-			user.TenantID, titulo, id, clienteID, valor, moeda, responsavel,
+			user.TenantID, titulo, id, clienteID, valor, moeda, responsavel, responsavelID,
 		).Scan(&novoOportunidadeID); err != nil {
 			jsonErr(w, "Erro ao criar oportunidade.", http.StatusInternalServerError)
 			return

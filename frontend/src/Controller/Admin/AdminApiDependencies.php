@@ -29,6 +29,11 @@ use E258Tech\Model\Service\MultiMoeda\MultiMoedaService;
 use E258Tech\Model\Service\Notificacoes\NotificacoesService;
 use E258Tech\Model\Service\Seguranca\SegurancaService;
 use E258Tech\Model\Service\SelfService\SelfServiceService;
+use E258Tech\Model\Service\SuperAdmin\SuperAdminService;
+use E258Tech\Model\Service\Aprovacao\AprovacaoService;
+use E258Tech\Model\Service\Tarefas\TarefasService;
+use E258Tech\Model\Service\AssinaturaDigital\AssinaturaDigitalService;
+use E258Tech\Model\Contract\NexoraGateway;
 use E258Tech\Model\Exception\OperationException;
 use E258Tech\Http\ApiResult;
 
@@ -36,6 +41,7 @@ final readonly class AdminApiDependencies
 {
     public function __construct(
         public AdminApiKernel $kernel,
+        public NexoraGateway $gateway,
         public LeadService $leads,
         public OpportunityService $opportunities,
         public ActivityService $activities,
@@ -62,6 +68,10 @@ final readonly class AdminApiDependencies
         public NotificacoesService $notificacoes,
         public SegurancaService $seguranca,
         public SelfServiceService $selfService,
+        public SuperAdminService $superAdmin,
+        public AprovacaoService $aprovacao,
+        public TarefasService $tarefas,
+        public AssinaturaDigitalService $assinaturaDigital,
     ) {
     }
 

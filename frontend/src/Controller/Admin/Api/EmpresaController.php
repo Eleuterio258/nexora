@@ -6,17 +6,12 @@ namespace E258Tech\Controller\Admin\Api;
 use E258Tech\Controller\Admin\AdminApiDependencies;
 use E258Tech\Http\ApiResult;
 use E258Tech\Http\Request;
-use E258Tech\Infrastructure\Auth\PhpSessionAuthorization;
 
 final class EmpresaController
 {
     public function empresaBranchSave(Request $request, AdminApiDependencies $d): ApiResult
     {
         $branchId = $request->int('branch_id');
-        $action = $branchId ? 'editar' : 'criar';
-        if (!(new PhpSessionAuthorization())->can('empresa', $action)) {
-            return new ApiResult(['error' => 'Sem permissao para executar esta acao.'], 403);
-        }
 
         if ($branchId) {
             return $d->result(

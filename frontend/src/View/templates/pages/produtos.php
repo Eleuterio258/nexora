@@ -30,6 +30,7 @@
     ];
 
     $csrf       = $app->security->csrfToken();
+    $canGerirProdutos = $app->session->can('stock', 'gerir_produtos');
     $pageTitle  = 'Produtos';
     $activePage = 'produtos';
     $breadcrumb = [['Admin', '/nexora/'], ['Produtos', '']];
@@ -39,6 +40,7 @@
 
 <div class="adm-page-header">
     <h1 class="adm-page-title">Produtos</h1>
+    <?php if ($canGerirProdutos): ?>
     <div class="adm-page-header-actions">
         <a href="<?php echo htmlspecialchars($app->routes->path('produto_categorias')) ?>" class="adm-btn adm-btn-outline">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -54,6 +56,7 @@
             Novo Produto
         </a>
     </div>
+    <?php endif; ?>
 </div>
 
 <div class="adm-card">
@@ -102,7 +105,7 @@
                     <th>Marca</th>
                     <th>IVA %</th>
                     <th>Estado</th>
-                    <th>Ações</th>
+                    <?php if ($canGerirProdutos): ?><th>Ações</th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -118,6 +121,7 @@
                 <td><?php echo $marcaNome ? htmlspecialchars($marcaNome) : '—' ?></td>
                 <td><?php echo number_format((float) $p['iva_percentual'], 2, ',', '.') ?></td>
                 <td><span class="adm-badge <?php echo $p['ativo'] ? 'adm-badge--green' : 'adm-badge--gray' ?>"><?php echo $p['ativo'] ? 'Ativo' : 'Inativo' ?></span></td>
+                <?php if ($canGerirProdutos): ?>
                 <td>
                     <div class="adm-actions">
                         <a href="<?php echo htmlspecialchars($app->routes->path('produto_form', ['id' => $p['id']])) ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Ver / Editar">
@@ -128,6 +132,9 @@
                         </a>
                     </div>
                 </td>
+                <?php else: ?>
+                <td>—</td>
+                <?php endif; ?>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -141,7 +148,9 @@
         </svg>
         <p class="adm-empty-title">Nenhum produto criado</p>
         <p class="adm-empty-sub">Começa por criar o primeiro produto do catálogo.</p>
+        <?php if ($canGerirProdutos): ?>
         <a href="<?php echo htmlspecialchars($app->routes->path('produto_form')) ?>" class="adm-btn adm-btn-primary">Criar Produto</a>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>

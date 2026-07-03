@@ -15,6 +15,11 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-https://nexora.e258tech.tech}
       UPLOADS_DIR: ./uploads
       AVATAR_DIR: ./avatars
+      GATEWAY_WEBHOOK_SECRET: ${GATEWAY_WEBHOOK_SECRET:-}
+      # Nexora-Pay corre como serviço externo independente
+      NEXORA_PAY_BASE_URL: ${NEXORA_PAY_BASE_URL:-https://pay.e258tech.tech}
+      NEXORA_PAY_API_KEY: ${NEXORA_PAY_API_KEY}
+      NEXORA_PAY_SERVICE_ACCOUNT: ${NEXORA_PAY_SERVICE_ACCOUNT:-gestao-escolar}
     volumes:
       - api_uploads:/app/uploads
       - api_avatars:/app/avatars

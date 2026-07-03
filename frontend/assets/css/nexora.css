@@ -25,6 +25,12 @@
     --adm-yellow-light: #fef3c7;
     --adm-blue:      #3b82f6;
     --adm-blue-light:#dbeafe;
+    --adm-purple:       #7c3aed;
+    --adm-purple-light: #ede9fe;
+
+    --adm-surface-alt: #f1f5f9;
+    --adm-shadow-card: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --adm-shadow-lg:   0 8px 32px rgba(0,0,0,.12);
 
     --adm-font-h: 'Outfit', sans-serif;
     --adm-font-b: 'Plus Jakarta Sans', sans-serif;
@@ -287,13 +293,15 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .adm-stat-card {
     background: var(--adm-white);
     border: 1px solid var(--adm-gray-200);
-    border-radius: 8px;
-    padding: var(--adm-sp-4);
+    border-radius: var(--adm-radius-md);
+    padding: var(--adm-sp-5);
     display: flex;
     align-items: center;
-    gap: var(--adm-sp-3);
-    box-shadow: none;
+    gap: var(--adm-sp-4);
+    box-shadow: var(--adm-shadow-card);
+    transition: box-shadow .15s, border-color .15s;
 }
+.adm-stat-card:hover { box-shadow: var(--adm-shadow-md); border-color: var(--adm-gray-300); }
 .adm-stat-icon {
     width: 38px; height: 38px;
     border-radius: 8px;
@@ -408,8 +416,8 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .adm-card {
     background: var(--adm-white);
     border: 1px solid var(--adm-gray-200);
-    border-radius: 8px;
-    box-shadow: none;
+    border-radius: var(--adm-radius-md);
+    box-shadow: var(--adm-shadow-card);
     overflow: hidden;
 }
 .adm-card-header {
@@ -488,7 +496,8 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .adm-badge--yellow { background: var(--adm-yellow-light);  color: #92400e; }
 .adm-badge--blue   { background: var(--adm-blue-light);    color: #1d4ed8; }
 .adm-badge--gray   { background: var(--adm-gray-100);      color: var(--adm-gray-600); }
-.adm-badge--indigo { background: #e0e7ff;                  color: #3730a3; }
+.adm-badge--indigo  { background: #e0e7ff;                  color: #3730a3; }
+.adm-badge--purple  { background: var(--adm-purple-light);  color: var(--adm-purple); }
 .adm-badge-dot {
     width: 6px; height: 6px; border-radius: 50%; background: currentColor;
 }
@@ -509,8 +518,8 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
     white-space: nowrap;
 }
 .adm-btn:disabled { opacity:.5; cursor:not-allowed; }
-.adm-btn-primary  { background: var(--adm-green); color:#fff; border-color:var(--adm-green); }
-.adm-btn-primary:hover:not(:disabled) { background: var(--adm-green-dark); border-color:var(--adm-green-dark); }
+.adm-btn-primary  { background: var(--adm-green); color:#fff; border-color:var(--adm-green); box-shadow:0 1px 3px rgba(16,185,129,.25); }
+.adm-btn-primary:hover:not(:disabled) { background: var(--adm-green-dark); border-color:var(--adm-green-dark); box-shadow:0 2px 6px rgba(16,185,129,.35); }
 .adm-btn-outline  { background: transparent; color: var(--adm-gray-700); border-color: var(--adm-gray-300); }
 .adm-btn-outline:hover:not(:disabled) { background: var(--adm-gray-50); }
 .adm-btn-danger   { background: var(--adm-red); color: #fff; border-color:var(--adm-red); }
@@ -524,6 +533,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .adm-form-group { margin-bottom: var(--adm-sp-5); }
 .adm-form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: var(--adm-sp-5); }
 .adm-form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--adm-sp-5); }
+.adm-form-row-1 { display: grid; grid-template-columns: 1fr; gap: var(--adm-sp-5); }
 .adm-label {
     display: block;
     font-size: var(--adm-text-xs);
@@ -663,20 +673,101 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .adm-empty-title { font-size:1rem; font-weight:600; color:var(--adm-gray-600); margin-bottom:var(--adm-sp-2); }
 .adm-empty-sub   { font-size:var(--adm-text-sm); margin-bottom:var(--adm-sp-5); }
 
-/* ── Confirm modal ───────────────────────────────────────────── */
+/* ── Modal system ────────────────────────────────────────────── */
+/* .adm-modal: overlay (novas páginas: style="display:none" → JS set to flex) */
+.adm-modal {
+    position:fixed; inset:0; background:rgba(0,0,0,.45);
+    z-index:200; align-items:center; justify-content:center;
+    padding:var(--adm-sp-6) var(--adm-sp-4);
+    overflow-y:auto;
+}
+/* .adm-modal-overlay: alias usado em bottom.php */
 .adm-modal-overlay {
     position:fixed; inset:0; background:rgba(0,0,0,.45);
     z-index:200; display:none; align-items:center; justify-content:center;
+    padding:var(--adm-sp-4);
 }
 .adm-modal-overlay.open { display:flex; }
-.adm-modal {
+/* Quando .adm-modal é filho directo de .adm-modal-overlay (padrão legado),
+   remove o position:fixed e transforma-o em caixa branca centrada */
+.adm-modal-overlay > .adm-modal {
+    position:static; inset:auto; z-index:auto;
     background:var(--adm-white); border-radius:var(--adm-radius-lg);
-    padding:var(--adm-sp-6); width:100%; max-width:400px;
+    width:100%; max-width:560px;
     box-shadow:0 20px 60px rgba(0,0,0,.2);
+    overflow:hidden; overflow-y:auto; max-height:90vh;
+    padding:var(--adm-sp-6);
 }
+/* No padrão legado o max-width pode vir via style inline — reset do max-width padrão */
+.adm-modal-overlay > .adm-modal > .adm-modal-title { margin-bottom:var(--adm-sp-4); }
+.adm-modal-overlay > .adm-modal > .adm-modal-footer { border-top:1px solid var(--adm-gray-100); margin-top:var(--adm-sp-5); padding-top:var(--adm-sp-4); }
+/* Caixa branca dentro de qualquer overlay */
+.adm-modal-content {
+    background:var(--adm-white); border-radius:var(--adm-radius-lg);
+    width:100%; max-width:480px;
+    box-shadow:0 20px 60px rgba(0,0,0,.2);
+    overflow:hidden;
+    display:flex; flex-direction:column; max-height:calc(100vh - var(--adm-sp-12));
+}
+.adm-modal-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:var(--adm-sp-4) var(--adm-sp-6);
+    border-bottom:1px solid var(--adm-gray-100);
+    flex-shrink:0;
+}
+.adm-modal-header h2,
+.adm-modal-header h3 { font-family:var(--adm-font-h); font-size:1rem; font-weight:700; color:var(--adm-gray-900); }
+.adm-modal-content > form,
+.adm-modal-content > .adm-form { padding:var(--adm-sp-5) var(--adm-sp-6) var(--adm-sp-5); }
 .adm-modal-title { font-family:var(--adm-font-h); font-size:1.1rem; font-weight:700; color:var(--adm-gray-900); margin-bottom:var(--adm-sp-2); }
-.adm-modal-body  { font-size:var(--adm-text-sm); color:var(--adm-gray-600); margin-bottom:var(--adm-sp-6); }
-.adm-modal-footer { display:flex; justify-content:flex-end; gap:var(--adm-sp-3); }
+.adm-modal-body  { font-size:var(--adm-text-sm); color:var(--adm-gray-600); margin-bottom:var(--adm-sp-5); }
+.adm-modal-footer { display:flex; justify-content:flex-end; gap:var(--adm-sp-3); padding:var(--adm-sp-4) var(--adm-sp-6); border-top:1px solid var(--adm-gray-100); flex-shrink:0; }
+
+/* ── Print / Recibos ─────────────────────────────────────────── */
+@media print {
+    .adm-sidebar,.adm-top-bar,.adm-breadcrumb,.no-print { display:none !important; }
+    .adm-content { margin:0 !important; padding:0 !important; }
+    body { font-size:11px; color:#000; }
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .recibo-card { box-shadow:none !important; border:1px solid var(--adm-gray-300) !important; border-top:4px solid var(--adm-green) !important; }
+    .recibo-table th,.recibo-table td { border:1px solid #ccc !important; }
+    .adm-card { box-shadow:none !important; border:1px solid #ddd !important; break-inside:avoid; }
+    .print-header { display:block !important; }
+}
+/* Recibo layout — alinhado com a identidade E258Tech (verde + Outfit/Plus Jakarta Sans) */
+.recibo-card { background:#fff; font-family:var(--adm-font-b); border-radius:var(--adm-radius-lg); border-top:4px solid var(--adm-green); box-shadow:0 2px 16px rgba(0,0,0,.08); max-width:860px; margin:0 auto; padding:2.5rem; }
+.recibo-header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:1.25rem; border-bottom:2px solid var(--adm-green); margin-bottom:1.5rem; }
+.recibo-logo { height:34px; width:auto; margin-bottom:.6rem; display:block; }
+.recibo-empresa h2 { font-family:var(--adm-font-h); font-size:1.1rem; font-weight:700; color:var(--adm-gray-900); margin:0 0 .2rem; }
+.recibo-empresa p,.recibo-titulo p { font-size:.8rem; color:var(--adm-gray-600); margin:.1rem 0; }
+.recibo-titulo { text-align:right; }
+.recibo-titulo h3 { font-family:var(--adm-font-h); font-size:1rem; font-weight:700; color:var(--adm-green-dark); margin:0 0 .25rem; }
+.recibo-section-title { font-family:var(--adm-font-h); font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--adm-green-dark); margin:1.25rem 0 .5rem; }
+.recibo-info-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:.75rem 1.5rem; padding:.75rem; background:var(--adm-gray-50); border-radius:var(--adm-radius-md); margin-bottom:1rem; }
+.recibo-info-label { font-size:.7rem; color:var(--adm-gray-500); font-weight:500; display:block; }
+.recibo-info-value { font-size:.85rem; font-weight:600; color:var(--adm-gray-900); display:block; }
+.recibo-table { width:100%; border-collapse:collapse; font-size:.85rem; }
+.recibo-table th { background:var(--adm-green-xlight); text-align:left; padding:.5rem .75rem; font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--adm-green-dark); }
+.recibo-table td { padding:.45rem .75rem; border-bottom:1px solid var(--adm-gray-100); }
+.recibo-table td.val { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+.recibo-table tr:last-child td { border-bottom:none; }
+.recibo-table tr.total-row td { background:var(--adm-gray-50); font-weight:700; }
+.recibo-totais { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; padding:1rem; background:linear-gradient(135deg, var(--adm-green-dark), var(--adm-green)); border-radius:var(--adm-radius-md); margin-top:1.25rem; color:#fff; text-align:center; }
+.recibo-totais .label { font-size:.7rem; opacity:.8; margin-bottom:.2rem; }
+.recibo-totais .value { font-size:1.05rem; font-weight:700; }
+.recibo-totais .liquido { background:rgba(255,255,255,.16); border-radius:var(--adm-radius-sm); padding:.4rem; }
+.recibo-totais .liquido .value { font-size:1.3rem; color:#fff; }
+.recibo-footer { margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--adm-gray-200); display:flex; justify-content:space-between; align-items:flex-end; font-size:.75rem; color:var(--adm-gray-500); }
+.recibo-assinatura { text-align:center; }
+.recibo-assinatura .linha { border-top:1px solid var(--adm-gray-400); width:180px; margin:.5rem auto .2rem; }
+.print-header { display:none; margin-bottom:1.5rem; }
+/* aliases para compatibilidade entre as duas variantes de recibo */
+.recibo-info-pair { display:flex; flex-direction:column; gap:.1rem; }
+.recibo-totais-item { text-align:center; }
+.recibo-totais-item .label { font-size:.7rem; opacity:.8; margin-bottom:.2rem; }
+.recibo-totais-item .value { font-size:1.05rem; font-weight:700; }
+.recibo-totais-item.liquido { background:rgba(255,255,255,.16); border-radius:var(--adm-radius-sm); padding:.4rem; }
+.recibo-totais-item.liquido .value { font-size:1.3rem; color:#fff; }
 
 /* ── Utility ─────────────────────────────────────────────────── */
 .adm-text-sm    { font-size:var(--adm-text-sm); }
@@ -920,23 +1011,11 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .kpi-chip-sub  { font-size:var(--adm-text-xs); color:var(--adm-green-dark); font-weight:600; }
 
 /* ── Organograma (árvore de unidades organizacionais) ──────────── */
+/* .adm-tree-* kept for backwards compatibility — organogram uses .org-* classes inline */
 .adm-tree-wrap { overflow-x: auto; padding: var(--adm-sp-4); }
-.adm-tree, .adm-tree-children { display: flex; list-style: none; padding-left: 0; margin: 0; }
-.adm-tree { flex-direction: column; }
-.adm-tree-root { align-items: flex-start; }
-.adm-tree-node { display: flex; flex-direction: column; align-items: center; padding: var(--adm-sp-4) var(--adm-sp-2) 0; position: relative; }
-.adm-tree-children { flex-direction: row; margin-top: var(--adm-sp-4); }
-.adm-tree-card {
-    border: 1px solid var(--adm-gray-200);
-    border-radius: var(--adm-radius-md);
-    background: var(--adm-white);
-    box-shadow: var(--adm-shadow-xs);
-    padding: var(--adm-sp-3) var(--adm-sp-4);
-    min-width: 160px;
-    text-align: center;
-}
-.adm-tree-card-title { font-weight: 600; font-size: var(--adm-text-sm); color: var(--adm-gray-800); }
-.adm-tree-card-meta { display: flex; flex-direction: column; gap: var(--adm-sp-1); margin-top: var(--adm-sp-1); align-items: center; }
+.adm-tree-card { border:1px solid var(--adm-gray-200); border-radius:var(--adm-radius-md); background:var(--adm-white); box-shadow:var(--adm-shadow-xs); padding:var(--adm-sp-3) var(--adm-sp-4); min-width:160px; text-align:center; }
+.adm-tree-card-title { font-weight:600; font-size:var(--adm-text-sm); color:var(--adm-gray-800); }
+.adm-tree-card-meta { display:flex; flex-direction:column; gap:var(--adm-sp-1); margin-top:var(--adm-sp-1); align-items:center; }
 
 /* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 1024px) {
@@ -956,3 +1035,109 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 @media (max-width: 480px) {
     .adm-stats-grid { grid-template-columns: 1fr; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Classes adicionais — grid, stat, layout, lista, paginação
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Grid genérico ───────────────────────────────────────────── */
+.adm-grid   { display:grid; gap:var(--adm-sp-5); }
+.adm-grid-2 { grid-template-columns:repeat(2, 1fr); }
+.adm-grid-3 { grid-template-columns:repeat(3, 1fr); }
+.adm-grid-4 { grid-template-columns:repeat(4, 1fr); }
+@media (max-width: 1024px) {
+    .adm-grid-4 { grid-template-columns:repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+    .adm-grid-2,
+    .adm-grid-3,
+    .adm-grid-4 { grid-template-columns:1fr; }
+}
+
+/* ── Stat simplificado (dentro de .adm-card) ─────────────────── */
+.adm-stat {
+    padding:var(--adm-sp-5);
+    display:flex; flex-direction:column; gap:.3rem;
+}
+.adm-stat-value {
+    font-family:var(--adm-font-h);
+    font-size:1.75rem; font-weight:800;
+    color:var(--adm-gray-900); line-height:1.1;
+}
+
+/* ── Flex helpers ────────────────────────────────────────────── */
+.adm-flex-between { display:flex; align-items:center; justify-content:space-between; }
+.adm-flex-end     { display:flex; align-items:center; justify-content:flex-end; }
+.adm-flex-col     { display:flex; flex-direction:column; }
+
+/* ── Lista simples ───────────────────────────────────────────── */
+.adm-list { list-style:none; display:flex; flex-direction:column; }
+.adm-list li {
+    display:flex; align-items:center; justify-content:space-between;
+    gap:var(--adm-sp-3);
+    padding:var(--adm-sp-3) 0;
+    border-bottom:1px solid var(--adm-gray-100);
+}
+.adm-list li:last-child { border-bottom:none; }
+
+/* ── Paginação ───────────────────────────────────────────────── */
+.adm-pagination {
+    display:flex; align-items:center; justify-content:center;
+    gap:var(--adm-sp-1);
+    padding:var(--adm-sp-4) var(--adm-sp-6);
+    border-top:1px solid var(--adm-gray-100);
+}
+
+/* ── Card: variantes ─────────────────────────────────────────── */
+.adm-card-padding { padding:var(--adm-sp-5); }
+.adm-card--flat   { box-shadow:none; border-color:var(--adm-gray-200); }
+.adm-card--muted  { background:var(--adm-gray-50); border-color:var(--adm-gray-200); box-shadow:none; }
+
+/* ── Formulário ──────────────────────────────────────────────── */
+.adm-form { display:flex; flex-direction:column; }
+
+/* ── Switch (toggle para módulos) ────────────────────────────── */
+.adm-switch { display:inline-flex; align-items:center; cursor:pointer; gap:var(--adm-sp-2); }
+.adm-switch input { position:absolute; opacity:0; width:0; height:0; }
+.adm-switch span {
+    display:inline-block; position:relative;
+    width:44px; height:24px;
+    background:var(--adm-gray-300);
+    border-radius:99px;
+    transition:background .2s; flex-shrink:0;
+}
+.adm-switch span::after {
+    content:''; position:absolute; left:3px; top:3px;
+    width:18px; height:18px;
+    background:#fff; border-radius:50%;
+    box-shadow:0 1px 3px rgba(0,0,0,.2);
+    transition:left .2s;
+}
+.adm-switch input:checked + span { background:var(--adm-green); }
+.adm-switch input:checked + span::after { left:23px; }
+.adm-switch-label { font-size:var(--adm-text-sm); font-weight:500; color:var(--adm-gray-700); }
+
+/* ── Input pequeno ───────────────────────────────────────────── */
+.adm-input-sm { padding:.35rem var(--adm-sp-3); font-size:var(--adm-text-xs); }
+
+/* ── Espaçamentos extra ──────────────────────────────────────── */
+.adm-mt-2 { margin-top:var(--adm-sp-2); }
+.adm-mt-3 { margin-top:var(--adm-sp-3); }
+.adm-mt-8 { margin-top:var(--adm-sp-8); }
+.adm-mb-2 { margin-bottom:var(--adm-sp-2); }
+.adm-mb-3 { margin-bottom:var(--adm-sp-3); }
+.adm-mb-8 { margin-bottom:var(--adm-sp-8); }
+.adm-p-4  { padding:var(--adm-sp-4); }
+.adm-p-5  { padding:var(--adm-sp-5); }
+.adm-p-6  { padding:var(--adm-sp-6); }
+.adm-gap-1 { gap:var(--adm-sp-1); }
+.adm-gap-4 { gap:var(--adm-sp-4); }
+
+/* ── Stat icon extra sizes ───────────────────────────────────── */
+.adm-stat-icon--indigo { background: #e0e7ff; color: #3730a3; }
+.adm-stat-icon--gray   { background: var(--adm-gray-100); color: var(--adm-gray-500); }
+
+/* ── Melhorias de interatividade ─────────────────────────────── */
+.adm-module-card:hover .adm-module-card-icon { transform:scale(1.05); transition:transform .15s; }
+.adm-table tbody tr { transition:background .1s; }
+.adm-badge { transition:opacity .15s; }

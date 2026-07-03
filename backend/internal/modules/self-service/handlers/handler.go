@@ -8,6 +8,7 @@ import (
 
 	"nexora/config"
 	mw "nexora/internal/middleware"
+	"nexora/internal/storage"
 )
 
 func decodeJSON(r *http.Request, v any) error {
@@ -15,12 +16,13 @@ func decodeJSON(r *http.Request, v any) error {
 }
 
 type Handler struct {
-	db  *pgxpool.Pool
-	cfg *config.Config
+	db      *pgxpool.Pool
+	cfg     *config.Config
+	storage storage.Provider
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config) *Handler {
-	return &Handler{db: db, cfg: cfg}
+func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider) *Handler {
+	return &Handler{db: db, cfg: cfg, storage: st}
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {

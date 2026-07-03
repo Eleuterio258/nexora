@@ -3,6 +3,8 @@
     $filtroUnidade = $app->request->queryInt('unit_id', 0) ?: 0;
     $filtroEstado  = $app->request->queryEnum('estado', ['ativo', 'suspenso', 'licenca', 'desligado']);
     $filtroQ       = $app->request->queryString('q');
+    $page          = max(1, $app->request->queryInt('page', 1) ?: 1);
+    $limit         = 20;
 
     $query = [];
     if ($filtroUnidade) {
@@ -16,8 +18,12 @@
     }
 
     $__safeList = fn(array $r) => ($r['status'] === 200 && is_array($r['body']) && array_is_list($r['body'])) ? $r['body'] : [];
+    $__safePaged = fn(array $r) => ($r['status'] === 200 && is_array($r['body']) && isset($r['body']['data'])) ? $r['body'] : ['data' => [], 'meta' => ['total' => 0, 'page' => 1, 'limit' => $limit]];
 
-    $funcionarios       = $__safeList($app->nexora->call('GET', '/api/rh/funcionarios', null, $query));
+    $funcionariosResp = $__safePaged($app->nexora->call('GET', '/api/rh/funcionarios', null, array_merge($query, ['page' => $page, 'limit' => $limit])));
+    $funcionarios     = $funcionariosResp['data'];
+    $meta             = $funcionariosResp['meta'] ?? ['total' => 0, 'page' => $page, 'limit' => $limit];
+    $totalPages       = max(1, (int) ceil($meta['total'] / $limit));
     $unidades           = $__safeList($app->nexora->call('GET', '/api/rh/unidades'));
     $periodos           = $__safeList($app->nexora->call('GET', '/api/rh/periodos'));
     $cargos             = $__safeList($app->nexora->call('GET', '/api/rh/cargos'));
@@ -56,9 +62,7 @@
         'obrigatoria'    => 'Obrigatória',
         'outra'          => 'Outra',
     ];
-    $todosFuncionarios = $query
-        ? ($app->nexora->call('GET', '/api/rh/funcionarios')['body'] ?? [])
-        : $funcionarios;
+    $todosFuncionarios = $__safeList($app->nexora->call('GET', '/api/rh/funcionarios', null, ['limit' => 1000]));
 
     $estadoBadges = [
         'ativo'     => ['adm-badge--green',  'Ativo'],
@@ -69,6 +73,7 @@
 
     $tipoContratoLabels = [
         'efetivo'           => 'Efetivo',
+        'indeterminado'     => 'Indeterminado',
         'termo_certo'       => 'Termo Certo',
         'termo_incerto'     => 'Termo Incerto',
         'estagio'           => 'Estágio',
@@ -118,63 +123,6 @@
     <h1 class="adm-page-title">Recursos Humanos</h1>
 </div>
 
-<div class="adm-tabs" id="mainTabs">
-    <button class="adm-tab active" onclick="switchTab('funcionarios',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        Funcionários
-        <?php if (count($funcionarios)): ?><span class="adm-tab-badge"><?php echo count($funcionarios) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('unidades',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
-        Unidades Organizacionais
-        <?php if (count($unidades)): ?><span class="adm-tab-badge"><?php echo count($unidades) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('periodos',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        Períodos de Avaliação
-        <?php if (count($periodos)): ?><span class="adm-tab-badge"><?php echo count($periodos) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('cargos',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
-        Cargos
-        <?php if (count($cargos)): ?><span class="adm-tab-badge"><?php echo count($cargos) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('horarios',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Horários
-        <?php if (count($horarios)): ?><span class="adm-tab-badge"><?php echo count($horarios) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('componentes-salariais',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        Componentes Salariais
-        <?php if (count($componentesSalariais)): ?><span class="adm-tab-badge"><?php echo count($componentesSalariais) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('beneficios',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
-        Benefícios
-        <?php if (count($beneficios)): ?><span class="adm-tab-badge"><?php echo count($beneficios) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('tipos-ausencia',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>
-        Tipos de Ausência
-        <?php if (count($tiposAusencia)): ?><span class="adm-tab-badge"><?php echo count($tiposAusencia) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('criterios-avaliacao',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 6 6 1-4.5 4.5L17.5 20 12 17l-5.5 3 1-6.5L3 9l6-1z"/></svg>
-        Critérios de Avaliação
-        <?php if (count($criteriosAvaliacao)): ?><span class="adm-tab-badge"><?php echo count($criteriosAvaliacao) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('formacoes',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-        Formações
-        <?php if (count($formacoes)): ?><span class="adm-tab-badge"><?php echo count($formacoes) ?></span><?php endif; ?>
-    </button>
-    <button class="adm-tab" onclick="switchTab('processamento-salarial',this)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-        Processamento Salarial
-        <?php if (count($folhasPagamento)): ?><span class="adm-tab-badge"><?php echo count($folhasPagamento) ?></span><?php endif; ?>
-    </button>
-</div>
 
 <!-- ── Funcionários ───────────────────────────────────────── -->
 <div class="adm-tab-panel active" id="tab-funcionarios">
@@ -199,7 +147,11 @@
                 <?php endforeach; ?>
             </select>
             <button class="adm-btn adm-btn-outline adm-btn-sm" type="button" onclick="applyFiltros()">Filtrar</button>
-            <span class="adm-filter-count"><?php echo count($funcionarios) ?> funcionário<?php echo count($funcionarios) !== 1 ? 's' : '' ?></span>
+            <span class="adm-filter-count"><?php echo $meta['total'] ?> funcionário<?php echo $meta['total'] !== 1 ? 's' : '' ?></span>
+            <button class="adm-btn adm-btn-primary adm-btn-sm" type="button" onclick="openNovoFuncionarioModal()" style="margin-left:auto">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Novo Funcionário
+            </button>
         </div>
 
         <?php if ($funcionarios): ?>
@@ -241,17 +193,38 @@
                 </tbody>
             </table>
         </div>
+
+        <?php if ($totalPages > 1): ?>
+        <div style="display:flex;justify-content:center;gap:var(--adm-sp-3);padding:var(--adm-sp-5)">
+            <?php if ($page > 1): ?>
+            <a href="<?php echo htmlspecialchars($app->view->queryLink('/nexora/rh/funcionarios', $app->request->query(), ['page' => $page - 1])) ?>" class="adm-btn adm-btn-outline adm-btn-sm">« Anterior</a>
+            <?php endif; ?>
+            <span class="adm-text-sm adm-text-muted" style="align-self:center">Página <?php echo $page ?> de <?php echo $totalPages ?></span>
+            <?php if ($page < $totalPages): ?>
+            <a href="<?php echo htmlspecialchars($app->view->queryLink('/nexora/rh/funcionarios', $app->request->query(), ['page' => $page + 1])) ?>" class="adm-btn adm-btn-outline adm-btn-sm">Seguinte »</a>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
         <?php else: ?>
         <div class="adm-empty">
             <p class="adm-empty-title">Nenhum funcionário encontrado</p>
-            <p class="adm-empty-sub">Adicione o primeiro funcionário usando o formulário abaixo.</p>
+            <p class="adm-empty-sub">Use o botão "Novo Funcionário" para adicionar o primeiro.</p>
         </div>
         <?php endif; ?>
     </div>
 
-    <div class="adm-card adm-mb-6">
-        <div class="adm-card-header"><h2 class="adm-card-title">Novo Funcionário</h2></div>
-        <div class="adm-card-body">
+    </div>
+</div>
+
+<!-- ── Modal: Novo Funcionário ──────────────────────────────────── -->
+<div class="adm-modal" id="novoFuncionarioModal" style="display:none">
+    <div class="adm-modal-content" style="max-width:720px">
+        <div class="adm-modal-header">
+            <h3>Novo Funcionário</h3>
+            <button class="adm-btn adm-btn-ghost adm-btn-icon" type="button" onclick="closeNovoFuncionarioModal()">&times;</button>
+        </div>
+        <div style="padding:var(--adm-sp-5) var(--adm-sp-6);max-height:72vh;overflow-y:auto">
             <div class="adm-form-row-3">
                 <div class="adm-form-group">
                     <label class="adm-label" for="f-nome">Nome Completo <span style="color:var(--adm-red)">*</span></label>
@@ -259,7 +232,7 @@
                 </div>
                 <div class="adm-form-group">
                     <label class="adm-label" for="f-numero">Número de Funcionário</label>
-                    <input class="adm-input" type="text" id="f-numero" maxlength="30" placeholder="ex: FUNC-001">
+                    <input class="adm-input" type="text" id="f-numero" maxlength="30" placeholder="A gerar…" disabled style="background:var(--adm-gray-50);color:var(--adm-gray-500)">
                 </div>
                 <div class="adm-form-group">
                     <label class="adm-label" for="f-unidade">Unidade Organizacional</label>
@@ -325,30 +298,33 @@
                     <input class="adm-input" type="email" id="f-email" maxlength="150" placeholder="ex: maria@empresa.co.mz">
                 </div>
                 <div class="adm-form-group">
-                    <label class="adm-label" for="f-salario">Salário Base</label>
+                    <label class="adm-label" for="f-salario">Salário Base (MZN)</label>
                     <?php if ($podeVerSalarios): ?>
                     <input class="adm-input" type="number" id="f-salario" step="0.01" min="0" placeholder="ex: 25000.00">
                     <?php else: ?>
-                    <input class="adm-input" type="text" id="f-salario" value="" placeholder="Confidencial — sem permissão" disabled>
+                    <input class="adm-input" type="text" id="f-salario" placeholder="Confidencial — sem permissão" disabled>
                     <?php endif; ?>
                 </div>
             </div>
-            <div class="adm-form-group">
-                <label class="adm-label" for="f-endereco">Endereço</label>
-                <input class="adm-input" type="text" id="f-endereco" maxlength="255" placeholder="ex: Av. Eduardo Mondlane, Maputo">
+            <div class="adm-form-row">
+                <div class="adm-form-group">
+                    <label class="adm-label" for="f-horario-id">Horário de Trabalho</label>
+                    <select class="adm-select" id="f-horario-id">
+                        <option value="">— Nenhum —</option>
+                        <?php foreach ($horarios as $h): ?>
+                        <option value="<?php echo (int) $h['id'] ?>"><?php echo htmlspecialchars($h['nome']) ?> (<?php echo htmlspecialchars($h['hora_entrada']) ?>–<?php echo htmlspecialchars($h['hora_saida']) ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label" for="f-endereco">Endereço</label>
+                    <input class="adm-input" type="text" id="f-endereco" maxlength="255" placeholder="ex: Av. Eduardo Mondlane, Maputo">
+                </div>
             </div>
-            <div class="adm-form-group">
-                <label class="adm-label" for="f-horario-id">Horário de Trabalho</label>
-                <select class="adm-select" id="f-horario-id">
-                    <option value="">— Nenhum —</option>
-                    <?php foreach ($horarios as $h): ?>
-                    <option value="<?php echo (int) $h['id'] ?>"><?php echo htmlspecialchars($h['nome']) ?> (<?php echo htmlspecialchars($h['hora_entrada']) ?>–<?php echo htmlspecialchars($h['hora_saida']) ?>)</option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div style="display:flex;gap:var(--adm-sp-3)">
-                <button class="adm-btn adm-btn-primary" type="button" onclick="saveFuncionario()">Adicionar Funcionário</button>
-            </div>
+        </div>
+        <div class="adm-modal-footer">
+            <button class="adm-btn adm-btn-ghost" type="button" onclick="closeNovoFuncionarioModal()">Cancelar</button>
+            <button class="adm-btn adm-btn-primary" type="button" onclick="saveFuncionario()">Adicionar Funcionário</button>
         </div>
     </div>
 </div>
@@ -1124,25 +1100,19 @@
     </div>
 </div>
 
+
 <script>
 const CSRF = '<?php echo $csrf ?>';
 
-// ── Tabs ─────────────────────────────────────────────────────
-function switchTab(name, btn) {
+function showSection(name) {
     document.querySelectorAll('.adm-tab-panel').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
-    document.getElementById('tab-' + name).classList.add('active');
-    btn.classList.add('active');
+    const panel = document.getElementById('tab-' + name);
+    if (panel) panel.classList.add('active');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const tabs = ['funcionarios', 'unidades', 'periodos', 'cargos', 'horarios', 'componentes-salariais', 'beneficios', 'tipos-ausencia', 'criterios-avaliacao', 'formacoes', 'processamento-salarial'];
     const hash = location.hash.replace('#', '');
-    const idx  = tabs.indexOf(hash);
-    if (idx > 0) {
-        const btn = document.querySelectorAll('#mainTabs .adm-tab')[idx];
-        if (btn) switchTab(hash, btn);
-    }
+    if (hash) showSection(hash);
 });
 
 async function postJSON(url, payload, tab) {
@@ -1173,42 +1143,72 @@ function applyFiltros() {
     location.href = '?' + params.toString() + '#funcionarios';
 }
 
-// ── Funcionários ─────────────────────────────────────────────
+// ── Modal: Novo Funcionário ───────────────────────────────────
+const _novoFuncModal = document.getElementById('novoFuncionarioModal');
+async function openNovoFuncionarioModal() {
+    _novoFuncModal.style.display = 'flex';
+    const el = document.getElementById('f-numero');
+    el.value = '';
+    el.placeholder = 'A gerar…';
+    try {
+        const r = await fetch('/nexora/api/rh_proximo_numero_funcionario');
+        if (r.ok) { const d = await r.json(); el.value = d.numero ?? ''; }
+    } catch (_) {}
+}
+function closeNovoFuncionarioModal() {
+    _novoFuncModal.style.display = 'none';
+    document.getElementById('f-numero').value = '';
+}
+_novoFuncModal.addEventListener('click', e => { if (e.target === _novoFuncModal) closeNovoFuncionarioModal(); });
+
 function onCargoFuncionarioChange() {
     const select = document.getElementById('f-cargo-id');
     document.getElementById('f-cargo-texto').style.display = select.value === 'outro' ? '' : 'none';
 }
 
-function saveFuncionario() {
+async function saveFuncionario() {
     const nome = document.getElementById('f-nome').value.trim();
     if (!nome) { showToast('O nome completo é obrigatório.', 'error'); return; }
 
-    const unidade = document.getElementById('f-unidade').value;
-    const salario = document.getElementById('f-salario').value;
+    const unidade    = document.getElementById('f-unidade').value;
+    const salario    = document.getElementById('f-salario').value;
     const cargoSelect = document.getElementById('f-cargo-id').value;
-    const cargoId   = (cargoSelect && cargoSelect !== 'outro') ? Number(cargoSelect) : null;
+    const cargoId    = (cargoSelect && cargoSelect !== 'outro') ? Number(cargoSelect) : null;
     const cargoTexto = cargoSelect === 'outro' ? (document.getElementById('f-cargo-texto').value.trim() || null) : null;
+    const horario    = document.getElementById('f-horario-id').value;
 
-    const horario = document.getElementById('f-horario-id').value;
+    try {
+        const res  = await fetch('/nexora/api/rh_funcionario_save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                nome_completo:       nome,
+                numero_funcionario:  document.getElementById('f-numero').value.trim() || null,
+                unit_id:             unidade ? Number(unidade) : null,
+                cargo_id:            cargoId,
+                cargo:               cargoTexto,
+                horario_id:          horario ? Number(horario) : null,
+                tipo_contrato:       document.getElementById('f-tipo-contrato').value,
+                data_admissao:       document.getElementById('f-data-admissao').value || null,
+                data_nascimento:     document.getElementById('f-data-nascimento').value || null,
+                genero:              document.getElementById('f-genero').value || null,
+                nuit:                document.getElementById('f-nuit').value.trim() || null,
+                telefone:            document.getElementById('f-telefone').value.trim() || null,
+                email:               document.getElementById('f-email').value.trim() || null,
+                endereco:            document.getElementById('f-endereco').value.trim() || null,
+                salario_base:        salario ? Number(salario) : null,
+                csrf: CSRF
+            })
+        }).then(r => r.json());
 
-    postJSON('/nexora/api/rh_funcionario_save', {
-        nome_completo: nome,
-        numero_funcionario: document.getElementById('f-numero').value.trim() || null,
-        unit_id: unidade ? Number(unidade) : null,
-        cargo_id: cargoId,
-        cargo: cargoTexto,
-        horario_id: horario ? Number(horario) : null,
-        tipo_contrato: document.getElementById('f-tipo-contrato').value,
-        data_admissao: document.getElementById('f-data-admissao').value || null,
-        data_nascimento: document.getElementById('f-data-nascimento').value || null,
-        genero: document.getElementById('f-genero').value || null,
-        nuit: document.getElementById('f-nuit').value.trim() || null,
-        telefone: document.getElementById('f-telefone').value.trim() || null,
-        email: document.getElementById('f-email').value.trim() || null,
-        endereco: document.getElementById('f-endereco').value.trim() || null,
-        salario_base: salario ? Number(salario) : null,
-        csrf: CSRF
-    }, 'funcionarios');
+        if (res.ok) {
+            showToast(res.msg || 'Funcionário adicionado com sucesso.');
+            closeNovoFuncionarioModal();
+            setTimeout(() => location.reload(), 700);
+        } else {
+            showToast(res.erro || 'Erro ao adicionar funcionário.', 'error');
+        }
+    } catch { showToast('Erro de ligação.', 'error'); }
 }
 
 // ── Unidades Organizacionais ────────────────────────────────────
@@ -1484,6 +1484,7 @@ function cancelarFolhaPagamento(id) {
         await postJSON('/nexora/api/rh_folha_pagamento_cancelar', { id, csrf: CSRF }, 'processamento-salarial');
     });
 }
+
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>

@@ -1,0 +1,7 @@
+-- ============================================================
+-- Down migration 087: não implementada
+-- ============================================================
+-- Esta migration atribuiu o cargo Administrador a funcionários ativos
+-- que não tinham cargo. Reverter exigiria um histórico prévio das
+-- atribuições, que não existe. O rollback deve ser feito manualmente.
+-- ============================================================

@@ -36,8 +36,8 @@ func (h *Handler) ListarComponentesSalariais(w http.ResponseWriter, r *http.Requ
 	user := mw.GetUser(r)
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT c.id, c.codigo, c.nome, c.tipo, c.forma_calculo, c.valor_padrao, c.ativo,
-		       (SELECT COUNT(*) FROM funcionario_componentes_salariais fc WHERE fc.componente_id = c.id)
-		  FROM componentes_salariais c
+		       (SELECT COUNT(*) FROM rh.funcionario_componentes_salariais fc WHERE fc.componente_id = c.id)
+		  FROM rh.componentes_salariais c
 		 WHERE c.tenant_id=$1
 		 ORDER BY c.tipo, c.nome`, user.TenantID)
 	defer rows.Close()
@@ -77,7 +77,7 @@ func (h *Handler) CriarComponenteSalarial(w http.ResponseWriter, r *http.Request
 	}
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO componentes_salariais (tenant_id, codigo, nome, tipo, forma_calculo, valor_padrao)
+		INSERT INTO rh.componentes_salariais (tenant_id, codigo, nome, tipo, forma_calculo, valor_padrao)
 		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
 		user.TenantID, body.Codigo, body.Nome, body.Tipo, body.FormaCalculo, body.ValorPadrao).Scan(&id)
 	if err != nil {
@@ -120,7 +120,7 @@ func (h *Handler) ActualizarComponenteSalarial(w http.ResponseWriter, r *http.Re
 		return
 	}
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE componentes_salariais SET
+		UPDATE rh.componentes_salariais SET
 		  codigo=COALESCE($1,codigo), nome=COALESCE($2,nome), tipo=COALESCE($3,tipo),
 		  forma_calculo=COALESCE($4,forma_calculo), valor_padrao=COALESCE($5,valor_padrao),
 		  ativo=COALESCE($6,ativo), updated_at=NOW()
@@ -146,7 +146,7 @@ func (h *Handler) RemoverComponenteSalarial(w http.ResponseWriter, r *http.Reque
 	id := chi.URLParam(r, "id")
 
 	var emUso bool
-	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM funcionario_componentes_salariais WHERE componente_id=$1 AND tenant_id=$2)`, id, user.TenantID).Scan(&emUso); err != nil {
+	if err := h.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM rh.funcionario_componentes_salariais WHERE componente_id=$1 AND tenant_id=$2)`, id, user.TenantID).Scan(&emUso); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
@@ -155,7 +155,7 @@ func (h *Handler) RemoverComponenteSalarial(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	tag, err := h.db.Exec(r.Context(), `DELETE FROM componentes_salariais WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), `DELETE FROM rh.componentes_salariais WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return

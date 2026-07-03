@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 $pageTitle  = 'Dashboard Escolar';
 $activePage = 'escolar_dashboard';
-$breadcrumb = [['Admin', '/nexora/'], ['Gestão Escolar', '/nexora/gestao-escolar/dashboard'], ['Dashboard', '']];
+$breadcrumb = $app->routes->escolarBreadcrumb([['Dashboard', '']]);
 
 try {
     $raw = $app->nexora->call('GET', '/api/escolar/dashboard/direction')['body'] ?? [];
@@ -21,7 +21,7 @@ $g = static fn(string ...$keys): int => (int) max(array_map(fn($k) => $ind[$k] ?
 
 $r = $app->routes;
 
-include dirname(__DIR__) . '/layouts/top.php';
+include dirname(__DIR__) . '/layouts/' . (!empty($GLOBALS['_escolarPanel']) ? 'escola_top' : 'top') . '.php';
 ?>
 
 <div class="adm-page-header">
@@ -131,4 +131,4 @@ $statCards = [
 
 </div>
 
-<?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+<?php include dirname(__DIR__) . '/layouts/' . (!empty($GLOBALS['_escolarPanel']) ? 'escola_bottom' : 'bottom') . '.php'; ?>

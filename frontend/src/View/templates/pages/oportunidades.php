@@ -12,6 +12,7 @@
     'perdido'     => ['adm-badge--red',    'Perdido'],
     ];
 
+    $canGerirOportunidades = $app->session->can('crm', 'gerir_oportunidades');
     $pageTitle  = 'Oportunidades';
     $activePage = 'crm_oportunidades';
     $breadcrumb = [['Admin', '/nexora/'], ['CRM', ''], ['Oportunidades', '']];
@@ -30,12 +31,14 @@
             </svg>
             Pipeline
         </a>
+        <?php if ($canGerirOportunidades): ?>
         <a href="/nexora/crm/oportunidades/form" class="adm-btn adm-btn-primary">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
             Nova Oportunidade
         </a>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -76,7 +79,7 @@
                     <th>Prob.</th>
                     <th>Fecho Previsto</th>
                     <th>Responsável</th>
-                    <th>Ações</th>
+                    <?php if ($canGerirOportunidades): ?><th>Ações</th><?php endif; ?>
                 </tr>
             </thead>
             <tbody>
@@ -100,6 +103,7 @@
                 <td><?php echo (int) $o['probabilidade'] ?>%</td>
                 <td><?php echo $o['data_fecho_prevista'] ? date('d/m/Y', strtotime($o['data_fecho_prevista'])) : '<span class="adm-text-muted">—</span>' ?></td>
                 <td><?php echo htmlspecialchars($o['responsavel'] ?? '—') ?></td>
+                <?php if ($canGerirOportunidades): ?>
                 <td>
                     <div class="adm-actions">
                         <a href="/nexora/crm/oportunidades/form?id=<?php echo $o['id'] ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Ver / Editar">
@@ -120,6 +124,9 @@
                         </button>
                     </div>
                 </td>
+                <?php else: ?>
+                <td>—</td>
+                <?php endif; ?>
             </tr>
             <?php endforeach; ?>
             </tbody>
@@ -132,7 +139,9 @@
         </svg>
         <p class="adm-empty-title">Nenhuma oportunidade criada</p>
         <p class="adm-empty-sub">Começa por criar a primeira oportunidade.</p>
+        <?php if ($canGerirOportunidades): ?>
         <a href="/nexora/crm/oportunidades/form" class="adm-btn adm-btn-primary">Criar Oportunidade</a>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>

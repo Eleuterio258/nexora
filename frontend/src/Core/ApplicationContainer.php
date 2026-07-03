@@ -18,6 +18,7 @@ use E258Tech\Controller\PublicSite\PublicApiController;
 use E258Tech\Http\ServerRequest;
 use E258Tech\Routing\AdminPageRouter;
 use E258Tech\Routing\AdminRoutes;
+use E258Tech\Routing\StudentAdminRoutes;
 use E258Tech\View\ViewHelper;
 
 final readonly class ApplicationContainer
@@ -32,6 +33,7 @@ final readonly class ApplicationContainer
     public HomeController $home;
     public PublicApiController $publicApi;
     public AdminRoutes $routes;
+    public StudentAdminRoutes $studentRoutes;
     public AdminPageRouter $adminPages;
     public AdminAuthController $adminAuth;
     public AdminDownloadController $adminDownload;
@@ -61,8 +63,9 @@ final readonly class ApplicationContainer
             dirname(__DIR__, 2) . '/src/View/templates'
         );
         $this->publicApi = new PublicApiController($this->request, $this->security, $this->nexora);
-        $this->routes = new AdminRoutes();
-        $this->adminPages = new AdminPageRouter(
+        $this->routes        = new AdminRoutes();
+        $this->studentRoutes = new StudentAdminRoutes();
+        $this->adminPages    = new AdminPageRouter(
             $this->routes,
             $this->guard,
             dirname(__DIR__, 2) . '/src/View/templates'

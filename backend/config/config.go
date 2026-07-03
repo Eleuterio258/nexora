@@ -28,6 +28,33 @@ type Config struct {
 	RecruitmentTenantID int64
 	UploadsDir          string
 	UploadMaxMB         int64
+
+	// Pagamentos — webhook do gateway
+	GatewayWebhookSecret string
+
+	// Nexora-Pay — gateway de pagamento (M-Pesa, eMola, mKesh)
+	NexoraPayBaseURL        string
+	NexoraPayAPIKey         string
+	NexoraPayServiceAccount string
+
+	// SMTP — envio de emails transaccionais
+	SMTPHost     string
+	SMTPPort     int
+	SMTPUser     string
+	SMTPPassword string
+	SMTPFrom     string
+	SMTPFromName string
+
+	// Object Storage (local ou minio)
+	StorageProvider   string
+	StorageLocalDir   string
+	StoragePublicURL  string
+	MinioEndpoint     string
+	MinioAccessKey    string
+	MinioSecretKey    string
+	MinioBucket       string
+	MinioUseSSL       bool
+	MinioRegion       string
 }
 
 func Load() *Config {
@@ -35,10 +62,10 @@ func Load() *Config {
 		DatabaseURL: env("DATABASE_URL",
 			"postgres://postgres:admin@localhost:5432/nexora_erp?sslmode=disable"+
 				"&options=-csearch_path%3D"+
-				"auth%2Cutilizadores%2Cempresas%2Cempresa%2Cautorizacao%2Cauditoria%2C"+
+				"auth%2Cutilizadores%2Cempresas%2Cauditoria%2C"+
 				"sistema_configuracao%2Cclientes%2Cprodutos%2Cstock%2Cfaturacao%2C"+
 				"recrutamento%2Ccrm%2Cpos%2C"+
-				"rh%2Crecursos_humanos%2C"+
+				"rh%2C"+
 				"contabilidade%2Ccentros_custo%2Ccompras%2C"+
 				"financeiro%2Ctesouraria%2Clogistica%2C"+
 				"impostos%2Cmulti_moeda%2C"+
@@ -53,10 +80,40 @@ func Load() *Config {
 		AvatarMaxMB:         envInt("AVATAR_MAX_MB", 2),
 		AvatarDir:           env("AVATAR_DIR", "./avatars"),
 
-		RecruitmentTenantID: envInt("RECRUITMENT_TENANT_ID", 1),
-		UploadsDir:          env("UPLOADS_DIR", "./uploads"),
-		UploadMaxMB:         envInt("UPLOAD_MAX_MB", 3),
+		RecruitmentTenantID:  envInt("RECRUITMENT_TENANT_ID", 1),
+		UploadsDir:           env("UPLOADS_DIR", "./uploads"),
+		UploadMaxMB:          envInt("UPLOAD_MAX_MB", 3),
+		GatewayWebhookSecret:    env("GATEWAY_WEBHOOK_SECRET", ""),
+		NexoraPayBaseURL:        env("NEXORA_PAY_BASE_URL", "http://nexora-pay:3000"),
+		NexoraPayAPIKey:         env("NEXORA_PAY_API_KEY", ""),
+		NexoraPayServiceAccount: env("NEXORA_PAY_SERVICE_ACCOUNT", "gestao-escolar"),
+
+		SMTPHost:     env("SMTP_HOST", ""),
+		SMTPPort:     int(envInt("SMTP_PORT", 587)),
+		SMTPUser:     env("SMTP_USER", ""),
+		SMTPPassword: env("SMTP_PASSWORD", ""),
+		SMTPFrom:     env("SMTP_FROM", ""),
+		SMTPFromName: env("SMTP_FROM_NAME", "Nexora ERP"),
+
+		StorageProvider:  env("STORAGE_PROVIDER", "minio"),
+		StorageLocalDir:  env("STORAGE_LOCAL_DIR", "./uploads"),
+		StoragePublicURL: env("STORAGE_PUBLIC_URL", ""),
+		MinioEndpoint:    env("MINIO_ENDPOINT", "localhost:9004"),
+		MinioAccessKey:   env("MINIO_ACCESS_KEY", "histories"),
+		MinioSecretKey:   env("MINIO_SECRET_KEY", "histories"),
+		MinioBucket:      env("MINIO_BUCKET", "nexora"),
+		MinioUseSSL:      envBool("MINIO_USE_SSL", false),
+		MinioRegion:      env("MINIO_REGION", "us-east-1"),
 	}
+}
+
+func envBool(key string, fallback bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return fallback
 }
 
 func env(key, fallback string) string {

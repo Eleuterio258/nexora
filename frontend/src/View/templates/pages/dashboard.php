@@ -1,11 +1,22 @@
 <?php
 
+if ($app->session->isSuperAdmin()) {
+    header('Location: /nexora/superadmin');
+    exit;
+}
+
+// Conta exclusivamente escolar é redireccionada para o painel da escola
+if ($app->session->isSchoolOnly()) {
+    header('Location: /escola');
+    exit;
+}
+
 // ── Módulos acessíveis pelo utilizador actual (via permissões sincronizadas com a API) ──
 $todosModulos = require dirname(__DIR__) . '/partials/modules.php';
 
 // Filtra apenas os módulos que o utilizador tem acesso (canModule) e que têm rota
 $moduloRotaMap = [
-    'recrutamento'         => ['rota' => 'dashboard',              'label' => 'Recrutamento',          'icon' => 'fa-briefcase'],
+    'recrutamento'         => ['rota' => 'recrutamento_dashboard', 'label' => 'Recrutamento',          'icon' => 'fa-briefcase'],
     'crm'                  => ['rota' => 'leads',                  'label' => 'CRM',                   'icon' => 'fa-handshake'],
     'clientes'             => ['rota' => 'clientes',               'label' => 'Clientes',              'icon' => 'fa-user-tie'],
     'faturacao'            => ['rota' => 'faturas',                'label' => 'Faturação',             'icon' => 'fa-file-invoice-dollar'],
@@ -20,7 +31,6 @@ $moduloRotaMap = [
     'multi-moeda'          => ['rota' => 'multi_moeda',           'label' => 'Multi-Moeda',           'icon' => 'fa-globe'],
     'centros-custo'        => ['rota' => 'centros_custo',         'label' => 'Centros de Custo',      'icon' => 'fa-building'],
     'recursos-humanos'     => ['rota' => 'rh_funcionarios',       'label' => 'Recursos Humanos',      'icon' => 'fa-person-chalkboard'],
-    'gestao-escolar'       => ['rota' => 'escolar_dashboard',     'label' => 'Gestão Escolar',        'icon' => 'fa-graduation-cap'],
     'assinaturas'          => ['rota' => 'assinaturas',           'label' => 'Assinaturas',           'icon' => 'fa-file-contract'],
     'notificacoes'         => ['rota' => 'notificacoes',          'label' => 'Notificações',          'icon' => 'fa-bell'],
     'seguranca'            => ['rota' => 'seguranca',             'label' => 'Segurança',             'icon' => 'fa-shield-halved'],
@@ -43,9 +53,26 @@ foreach ($moduloRotaMap as $modKey => $info) {
     }
 }
 
-// ── Bloco de recrutamento (só se tiver permissão) ────────────────────────────
+// ── Redirecionamento automático para o Painel da Escola (legado) ──────────────
+// Agora o redireccionamento é feito pela flag 'escopo'. Mantemos a verificação
+// como fallback para contas sem escopo definido ou com permissões exclusivas.
+if (!$app->session->isBoth()) {
+    $_modulosNegocio = [
+        'recrutamento','crm','clientes','faturacao','pos','stock','compras',
+        'logistica','financeiro','tesouraria','contabilidade','impostos',
+        'multi-moeda','centros-custo','recursos-humanos','gestao-escolar','assinaturas',
+    ];
+    $_negocioAcessiveis = array_intersect_key($modulosAcessiveis, array_flip($_modulosNegocio));
+
+    if (count($_negocioAcessiveis) === 1 && isset($_negocioAcessiveis['gestao-escolar'])) {
+        header('Location: /escola');
+        exit;
+    }
+}
+
+// ── Bloco de recrutamento (só se tiver permissão de ver vagas) ───────────────
 $dash = [];
-if ($app->session->canModule('recrutamento')) {
+if ($app->session->can('recrutamento', 'ver_vagas')) {
     $resp = $app->nexora->call('GET', '/api/recrutamento/dashboard');
     if ($resp['status'] === 200 && is_array($resp['body'])) {
         $dash = $resp['body'];
@@ -89,7 +116,7 @@ include dirname(__DIR__) . '/layouts/top.php';
     </div>
 </div>
 
-<?php if ($app->session->canModule('recrutamento')): ?>
+<?php if ($app->session->can('recrutamento', 'ver_vagas')): ?>
 <!-- ── Stats de Recrutamento ─────────────────────────────────────────────── -->
 <div class="adm-stats-grid" style="margin-bottom:var(--adm-sp-6)">
     <div class="adm-stat-card">
@@ -129,6 +156,16 @@ include dirname(__DIR__) . '/layouts/top.php';
     <h2 class="adm-section-title">Os meus módulos</h2>
 </div>
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:var(--adm-sp-4);margin-bottom:var(--adm-sp-8)">
+    <?php if ($app->session->isBoth() && $app->session->canModule('gestao-escolar')): ?>
+    <a href="/escola"
+       class="adm-module-card"
+       style="--adm-module-color:#0D948840">
+        <div class="adm-module-card-icon" style="background:#0D948818">
+            <i class="fa-solid fa-graduation-cap" style="font-size:1.05rem;color:#0D9488"></i>
+        </div>
+        <span class="adm-module-card-label">Painel da Escola</span>
+    </a>
+    <?php endif; ?>
     <?php foreach ($modulosAcessiveis as $key => $mod): ?>
     <?php
         try { $href = $app->routes->path($mod['rota']); } catch (\Exception $e) { continue; }
@@ -155,7 +192,7 @@ include dirname(__DIR__) . '/layouts/top.php';
 </div>
 <?php endif; ?>
 
-<?php if ($app->session->canModule('recrutamento') && (!empty($recentes) || !empty($prazosProximos))): ?>
+<?php if ($app->session->can('recrutamento', 'ver_vagas') && (!empty($recentes) || !empty($prazosProximos))): ?>
 <!-- ── Candidaturas recentes + Prazos ────────────────────────────────────── -->
 <div style="display:grid;grid-template-columns:1fr 280px;gap:var(--adm-sp-6);align-items:start">
 

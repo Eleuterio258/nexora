@@ -29,7 +29,11 @@ use E258Tech\Model\Service\MultiMoeda\MultiMoedaService;
 use E258Tech\Model\Service\Notificacoes\NotificacoesService;
 use E258Tech\Model\Service\Seguranca\SegurancaService;
 use E258Tech\Model\Service\SelfService\SelfServiceService;
+use E258Tech\Model\Service\SuperAdmin\SuperAdminService;
 use E258Tech\Model\Service\Recruitment\RecruitmentAdminService;
+use E258Tech\Model\Service\Aprovacao\AprovacaoService;
+use E258Tech\Model\Service\Tarefas\TarefasService;
+use E258Tech\Model\Service\AssinaturaDigital\AssinaturaDigitalService;
 use E258Tech\Infrastructure\Auth\PhpSessionAuthorization;
 use E258Tech\Http\ApiResult;
 use E258Tech\Controller\Admin\Api;
@@ -47,6 +51,7 @@ final readonly class AdminApiRuntime
                 $app->request,
                 $app->security
             ),
+            $gateway,
             new LeadService($gateway),
             new OpportunityService($gateway),
             new ActivityService($gateway),
@@ -73,6 +78,10 @@ final readonly class AdminApiRuntime
             new NotificacoesService($gateway),
             new SegurancaService($gateway),
             new SelfServiceService($gateway),
+            new SuperAdminService($gateway),
+            new AprovacaoService($gateway),
+            new TarefasService($gateway),
+            new AssinaturaDigitalService($gateway),
         );
     }
 
@@ -133,6 +142,10 @@ final readonly class AdminApiRuntime
             'chat'                 => new Api\SelfServiceController(),
             'assiduidade'          => new Api\SelfServiceController(),
             'perfil'               => new Api\SelfServiceController(),
+            'superadmin'           => new Api\SuperAdminController(),
+            'aprovacoes'           => new Api\AprovacaoController(),
+            'tarefas'              => new Api\TarefasController(),
+            'assinatura-digital'   => new Api\AssinaturaDigitalController(),
             default                => throw new \InvalidArgumentException("Controller nao encontrado para modulo: $module"),
         };
     }

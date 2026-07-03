@@ -42,10 +42,11 @@ type Client struct {
 
 // Incoming é o formato das mensagens enviadas pelo cliente.
 type Incoming struct {
-	Type        string `json:"type"`
-	ConversaID  int64  `json:"conversa_id"`
-	Conteudo    string `json:"conteudo"`
+	Type         string `json:"type"`
+	ConversaID   int64  `json:"conversa_id"`
+	Conteudo     string `json:"conteudo"`
 	TipoMensagem string `json:"tipo_mensagem"`
+	NotifID      int64  `json:"notif_id"`
 }
 
 // ServeWS faz o upgrade HTTP → WebSocket e inicia as goroutines de I/O.
@@ -111,6 +112,9 @@ func ServeWS(hub *Hub, db *pgxpool.Pool, jwtSecret string, w http.ResponseWriter
 		"user_id":      c.UserID,
 		"online_users": hub.OnlineUsers(),
 	})
+
+	// Enviar contagem de notificações não lidas
+	go c.sendUnreadCount()
 
 	go c.writePump()
 	go c.readPump()
@@ -226,7 +230,32 @@ func (c *Client) handleIncoming(raw []byte) {
 		c.hub.BroadcastRoom(inc.ConversaID, encode(EvtStopTyping, map[string]any{
 			"user_id": c.UserID, "conversa_id": inc.ConversaID,
 		}))
+
+	case "mark_read":
+		if inc.NotifID == 0 { return }
+		c.db.Exec(context.Background(), `
+			UPDATE utilizadores.user_notifications
+			   SET lida = TRUE, lida_em = NOW()
+			 WHERE id = $1 AND user_id = $2`,
+			inc.NotifID, c.UserID)
+		go c.sendUnreadCount()
+
+	case "mark_all_read":
+		c.db.Exec(context.Background(), `
+			UPDATE utilizadores.user_notifications
+			   SET lida = TRUE, lida_em = NOW()
+			 WHERE user_id = $1 AND lida = FALSE`,
+			c.UserID)
+		c.send <- encode(EvtNotificationCount, map[string]any{"total": 0})
 	}
+}
+
+func (c *Client) sendUnreadCount() {
+	var total int
+	c.db.QueryRow(context.Background(), `
+		SELECT COUNT(*) FROM utilizadores.user_notifications
+		 WHERE user_id = $1 AND lida = FALSE`, c.UserID).Scan(&total)
+	c.send <- encode(EvtNotificationCount, map[string]any{"total": total})
 }
 
 func (c *Client) isParticipant(conversaID int64) bool {

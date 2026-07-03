@@ -194,11 +194,30 @@ final class RecursosHumanosController
         // Este endpoint usa bootstrap directo — não passa pelo kernel padrão.
         // Mantém a lógica de ficheiro aqui para compatibilidade com dispatch().
         $authorization = new \E258Tech\Infrastructure\Auth\PhpSessionAuthorization();
-        if (!$authorization->isAuthenticated() || !$authorization->can('recursos-humanos', 'ver')) {
+        if (!$authorization->isAuthenticated() || !$authorization->can('recursos-humanos', 'gerir_contratos')) {
             return new ApiResult(['erro' => 'Sem permissao.'], 403);
         }
 
         $path = (string) ($_GET['path'] ?? '');
+
+        // Suporte a ficheiros guardados no storage remoto (MinIO/S3).
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            $data = @file_get_contents($path);
+            if ($data === false) {
+                return new ApiResult(['erro' => 'Ficheiro nao disponivel.'], 404);
+            }
+            $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            $mimeTypes = [
+                'pdf' => 'application/pdf', 'doc' => 'application/msword',
+                'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+            ];
+            header('Content-Type: ' . ($mimeTypes[$ext] ?? 'application/octet-stream'));
+            header('Content-Disposition: inline; filename="contrato.' . $ext . '"');
+            header('Content-Length: ' . (string) strlen($data));
+            echo $data;
+            exit;
+        }
 
         if (!preg_match('/^rh-contratos\/[a-f0-9]{32}\.(pdf|docx?|jpe?g|png)$/i', $path)) {
             return new ApiResult([], 404);
@@ -220,6 +239,30 @@ final class RecursosHumanosController
         header('Content-Disposition: inline; filename="' . basename($fullPath) . '"');
         header('Content-Length: ' . (string) filesize($fullPath));
         readfile($fullPath);
+        exit;
+    }
+
+    public function rhContratoPdf(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        $authorization = new \E258Tech\Infrastructure\Auth\PhpSessionAuthorization();
+        if (!$authorization->isAuthenticated() || !$authorization->can('recursos-humanos', 'gerir_contratos')) {
+            return new ApiResult(['erro' => 'Sem permissao.'], 403);
+        }
+
+        $id = (int) ($_GET['id'] ?? 0);
+        if ($id <= 0) {
+            return new ApiResult(['erro' => 'Contrato invalido.'], 400);
+        }
+
+        $binary = $d->rh->downloadContractPdf($id);
+        if ($binary['status'] !== 200 || empty($binary['body'])) {
+            return new ApiResult(['erro' => 'PDF nao disponivel.'], $binary['status'] ?? 404);
+        }
+
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="contrato-' . $id . '.pdf"');
+        header('Content-Length: ' . (string) strlen($binary['body']));
+        echo $binary['body'];
         exit;
     }
 
@@ -279,21 +322,67 @@ final class RecursosHumanosController
                     'ficheiro_url' => $ficheiroUrl,
                 ];
 
-                return $d->rh->updateContract($id, $payload);
+                $result = $d->rh->updateContract($id, $payload);
+                $contractId = $id;
+            } else {
+                $payload = [
+                    'funcionario_id' => $request->int('funcionario_id') ?? 0,
+                    'tipo' => $request->string('tipo'),
+                    'funcao' => $request->string('funcao') ?: null,
+                    'data_inicio' => $request->string('data_inicio'),
+                    'data_fim' => $request->string('data_fim') ?: null,
+                    'salario' => $request->float('salario'),
+                    'ficheiro_url' => $ficheiroUrl,
+                ];
+
+                $result = $d->rh->createContract($payload);
+                $contractId = (int) ($result['id'] ?? 0);
             }
 
-            $payload = [
-                'funcionario_id' => $request->int('funcionario_id') ?? 0,
-                'tipo' => $request->string('tipo'),
-                'funcao' => $request->string('funcao') ?: null,
-                'data_inicio' => $request->string('data_inicio'),
-                'data_fim' => $request->string('data_fim') ?: null,
-                'salario' => $request->float('salario'),
-                'ficheiro_url' => $ficheiroUrl,
-            ];
+            // Se não foi feito upload manual, gera PDF automaticamente e guarda no storage.
+            if ($ficheiroUrl === null && $contractId > 0) {
+                $comParticipacao = ($request->string('participacao') ?? '0') === '1';
+                $this->generateAndStoreContractPdf($d, $contractId, $comParticipacao);
+            }
 
-            return $d->rh->createContract($payload);
+            return $result;
         });
+    }
+
+    private function generateAndStoreContractPdf(AdminApiDependencies $d, int $contractId, bool $comParticipacao): void
+    {
+        // Obter contrato e funcionário
+        try {
+            $contract = $d->rh->getContract($contractId);
+        } catch (OperationException) {
+            return;
+        }
+
+        $funcionarioId = (int) ($contract['funcionario_id'] ?? 0);
+        if ($funcionarioId <= 0) {
+            return;
+        }
+
+        try {
+            $employeeData = $d->rh->getEmployee($funcionarioId);
+        } catch (OperationException) {
+            return;
+        }
+
+        $empresa = [
+            'nome'   => 'e258tech, Lda',
+            'nuit'   => '402134951',
+            'morada' => 'Maputo, Moçambique',
+        ];
+
+        $builder = new \E258Tech\Infrastructure\Pdf\ContratoE258TechBuilder();
+        $pdf = $builder->build([
+            'empresa'     => $empresa,
+            'funcionario' => $employeeData['funcionario'] ?? [],
+            'contrato'    => $contract,
+        ], $comParticipacao);
+
+        $d->rh->saveContractPdf($contractId, $pdf);
     }
 
     public function rhCriterioAvaliacaoRemover(Request $request, AdminApiDependencies $d): ApiResult
@@ -329,7 +418,7 @@ final class RecursosHumanosController
     public function rhDocumentoFicheiro(Request $request, AdminApiDependencies $d): ApiResult
     {
         $authorization = new \E258Tech\Infrastructure\Auth\PhpSessionAuthorization();
-        if (!$authorization->isAuthenticated() || !$authorization->can('recursos-humanos', 'ver')) {
+        if (!$authorization->isAuthenticated() || !$authorization->can('recursos-humanos', 'ver_funcionarios')) {
             return new ApiResult(['erro' => 'Sem permissao.'], 403);
         }
 
@@ -666,6 +755,39 @@ final class RecursosHumanosController
         return $d->result(fn() => $d->rh->saveEmployee($id, $payload));
     }
 
+    public function rhAdiantamentoSave(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        $funcionarioId = $request->int('funcionario_id') ?? 0;
+        return $d->result(fn() => $d->rh->criarAdiantamento($funcionarioId, [
+            'valor_total'    => $request->float('valor_total'),
+            'num_prestacoes' => $request->int('num_prestacoes') ?? 1,
+            'descricao'      => $request->string('descricao') ?: null,
+            'data_inicio'    => $request->string('data_inicio') ?: null,
+        ]));
+    }
+
+    public function rhAdiantamentoCancelar(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        return $d->result(fn() => $d->rh->cancelarAdiantamento($request->int('id') ?? 0));
+    }
+
+    public function rhEmprestimoSave(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        $funcionarioId = $request->int('funcionario_id') ?? 0;
+        return $d->result(fn() => $d->rh->criarEmprestimo($funcionarioId, [
+            'valor_total'    => $request->float('valor_total'),
+            'num_prestacoes' => $request->int('num_prestacoes') ?? 1,
+            'taxa_juros'     => $request->float('taxa_juros') ?? 0.0,
+            'descricao'      => $request->string('descricao') ?: null,
+            'data_inicio'    => $request->string('data_inicio') ?: null,
+        ]));
+    }
+
+    public function rhEmprestimoCancelar(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        return $d->result(fn() => $d->rh->cancelarEmprestimo($request->int('id') ?? 0));
+    }
+
     public function rhHistoricoSalarialSave(Request $request, AdminApiDependencies $d): ApiResult
     {
         $funcionarioId = $request->int('funcionario_id') ?? 0;
@@ -805,5 +927,165 @@ final class RecursosHumanosController
             ];
 
         return $d->result(fn() => $d->rh->saveUnit($id, $payload));
+    }
+
+    public function rhProximoNumeroFuncionario(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        return $d->result(fn() => $d->rh->getProximoNumero());
+    }
+
+    public function rhIrpsEscaloes(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        $ano = $request->int('ano');
+        return $d->result(fn() => $d->rh->listarIrpsEscaloes($ano));
+    }
+
+    public function rhIrpsEscalaoSave(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        return $d->result(fn() => $d->rh->criarIrpsEscalao([
+            'ano_fiscal'  => $request->int('ano_fiscal') ?? (int)date('Y'),
+            'limite_inf'  => $request->float('limite_inf') ?? 0,
+            'limite_sup'  => $request->float('limite_sup'),
+            'taxa'        => $request->float('taxa') ?? 0,
+            'parcela_ded' => $request->float('parcela_ded') ?? 0,
+        ]));
+    }
+
+    public function rhIrpsEscalaoUpdate(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        return $d->result(fn() => $d->rh->actualizarIrpsEscalao($request->int('id') ?? 0, [
+            'limite_sup'  => $request->float('limite_sup'),
+            'taxa'        => $request->float('taxa') ?? 0,
+            'parcela_ded' => $request->float('parcela_ded') ?? 0,
+            'ativo'       => $request->has('ativo') ? $request->bool('ativo') : null,
+        ]));
+    }
+
+    public function rhIrpsEscalaoDelete(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        return $d->result(fn() => $d->rh->eliminarIrpsEscalao($request->int('id') ?? 0));
+    }
+
+    public function rhIrpsSeedMozambique(Request $_, AdminApiDependencies $d): ApiResult
+    {
+        return $d->result(fn() => $d->rh->seedIrpsMozambique2024());
+    }
+
+    public function rhConfigSave(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        return $d->result(fn() => $d->rh->saveConfig(
+            $request->string('chave') ?? '',
+            $request->string('valor') ?: null,
+        ));
+    }
+
+    public function rhOperacao(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        $operation = $request->string('operation');
+        $id        = $request->int('id');
+        $payload   = (array) ($request->all()['payload'] ?? []);
+
+        return match ($operation) {
+            // ── Cargos ────────────────────────────────────────────────────────
+            'cargo.create' => $d->result(fn() => $d->rh->savePosition(null, $payload)),
+            'cargo.update' => $d->result(fn() => $d->rh->savePosition($id, $payload)),
+            'cargo.delete' => $d->result(fn() => $d->rh->deletePosition($id ?? 0)),
+            // ── Unidades Organizacionais ───────────────────────────────────────
+            'unidade.create' => $d->result(fn() => $d->rh->saveUnit(null, $payload)),
+            'unidade.update' => $d->result(fn() => $d->rh->saveUnit($id, $payload)),
+            'unidade.delete' => $d->result(fn() => $d->rh->deleteUnit($id ?? 0)),
+            'unidade.mover'  => $d->result(fn() => $d->rh->moveUnit(
+                $id ?? 0,
+                isset($payload['parent_id']) && $payload['parent_id'] !== '' ? (int) $payload['parent_id'] : null
+            )),
+            // ── Horários de Trabalho ───────────────────────────────────────────
+            'horario.create' => $d->result(fn() => $d->rh->saveSchedule(null, $payload)),
+            'horario.update' => $d->result(fn() => $d->rh->saveSchedule($id, $payload)),
+            'horario.delete' => $d->result(fn() => $d->rh->deleteSchedule($id ?? 0)),
+            // ── Componentes Salariais ──────────────────────────────────────────
+            'componente.create' => $d->result(fn() => $d->rh->saveSalaryComponent(null, $payload)),
+            'componente.update' => $d->result(fn() => $d->rh->saveSalaryComponent($id, $payload)),
+            'componente.delete' => $d->result(fn() => $d->rh->deleteSalaryComponent($id ?? 0)),
+            // ── Benefícios ────────────────────────────────────────────────────
+            'beneficio.create' => $d->result(fn() => $d->rh->saveBenefit(null, $payload)),
+            'beneficio.update' => $d->result(fn() => $d->rh->saveBenefit($id, $payload)),
+            'beneficio.delete' => $d->result(fn() => $d->rh->deleteBenefit($id ?? 0)),
+            // ── Tipos de Ausência ─────────────────────────────────────────────
+            'tipo_ausencia.create' => $d->result(fn() => $d->rh->saveLeaveType(null, $payload)),
+            'tipo_ausencia.update' => $d->result(fn() => $d->rh->saveLeaveType($id, $payload)),
+            'tipo_ausencia.delete' => $d->result(fn() => $d->rh->deleteLeaveType($id ?? 0)),
+            // ── Critérios de Avaliação ────────────────────────────────────────
+            'criterio.create' => $d->result(fn() => $d->rh->saveEvaluationCriterion(null, $payload)),
+            'criterio.update' => $d->result(fn() => $d->rh->saveEvaluationCriterion($id, $payload)),
+            'criterio.delete' => $d->result(fn() => $d->rh->deleteEvaluationCriterion($id ?? 0)),
+            // ── Formações ─────────────────────────────────────────────────────
+            'formacao.create' => $d->result(fn() => $d->rh->saveTraining(null, $payload)),
+            'formacao.update' => $d->result(fn() => $d->rh->saveTraining($id, $payload)),
+            'formacao.delete' => $d->result(fn() => $d->rh->deleteTraining($id ?? 0)),
+            // ── Períodos de Avaliação ─────────────────────────────────────────
+            'periodo.create'   => $d->result(fn() => $d->rh->createPeriod($payload)),
+            'periodo.encerrar' => $d->result(fn() => $d->rh->closePeriod($id ?? 0)),
+            // ── Processamento Salarial ────────────────────────────────────────
+            'folha.create'    => $d->result(fn() => $d->rh->createPayrollRun($payload)),
+            'folha.processar' => $d->result(fn() => $d->rh->processPayrollRun($id ?? 0)),
+            'folha.pagar'     => $d->result(fn() => $d->rh->payPayrollRun($id ?? 0, $payload)),
+            'folha.cancelar'  => $d->result(fn() => $d->rh->cancelPayrollRun($id ?? 0)),
+            default => new ApiResult(['erro' => "Operação RH desconhecida: $operation"], 400),
+        };
+    }
+
+    public function rhContratoEnviarAssinatura(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        return $d->result(function () use ($d, $request): array {
+            $contractId = $request->int('id') ?? 0;
+            if ($contractId <= 0) {
+                throw new OperationException('Contrato inválido.');
+            }
+
+            $contract = $d->rh->getContract($contractId);
+            $employeeId = (int) ($contract['funcionario_id'] ?? 0);
+            if ($employeeId <= 0) {
+                throw new OperationException('Funcionário do contrato não encontrado.');
+            }
+
+            $pdf = $d->rh->downloadContractPdf($contractId);
+            if (($pdf['status'] ?? 0) !== 200 || empty($pdf['body'])) {
+                throw new OperationException('PDF do contrato não encontrado. Gere o PDF primeiro.');
+            }
+
+            $tmpPath = tempnam(sys_get_temp_dir(), 'contrato_') . '.pdf';
+            file_put_contents($tmpPath, $pdf['body']);
+
+            $employee = $d->rh->getEmployee($employeeId);
+            $dadosFunc = $employee['funcionario'] ?? $employee;
+            $nome = $dadosFunc['nome_completo'] ?? ($dadosFunc['nome'] ?? 'Funcionário');
+            $email = $dadosFunc['email'] ?? null;
+
+            try {
+                $doc = $d->assinaturaDigital->uploadDocumento(
+                    'Contrato de trabalho — ' . $nome,
+                    'Contrato gerado automaticamente a partir do RH.',
+                    ['tmp_name' => $tmpPath, 'name' => "contrato-$contractId.pdf", 'type' => 'application/pdf']
+                );
+
+                $docId = (int) ($doc['id'] ?? 0);
+                if ($docId > 0) {
+                    $d->assinaturaDigital->adicionarSignatario($docId, [
+                        'nome' => $nome,
+                        'email' => $email,
+                        'ordem' => 1,
+                        'pagina' => 1,
+                        'x' => 100,
+                        'y' => 100,
+                    ]);
+                }
+
+                return ['ok' => true, 'doc_id' => $docId];
+            } finally {
+                if (file_exists($tmpPath)) {
+                    unlink($tmpPath);
+                }
+            }
+        });
     }
 }

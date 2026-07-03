@@ -4,7 +4,7 @@ declare(strict_types=1);
 $_escolar   = include dirname(__DIR__) . '/partials/escolar_resources.php';
 $pageTitle  = 'Alunos';
 $activePage = 'escolar_alunos';
-$breadcrumb = [['Admin', '/nexora/'], ['Gestão Escolar', '/nexora/gestao-escolar'], ['Alunos', '']];
+$breadcrumb = $app->routes->escolarBreadcrumb([['Alunos', '']]);
 
 $workspace = [
     'title'     => 'Alunos',

@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
 )
 
 type Permission struct {
@@ -22,7 +22,6 @@ type ModuloAcesso struct {
 // moduloCores define a cor de cada módulo do ERP.
 var moduloCores = map[string]string{
 	"auth":                  "#6366F1", // indigo
-	"autorizacao":           "#F97316", // orange
 	"empresa":               "#2563EB", // blue
 	"clientes":              "#8B5CF6", // violet
 	"vendas":                "#3B82F6", // blue
@@ -55,13 +54,22 @@ func corDoModulo(modulo string) string {
 	return "#64748B" // slate — fallback para módulos não mapeados
 }
 
+// DBQuerier define as operações mínimas de base de dados usadas pelo RBAC.
+// Permite testar a lógica com mocks (pgxmock) sem depender de *pgxpool.Pool.
+type DBQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row
+	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)
+}
+
 type UserAccess struct {
-	UserID    int64         `json:"user_id"`
-	TenantID  int64         `json:"tenant_id"`
-	Tipo      string        `json:"tipo"`
-	CargoID   *int64        `json:"cargo_id,omitempty"`
-	CargoNome *string       `json:"cargo_nome,omitempty"`
-	Modulos   []ModuloAcesso `json:"modulos"` // organizado por módulo
+	UserID    int64          `json:"user_id"`
+	TenantID  int64          `json:"tenant_id"`
+	Tipo      string         `json:"tipo"`
+	Escopo    string         `json:"escopo"`
+	CargoID   *int64         `json:"cargo_id,omitempty"`
+	CargoNome *string        `json:"cargo_nome,omitempty"`
+	Modulos   []ModuloAcesso `json:"modulos"`
+	Features  []string       `json:"features"`
 	// lista plana interna — usada por Can(), não serializada
 	permissoes []Permission
 }
@@ -72,7 +80,7 @@ func (ua *UserAccess) Can(modulo, acao string) bool {
 		return true
 	}
 	for _, p := range ua.permissoes {
-		if p.Modulo == modulo && p.Acao == acao {
+		if p.Modulo == modulo && (p.Acao == acao || p.Acao == "*") {
 			return true
 		}
 	}
@@ -94,21 +102,22 @@ func buildModulos(perms []Permission) []ModuloAcesso {
 	for _, mod := range order {
 		acoes := m[mod]
 		sort.Strings(acoes)
-		out = append(out, ModuloAcesso{Modulo: mod, Acoes: acoes})
+		out = append(out, ModuloAcesso{Modulo: mod, Cor: corDoModulo(mod), Acoes: acoes})
 	}
 	return out
 }
 
 // LoadUserAccess carrega tipo + cargo + permissões mergeadas para um utilizador.
-func LoadUserAccess(ctx context.Context, pool *pgxpool.Pool, userID int64) (*UserAccess, error) {
-	ua := &UserAccess{UserID: userID, Modulos: []ModuloAcesso{}}
+func LoadUserAccess(ctx context.Context, db DBQuerier, userID int64) (*UserAccess, error) {
+	ua := &UserAccess{UserID: userID, Modulos: []ModuloAcesso{}, Features: []string{}}
 
-	err := pool.QueryRow(ctx, `
-		SELECT u.tenant_id, u.tipo, u.cargo_id, c.nome
+	err := db.QueryRow(ctx, `
+		SELECT COALESCE(m.tenant_id, 0), u.tipo, COALESCE(NULLIF(m.escopo, ''), 'erp'), m.cargo_id, c.nome
 		  FROM users u
-		  LEFT JOIN cargos c ON c.id = u.cargo_id
+		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
+		  LEFT JOIN cargos c ON c.id = m.cargo_id
 		 WHERE u.id = $1`, userID).
-		Scan(&ua.TenantID, &ua.Tipo, &ua.CargoID, &ua.CargoNome)
+		Scan(&ua.TenantID, &ua.Tipo, &ua.Escopo, &ua.CargoID, &ua.CargoNome)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +130,7 @@ func LoadUserAccess(ctx context.Context, pool *pgxpool.Pool, userID int64) (*Use
 
 	// Permissões do cargo
 	if ua.CargoID != nil {
-		rows, err := pool.Query(ctx, `
+		rows, err := db.Query(ctx, `
 			SELECT modulo, acao FROM permissoes_cargo WHERE cargo_id = $1
 			ORDER BY modulo, acao`, *ua.CargoID)
 		if err != nil {
@@ -141,7 +150,7 @@ func LoadUserAccess(ctx context.Context, pool *pgxpool.Pool, userID int64) (*Use
 	}
 
 	// Permissões diretas (extendem o cargo)
-	rows, err := pool.Query(ctx, `
+	rows, err := db.Query(ctx, `
 		SELECT modulo, acao FROM permissoes_diretas WHERE user_id = $1
 		ORDER BY modulo, acao`, userID)
 	if err != nil {
@@ -160,7 +169,7 @@ func LoadUserAccess(ctx context.Context, pool *pgxpool.Pool, userID int64) (*Use
 	}
 
 	// permissões padrão por tipo (tabela auth.permissoes_tipo)
-	tipoRows, err := pool.Query(ctx, `
+	tipoRows, err := db.Query(ctx, `
 		SELECT modulo, acao FROM auth.permissoes_tipo WHERE tipo=$1
 		ORDER BY modulo, acao`, ua.Tipo)
 	if err == nil {
@@ -177,6 +186,80 @@ func LoadUserAccess(ctx context.Context, pool *pgxpool.Pool, userID int64) (*Use
 		}
 	}
 
+	// Filtrar módulos que o superadmin desactivou para este tenant.
+	// Se saas.tenant_modules.ativo = FALSE, remove todas as permissões desse módulo.
+	if disabled, err := loadModulosDesativados(ctx, db, ua.TenantID); err == nil && len(disabled) > 0 {
+		filtered := make([]Permission, 0, len(ua.permissoes))
+		for _, p := range ua.permissoes {
+			if !disabled[p.Modulo] {
+				filtered = append(filtered, p)
+			}
+		}
+		ua.permissoes = filtered
+	}
+
+	// Filtrar módulos pelo escopo do utilizador.
+	// Contas 'escola' e professores só devem ver o módulo 'gestao-escolar'.
+	if ua.Tipo != "superadmin" && (ua.Escopo == "escola" || ua.Escopo == "portal_professor") {
+		filtered := make([]Permission, 0, len(ua.permissoes))
+		for _, p := range ua.permissoes {
+			if p.Modulo == "gestao-escolar" {
+				filtered = append(filtered, p)
+			}
+		}
+		ua.permissoes = filtered
+	}
+
 	ua.Modulos = buildModulos(ua.permissoes)
+
+	// Carregar features activas para este tenant (catálogo + overrides do tenant).
+	ua.Features = loadFeaturesTenant(ctx, db, ua.TenantID)
+
 	return ua, nil
+}
+
+// loadFeaturesTenant devolve as chaves das features activas para um tenant.
+// Para cada feature do catálogo: usa override de tenant_feature_flags se existir,
+// caso contrário usa o valor ativo_por_defeito — e só inclui se o módulo estiver activo.
+func loadFeaturesTenant(ctx context.Context, db DBQuerier, tenantID int64) []string {
+	rows, err := db.Query(ctx, `
+		SELECT fc.key
+		  FROM saas.feature_catalog fc
+		  JOIN saas.tenant_modules tm
+		    ON tm.tenant_id = $1 AND tm.modulo = fc.modulo AND tm.ativo = TRUE
+		  LEFT JOIN sistema_configuracao.tenant_feature_flags tf
+		    ON tf.tenant_id = $1 AND tf.codigo = fc.key
+		 WHERE COALESCE(tf.activo, fc.ativo_por_defeito) = TRUE
+		 ORDER BY fc.key`, tenantID, tenantID)
+	if err != nil {
+		return []string{}
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var k string
+		if rows.Scan(&k) == nil {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+// loadModulosDesativados devolve o conjunto de módulos com ativo=FALSE para um tenant.
+func loadModulosDesativados(ctx context.Context, db DBQuerier, tenantID int64) (map[string]bool, error) {
+	rows, err := db.Query(ctx,
+		`SELECT modulo FROM saas.tenant_modules WHERE tenant_id = $1 AND ativo = FALSE`,
+		tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	disabled := map[string]bool{}
+	for rows.Next() {
+		var mod string
+		if rows.Scan(&mod) == nil {
+			disabled[mod] = true
+		}
+	}
+	return disabled, rows.Err()
 }

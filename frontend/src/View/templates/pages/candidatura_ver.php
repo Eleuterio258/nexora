@@ -17,7 +17,8 @@ if ($c['estado'] === 'recebida') {
 }
 
 // Notes / timeline (já vêm ordenadas por created_at DESC)
-$notas = $c['notas'] ?? [];
+$notas        = $c['notas'] ?? [];
+$respostasVaga = $c['respostas_vaga'] ?? [];
 
 $csrf = $app->security->csrfToken();
 $adminUser = $app->session->user()['nome'] ?? $app->session->user()['email'] ?? 'admin';
@@ -62,10 +63,16 @@ include dirname(__DIR__) . '/layouts/top.php';
             Voltar
         </a>
         <?php if ($c['cv_ficheiro']): ?>
-        <a href="/nexora/download?type=cv&id=<?= $c['id'] ?>" target="_blank" class="adm-btn adm-btn-primary adm-btn-sm">
+        <a href="/nexora/download?type=cv&id=<?= $c['id'] ?>" target="_blank" class="adm-btn adm-btn-outline adm-btn-sm">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             Ver CV
         </a>
+        <?php endif; ?>
+        <?php if ($c['estado'] === 'aprovada'): ?>
+        <button class="adm-btn adm-btn-primary adm-btn-sm" onclick="contratarCandidato()" id="btnContratar">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Contratar
+        </button>
         <?php endif; ?>
     </div>
 </div>
@@ -94,6 +101,13 @@ include dirname(__DIR__) . '/layouts/top.php';
                 <span class="adm-tab-badge"><?= count($notas) ?></span>
                 <?php endif; ?>
             </button>
+            <?php if (!empty($respostasVaga)): ?>
+            <button class="adm-tab" onclick="switchTab('respostas',this)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                Respostas da Vaga
+                <span class="adm-tab-badge"><?= count($respostasVaga) ?></span>
+            </button>
+            <?php endif; ?>
         </div>
 
         <!-- Tab: Informação -->
@@ -240,6 +254,37 @@ include dirname(__DIR__) . '/layouts/top.php';
             </div>
         </div>
 
+        <?php if (!empty($respostasVaga)): ?>
+        <!-- Tab: Respostas da Vaga -->
+        <div class="adm-tab-panel" id="tab-respostas">
+            <div class="adm-card">
+                <div class="adm-card-header"><h2 class="adm-card-title">Respostas aos Campos da Vaga</h2></div>
+                <div class="adm-card-body">
+                    <div style="display:grid;gap:var(--adm-sp-4)">
+                        <?php foreach ($respostasVaga as $r): ?>
+                        <div class="adm-detail-pair">
+                            <span class="adm-detail-pair-label"><?= htmlspecialchars($r['label']) ?></span>
+                            <?php if ($r['ficheiro']): ?>
+                            <span class="adm-detail-pair-value">
+                                <a href="/nexora/download?type=vaga_campo&candidatura_id=<?= $c['id'] ?>&campo_id=<?= $r['campo_id'] ?>"
+                                   target="_blank" class="adm-btn adm-btn-outline adm-btn-sm">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                    Abrir ficheiro
+                                </a>
+                            </span>
+                            <?php elseif ($r['valor'] !== null): ?>
+                            <span class="adm-detail-pair-value" style="white-space:pre-wrap"><?= htmlspecialchars($r['valor']) ?></span>
+                            <?php else: ?>
+                            <span class="adm-detail-pair-value adm-text-muted">—</span>
+                            <?php endif; ?>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <!-- Tab: Notas / Timeline -->
         <div class="adm-tab-panel" id="tab-notas">
             <div class="adm-card adm-mb-6">
@@ -359,6 +404,23 @@ include dirname(__DIR__) . '/layouts/top.php';
             </div>
         </div>
 
+        <?php if ($c['estado'] === 'aprovada'): ?>
+        <!-- Contratar -->
+        <div class="adm-card adm-mb-6" id="cardContratar">
+            <div class="adm-card-header"><h2 class="adm-card-title">Contratação</h2></div>
+            <div class="adm-card-body">
+                <p class="adm-text-sm" style="color:var(--adm-gray-600);margin-bottom:var(--adm-sp-4)">
+                    Candidato aprovado. Ao contratar, será criado automaticamente um registo no módulo RH.
+                </p>
+                <button class="adm-btn adm-btn-primary" style="width:100%;justify-content:center" onclick="contratarCandidato()" id="btnContratarSidebar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    Confirmar Contratação
+                </button>
+                <div id="contrataResultado" style="display:none;margin-top:var(--adm-sp-3);padding:var(--adm-sp-3);background:#f0fdf4;border-radius:var(--adm-radius);border:1px solid #bbf7d0"></div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <!-- Quick nav -->
         <div class="adm-card">
             <div class="adm-card-header"><h2 class="adm-card-title">Navegação</h2></div>
@@ -474,6 +536,39 @@ async function saveNota() {
             showToast('Nota adicionada');
         } else showToast(data.erro || 'Erro', 'error');
     } catch { showToast('Erro de ligação', 'error'); }
+}
+
+// ── Contratar Candidato ───────────────────────────────────────
+async function contratarCandidato() {
+    if (!confirm('Confirmar contratação de ' + <?= json_encode($c['nome']) ?> + '? Esta acção é irreversível.')) return;
+    const btns = [document.getElementById('btnContratar'), document.getElementById('btnContratarSidebar')].filter(Boolean);
+    btns.forEach(b => { b.disabled = true; b.textContent = 'A contratar...'; });
+    try {
+        const res  = await fetch('/nexora/api/candidatura_contratar', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({id: CAND_ID, csrf: CSRF})
+        });
+        const data = await res.json();
+        if (data.ok) {
+            const div = document.getElementById('contrataResultado');
+            if (div) {
+                div.style.display = 'block';
+                div.innerHTML = '<strong style="color:#15803d">Contratado com sucesso!</strong><br>'
+                    + (data.rh_employee_id ? '<span style="font-size:.85rem;color:#166534">Funcionário RH criado (ID: ' + data.rh_employee_id + '). '
+                       + 'Agora crie o professor em <a href="/nexora/gestao-escolar/professores" style="color:#15803d">Gestão Escolar → Professores</a>.</span>'
+                       : '<span style="font-size:.85rem;color:#166534">' + (data.mensagem || '') + '</span>');
+            }
+            btns.forEach(b => { b.disabled = true; b.style.opacity = '.5'; });
+            showToast('Candidato contratado!');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            btns.forEach(b => { b.disabled = false; b.textContent = 'Contratar'; });
+            showToast(data.erro || 'Erro ao contratar', 'error');
+        }
+    } catch {
+        btns.forEach(b => { b.disabled = false; b.textContent = 'Contratar'; });
+        showToast('Erro de ligação', 'error');
+    }
 }
 
 // ── Append to timeline ────────────────────────────────────────

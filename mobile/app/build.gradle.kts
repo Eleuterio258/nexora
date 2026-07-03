@@ -20,8 +20,8 @@ android {
 
         // Dispositivo físico → IP da máquina na rede local
         // Emulador          → usar 10.0.2.2
-        buildConfigField("String", "API_BASE_URL", "\"http://192.168.168.216:8080/\"")
-        buildConfigField("String", "WS_BASE_URL",  "\"ws://192.168.168.216:8080/\"")
+        buildConfigField("String", "API_BASE_URL", "\"http://192.168.168.219:8080/\"")
+        buildConfigField("String", "WS_BASE_URL",  "\"ws://192.168.168.219:8080/\"")
     }
 
     buildTypes {
