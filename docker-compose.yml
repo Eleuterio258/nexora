@@ -6,7 +6,7 @@ services:
     container_name: nexora-api
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD}@nexora-db:5432/nexora_erp?sslmode=disable
+      DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD}@postgres:5432/nexora_erp?sslmode=disable
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
@@ -16,6 +16,14 @@ services:
       UPLOADS_DIR: ./uploads
       AVATAR_DIR: ./avatars
       GATEWAY_WEBHOOK_SECRET: ${GATEWAY_WEBHOOK_SECRET:-}
+      # Object Storage — MinIO existente na rede 'backend'
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-minio}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-nexoraerp}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
       # Nexora-Pay corre como serviço externo independente
       NEXORA_PAY_BASE_URL: ${NEXORA_PAY_BASE_URL:-https://pay.e258tech.tech}
       NEXORA_PAY_API_KEY: ${NEXORA_PAY_API_KEY}
@@ -24,14 +32,14 @@ services:
       - api_uploads:/app/uploads
       - api_avatars:/app/avatars
     networks:
-      - e258techmozambique
+      - backend
     labels:
       - "traefik.enable=true"
       # HTTPS — api.nexora.e258tech.tech
       - "traefik.http.routers.nexora-api.rule=Host(`api.nexora.e258tech.tech`)"
       - "traefik.http.routers.nexora-api.entrypoints=websecure"
       - "traefik.http.routers.nexora-api.tls=true"
-      - "traefik.http.routers.nexora-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nexora-api.tls.certresolver=le"
       - "traefik.http.services.nexora-api.loadbalancer.server.port=8080"
       # Redirect HTTP → HTTPS
       - "traefik.http.routers.nexora-api-http.rule=Host(`api.nexora.e258tech.tech`)"
@@ -57,14 +65,14 @@ services:
     volumes:
       - web_uploads:/var/www/html/uploads
     networks:
-      - e258techmozambique
+      - backend
     labels:
       - "traefik.enable=true"
       # HTTPS — e258tech.tech
       - "traefik.http.routers.e258tech.rule=Host(`e258tech.tech`)"
       - "traefik.http.routers.e258tech.entrypoints=websecure"
       - "traefik.http.routers.e258tech.tls=true"
-      - "traefik.http.routers.e258tech.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.e258tech.tls.certresolver=le"
       - "traefik.http.routers.e258tech.middlewares=e258tech-sec"
       - "traefik.http.services.e258tech.loadbalancer.server.port=80"
       # ── Cabeçalhos de segurança ──────────────────────────────
@@ -85,7 +93,7 @@ services:
       - "traefik.http.routers.nexora.rule=Host(`nexora.e258tech.tech`)"
       - "traefik.http.routers.nexora.entrypoints=websecure"
       - "traefik.http.routers.nexora.tls=true"
-      - "traefik.http.routers.nexora.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nexora.tls.certresolver=le"
       - "traefik.http.routers.nexora.service=e258tech"
       - "traefik.http.routers.nexora.middlewares=nexora-rootredir,e258tech-sec"
       - "traefik.http.middlewares.nexora-rootredir.redirectregex.regex=^https://nexora\\.e258tech\\.tech/?$$"
@@ -107,5 +115,5 @@ volumes:
 
 # ── Redes ─────────────────────────────────────────────────────
 networks:
-  e258techmozambique:
+  backend:
     external: true
