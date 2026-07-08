@@ -1,13 +1,13 @@
-<?php
+﻿<?php
 
-$id     = $app->request->queryInt('id', 0);
-$isEdit = $id > 0;
+$idHash = $app->request->queryString('id');
+$isEdit = $idHash !== '';
 $user   = null;
 $cargos = [];
 $permsCurrent = [];
 
 if ($isEdit) {
-    $resp = $app->nexora->call('GET', "/api/auth/utilizadores/$id");
+    $resp = $app->nexora->call('GET', "/api/auth/utilizadores/$idHash");
     if ($resp['status'] !== 200) {
         header('Location: /nexora/admin/utilizadores');
         exit;
@@ -17,7 +17,7 @@ if ($isEdit) {
     $cargosResp = $app->nexora->call('GET', '/api/auth/cargos');
     $cargos = array_values(array_filter($cargosResp['body'] ?? [], fn($c) => ! empty($c['ativo'])));
 
-    $permsResp    = $app->nexora->call('GET', "/api/auth/utilizadores/$id/permissoes");
+    $permsResp    = $app->nexora->call('GET', "/api/auth/utilizadores/$idHash/permissoes");
     $permsCurrent = $permsResp['body'] ?? [];
 
     $tipoUtilizador = $user['tipo'] ?? 'funcionario';
@@ -127,7 +127,7 @@ include dirname(__DIR__) . '/layouts/top.php';
 <div class="adm-tab-panel active" id="tab-dados">
     <form id="userForm">
         <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
-        <input type="hidden" name="id" value="<?= $id ?>">
+        <input type="hidden" name="id" value="<?= (int)($utilizador['id'] ?? 0) ?>">
 
         <div class="adm-card adm-mb-6">
             <div class="adm-card-header">
@@ -362,7 +362,7 @@ function mudarEstado(acao) {
                 const res  = await fetch('/nexora/api/utilizador_estado', {
                     method: 'POST',
                     headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({id: <?= $id ?>, acao, csrf: '<?= $csrf ?>'})
+                    body: JSON.stringify({id: <?= (int)($utilizador['id'] ?? 0) ?>, acao, csrf: '<?= $csrf ?>'})
                 });
                 const data = await res.json();
                 if (data.ok) {
@@ -386,7 +386,7 @@ async function saveTipo() {
         const res  = await fetch('/nexora/api/utilizador_tipo', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({id: <?= $id ?>, tipo, csrf: '<?= $csrf ?>'})
+            body: JSON.stringify({id: <?= (int)($utilizador['id'] ?? 0) ?>, tipo, csrf: '<?= $csrf ?>'})
         });
         const data = await res.json();
         if (data.ok) {
@@ -408,7 +408,7 @@ async function resetPassword() {
         const res  = await fetch('/nexora/api/utilizador_reset_password', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({id: <?= $id ?>, password: pw, csrf: '<?= $csrf ?>'})
+            body: JSON.stringify({id: <?= (int)($utilizador['id'] ?? 0) ?>, password: pw, csrf: '<?= $csrf ?>'})
         });
         const data = await res.json();
         if (data.ok) {
@@ -429,7 +429,7 @@ async function saveCargo() {
         const res  = await fetch('/nexora/api/utilizador_cargo', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({id: <?= $id ?>, cargo_id: cargoVal ? parseInt(cargoVal, 10) : null, csrf: '<?= $csrf ?>'})
+            body: JSON.stringify({id: <?= (int)($utilizador['id'] ?? 0) ?>, cargo_id: cargoVal ? parseInt(cargoVal, 10) : null, csrf: '<?= $csrf ?>'})
         });
         const data = await res.json();
         showToast(data.ok ? 'Cargo atualizado' : (data.error || 'Erro'), data.ok ? 'success' : 'error');
@@ -448,7 +448,7 @@ async function savePerms() {
         const res  = await fetch('/nexora/api/utilizador_permissoes', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({id: <?= $id ?>, permissoes, csrf: '<?= $csrf ?>'})
+            body: JSON.stringify({id: <?= (int)($utilizador['id'] ?? 0) ?>, permissoes, csrf: '<?= $csrf ?>'})
         });
         const data = await res.json();
         showToast(data.ok ? 'Permissões atualizadas' : (data.error || 'Erro'), data.ok ? 'success' : 'error');
@@ -544,3 +544,5 @@ document.head.appendChild(style);
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+
+

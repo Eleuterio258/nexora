@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 namespace E258Tech\Controller\PublicSite;
 
+use E258Tech\Infrastructure\Auth\PortalCandidatoSession;
 use E258Tech\Infrastructure\Nexora\NexoraClient;
 use E258Tech\Infrastructure\Security\WebSecurity;
+use E258Tech\Routing\CandidatoRoutes;
 use E258Tech\View\ViewHelper;
 
 final readonly class CarreiraController
@@ -14,7 +16,8 @@ final readonly class CarreiraController
         private WebSecurity $security,
         private ViewHelper $view,
         private OpenVacanciesCounter $openVacancies,
-        private string $viewRoot
+        private string $viewRoot,
+        private CandidatoRoutes $candidatoRoutes
     ) {
     }
 
@@ -43,10 +46,13 @@ final readonly class CarreiraController
         $activePage = 'carreira';
         $csrf       = $this->security->csrfToken();
         $view       = $this->view;
-        $app        = (object) ['openVacancies' => $this->openVacancies];
+        $app        = (object) ['openVacancies' => $this->openVacancies, 'candidatoRoutes' => $this->candidatoRoutes];
 
         $vagas      = $this->fetchVagas();
         $totalVagas = array_sum(array_column($vagas, 'num_vagas'));
+
+        $candidatoSessao = new PortalCandidatoSession();
+        $candidatoLogado = $candidatoSessao->isAuthenticated() ? $candidatoSessao->candidato() : null;
 
         require $this->viewRoot . '/public/carreira.php';
     }
@@ -56,19 +62,16 @@ final readonly class CarreiraController
         $activePage = 'carreira';
         $csrf       = $this->security->csrfToken();
         $view       = $this->view;
-        $app        = (object) ['openVacancies' => $this->openVacancies];
+        $app        = (object) ['openVacancies' => $this->openVacancies, 'candidatoRoutes' => $this->candidatoRoutes];
 
         require $this->viewRoot . '/public/carreira_estado.php';
     }
 
     public function loginCandidato(): void
     {
-        $activePage = 'carreira';
-        $csrf       = $this->security->csrfToken();
-        $view       = $this->view;
-        $app        = (object) ['openVacancies' => $this->openVacancies];
-
-        require $this->viewRoot . '/public/carreira_login.php';
+        // Login unificado — mesma entrada que ERP/aluno/encarregado/professor.
+        header('Location: ' . $this->candidatoRoutes->loginUrl());
+        exit;
     }
 
     public function registarCandidato(): void
@@ -76,18 +79,44 @@ final readonly class CarreiraController
         $activePage = 'carreira';
         $csrf       = $this->security->csrfToken();
         $view       = $this->view;
-        $app        = (object) ['openVacancies' => $this->openVacancies];
+        $app        = (object) ['openVacancies' => $this->openVacancies, 'candidatoRoutes' => $this->candidatoRoutes];
 
         require $this->viewRoot . '/public/carreira_registar.php';
     }
 
     public function areaCandidato(): void
     {
+        $session = new PortalCandidatoSession();
+        $session->requireAuthenticated();
+
+        $candidato    = $session->candidato();
+        $candidaturas = $this->nexora->callWithBearer(
+            'GET',
+            '/api/public/recrutamento/candidatos/candidaturas',
+            null,
+            $session->token()
+        )['body'] ?? [];
+        if (!is_array($candidaturas)) {
+            $candidaturas = [];
+        }
+
         $activePage = 'carreira';
         $csrf       = $this->security->csrfToken();
         $view       = $this->view;
-        $app        = (object) ['openVacancies' => $this->openVacancies];
+        $app        = (object) ['openVacancies' => $this->openVacancies, 'candidatoRoutes' => $this->candidatoRoutes];
 
         require $this->viewRoot . '/public/carreira_area.php';
+    }
+
+    public function logoutCandidato(): never
+    {
+        $session = new PortalCandidatoSession();
+        $token   = $session->token();
+        if ($token !== '') {
+            $this->nexora->callWithBearer('POST', '/api/public/recrutamento/candidatos/logout', null, $token);
+        }
+        $session->destroy();
+        header('Location: /nexora/login');
+        exit;
     }
 }

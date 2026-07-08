@@ -1,64 +1,55 @@
 import 'package:flutter/material.dart';
+import '../features/applications/domain/entities/application.dart';
 import '../widgets/nexora_logo.dart';
 
 class ApplicationDetailScreen extends StatelessWidget {
-  final String title;
-  final String company;
-  final String location;
-  final String date;
-  final String status;
-  final Color logoBg;
-  final String logoText;
-  final bool isGoogle;
-  final bool isMicrosoft;
+  final Application application;
 
-  const ApplicationDetailScreen({
-    super.key,
-    required this.title,
-    required this.company,
-    required this.location,
-    required this.date,
-    required this.status,
-    required this.logoBg,
-    required this.logoText,
-    this.isGoogle = false,
-    this.isMicrosoft = false,
-  });
+  const ApplicationDetailScreen({super.key, required this.application});
 
   Color get _statusColor {
-    switch (status) {
-      case 'Interview':
+    switch (application.status) {
+      case ApplicationStatus.interview:
         return const Color(0xFFE57C00);
-      case 'In Review':
+      case ApplicationStatus.inReview:
         return const Color(0xFF4A90D9);
+      case ApplicationStatus.rejected:
+        return const Color(0xFFB00020);
       default:
         return kPrimary;
     }
   }
 
   Color get _statusBg {
-    switch (status) {
-      case 'Interview':
+    switch (application.status) {
+      case ApplicationStatus.interview:
         return const Color(0xFFFFF3E8);
-      case 'In Review':
+      case ApplicationStatus.inReview:
         return const Color(0xFFEBF3FF);
+      case ApplicationStatus.rejected:
+        return const Color(0xFFFBE9E7);
       default:
         return const Color(0xFFE8F8F0);
     }
   }
 
   int get _stepReached {
-    switch (status) {
-      case 'In Review':
+    switch (application.status) {
+      case ApplicationStatus.inReview:
         return 1;
-      case 'Interview':
+      case ApplicationStatus.interview:
         return 2;
-      case 'Offer':
+      case ApplicationStatus.approved:
+        return 3;
+      case ApplicationStatus.rejected:
         return 3;
       default:
         return 0;
     }
   }
+
+  String _fmt(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   @override
   Widget build(BuildContext context) {
@@ -76,7 +67,6 @@ class ApplicationDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Top bar
                       Row(
                         children: [
                           GestureDetector(
@@ -95,7 +85,7 @@ class ApplicationDetailScreen extends StatelessWidget {
                           const SizedBox(width: 12),
                           const Expanded(
                             child: Text(
-                              'Application Details',
+                              'Detalhe da Candidatura',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
@@ -111,7 +101,7 @@ class ApplicationDetailScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              status,
+                              application.status.pt,
                               style: TextStyle(
                                 color: _statusColor,
                                 fontSize: 12,
@@ -122,17 +112,26 @@ class ApplicationDetailScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 20),
-                      // Company info row
                       Row(
                         children: [
-                          _buildLogo(),
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: const Color.fromRGBO(255, 255, 255, 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Center(
+                              child: NexoraLogoIcon(size: 30, isWhite: true),
+                            ),
+                          ),
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  title,
+                                  application.jobTitle,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 18,
@@ -144,7 +143,7 @@ class ApplicationDetailScreen extends StatelessWidget {
                                 Row(
                                   children: [
                                     Text(
-                                      company,
+                                      application.company,
                                       style: const TextStyle(
                                         color: Color.fromRGBO(255, 255, 255, 0.85),
                                         fontSize: 13.5,
@@ -156,22 +155,16 @@ class ApplicationDetailScreen extends StatelessWidget {
                                         color: Colors.white, size: 14),
                                   ],
                                 ),
-                                const SizedBox(height: 3),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.location_on_outlined,
-                                        color: Color.fromRGBO(255, 255, 255, 0.7),
-                                        size: 13),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      location,
-                                      style: const TextStyle(
-                                        color: Color.fromRGBO(255, 255, 255, 0.7),
-                                        fontSize: 12.5,
-                                      ),
+                                if (application.trackingCode != null) ...[
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Código: ${application.trackingCode}',
+                                    style: const TextStyle(
+                                      color: Color.fromRGBO(255, 255, 255, 0.7),
+                                      fontSize: 12.5,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -195,14 +188,13 @@ class ApplicationDetailScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── Applied date ──
                       Row(
                         children: [
                           Icon(Icons.calendar_today_outlined,
                               size: 14, color: Colors.grey.shade500),
                           const SizedBox(width: 6),
                           Text(
-                            'Applied on $date',
+                            'Submetida em ${_fmt(application.appliedAt)}',
                             style: TextStyle(
                               color: Colors.grey.shade600,
                               fontSize: 13,
@@ -215,33 +207,38 @@ class ApplicationDetailScreen extends StatelessWidget {
 
                       // ── Timeline ──
                       _SectionCard(
-                        title: 'Application Progress',
+                        title: 'Progresso da Candidatura',
                         child: Column(
                           children: [
                             _TimelineStep(
-                              label: 'Applied',
-                              sublabel: 'Application submitted',
+                              label: 'Recebida',
+                              sublabel: 'Candidatura submetida',
                               stepIndex: 0,
                               reached: _stepReached,
                               isLast: false,
                             ),
                             _TimelineStep(
-                              label: 'Screening',
-                              sublabel: 'Profile under review',
+                              label: 'Em Análise',
+                              sublabel: 'Perfil em avaliação',
                               stepIndex: 1,
                               reached: _stepReached,
                               isLast: false,
                             ),
                             _TimelineStep(
-                              label: 'Interview',
-                              sublabel: 'Interview scheduled',
+                              label: 'Entrevista',
+                              sublabel: application.interviewDate != null
+                                  ? 'Agendada para ${_fmt(application.interviewDate!)}'
+                                  : 'Ainda não agendada',
                               stepIndex: 2,
                               reached: _stepReached,
                               isLast: false,
                             ),
                             _TimelineStep(
-                              label: 'Decision',
-                              sublabel: 'Final hiring decision',
+                              label: 'Decisão',
+                              sublabel: application.status ==
+                                      ApplicationStatus.rejected
+                                  ? 'Não seleccionada desta vez'
+                                  : 'Decisão final da candidatura',
                               stepIndex: 3,
                               reached: _stepReached,
                               isLast: true,
@@ -249,139 +246,45 @@ class ApplicationDetailScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 14),
 
-                      // ── Job details ──
-                      _SectionCard(
-                        title: 'Job Details',
-                        child: Column(
-                          children: [
-                            _DetailRow(
-                              icon: Icons.work_outline,
-                              label: 'Type',
-                              value: 'Full-time',
-                            ),
-                            _DetailRow(
-                              icon: Icons.location_on_outlined,
-                              label: 'Location',
-                              value: location,
-                            ),
-                            _DetailRow(
-                              icon: Icons.attach_money_outlined,
-                              label: 'Salary',
-                              value: '\$80k – \$120k / year',
-                            ),
-                            _DetailRow(
-                              icon: Icons.category_outlined,
-                              label: 'Department',
-                              value: 'Product & Design',
-                              isLast: true,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // ── Documents ──
-                      _SectionCard(
-                        title: 'Submitted Documents',
-                        child: Column(
-                          children: const [
-                            _DocumentRow(
-                                icon: Icons.description_outlined,
-                                name: 'Resume.pdf',
-                                size: '248 KB'),
-                            SizedBox(height: 10),
-                            _DocumentRow(
-                                icon: Icons.article_outlined,
-                                name: 'Cover_Letter.pdf',
-                                size: '95 KB'),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // ── Actions ──
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: ElevatedButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                          label: const Text(
-                            'Message Recruiter',
-                            style: TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w600),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimary,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
+                      if (application.interviewDate != null ||
+                          application.interviewLocation != null ||
+                          application.interviewLink != null) ...[
+                        const SizedBox(height: 14),
+                        _SectionCard(
+                          title: 'Entrevista',
+                          child: Column(
+                            children: [
+                              if (application.interviewDate != null)
+                                _DetailRow(
+                                  icon: Icons.event_outlined,
+                                  label: 'Data',
+                                  value:
+                                      '${_fmt(application.interviewDate!)} às ${application.interviewDate!.hour.toString().padLeft(2, '0')}:${application.interviewDate!.minute.toString().padLeft(2, '0')}',
+                                ),
+                              if (application.interviewLocation != null)
+                                _DetailRow(
+                                  icon: Icons.location_on_outlined,
+                                  label: 'Local',
+                                  value: application.interviewLocation!,
+                                ),
+                              if (application.interviewLink != null)
+                                _DetailRow(
+                                  icon: Icons.link,
+                                  label: 'Link',
+                                  value: application.interviewLink!,
+                                  isLast: true,
+                                ),
+                            ],
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLogo() {
-    if (isMicrosoft) {
-      const sq = 13.0;
-      const gap = 2.5;
-      return Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A2E),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Container(width: sq, height: sq, color: const Color(0xFFF25022)),
-                const SizedBox(width: gap),
-                Container(width: sq, height: sq, color: const Color(0xFF7FBA00)),
-              ]),
-              const SizedBox(height: gap),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Container(width: sq, height: sq, color: const Color(0xFF00A4EF)),
-                const SizedBox(width: gap),
-                Container(width: sq, height: sq, color: const Color(0xFFFFB900)),
-              ]),
-            ],
-          ),
-        ),
-      );
-    }
-    return Container(
-      width: 52,
-      height: 52,
-      decoration: BoxDecoration(
-        color: logoBg,
-        borderRadius: BorderRadius.circular(12),
-        border: logoBg == Colors.white
-            ? Border.all(color: const Color.fromRGBO(255, 255, 255, 0.3))
-            : null,
-      ),
-      child: Center(
-        child: Text(
-          logoText,
-          style: TextStyle(
-            color: logoBg == Colors.white ? Colors.black87 : Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: logoText.length > 2 ? 10 : 18,
-          ),
         ),
       ),
     );
@@ -524,7 +427,7 @@ class _TimelineStep extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
-                  'Done',
+                  'Concluído',
                   style: TextStyle(
                       color: kPrimary,
                       fontSize: 10,
@@ -543,7 +446,7 @@ class _TimelineStep extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
-                  'Active',
+                  'Actual',
                   style: TextStyle(
                       color: Color(0xFF4A90D9),
                       fontSize: 10,
@@ -586,12 +489,16 @@ class _DetailRow extends StatelessWidget {
                   fontSize: 13),
             ),
             const Spacer(),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Color(0xFF1A2E2A),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+            Flexible(
+              child: Text(
+                value,
+                textAlign: TextAlign.end,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF1A2E2A),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -601,57 +508,6 @@ class _DetailRow extends StatelessWidget {
           Divider(height: 1, color: Colors.grey.shade100),
           const SizedBox(height: 10),
         ],
-      ],
-    );
-  }
-}
-
-// ── Document row ──
-class _DocumentRow extends StatelessWidget {
-  final IconData icon;
-  final String name;
-  final String size;
-
-  const _DocumentRow({
-    required this.icon,
-    required this.name,
-    required this.size,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: const Color(0xFFE8F8F0),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: kPrimary, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: Color(0xFF1A2E2A),
-                ),
-              ),
-              Text(
-                size,
-                style: TextStyle(color: Colors.grey.shade400, fontSize: 11.5),
-              ),
-            ],
-          ),
-        ),
-        const Icon(Icons.check_circle, color: kPrimary, size: 18),
       ],
     );
   }

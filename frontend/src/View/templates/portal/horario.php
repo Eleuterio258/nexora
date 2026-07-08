@@ -35,12 +35,14 @@ include dirname(__FILE__) . '/layout_top.php';
     </div>
     <div style="padding:.5rem">
     <?php foreach ($aulas as $a): ?>
-    <div style="padding:.6rem .75rem;border-radius:8px;background:#F0F9FF;margin-bottom:.35rem;border-left:3px solid #0EA5E9">
-        <div style="font-size:.73rem;color:#0EA5E9;font-weight:700">
+    <div style="padding:.6rem .75rem;border-radius:8px;background:#F0F9FF;margin-bottom:.35rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem">
+            <span style="font-size:.73rem;color:#0EA5E9;font-weight:700;white-space:nowrap">
             <?= htmlspecialchars($a['hora_inicio'] ?? '') ?> – <?= htmlspecialchars($a['hora_fim'] ?? '') ?>
-        </div>
-        <div style="font-weight:600;font-size:.875rem;color:#0C4A6E;margin-top:.15rem">
+            </span>
+            <span style="font-weight:600;font-size:.875rem;color:#0C4A6E;text-align:right">
             <?= htmlspecialchars($a['disciplina'] ?? '') ?>
+            </span>
         </div>
         <?php if (!empty($a['professor'])): ?>
         <div style="font-size:.77rem;color:#64748B;margin-top:.1rem">

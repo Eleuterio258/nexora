@@ -1,8 +1,8 @@
-<?php
+﻿<?php
 
-    $id = $app->request->queryInt('id', 0);
+    $idHash = $app->request->queryString('id');
 
-    $resp = $app->nexora->call('GET', "/api/rh/folhas-pagamento/$id");
+    $resp = $app->nexora->call('GET', "/api/rh/folhas-pagamento/$idHash");
     $__safeList = fn(array $r) => ($r['status'] === 200 && is_array($r['body']) && array_is_list($r['body'])) ? $r['body'] : [];
     if ($resp['status'] !== 200) {
         header('Location: /nexora/rh/funcionarios#processamento-salarial');
@@ -189,7 +189,7 @@
             </div>
         </div>
         <div style="margin-top:var(--adm-sp-4)">
-            <a href="/nexora/contabilidade/lancamento?id=<?php echo (int) $lancamento['id'] ?>" class="adm-btn adm-btn-outline adm-btn-sm">Ver Lançamento</a>
+            <a href="/nexora/contabilidade/lancamento?id=<?php echo $app->id->encode((int)$lancamento['id']) ?>" class="adm-btn adm-btn-outline adm-btn-sm">Ver Lançamento</a>
         </div>
     </div>
 </div>
@@ -216,7 +216,7 @@
                 <td class="adm-fw-600"><?php echo rhValorSalarial($rv['salario_liquido'] !== null ? (float) $rv['salario_liquido'] : null, $podeVerSalarios) ?></td>
                 <td><span class="adm-badge <?php echo $rvBadge[0] ?>"><?php echo $rvBadge[1] ?></span></td>
                 <td>
-                    <a class="adm-btn adm-btn-ghost adm-btn-sm" href="/nexora/rh/recibo-vencimento?id=<?php echo (int) $rv['id'] ?>">
+                    <a class="adm-btn adm-btn-ghost adm-btn-sm" href="/nexora/rh/recibo-vencimento?id=<?php echo $app->id->encode((int)$rv['id']) ?>">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         Ver
                     </a>
@@ -320,3 +320,5 @@ async function cancelarFolha() {
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+
+

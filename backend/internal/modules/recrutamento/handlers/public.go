@@ -29,16 +29,28 @@ var emailRe = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 
 // resolveTenantID devolve o tenant a usar para endpoints públicos.
 // Prioridade:
-//  1. ?tenant=codigo  (útil em localhost/dev para testar vários tenants)
-//  2. settings.recrutamento_tenant_id  (configurado pelo admin)
-//  3. RECRUITMENT_TENANT_ID da config  (fallback env/.env)
+//  1. ?tenant_id=id  (usado pelas apps móveis — o candidato autenticado já conhece o seu próprio tenant_id)
+//  2. ?tenant=codigo  (útil em localhost/dev para testar vários tenants)
+//  3. settings.recrutamento_tenant_id  (configurado pelo admin)
+//  4. RECRUITMENT_TENANT_ID da config  (fallback env/.env)
 func (h *Handler) resolveTenantID(r *http.Request) int64 {
 	ctx := r.Context()
+
+	if tid := strings.TrimSpace(r.URL.Query().Get("tenant_id")); tid != "" {
+		if parsed, err := strconv.ParseInt(tid, 10, 64); err == nil && parsed > 0 {
+			var exists bool
+			if err := h.db.QueryRow(ctx,
+				`SELECT EXISTS(SELECT 1 FROM saas.tenants WHERE id=$1 AND status='ativo')`, parsed,
+			).Scan(&exists); err == nil && exists {
+				return parsed
+			}
+		}
+	}
 
 	if codigo := strings.TrimSpace(r.URL.Query().Get("tenant")); codigo != "" {
 		var id int64
 		if err := h.db.QueryRow(ctx,
-			`SELECT id FROM saas.tenants WHERE codigo=$1 AND status='activo'`, codigo,
+			`SELECT id FROM saas.tenants WHERE codigo=$1 AND status='ativo'`, codigo,
 		).Scan(&id); err == nil && id > 0 {
 			return id
 		}
@@ -148,7 +160,7 @@ func (h *Handler) ListarVagasPublicas(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ObterVagaPublica(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+	id := h.decodeID(chi.URLParam(r, "id"))
 	tenantID := h.resolveTenantID(r)
 	row := h.db.QueryRow(r.Context(), "SELECT "+vagaSelectCols+` FROM vagas
 		WHERE id=$1 AND tenant_id=$2 AND ativa=TRUE AND (prazo IS NULL OR prazo >= CURRENT_DATE)`,

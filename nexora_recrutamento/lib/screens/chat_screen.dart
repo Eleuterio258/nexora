@@ -1,62 +1,67 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../features/messages/domain/entities/message.dart';
+import '../features/messages/presentation/bloc/chat_bloc.dart';
+import '../injection_container.dart';
 import '../widgets/nexora_logo.dart';
 
-class ChatScreen extends StatefulWidget {
+class ChatScreen extends StatelessWidget {
+  final int candidaturaId;
   final String name;
   final String role;
   final String company;
   final Color avatarColor;
-  final bool online;
 
   const ChatScreen({
     super.key,
+    required this.candidaturaId,
     required this.name,
     required this.role,
     required this.company,
     required this.avatarColor,
-    this.online = false,
   });
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => ChatBloc(
+        getMessages: getIt(),
+        sendMessage: getIt(),
+        socketService: getIt(),
+      )..add(ChatMessagesLoadRequested(candidaturaId)),
+      child: _ChatView(
+        candidaturaId: candidaturaId,
+        name: name,
+        role: role,
+        company: company,
+        avatarColor: avatarColor,
+      ),
+    );
+  }
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatView extends StatefulWidget {
+  final int candidaturaId;
+  final String name;
+  final String role;
+  final String company;
+  final Color avatarColor;
+
+  const _ChatView({
+    required this.candidaturaId,
+    required this.name,
+    required this.role,
+    required this.company,
+    required this.avatarColor,
+  });
+
+  @override
+  State<_ChatView> createState() => _ChatViewState();
+}
+
+class _ChatViewState extends State<_ChatView> {
   final _ctrl = TextEditingController();
   final _scroll = ScrollController();
-
-  final List<_Msg> _messages = [
-    _Msg(
-      text: 'Hi! Thanks for applying to the Senior Product Designer role. Your portfolio is impressive!',
-      isMe: false,
-      time: '10:28 AM',
-    ),
-    _Msg(
-      text: 'Would you be available for a 30-minute call this week to discuss the position?',
-      isMe: false,
-      time: '10:29 AM',
-    ),
-    _Msg(
-      text: 'Thank you so much! I\'m very interested in the role.',
-      isMe: true,
-      time: '10:45 AM',
-    ),
-    _Msg(
-      text: 'I\'m available Wednesday or Thursday afternoon. Would either of those work?',
-      isMe: true,
-      time: '10:45 AM',
-    ),
-    _Msg(
-      text: 'Thursday at 3 PM works perfectly! I\'ll send you a calendar invite.',
-      isMe: false,
-      time: '11:02 AM',
-    ),
-    _Msg(
-      text: 'Please bring any questions you have about the team and the product vision.',
-      isMe: false,
-      time: '11:03 AM',
-    ),
-  ];
 
   @override
   void dispose() {
@@ -68,25 +73,25 @@ class _ChatScreenState extends State<ChatScreen> {
   void _send() {
     final text = _ctrl.text.trim();
     if (text.isEmpty) return;
-    setState(() {
-      _messages.add(_Msg(text: text, isMe: true, time: _nowTime()));
-      _ctrl.clear();
-    });
-    Future.delayed(const Duration(milliseconds: 100), () {
+    context.read<ChatBloc>().add(
+          ChatMessageSendRequested(
+            candidaturaId: widget.candidaturaId,
+            content: text,
+          ),
+        );
+    _ctrl.clear();
+  }
+
+  void _scrollToBottom() {
+    if (!_scroll.hasClients) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scroll.hasClients) return;
       _scroll.animateTo(
         _scroll.position.maxScrollExtent,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
     });
-  }
-
-  String _nowTime() {
-    final now = DateTime.now();
-    final h = now.hour % 12 == 0 ? 12 : now.hour % 12;
-    final m = now.minute.toString().padLeft(2, '0');
-    final ampm = now.hour < 12 ? 'AM' : 'PM';
-    return '$h:$m $ampm';
   }
 
   @override
@@ -103,35 +108,17 @@ class _ChatScreenState extends State<ChatScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: widget.avatarColor,
-                  child: Text(
-                    widget.name[0],
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
-                  ),
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: widget.avatarColor,
+              child: Text(
+                widget.name.isNotEmpty ? widget.name[0] : '?',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
                 ),
-                if (widget.online)
-                  Positioned(
-                    bottom: 1,
-                    right: 1,
-                    child: Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(
-                        color: kPrimary,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -140,6 +127,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   Text(
                     widget.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 14.5,
@@ -147,11 +136,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                   Text(
-                    widget.online ? 'Online' : '${widget.role} • ${widget.company}',
+                    '${widget.role} • ${widget.company}',
                     style: TextStyle(
-                      color: widget.online ? kPrimary : Colors.grey.shade500,
+                      color: Colors.grey.shade500,
                       fontSize: 11.5,
-                      fontWeight: widget.online ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                 ],
@@ -159,17 +147,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.call_outlined, color: Color(0xFF1A2E2A), size: 22),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.videocam_outlined, color: Color(0xFF1A2E2A), size: 22),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 4),
-        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: const Color(0xFFEEEEEE)),
@@ -177,13 +154,49 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
-          // Messages list
           Expanded(
-            child: ListView.builder(
-              controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              itemCount: _messages.length,
-              itemBuilder: (context, i) => _BubbleWidget(msg: _messages[i]),
+            child: BlocConsumer<ChatBloc, ChatState>(
+              listener: (context, state) {
+                if (state is ChatFailureState) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(state.message)),
+                  );
+                }
+                if (state is ChatLoaded) _scrollToBottom();
+              },
+              builder: (context, state) {
+                if (state is ChatLoading || state is ChatInitial) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (state is ChatFailureState) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Text(
+                        state.message,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                    ),
+                  );
+                }
+                final messages = (state as ChatLoaded).messages;
+                if (messages.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'Envie a primeira mensagem sobre a sua candidatura.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey.shade500),
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  controller: _scroll,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  itemCount: messages.length,
+                  itemBuilder: (context, i) => _BubbleWidget(msg: messages[i]),
+                );
+              },
             ),
           ),
 
@@ -211,7 +224,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               textInputAction: TextInputAction.send,
                               onSubmitted: (_) => _send(),
                               decoration: InputDecoration(
-                                hintText: 'Type a message…',
+                                hintText: 'Escreva uma mensagem…',
                                 hintStyle: TextStyle(
                                     color: Colors.grey.shade400, fontSize: 14),
                                 border: InputBorder.none,
@@ -220,11 +233,6 @@ class _ChatScreenState extends State<ChatScreen> {
                                     const EdgeInsets.symmetric(vertical: 12),
                               ),
                             ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.attach_file_outlined,
-                                color: Colors.grey.shade400, size: 20),
-                            onPressed: () {},
                           ),
                         ],
                       ),
@@ -254,33 +262,34 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-class _Msg {
-  final String text;
-  final bool isMe;
-  final String time;
-  const _Msg({required this.text, required this.isMe, required this.time});
+String _formatBubbleTime(DateTime dt) {
+  final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+  final m = dt.minute.toString().padLeft(2, '0');
+  final ampm = dt.hour < 12 ? 'AM' : 'PM';
+  return '$h:$m $ampm';
 }
 
 class _BubbleWidget extends StatelessWidget {
-  final _Msg msg;
+  final Message msg;
   const _BubbleWidget({required this.msg});
 
   @override
   Widget build(BuildContext context) {
+    final isMe = msg.sender == MessageSender.candidato;
     return Align(
-      alignment: msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.72),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: msg.isMe ? kPrimary : Colors.white,
+          color: isMe ? kPrimary : Colors.white,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(msg.isMe ? 16 : 4),
-            bottomRight: Radius.circular(msg.isMe ? 4 : 16),
+            bottomLeft: Radius.circular(isMe ? 16 : 4),
+            bottomRight: Radius.circular(isMe ? 4 : 16),
           ),
           boxShadow: const [
             BoxShadow(
@@ -289,21 +298,33 @@ class _BubbleWidget extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment:
-              msg.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
+            if (!isMe)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text(
+                  msg.author,
+                  style: TextStyle(
+                    color: Colors.grey.shade500,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             Text(
-              msg.text,
+              msg.content,
               style: TextStyle(
-                color: msg.isMe ? Colors.white : const Color(0xFF1A2E2A),
+                color: isMe ? Colors.white : const Color(0xFF1A2E2A),
                 fontSize: 14,
                 height: 1.45,
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              msg.time,
+              _formatBubbleTime(msg.createdAt),
               style: TextStyle(
-                color: msg.isMe
+                color: isMe
                     ? const Color.fromRGBO(255, 255, 255, 0.65)
                     : Colors.grey.shade400,
                 fontSize: 10.5,

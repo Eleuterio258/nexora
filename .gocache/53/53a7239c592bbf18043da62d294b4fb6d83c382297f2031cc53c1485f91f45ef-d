@@ -1,0 +1,8 @@
+./audit.go
+./audit_module.go
+./auth.go
+./candidato_auth.go
+./portal_auth.go
+./portal_encarregado_auth.go
+./ratelimit.go
+./auth_test.go

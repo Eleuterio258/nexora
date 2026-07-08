@@ -2,14 +2,26 @@ package com.factpro.ui;
 
 import com.factpro.FactProApplication;
 import com.factpro.auth.SessionManager;
+import com.factpro.clientes.dao.ClienteDAO;
+import com.factpro.clientes.view.ClienteListPanel;
 import com.factpro.compras.view.CompraListPanel;
+import com.factpro.configuracoes.view.ConfiguracoesPanel;
+import com.factpro.contas.dao.ContaReceberDAO;
+import com.factpro.contas.view.ContasReceberPanel;
 import com.factpro.fornecedores.view.FornecedorListPanel;
+import com.factpro.notificacoes.view.NotificacoesPanel;
+import com.factpro.produtos.dao.CategoriaDAO;
+import com.factpro.produtos.dao.ProdutoDAO;
+import com.factpro.produtos.view.ProdutoListPanel;
+import com.factpro.relatorios.service.RelatorioService;
+import com.factpro.relatorios.view.RelatoriosPanel;
+import com.factpro.stock.dao.StockMovimentoDAO;
 import com.factpro.stock.view.StockPanel;
+import com.factpro.vendas.dao.VendaDAO;
+import com.factpro.vendas.dao.VendaItemDAO;
 import com.factpro.vendas.view.DashboardPanel;
 import com.factpro.vendas.view.POSPanel;
 import com.factpro.vendas.view.VendaListPanel;
-import com.factpro.produtos.view.ProdutoListPanel;
-import com.factpro.clientes.view.ClienteListPanel;
 import com.formdev.flatlaf.FlatClientProperties;
 
 import javax.swing.*;
@@ -39,6 +51,8 @@ public class MainFrame extends JFrame {
     private JPanel fornecedoresPanel;
     private JPanel relatoriosPanel;
     private JPanel configuracoesPanel;
+    private JPanel contasReceberPanel;
+    private JPanel notificacoesPanel;
 
     public MainFrame() {
         setTitle("FactPro - Sistema de Faturacao v1.0.0");
@@ -62,7 +76,7 @@ public class MainFrame extends JFrame {
         contentPanel = new JPanel(cardLayout);
 
         // Add placeholder panels for each view
-        String[] views = {"Dashboard", "POS", "Vendas", "Produtos", "Clientes", "Stock", "Compras", "Fornecedores", "Relatorios", "Configuracoes"};
+        String[] views = {"Dashboard", "POS", "Vendas", "Produtos", "Clientes", "Stock", "Compras", "Fornecedores", "ContasReceber", "Notificacoes", "Relatorios", "Configuracoes"};
         for (String view : views) {
             contentPanel.add(createPlaceholderPanel(view), view);
         }
@@ -157,6 +171,8 @@ public class MainFrame extends JFrame {
         setupNavigation("Stock", e -> showPanel("Stock", this::getStockPanel));
         setupNavigation("Compras", e -> showPanel("Compras", this::getComprasPanel));
         setupNavigation("Fornecedores", e -> showPanel("Fornecedores", this::getFornecedoresPanel));
+        setupNavigation("ContasReceber", e -> showPanel("ContasReceber", this::getContasReceberPanel));
+        setupNavigation("Notificacoes", e -> showPanel("Notificacoes", this::getNotificacoesPanel));
         setupNavigation("Relatorios", e -> showPanel("Relatorios", this::getRelatoriosPanel));
         setupNavigation("Configuracoes", e -> showPanel("Configuracoes", this::getConfiguracoesPanel));
 
@@ -297,7 +313,16 @@ public class MainFrame extends JFrame {
 
     private JPanel getRelatoriosPanel() {
         if (relatoriosPanel == null) {
-            relatoriosPanel = createPlaceholderPanel("Relatorios");
+            RelatorioService relatorioService = new RelatorioService(
+                    new VendaDAO(),
+                    new ProdutoDAO(),
+                    new ClienteDAO(),
+                    new StockMovimentoDAO(),
+                    new VendaItemDAO(),
+                    new CategoriaDAO(),
+                    new ContaReceberDAO()
+            );
+            relatoriosPanel = new RelatoriosPanel(relatorioService, new CategoriaDAO(), new ContaReceberDAO());
             relatoriosPanel.setName("Relatorios");
             replacePlaceholder("Relatorios", relatoriosPanel);
         }
@@ -306,11 +331,29 @@ public class MainFrame extends JFrame {
 
     private JPanel getConfiguracoesPanel() {
         if (configuracoesPanel == null) {
-            configuracoesPanel = createPlaceholderPanel("Configuracoes");
+            configuracoesPanel = new ConfiguracoesPanel();
             configuracoesPanel.setName("Configuracoes");
             replacePlaceholder("Configuracoes", configuracoesPanel);
         }
         return configuracoesPanel;
+    }
+
+    private JPanel getContasReceberPanel() {
+        if (contasReceberPanel == null) {
+            contasReceberPanel = new ContasReceberPanel();
+            contasReceberPanel.setName("ContasReceber");
+            replacePlaceholder("ContasReceber", contasReceberPanel);
+        }
+        return contasReceberPanel;
+    }
+
+    private JPanel getNotificacoesPanel() {
+        if (notificacoesPanel == null) {
+            notificacoesPanel = new NotificacoesPanel();
+            notificacoesPanel.setName("Notificacoes");
+            replacePlaceholder("Notificacoes", notificacoesPanel);
+        }
+        return notificacoesPanel;
     }
 
     private void replacePlaceholder(String viewName, JPanel newPanel) {

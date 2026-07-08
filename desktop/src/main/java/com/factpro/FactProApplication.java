@@ -7,6 +7,7 @@ import com.factpro.config.AppConfig;
 import com.factpro.core.database.DatabaseManager;
 import com.factpro.core.database.DatabaseMigration;
 import com.factpro.auth.SessionManager;
+import com.factpro.notificacoes.service.NotificationEventListener;
 import com.factpro.ui.MainFrame;
 import com.factpro.ui.LoginDialog;
 import org.slf4j.Logger;
@@ -84,6 +85,7 @@ public class FactProApplication {
         // After successful login, show main window
         if (loginDialog.isLoginSuccessful()) {
             loginDialog.dispose();
+            registerNotificationListeners();
             showMainWindow();
         } else {
             // User closed login without success
@@ -91,6 +93,19 @@ public class FactProApplication {
         }
     }
     
+    /**
+     * Regista listeners de notificacoes apos login.
+     */
+    private static void registerNotificationListeners() {
+        try {
+            NotificationEventListener listener = new NotificationEventListener();
+            listener.registerListeners();
+            logger.info("Listeners de notificacoes inicializados");
+        } catch (Exception e) {
+            logger.error("Erro ao registar listeners de notificacoes", e);
+        }
+    }
+
     /**
      * Exibe a janela principal da aplicação.
      */

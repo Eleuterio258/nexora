@@ -69,7 +69,7 @@ include dirname(__DIR__) . '/layouts/top.php';
                 </button>
             </div>
         </div>
-        <a href="<?= htmlspecialchars($app->routes->path('tarefas_quadro')) ?>?id=<?= (int)$q['id'] ?>" class="quadro-card-body">
+        <a href="<?= htmlspecialchars($app->routes->path('tarefas_quadro')) ?>?id=<?= $app->id->encode((int)$q['id']) ?>" class="quadro-card-body">
             <?php if (!empty($q['descricao'])): ?>
             <p class="quadro-card-desc"><?= htmlspecialchars($q['descricao']) ?></p>
             <?php endif; ?>

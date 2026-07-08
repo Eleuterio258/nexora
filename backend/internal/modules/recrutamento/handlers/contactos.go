@@ -65,7 +65,7 @@ func (h *Handler) ListarContactos(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) MarcarLido(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id := h.decodeID(chi.URLParam(r, "id"))
 
 	tag, err := h.db.Exec(r.Context(), "UPDATE contactos SET lido=TRUE WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
 	if err != nil {

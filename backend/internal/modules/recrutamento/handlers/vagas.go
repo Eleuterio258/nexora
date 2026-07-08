@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -34,6 +35,7 @@ type Vaga struct {
 	Prazo             *string   `json:"prazo"`
 	PermitePublica    bool      `json:"permite_publica"`
 	PermiteConta      bool      `json:"permite_conta"`
+	CargoID           *int64    `json:"cargo_id"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }
@@ -55,6 +57,7 @@ type vagaInput struct {
 	Prazo             *string  `json:"prazo"`
 	PermitePublica    *bool    `json:"permite_publica"`
 	PermiteConta      *bool    `json:"permite_conta"`
+	CargoID           *int64   `json:"cargo_id"`
 }
 
 var dateFormatRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
@@ -92,17 +95,29 @@ func strDefault(s *string, def string) string {
 
 const vagaSelectCols = `id, titulo, area, local, regime, tipo, descricao, sobre_funcao,
 	responsabilidades, req_obrigatorios, req_preferenciais, oferece, ativa, num_vagas,
-	to_char(prazo, 'YYYY-MM-DD'), permite_publica, permite_conta, created_at, updated_at`
+	to_char(prazo, 'YYYY-MM-DD'), permite_publica, permite_conta, cargo_id, created_at, updated_at`
 
 func scanVaga(row pgx.Row, extra ...any) (*Vaga, error) {
 	var v Vaga
 	dest := []any{&v.ID, &v.Titulo, &v.Area, &v.Local, &v.Regime, &v.Tipo, &v.Descricao,
 		&v.SobreFuncao, &v.Responsabilidades, &v.ReqObrigatorios, &v.ReqPreferenciais, &v.Oferece,
-		&v.Ativa, &v.NumVagas, &v.Prazo, &v.PermitePublica, &v.PermiteConta, &v.CreatedAt, &v.UpdatedAt}
+		&v.Ativa, &v.NumVagas, &v.Prazo, &v.PermitePublica, &v.PermiteConta, &v.CargoID, &v.CreatedAt, &v.UpdatedAt}
 	if err := row.Scan(append(dest, extra...)...); err != nil {
 		return nil, err
 	}
 	return &v, nil
+}
+
+// validarCargoVaga confirma que o cargo indicado existe e está activo no tenant.
+func (h *Handler) validarCargoVaga(ctx context.Context, tenantID int64, cargoID *int64) bool {
+	if cargoID == nil || *cargoID <= 0 {
+		return false
+	}
+	var existe bool
+	if err := h.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM rh.cargos WHERE id=$1 AND tenant_id=$2 AND ativo)`, *cargoID, tenantID).Scan(&existe); err != nil {
+		return false
+	}
+	return existe
 }
 
 // ── Listagem / CRUD ──────────────────────────────────────────────────────────
@@ -182,6 +197,10 @@ func (h *Handler) CriarVaga(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "A área é obrigatória.", http.StatusUnprocessableEntity)
 		return
 	}
+	if !h.validarCargoVaga(r.Context(), user.TenantID, body.CargoID) {
+		jsonErr(w, "O cargo a contratar é obrigatório e deve estar activo em Recursos Humanos.", http.StatusUnprocessableEntity)
+		return
+	}
 	prazo, ok := parsePrazo(body.Prazo)
 	if !ok {
 		jsonErr(w, "Formato de prazo inválido.", http.StatusUnprocessableEntity)
@@ -210,8 +229,8 @@ func (h *Handler) CriarVaga(w http.ResponseWriter, r *http.Request) {
 		INSERT INTO vagas
 			(tenant_id, titulo, area, local, regime, tipo, descricao, sobre_funcao,
 			 responsabilidades, req_obrigatorios, req_preferenciais, oferece,
-			 ativa, num_vagas, prazo, permite_publica, permite_conta)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+			 ativa, num_vagas, prazo, permite_publica, permite_conta, cargo_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 		RETURNING id`,
 		user.TenantID, body.Titulo, body.Area,
 		strDefault(body.Local, "Maputo, Moçambique"),
@@ -220,7 +239,7 @@ func (h *Handler) CriarVaga(w http.ResponseWriter, r *http.Request) {
 		body.Descricao, body.SobreFuncao,
 		filterList(body.Responsabilidades), filterList(body.ReqObrigatorios),
 		filterList(body.ReqPreferenciais), filterList(body.Oferece),
-		ativa, numVagas, prazo, permitePublica, permiteConta,
+		ativa, numVagas, prazo, permitePublica, permiteConta, body.CargoID,
 	).Scan(&id)
 	if err != nil {
 		jsonErr(w, "Erro ao guardar na base de dados.", http.StatusInternalServerError)
@@ -231,7 +250,7 @@ func (h *Handler) CriarVaga(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ObterVaga(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id := h.decodeID(chi.URLParam(r, "id"))
 	row := h.db.QueryRow(r.Context(), "SELECT "+vagaSelectCols+" FROM vagas WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
 	v, err := scanVaga(row)
 	if err != nil {
@@ -243,7 +262,7 @@ func (h *Handler) ObterVaga(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ActualizarVaga(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id := h.decodeID(chi.URLParam(r, "id"))
 
 	var body vagaInput
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -259,6 +278,10 @@ func (h *Handler) ActualizarVaga(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Area == "" {
 		jsonErr(w, "A área é obrigatória.", http.StatusUnprocessableEntity)
+		return
+	}
+	if !h.validarCargoVaga(r.Context(), user.TenantID, body.CargoID) {
+		jsonErr(w, "O cargo a contratar é obrigatório e deve estar activo em Recursos Humanos.", http.StatusUnprocessableEntity)
 		return
 	}
 	prazo, ok := parsePrazo(body.Prazo)
@@ -288,8 +311,9 @@ func (h *Handler) ActualizarVaga(w http.ResponseWriter, r *http.Request) {
 		UPDATE vagas SET
 			titulo=$1, area=$2, local=$3, regime=$4, tipo=$5, descricao=$6, sobre_funcao=$7,
 			responsabilidades=$8, req_obrigatorios=$9, req_preferenciais=$10, oferece=$11,
-			ativa=$12, num_vagas=$13, prazo=$14, permite_publica=$15, permite_conta=$16, updated_at=NOW()
-		WHERE id=$17 AND tenant_id=$18`,
+			ativa=$12, num_vagas=$13, prazo=$14, permite_publica=$15, permite_conta=$16,
+			cargo_id=$17, updated_at=NOW()
+		WHERE id=$18 AND tenant_id=$19`,
 		body.Titulo, body.Area,
 		strDefault(body.Local, "Maputo, Moçambique"),
 		strDefault(body.Regime, "Presencial / Híbrido"),
@@ -297,7 +321,7 @@ func (h *Handler) ActualizarVaga(w http.ResponseWriter, r *http.Request) {
 		body.Descricao, body.SobreFuncao,
 		filterList(body.Responsabilidades), filterList(body.ReqObrigatorios),
 		filterList(body.ReqPreferenciais), filterList(body.Oferece),
-		ativa, numVagas, prazo, permitePublica, permiteConta, id, user.TenantID,
+		ativa, numVagas, prazo, permitePublica, permiteConta, body.CargoID, id, user.TenantID,
 	)
 	if err != nil {
 		jsonErr(w, "Erro ao actualizar na base de dados.", http.StatusInternalServerError)
@@ -314,7 +338,7 @@ func (h *Handler) ActualizarVaga(w http.ResponseWriter, r *http.Request) {
 // (CV / carta), replicando admin/api/vaga_delete.php.
 func (h *Handler) RemoverVaga(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id := h.decodeID(chi.URLParam(r, "id"))
 	ctx := r.Context()
 
 	tx, err := h.db.Begin(ctx)
@@ -382,7 +406,7 @@ func (h *Handler) RemoverVaga(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) mudarEstadoVaga(ativa bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := mw.GetUser(r)
-		id := chi.URLParam(r, "id")
+		id := h.decodeID(chi.URLParam(r, "id"))
 		tag, _ := h.db.Exec(r.Context(), "UPDATE vagas SET ativa=$1, updated_at=NOW() WHERE id=$2 AND tenant_id=$3", ativa, id, user.TenantID)
 		if tag.RowsAffected() == 0 {
 			jsonErr(w, "Vaga não encontrada.", http.StatusNotFound)

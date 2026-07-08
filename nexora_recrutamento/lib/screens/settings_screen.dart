@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../features/auth/presentation/bloc/auth_bloc.dart';
 import '../widgets/nexora_logo.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -173,7 +175,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: TextStyle(color: Color(0xFF9AA5B1))),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              Navigator.pop(context); // fecha o diálogo
+              context.read<AuthBloc>().add(const AuthLogoutRequested());
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/login',
+                (route) => false,
+              );
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFE53935),
               foregroundColor: Colors.white,

@@ -1,7 +1,7 @@
 <?php
 
-    $id     = $app->request->queryInt('id', 0);
-    $isEdit = $id > 0;
+    $idHash = $app->request->queryString('id');
+    $isEdit = $idHash !== '';
 
     $cliente    = null;
     $contactos  = [];
@@ -11,7 +11,7 @@
     $saldo      = [];
 
     if ($isEdit) {
-        $resp = $app->nexora->call('GET', "/api/clientes/$id");
+        $resp = $app->nexora->call('GET', "/api/clientes/$idHash");
         if ($resp['status'] !== 200) {
             header('Location: /nexora/clientes');
             exit;
@@ -114,7 +114,7 @@
 
 <form id="clienteForm">
     <input type="hidden" name="csrf_token" value="<?php echo $csrf ?>">
-    <?php if ($isEdit): ?><input type="hidden" name="id" value="<?php echo $id ?>"><?php endif; ?>
+    <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= (int)($cliente['id'] ?? 0) ?>"><?php endif; ?>
 
     <div class="adm-card adm-mb-6">
         <div class="adm-card-header"><h2 class="adm-card-title">Identificação</h2></div>
@@ -577,7 +577,7 @@
 <?php endif; ?>
 
 <script>
-const CLIENTE_ID = <?php echo $isEdit ? $id : 'null' ?>;
+const CLIENTE_ID = <?= $isEdit ? (int)($cliente['id'] ?? 0) : 'null' ?>;
 const CSRF       = '<?php echo $csrf ?>';
 
 // ── Tabs ─────────────────────────────────────────────────────
@@ -620,7 +620,7 @@ document.getElementById('clienteForm').addEventListener('submit', async function
                 btn.disabled = false;
                 btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Guardar alterações`;
             } else {
-                window.location.href = '/nexora/clientes/form?id=' + data.id + '&msg=' + encodeURIComponent(data.msg || 'Cliente criado com sucesso.');
+                window.location.href = '/nexora/clientes/form?id=' + nexoraEncodeId(data.id) + '&msg=' + encodeURIComponent(data.msg || 'Cliente criado com sucesso.');
             }
         } else {
             msgEl.innerHTML = `<div class="adm-alert adm-alert--error">${data.erro || 'Erro ao guardar.'}</div>`;

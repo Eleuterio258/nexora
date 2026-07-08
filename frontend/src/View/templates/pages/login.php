@@ -1,3 +1,37 @@
+<?php
+// Módulos da suite Nexora mostrados no ecrã de login. Texto em vez de logótipos
+// de imagem: os ficheiros em assets/images/erp-logos/*.svg são traçados a
+// partir de bitmaps com uma margem transparente enorme (o desenho real ocupa
+// só ~20–45% do canvas), pelo que ficam ilegíveis a qualquer tamanho pequeno.
+// Uma única fonte de dados alimenta a versão desktop e a mobile, para não
+// haver dois blocos de HTML escritos à mão a divergir com o tempo.
+$suiteModules = [
+    ['nome' => 'Pay',          'cor' => '#f5b942'],
+    ['nome' => 'School',       'cor' => '#60a5fa'],
+    ['nome' => 'Recrutamento', 'cor' => '#c084fc'],
+];
+
+$renderErpSuite = function (bool $mobile) use ($suiteModules): void {
+    $cls = 'erp-suite' . ($mobile ? ' erp-suite--mobile' : '');
+    ?>
+    <div class="<?= $cls ?>" aria-label="Suite Nexora ERP">
+        <div class="erp-suite-label">Suite ERP</div>
+        <div class="erp-suite-primary">
+            <span class="erp-suite-mark">N</span>
+            <span class="erp-suite-name">Nexora <strong>ERP</strong></span>
+        </div>
+        <div class="erp-suite-modules">
+            <?php foreach ($suiteModules as $mod): ?>
+            <div class="erp-suite-module">
+                <span class="erp-suite-dot" style="background:<?= htmlspecialchars($mod['cor']) ?>"></span>
+                <?= htmlspecialchars($mod['nome']) ?>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php
+};
+?>
 <!DOCTYPE html>
 <html lang="pt">
 <head>
@@ -40,7 +74,7 @@
         .login-aside::before { width: 420px; height: 420px; top: -140px; right: -140px; }
         .login-aside::after  { width: 280px; height: 280px; bottom: -90px; left: -70px; background: rgba(255,255,255,.06); }
 
-        .login-aside-content { position: relative; z-index: 1; max-width: 420px; }
+        .login-aside-content { position: relative; z-index: 1; max-width: 500px; }
         .login-aside .login-logo span { color: #fff; }
         .login-aside .login-logo-mark { filter: brightness(0) invert(1); }
 
@@ -55,7 +89,103 @@
             font-size: var(--adm-text-base);
             color: rgba(255,255,255,.78);
             line-height: 1.6;
+            margin-bottom: var(--adm-sp-8);
+        }
+
+        .erp-suite {
+            display: flex;
+            flex-direction: column;
+            gap: var(--adm-sp-4);
+            padding: var(--adm-sp-5);
             margin-bottom: var(--adm-sp-10);
+            background: rgba(255,255,255,.10);
+            border: 1px solid rgba(255,255,255,.16);
+            border-radius: var(--adm-radius-lg);
+            backdrop-filter: blur(12px);
+        }
+        .erp-suite-label {
+            font-size: .68rem;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,.64);
+        }
+        /* Marca + nome por extenso — sem depender de ficheiros de logótipo
+           (os SVGs em erp-logos/ são traçados a partir de bitmaps com uma
+           margem transparente enorme e ficam ilegíveis a este tamanho). */
+        .erp-suite-primary {
+            display: flex;
+            align-items: center;
+            gap: var(--adm-sp-3);
+        }
+        .erp-suite-mark {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 34px;
+            height: 34px;
+            border-radius: var(--adm-radius-md);
+            background: rgba(255,255,255,.16);
+            border: 1px solid rgba(255,255,255,.22);
+            font-family: var(--adm-font-h);
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: #fff;
+        }
+        .erp-suite-name {
+            font-family: var(--adm-font-h);
+            font-weight: 500;
+            font-size: 1.15rem;
+            color: rgba(255,255,255,.92);
+            letter-spacing: -.01em;
+        }
+        .erp-suite-name strong { font-weight: 700; color: #fff; }
+        .erp-suite-modules {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: var(--adm-sp-2);
+        }
+        .erp-suite-module {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            min-height: 40px;
+            padding: 0 var(--adm-sp-3);
+            font-size: var(--adm-text-xs);
+            font-weight: 600;
+            color: rgba(255,255,255,.85);
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.14);
+            border-radius: var(--adm-radius-md);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .erp-suite-dot {
+            flex-shrink: 0;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .erp-suite--mobile {
+            display: none;
+            margin-bottom: var(--adm-sp-5);
+            padding: var(--adm-sp-4);
+            background: var(--adm-gray-50, #f8fafc);
+            border-color: var(--adm-gray-200);
+            backdrop-filter: none;
+        }
+        .erp-suite--mobile .erp-suite-label { color: var(--adm-gray-500); }
+        .erp-suite--mobile .erp-suite-mark { background: var(--adm-green); border-color: var(--adm-green); }
+        .erp-suite--mobile .erp-suite-name { color: var(--adm-gray-700); }
+        .erp-suite--mobile .erp-suite-name strong { color: var(--adm-gray-900); }
+        .erp-suite--mobile .erp-suite-module {
+            color: var(--adm-gray-700);
+            background: var(--adm-white);
+            border-color: var(--adm-gray-200);
+            box-shadow: var(--adm-shadow-sm);
         }
 
         .login-features { list-style: none; display: flex; flex-direction: column; gap: var(--adm-sp-5); }
@@ -148,6 +278,11 @@
         @media (max-width: 900px) {
             .login-aside { display: none; }
             .login-logo--mobile { display: flex; }
+            .erp-suite--mobile { display: flex; }
+        }
+
+        @media (max-width: 520px) {
+            .erp-suite-modules { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -163,6 +298,8 @@
             </div>
             <h2>Painel de Administração</h2>
             <p>Recrutamento, utilizadores, permissões e auditoria — tudo num só lugar.</p>
+
+            <?php $renderErpSuite(false); ?>
 
             <ul class="login-features">
                 <li>
@@ -211,9 +348,11 @@
                 <span>Admin Panel</span>
             </div>
 
+            <?php $renderErpSuite(true); ?>
+
             <div class="login-card">
-                <h1 class="login-title">Bem-vindo de volta</h1>
-                <p class="login-sub">Entre com as suas credenciais para aceder ao painel</p>
+                <h1 class="login-title">Aceder ao Nexora ERP</h1>
+                <p class="login-sub">Entre para gerir os módulos da suite empresarial</p>
 
                 <?php if ($erro): ?>
                 <div class="login-erro">

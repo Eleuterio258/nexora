@@ -32,6 +32,13 @@ public class SessionManager {
         return instance;
     }
 
+    /**
+     * Reseta o singleton. Utilizado apenas em testes para garantir isolamento.
+     */
+    static synchronized void resetInstance() {
+        instance = null;
+    }
+
     public void login(User user) {
         this.currentUser = user;
         this.authenticated = true;
@@ -119,7 +126,7 @@ public class SessionManager {
 
     private void loadPermissions() {
         RoleDAO roleDAO = new RoleDAO();
-        this.userPermissions = roleDAO.findPermissionNamesByRoleId(currentUser.getRoleId());
+        this.userPermissions = roleDAO.findPermissionsByRoleId(currentUser.getRoleId());
         this.permissionsLoadedAt = System.currentTimeMillis();
         logger.info("Permissoes carregadas: {} (total: {})", userPermissions, userPermissions.size());
     }

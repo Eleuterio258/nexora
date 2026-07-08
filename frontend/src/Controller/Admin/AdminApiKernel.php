@@ -43,7 +43,7 @@ final class AdminApiKernel
 
             $request = Request::fromServerRequest($this->request);
             if (strtoupper($method) !== 'GET') {
-                if (!$this->security->hasValidCsrf($request->csrfToken())) {
+                if (!$this->security->hasValidCsrf($this->request->csrfToken())) {
                     $this->respond([$errorKey => 'Token CSRF invalido.'], 403);
                 }
             }

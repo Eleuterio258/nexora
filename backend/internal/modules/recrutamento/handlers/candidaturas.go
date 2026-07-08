@@ -48,18 +48,23 @@ type CandidaturaNota struct {
 }
 
 type RespostaVaga struct {
-	CampoID    int64   `json:"campo_id"`
-	Codigo     string  `json:"codigo"`
-	Label      string  `json:"label"`
-	Tipo       string  `json:"tipo"`
-	Valor      *string `json:"valor"`
-	Ficheiro   *string `json:"ficheiro"`
+	CampoID  int64   `json:"campo_id"`
+	Codigo   string  `json:"codigo"`
+	Label    string  `json:"label"`
+	Tipo     string  `json:"tipo"`
+	Valor    *string `json:"valor"`
+	Ficheiro *string `json:"ficheiro"`
 }
 
 type candidaturaDetalhe struct {
 	*Candidatura
-	Notas        []CandidaturaNota `json:"notas"`
-	RespostasVaga []RespostaVaga   `json:"respostas_vaga"`
+	Notas          []CandidaturaNota `json:"notas"`
+	RespostasVaga  []RespostaVaga    `json:"respostas_vaga"`
+	VagaArea       *string           `json:"vaga_area"`
+	VagaCargoID    *int64            `json:"vaga_cargo_id"`
+	VagaCargoNome  *string           `json:"vaga_cargo_nome"`
+	VagaSalarioMin *float64          `json:"vaga_salario_min"`
+	VagaSalarioMax *float64          `json:"vaga_salario_max"`
 }
 
 const candidaturaSelectCols = `id, vaga_id, nome, email, telefone, vaga_titulo, carta,
@@ -170,7 +175,7 @@ func (h *Handler) ListarCandidaturas(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ObterCandidatura(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id := h.decodeID(chi.URLParam(r, "id"))
 	ctx := r.Context()
 
 	row := h.db.QueryRow(ctx, "SELECT "+candidaturaSelectCols+" FROM candidaturas WHERE id=$1 AND tenant_id=$2", id, user.TenantID)
@@ -179,6 +184,21 @@ func (h *Handler) ObterCandidatura(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Candidatura não encontrada.", http.StatusNotFound)
 		return
 	}
+
+	// Área, cargo e faixa salarial definidos na vaga — o cargo é a fonte
+	// autoritativa que o backend aplica automaticamente ao funcionário ao
+	// contratar (ver ContratarCandidato); o frontend mostra-o aqui só como
+	// informação, e usa a faixa salarial para sugerir o salário base.
+	var vagaArea, vagaCargoNome *string
+	var vagaCargoID *int64
+	var vagaSalarioMin, vagaSalarioMax *float64
+	_ = h.db.QueryRow(ctx, `
+		SELECT v.area, v.cargo_id, rc.nome, rc.salario_min, rc.salario_max
+		FROM candidaturas c
+		LEFT JOIN vagas v ON v.id = c.vaga_id
+		LEFT JOIN rh.cargos rc ON rc.id = v.cargo_id
+		WHERE c.id = $1`, id,
+	).Scan(&vagaArea, &vagaCargoID, &vagaCargoNome, &vagaSalarioMin, &vagaSalarioMax)
 
 	notas := []CandidaturaNota{}
 	rows, err := h.db.Query(ctx,
@@ -211,7 +231,11 @@ func (h *Handler) ObterCandidatura(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	jsonOK(w, candidaturaDetalhe{Candidatura: c, Notas: notas, RespostasVaga: respostasVaga}, http.StatusOK)
+	jsonOK(w, candidaturaDetalhe{
+		Candidatura: c, Notas: notas, RespostasVaga: respostasVaga,
+		VagaArea: vagaArea, VagaCargoID: vagaCargoID, VagaCargoNome: vagaCargoNome,
+		VagaSalarioMin: vagaSalarioMin, VagaSalarioMax: vagaSalarioMax,
+	}, http.StatusOK)
 }
 
 // ── Pipeline ─────────────────────────────────────────────────────────────────
@@ -220,7 +244,7 @@ func (h *Handler) ObterCandidatura(w http.ResponseWriter, r *http.Request) {
 // replicando admin/api/candidatura_mover.php.
 func (h *Handler) MoverCandidatura(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id := h.decodeID(chi.URLParam(r, "id"))
 
 	var body struct {
 		Estado string `json:"estado"`
@@ -254,8 +278,12 @@ func (h *Handler) MoverCandidatura(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if oldEstado != body.Estado {
-		texto := fmt.Sprintf("Estado alterado: %s → %s", estadoLabels[oldEstado], novoLabel)
+	idInt, _ := strconv.ParseInt(id, 10, 64)
+	estadoMudou := oldEstado != body.Estado
+	var texto string
+
+	if estadoMudou {
+		texto = fmt.Sprintf("Estado alterado: %s → %s", estadoLabels[oldEstado], novoLabel)
 		if _, err := tx.Exec(ctx,
 			"INSERT INTO candidatura_notas (candidatura_id, autor, tipo, conteudo) VALUES ($1,'sistema','sistema',$2)",
 			id, texto); err != nil {
@@ -264,9 +292,8 @@ func (h *Handler) MoverCandidatura(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Disparar notificação automática conforme novo estado
-		idInt, _ := strconv.ParseInt(id, 10, 64)
 		if evento := eventoParaEstado(body.Estado); evento != "" {
-			if err := h.notificarCandidatura(ctx, tx, user.TenantID, idInt, evento); err != nil {
+			if err := h.notificarCandidatura(ctx, tx, user.TenantID, idInt, evento, nil); err != nil {
 				// Não falhar a transição se a notificação falhar; registar erro silenciosamente
 			}
 		}
@@ -277,6 +304,12 @@ func (h *Handler) MoverCandidatura(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Push só depois do commit — antes disso a mudança de estado ainda não
+	// é visível a outras queries (ex.: a que lê vaga_titulo/candidato_id).
+	if estadoMudou {
+		h.notificarCandidatoPush(ctx, idInt, "Sistema", texto)
+	}
+
 	jsonOK(w, map[string]any{"ok": true}, http.StatusOK)
 }
 
@@ -284,7 +317,7 @@ func (h *Handler) MoverCandidatura(w http.ResponseWriter, r *http.Request) {
 // nota de avaliação, replicando admin/api/candidatura_avaliar.php.
 func (h *Handler) AvaliarCandidatura(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id := h.decodeID(chi.URLParam(r, "id"))
 
 	var body struct {
 		Score *int16  `json:"score"`
@@ -348,7 +381,7 @@ func (h *Handler) AvaliarCandidatura(w http.ResponseWriter, r *http.Request) {
 // para "entrevista" e regista uma nota com o resumo, replicando admin/api/entrevista_save.php.
 func (h *Handler) AgendarEntrevista(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id := h.decodeID(chi.URLParam(r, "id"))
 
 	var body struct {
 		Data    string  `json:"data"`
@@ -429,7 +462,7 @@ func (h *Handler) AgendarEntrevista(w http.ResponseWriter, r *http.Request) {
 	}
 
 	idInt, _ := strconv.ParseInt(id, 10, 64)
-	if err := h.notificarCandidatura(ctx, tx, user.TenantID, idInt, "entrevista_agendada"); err != nil {
+	if err := h.notificarCandidatura(ctx, tx, user.TenantID, idInt, "entrevista_agendada", nil); err != nil {
 		// Não bloquear o agendamento se a notificação falhar
 	}
 
@@ -445,7 +478,7 @@ func (h *Handler) AgendarEntrevista(w http.ResponseWriter, r *http.Request) {
 // admin/api/nota_save.php. O autor é o nome do utilizador autenticado.
 func (h *Handler) AdicionarNota(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id := h.decodeID(chi.URLParam(r, "id"))
 	ctx := r.Context()
 
 	var body struct {
@@ -486,6 +519,12 @@ func (h *Handler) AdicionarNota(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Erro ao guardar.", http.StatusInternalServerError)
 		return
 	}
+
+	// Notifica o candidato por push — a nota do recrutador é, para o
+	// candidato, uma mensagem na conversa da candidatura.
+	h.notificarCandidatoPush(ctx, nota.CandidaturaID, autor, conteudo)
+	h.realtime.EmitNovaMensagem(nota)
+
 	jsonOK(w, nota, http.StatusCreated)
 }
 
@@ -494,7 +533,7 @@ func (h *Handler) AdicionarNota(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) downloadFicheiro(coluna string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := mw.GetUser(r)
-		id := chi.URLParam(r, "id")
+		id := h.decodeID(chi.URLParam(r, "id"))
 
 		var ficheiro *string
 		err := h.db.QueryRow(r.Context(),

@@ -98,6 +98,9 @@ func (s *TimetableService) UpdateEntry(ctx context.Context, id, tenantID int64, 
 		if err == pgx.ErrNoRows {
 			return ErrTimetableNotFound
 		}
+		if errors.Is(err, repositories.ErrInvalidColumn) {
+			return ErrTimetableInvalidData
+		}
 		return err
 	}
 	return nil

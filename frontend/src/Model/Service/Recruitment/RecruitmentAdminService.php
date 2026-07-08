@@ -91,6 +91,9 @@ final class RecruitmentAdminService extends NexoraService
         if (($payload['area'] ?? '') === '') {
             throw new OperationException('A area e obrigatoria.');
         }
+        if (empty($payload['cargo_id'])) {
+            throw new OperationException('O cargo a contratar e obrigatorio.');
+        }
         if (!empty($payload['prazo']) && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $payload['prazo'])) {
             throw new OperationException('Formato de prazo invalido.');
         }
@@ -180,12 +183,12 @@ final class RecruitmentAdminService extends NexoraService
         return ['ok' => true];
     }
 
-    public function contratar(int $id): array
+    public function contratar(int $id, array $payload = []): array
     {
         if ($id <= 0) {
             throw new OperationException('ID invalido.');
         }
-        $response = $this->gateway->request('POST', "/api/recrutamento/candidaturas/$id/contratar");
+        $response = $this->gateway->request('POST', "/api/recrutamento/candidaturas/$id/contratar", $payload);
         $this->ensureSuccess($response, 'Erro ao contratar candidato.');
         return array_merge(['ok' => true], (array) ($response->body ?? []));
     }

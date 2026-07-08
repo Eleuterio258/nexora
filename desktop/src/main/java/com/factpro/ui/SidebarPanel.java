@@ -47,6 +47,8 @@ public class SidebarPanel extends JPanel {
                 {"Stock", "\uD83D\uDCE3", "menu:stock"},
                 {"Compras", "\uD83D\uDCD6", "menu:compras"},
                 {"Fornecedores", "\uD83C\uDE5A", "menu:fornecedores"},
+                {"ContasReceber", "\uD83D\uDCB3", "menu:contas_receber"},
+                {"Notificacoes", "\uD83D\uDD14", "menu:notificacoes"},
                 {"Relatorios", "\uD83D\uDCC8", "menu:relatorios"},
                 {"Configuracoes", "\u2699\uFE0F", "menu:configuracoes"}
         };

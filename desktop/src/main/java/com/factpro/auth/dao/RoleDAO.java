@@ -106,8 +106,8 @@ public class RoleDAO extends BaseDAO<Role> {
     }
 
     public List<String> findPermissionsByRoleId(Long roleId) {
-        String sql = "SELECT p.nome FROM permissoes p " +
-                     "INNER JOIN role_permissoes rp ON p.id = rp.permissao_id " +
+        String sql = "SELECT p.nome FROM permissions p " +
+                     "INNER JOIN role_permissions rp ON p.id = rp.permission_id " +
                      "WHERE rp.role_id = ? ORDER BY p.nome";
         List<String> permissions = new ArrayList<>();
         try (Connection conn = DatabaseManager.getInstance().getConnection();

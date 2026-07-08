@@ -1,7 +1,8 @@
 <?php
 declare(strict_types=1);
 
-$cartaoId = (int) ($_GET['id'] ?? 0);
+$idHash   = $app->request->queryString('id');
+$cartaoId = $idHash ? $app->id->decode($idHash) : 0;
 $backUrl  = filter_var($_GET['back'] ?? '', FILTER_SANITIZE_URL);
 if ($cartaoId <= 0) {
     header('Location: ' . $app->routes->path('tarefas'));

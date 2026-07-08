@@ -99,6 +99,33 @@ final readonly class PublicApiController
         exit;
     }
 
+    /**
+     * Proxy genérico para pedidos JSON (GET/POST/PUT/DELETE) do portal do
+     * candidato e afins — reencaminha corpo e cabeçalho Authorization tal
+     * como recebidos, sem exigir sessão PHP (a autenticação é o Bearer token
+     * emitido por /api/auth/login).
+     */
+    public function proxyJson(string $uri, string $method): never
+    {
+        $method = strtoupper($method);
+        $payload = in_array($method, ['POST', 'PUT', 'PATCH'], true) ? $this->jsonBody() : null;
+        $response = $this->nexora->callPublic($method, $uri, $payload, $method === 'GET' ? $_GET : []);
+        header('Content-Type: application/json');
+        http_response_code($response['status'] ?: 200);
+        echo json_encode($response['body']);
+        exit;
+    }
+
+    private function jsonBody(): ?array
+    {
+        $raw = file_get_contents('php://input');
+        if ($raw === false || $raw === '') {
+            return null;
+        }
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : null;
+    }
+
     private function respond(array $response, string $fallback): never
     {
         $this->security->jsonResponse(

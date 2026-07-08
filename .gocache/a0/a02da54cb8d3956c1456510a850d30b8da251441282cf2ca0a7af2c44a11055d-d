@@ -1,0 +1,8 @@
+./apikeys.go
+./auth.go
+./cargos.go
+./handler.go
+./historico.go
+./permissoes.go
+./sessoes.go
+./utilizadores.go

@@ -1,12 +1,12 @@
-<?php
+﻿<?php
 
-    $id         = $app->request->queryInt('id', 0);
-    $isEdit     = $id > 0;
+    $idHash = $app->request->queryString('id');
+    $isEdit = $idHash !== '';
     $lead       = null;
     $atividades = [];
 
     if ($isEdit) {
-    $resp = $app->nexora->call('GET', "/api/crm/leads/$id");
+    $resp = $app->nexora->call('GET', "/api/crm/leads/$idHash");
     if ($resp['status'] !== 200) {
         header('Location: /nexora/crm/leads');
         exit;
@@ -398,7 +398,7 @@ async function converterLead() {
         if (data.ok) {
             let html = '<div class="adm-alert adm-alert--success" style="margin-bottom:var(--adm-sp-3)">Lead convertido com sucesso. Cliente #' + data.cliente_id + ' criado.</div>';
             if (data.oportunidade_id) {
-                html += '<a href="/nexora/crm/oportunidades/form?id=' + data.oportunidade_id + '" class="adm-btn adm-btn-outline" style="width:100%;justify-content:center">Ver oportunidade criada</a>';
+                html += '<a href="/nexora/crm/oportunidades/form?id=' + nexoraEncodeId(data.oportunidade_id) + '" class="adm-btn adm-btn-outline" style="width:100%;justify-content:center">Ver oportunidade criada</a>';
             }
             document.getElementById('convertCardBody').innerHTML = html;
             showToast('Lead convertido');
@@ -489,3 +489,5 @@ document.head.appendChild(style);
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+
+

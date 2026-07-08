@@ -1,0 +1,10 @@
+./academic_structure.go
+./calendar.go
+./class.go
+./enrollment.go
+./fee.go
+./grade.go
+./incident.go
+./notificacao.go
+./teacher.go
+./timetable.go

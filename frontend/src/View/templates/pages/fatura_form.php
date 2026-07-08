@@ -1,7 +1,7 @@
 <?php
 
-    $id     = $app->request->queryInt('id', 0);
-    $isEdit = $id > 0;
+    $idHash = $app->request->queryString('id');
+    $isEdit = $idHash !== '';
 
     $fatura      = null;
     $itens       = [];
@@ -19,7 +19,7 @@
     ];
 
     if ($isEdit) {
-        $resp = $app->nexora->call('GET', "/api/faturacao/invoices/$id");
+        $resp = $app->nexora->call('GET', "/api/faturacao/invoices/$idHash");
         if ($resp['status'] !== 200) {
             header('Location: /nexora/faturacao/faturas');
             exit;
@@ -61,7 +61,7 @@
     </div>
     <div class="adm-page-header-actions">
         <?php if ($isEdit): ?>
-        <a href="/nexora/faturacao/faturas/proforma?id=<?php echo $id ?>" target="_blank" class="adm-btn adm-btn-outline adm-btn-sm">
+        <a href="/nexora/faturacao/faturas/proforma?id=<?= htmlspecialchars($idHash) ?>" target="_blank" class="adm-btn adm-btn-outline adm-btn-sm">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             Pró-forma
         </a>
@@ -298,7 +298,7 @@
 <?php endif; ?>
 
 <script>
-const FATURA_ID = <?php echo $isEdit ? $id : 'null' ?>;
+const FATURA_ID = <?= $isEdit ? (int)($fatura['id'] ?? 0) : 'null' ?>;
 const CSRF      = '<?php echo $csrf ?>';
 
 <?php if (! $isEdit): ?>
@@ -324,7 +324,7 @@ async function saveFatura() {
         });
         const data = await res.json();
         if (data.ok) {
-            window.location.href = '/nexora/faturacao/faturas/form?id=' + data.id;
+            window.location.href = '/nexora/faturacao/faturas/form?id=' + nexoraEncodeId(data.id);
         } else {
             document.getElementById('formMsg').innerHTML = `<div class="adm-alert adm-alert--error">${data.erro || 'Erro ao guardar.'}</div>`;
             btn.disabled = false;

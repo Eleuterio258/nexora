@@ -82,7 +82,7 @@ public class AuditLogger {
                                  String descricao, boolean sucesso) {
         String sql = "INSERT INTO " + TABLE + 
                      " (tenant_id, user_id, acao, recurso, recurso_id, descricao, " +
-                     "endereco_ip, sucesso, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                     "ip_address, sucesso, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         SessionManager session = SessionManager.getInstance();
         

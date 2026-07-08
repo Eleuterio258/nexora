@@ -100,6 +100,14 @@ final readonly class AdminAuthController
                 'ativo' => $this->session->hasEscopo('portal_encarregado'),
             ],
             [
+                'escopo' => 'portal_candidato',
+                'titulo' => 'Area do Candidato',
+                'descricao' => 'Acompanhe as suas candidaturas a vagas.',
+                'url' => '/carreira/candidato/area',
+                'icone' => 'briefcase',
+                'ativo' => $this->session->hasEscopo('portal_candidato'),
+            ],
+            [
                 'escopo' => 'superadmin',
                 'titulo' => 'Superadmin',
                 'descricao' => 'Area de administracao e configuracao global.',
@@ -152,7 +160,7 @@ final readonly class AdminAuthController
 
                 $next = $this->request->queryString('next', '/nexora/destino');
                 // Só aceita redireccionamentos internos conhecidos.
-                if (!preg_match('#^/(nexora|escola|portal/aluno|portal/encarregado|portal/professor)(/|$)#', $next)) {
+                if (!preg_match('#^/(nexora|escola|portal/aluno|portal/encarregado|portal/professor|carreira|vagas)(/|\?|$)#', $next)) {
                     $next = '/nexora/destino';
                 }
                 // Restringir ao escopo do utilizador.
@@ -166,6 +174,8 @@ final readonly class AdminAuthController
                     } elseif ($this->session->hasEscopo('portal_aluno') && !str_starts_with($next, '/portal/aluno')) {
                         $next = '/nexora/destino';
                     } elseif ($this->session->hasEscopo('portal_encarregado') && !str_starts_with($next, '/portal/encarregado')) {
+                        $next = '/nexora/destino';
+                    } elseif ($this->session->hasEscopo('portal_candidato') && !str_starts_with($next, '/carreira') && !str_starts_with($next, '/vagas')) {
                         $next = '/nexora/destino';
                     }
                 }

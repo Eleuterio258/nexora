@@ -22,31 +22,33 @@ class JobBloc extends Bloc<JobEvent, JobState> {
 
   Future<void> _onLoad(JobsLoadRequested event, Emitter<JobState> emit) async {
     emit(const JobLoading());
-    final result = await _getJobs(
-        GetJobsParams(category: event.category, query: event.query));
+    final result = await _getJobs(GetJobsParams(
+        category: event.category, query: event.query, tenantId: event.tenantId));
     result.fold(
       (f) => emit(JobFailureState(f.message)),
-      (jobs) => emit(JobsLoaded(jobs, activeCategory: event.category)),
+      (jobs) => emit(JobsLoaded(jobs,
+          activeCategory: event.category, tenantId: event.tenantId)),
     );
   }
 
   Future<void> _onRefresh(
       JobRefreshRequested event, Emitter<JobState> emit) async {
     final current = state;
-    final category =
-        current is JobsLoaded ? current.activeCategory : null;
-    add(JobsLoadRequested(category: category));
+    final category = current is JobsLoaded ? current.activeCategory : null;
+    final tenantId = current is JobsLoaded ? current.tenantId : null;
+    add(JobsLoadRequested(category: category, tenantId: tenantId));
   }
 
   Future<void> _onSaveToggle(
       JobSaveToggled event, Emitter<JobState> emit) async {
     await _toggleSave(
-        ToggleSaveJobParams(jobId: event.jobId, save: event.save));
+        ToggleSaveJobParams(job: event.job, save: event.save));
     // Update the saved flag in the current list optimistically
     if (state is JobsLoaded) {
       final current = state as JobsLoaded;
       final updated = current.jobs
-          .map((j) => j.id == event.jobId ? j.copyWith(isSaved: event.save) : j)
+          .map((j) =>
+              j.id == event.job.id ? j.copyWith(isSaved: event.save) : j)
           .toList();
       emit(JobsLoaded(updated, activeCategory: current.activeCategory));
     }

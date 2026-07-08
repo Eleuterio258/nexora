@@ -7,14 +7,13 @@ import '../datasources/application_remote_datasource.dart';
 
 class ApplicationRepositoryImpl implements ApplicationRepository {
   final ApplicationRemoteDataSource remote;
-  final String token;
 
-  const ApplicationRepositoryImpl({required this.remote, required this.token});
+  const ApplicationRepositoryImpl({required this.remote});
 
   @override
   Future<Either<Failure, List<Application>>> getApplications() async {
     try {
-      return Right(await remote.getApplications(token));
+      return Right(await remote.getApplications());
     } on AuthException catch (e) {
       return Left(AuthFailure(e.message));
     } on ServerException catch (e) {
@@ -27,7 +26,7 @@ class ApplicationRepositoryImpl implements ApplicationRepository {
   @override
   Future<Either<Failure, Application>> getApplicationById(int id) async {
     try {
-      return Right(await remote.getApplicationById(id, token));
+      return Right(await remote.getApplicationById(id));
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } on NetworkException {
@@ -38,14 +37,23 @@ class ApplicationRepositoryImpl implements ApplicationRepository {
   @override
   Future<Either<Failure, Application>> submitApplication({
     required int jobId,
+    required String jobTitle,
+    required String nome,
+    required String email,
+    String? telefone,
     required String coverLetter,
   }) async {
     try {
-      return Right(await remote.submitApplication(
-        jobId: jobId,
-        coverLetter: coverLetter,
-        token: token,
-      ));
+      return Right(
+        await remote.submitApplication(
+          jobId: jobId,
+          jobTitle: jobTitle,
+          nome: nome,
+          email: email,
+          telefone: telefone,
+          coverLetter: coverLetter,
+        ),
+      );
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } on NetworkException {

@@ -273,7 +273,38 @@ export STORAGE_PUBLIC_URL="http://localhost:9004/nexora"
 
 ---
 
-## 7. Pendências
+## 7. Integração Recrutamento → RH — Fase 5 (Notificações e Permissões)
+
+**Data:** 2026-07-06  
+**Ficheiros alterados:**
+- `internal/modules/recrutamento/handlers/contratar.go`
+- `internal/modules/recrutamento/handlers/notificacoes.go`
+- `internal/modules/recrutamento/handlers/candidaturas.go`
+- `internal/router/router.go`
+- `migrations/20260705000002_recrutamento_contratacao_rh.up.sql`
+- `migrations/20260705000003_recrutamento_permissao_contratar.up.sql`
+
+### 7.1 Notificação automática de contratação
+
+- Adicionado evento `contratado` ao sistema de notificações do recrutamento.
+- Template padrão inclui `{{numero_funcionario}}` e `{{data_admissao}}`.
+- Disparo dentro da transação: email/SMS conforme configuração do tenant.
+- Push de boas-vindas enviado após `COMMIT`, sem bloquear a resposta.
+
+### 7.2 Permissão granular `recrutamento.contratar`
+
+- Criada migration `20260705000003_recrutamento_permissao_contratar`.
+- A permissão é herdada automaticamente por quem já possui `gerir_candidaturas`.
+- Rota `POST /api/recrutamento/candidaturas/{id}/contratar` agora exige `recrutamento.contratar` **ou** `recrutamento.gerir_candidaturas`.
+
+### 7.3 Melhorias de mensagens
+
+- Resposta do endpoint indica número de funcionário e data de admissão.
+- Mensagem de boas-vindas ao candidato enviada por push.
+
+---
+
+## 8. Pendências
 
 | # | Problema | Observação |
 |---|---|---|
@@ -285,6 +316,6 @@ export STORAGE_PUBLIC_URL="http://localhost:9004/nexora"
 
 ---
 
-## 8. Conclusão
+## 9. Conclusão
 
-Foram aplicadas correções críticas no módulo Gestão Escolar e implementada uma camada completa de abstração de storage compatível com MinIO. O sistema está funcional para o utilizador `admin@enigmaschool.mz` tanto com storage local como MinIO, e a migração dos ficheiros existentes foi testada com sucesso.
+Foram aplicadas correções críticas no módulo Gestão Escolar, implementada uma camada completa de abstração de storage compatível com MinIO e concluída a integração Recrutamento → RH com notificações automáticas, permissão granular de contratação e conformidade legal para Moçambique. O sistema está funcional para o utilizador `admin@enigmaschool.mz` tanto com storage local como MinIO, e a migração dos ficheiros existentes foi testada com sucesso.

@@ -9,7 +9,7 @@ $initials   = mb_strtoupper(mb_substr($adminUser, 0, 1));
 $ap         = $activePage ?? '';
 
 // Grupos de páginas para activar a secção
-$apAcademico  = in_array($ap, ['escolar_anos_lectivos','escolar_turmas','escolar_disciplinas','escolar_professores','escolar_atribuicoes','escolar_horarios','escolar_calendario','escolar_niveis','escolar_series','escolar_cursos'], true);
+$apAcademico  = in_array($ap, ['escolar_anos_lectivos','escolar_periodos','escolar_turmas','escolar_disciplinas','escolar_professores','escolar_atribuicoes','escolar_horarios','escolar_calendario','escolar_niveis','escolar_series','escolar_cursos'], true);
 $apAlunos     = in_array($ap, ['escolar_alunos','escolar_matriculas','escolar_cargos_alunos','escolar_cargos_professores','escolar_ocorrencias'], true);
 $apAvaliacao  = in_array($ap, ['escolar_frequencia','escolar_avaliacoes','escolar_notas','escolar_boletins'], true);
 $apFinanceiro = in_array($ap, ['escolar_planos_cobranca','escolar_cobrancas','escolar_pagamentos','escolar_inadimplencia','escolar_config_financeira'], true);
@@ -104,6 +104,7 @@ $apPortal     = in_array($ap, ['aluno_portal'], true);
                 </summary>
                 <div class="adm-nav-submenu">
                     <a href="/escola/anos-lectivos"  class="adm-nav-item <?= $ap === 'escolar_anos_lectivos' ? 'active' : '' ?>"><i class="fa-solid fa-calendar-days fa-fw"></i> Anos Lectivos</a>
+                    <a href="/escola/periodos"       class="adm-nav-item <?= $ap === 'escolar_periodos' ? 'active' : '' ?>"><i class="fa-solid fa-calendar-week fa-fw"></i> Períodos / Módulos</a>
                     <a href="/escola/niveis"         class="adm-nav-item <?= $ap === 'escolar_niveis' ? 'active' : '' ?>"><i class="fa-solid fa-layer-group fa-fw"></i> Níveis</a>
                     <a href="/escola/series"         class="adm-nav-item <?= $ap === 'escolar_series' ? 'active' : '' ?>"><i class="fa-solid fa-list-ol fa-fw"></i> Séries</a>
                     <a href="/escola/cursos"         class="adm-nav-item <?= $ap === 'escolar_cursos' ? 'active' : '' ?>"><i class="fa-solid fa-graduation-cap fa-fw"></i> Cursos</a>

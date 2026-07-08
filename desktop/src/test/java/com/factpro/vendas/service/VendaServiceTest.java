@@ -1,5 +1,6 @@
 package com.factpro.vendas.service;
 
+import com.factpro.auth.PermissionChecker;
 import com.factpro.core.exception.BusinessException;
 import com.factpro.core.exception.StockInsuficienteException;
 import com.factpro.produtos.dao.ProdutoDAO;
@@ -34,6 +35,7 @@ class VendaServiceTest {
 
     @BeforeEach
     void setUp() {
+        PermissionChecker.setTestBypass(true);
         vendaDAO = mock(VendaDAO.class);
         vendaItemDAO = mock(VendaItemDAO.class);
         produtoDAO = mock(ProdutoDAO.class);

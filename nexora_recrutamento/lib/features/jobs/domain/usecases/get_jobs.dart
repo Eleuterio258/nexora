@@ -10,15 +10,16 @@ class GetJobs extends UseCase<List<Job>, GetJobsParams> {
   const GetJobs(this.repository);
 
   @override
-  Future<Either<Failure, List<Job>>> call(GetJobsParams params) =>
-      repository.getJobs(category: params.category, query: params.query);
+  Future<Either<Failure, List<Job>>> call(GetJobsParams params) => repository
+      .getJobs(category: params.category, query: params.query, tenantId: params.tenantId);
 }
 
 class GetJobsParams extends Equatable {
   final String? category;
   final String? query;
-  const GetJobsParams({this.category, this.query});
+  final int? tenantId;
+  const GetJobsParams({this.category, this.query, this.tenantId});
 
   @override
-  List<Object?> get props => [category, query];
+  List<Object?> get props => [category, query, tenantId];
 }

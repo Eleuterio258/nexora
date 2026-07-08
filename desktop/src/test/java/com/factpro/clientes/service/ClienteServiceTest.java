@@ -1,7 +1,9 @@
 package com.factpro.clientes.service;
 
+import com.factpro.auth.PermissionChecker;
 import com.factpro.clientes.dao.ClienteDAO;
 import com.factpro.clientes.model.Cliente;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -19,8 +21,14 @@ class ClienteServiceTest {
 
     @BeforeEach
     void setUp() {
+        PermissionChecker.setTestBypass(true);
         clienteDAO = mock(ClienteDAO.class);
         clienteService = new ClienteService(clienteDAO);
+    }
+
+    @AfterEach
+    void tearDown() {
+        PermissionChecker.setTestBypass(false);
     }
 
     @Test

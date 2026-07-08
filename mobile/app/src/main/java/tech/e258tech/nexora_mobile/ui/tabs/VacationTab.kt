@@ -1,6 +1,5 @@
 package tech.e258tech.nexora_mobile.ui.tabs
 
-import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
@@ -96,7 +95,7 @@ internal class VacationTab(private val activity: MainActivity) {
             gravity = Gravity.CENTER
             setPadding(activity.dp(16), activity.dp(14), activity.dp(16), activity.dp(14))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#059669"))
+                setColor(activity.getColor(R.color.primary_blue_dark))
                 cornerRadius = activity.dp(12).toFloat()
             }
             layoutParams = LinearLayout.LayoutParams(

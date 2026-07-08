@@ -20,9 +20,29 @@ class AuthRepositoryImpl implements AuthRepository {
   }) async {
     try {
       final user = await _datasource.login(email: email, password: password);
-      await _storage.write(StorageKeys.authToken, user.token);
-      await _storage.write(StorageKeys.userId, user.id);
-      await _storage.write(StorageKeys.userRole, user.role);
+
+      final expiresAt = DateTime.now()
+          .add(Duration(seconds: user.expiresIn ?? 28800))
+          .millisecondsSinceEpoch
+          .toString();
+
+      await Future.wait([
+        _storage.write(StorageKeys.authToken,      user.token),
+        _storage.write(StorageKeys.userId,         user.id),
+        _storage.write(StorageKeys.userRole,       user.role),
+        _storage.write(StorageKeys.userName,       user.name),
+        _storage.write(StorageKeys.userEmail,      user.email),
+        _storage.write(StorageKeys.tokenExpiresAt, expiresAt),
+        if (user.refreshToken != null)
+          _storage.write(StorageKeys.refreshToken, user.refreshToken!),
+        if (user.code != null)
+          _storage.write(StorageKeys.userCode,  user.code!),
+        if (user.cargo != null)
+          _storage.write(StorageKeys.userCargo, user.cargo!),
+        if (user.modulos != null)
+          _storage.write(StorageKeys.userModulos, user.modulos!),
+      ]);
+
       return Right(user);
     } on UnauthorizedException {
       return Left(InvalidCredentialsFailure());

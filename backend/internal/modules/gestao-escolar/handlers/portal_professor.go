@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -12,7 +13,6 @@ import (
 )
 
 // professorID resolve o teacher_id a partir do user_id do JWT.
-// Devolve (teacherID, tenantID, ok). Envia 404 se não encontrado.
 func (h *Handler) professorID(w http.ResponseWriter, r *http.Request) (teacherID, tenantID int64, ok bool) {
 	u := mw.GetUser(r)
 	if u == nil || u.Escopo != "portal_professor" {
@@ -49,9 +49,9 @@ func (h *Handler) ProfessorPortalMe(w http.ResponseWriter, r *http.Request) {
 			'fotografia_url', t.fotografia_url,
 			'disciplinas', COALESCE((
 				SELECT jsonb_agg(DISTINCT sub.nome ORDER BY sub.nome)
-				  FROM gestao_escolar.school_timetable_slots sl
-				  JOIN gestao_escolar.school_subjects sub ON sub.id = sl.subject_id
-				 WHERE sl.teacher_id = t.id AND sl.tenant_id = t.tenant_id
+				  FROM gestao_escolar.school_teacher_assignments ta
+				  JOIN gestao_escolar.school_subjects sub ON sub.id = ta.subject_id
+				 WHERE ta.teacher_id = t.id AND ta.tenant_id = t.tenant_id AND ta.activo = true
 			), '[]')
 		)
 		FROM gestao_escolar.school_teachers t
@@ -62,6 +62,83 @@ func (h *Handler) ProfessorPortalMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonOK(w, result, http.StatusOK)
+}
+
+// ── GET /api/portal/professor/me/dashboard ───────────────────────────────────
+
+func (h *Handler) ProfessorPortalDashboard(w http.ResponseWriter, r *http.Request) {
+	tid, tenID, ok := h.professorID(w, r)
+	if !ok {
+		return
+	}
+
+	today := int(time.Now().Weekday())
+	if time.Now().Weekday() == time.Sunday {
+		today = 0
+	}
+
+	var aulasHoje int64
+	_ = h.db.QueryRow(r.Context(), `
+		SELECT COUNT(*)
+		  FROM gestao_escolar.school_timetable_entries te
+		 WHERE te.teacher_id = $1 AND te.tenant_id = $2
+		   AND te.dia_semana = $3 AND te.activo = true`,
+		tid, tenID, today).Scan(&aulasHoje)
+
+	var totalTurmas int64
+	_ = h.db.QueryRow(r.Context(), `
+		SELECT COUNT(DISTINCT class_id)
+		  FROM gestao_escolar.school_teacher_assignments
+		 WHERE teacher_id = $1 AND tenant_id = $2 AND activo = true`,
+		tid, tenID).Scan(&totalTurmas)
+
+	var totalAlunos int64
+	_ = h.db.QueryRow(r.Context(), `
+		SELECT COUNT(DISTINCT e.student_id)
+		  FROM gestao_escolar.school_teacher_assignments ta
+		  JOIN gestao_escolar.school_enrollments e ON e.class_id = ta.class_id AND e.tenant_id = ta.tenant_id
+		 WHERE ta.teacher_id = $1 AND ta.tenant_id = $2
+		   AND ta.activo = true AND e.status = 'activa'`,
+		tid, tenID).Scan(&totalAlunos)
+
+	var notasPendentes int64
+	_ = h.db.QueryRow(r.Context(), `
+		SELECT COUNT(*)
+		  FROM gestao_escolar.school_grade_items i
+		  JOIN gestao_escolar.school_teacher_assignments ta ON ta.class_id = i.class_id
+		 WHERE ta.teacher_id = $1 AND ta.tenant_id = $2 AND ta.activo = true
+		   AND i.publicado = true
+		   AND EXISTS (
+			   SELECT 1 FROM gestao_escolar.school_enrollments e
+			    WHERE e.class_id = i.class_id AND e.status = 'activa'
+			      AND NOT EXISTS (
+				      SELECT 1 FROM gestao_escolar.school_grades g
+				       WHERE g.grade_item_id = i.id AND g.student_id = e.student_id
+			      )
+		   )`,
+		tid, tenID).Scan(&notasPendentes)
+
+	var presencasPendentes int64
+	_ = h.db.QueryRow(r.Context(), `
+		SELECT COUNT(DISTINCT te.class_id)
+		  FROM gestao_escolar.school_timetable_entries te
+		 WHERE te.teacher_id = $1 AND te.tenant_id = $2
+		   AND te.dia_semana = $3 AND te.activo = true
+		   AND NOT EXISTS (
+			   SELECT 1 FROM gestao_escolar.school_attendance a
+			    WHERE a.class_id = te.class_id
+			      AND a.attendance_date = CURRENT_DATE
+			      AND a.tenant_id = te.tenant_id
+		   )`,
+		tid, tenID, today).Scan(&presencasPendentes)
+
+	jsonOK(w, map[string]any{
+		"aulas_hoje":           aulasHoje,
+		"total_turmas":         totalTurmas,
+		"total_alunos":         totalAlunos,
+		"notas_pendentes":      notasPendentes,
+		"presencas_pendentes":  presencasPendentes,
+	}, http.StatusOK)
 }
 
 // ── GET /api/portal/professor/me/turmas ──────────────────────────────────────
@@ -85,9 +162,9 @@ func (h *Handler) ProfessorPortalTurmas(w http.ResponseWriter, r *http.Request) 
 			                  WHERE e.class_id = c.id AND e.status = 'activa')
 		) ORDER BY c.nome), '[]')
 		FROM (
-			SELECT DISTINCT sl.class_id, sl.subject_id
-			  FROM gestao_escolar.school_timetable_slots sl
-			 WHERE sl.teacher_id = $1 AND sl.tenant_id = $2
+			SELECT DISTINCT ta.class_id, ta.subject_id
+			  FROM gestao_escolar.school_teacher_assignments ta
+			 WHERE ta.teacher_id = $1 AND ta.tenant_id = $2 AND ta.activo = true
 		) x
 		JOIN gestao_escolar.school_classes c ON c.id = x.class_id
 		JOIN gestao_escolar.school_subjects sub ON sub.id = x.subject_id
@@ -124,9 +201,9 @@ func (h *Handler) ProfessorPortalTurma(w http.ResponseWriter, r *http.Request) {
 			                  WHERE e.class_id = c.id AND e.status = 'activa'),
 			'disciplinas', COALESCE((
 				SELECT jsonb_agg(DISTINCT sub.nome)
-				  FROM gestao_escolar.school_timetable_slots sl
-				  JOIN gestao_escolar.school_subjects sub ON sub.id = sl.subject_id
-				 WHERE sl.teacher_id = $1 AND sl.class_id = c.id AND sl.tenant_id = $2
+				  FROM gestao_escolar.school_teacher_assignments ta
+				  JOIN gestao_escolar.school_subjects sub ON sub.id = ta.subject_id
+				 WHERE ta.teacher_id = $1 AND ta.class_id = c.id AND ta.tenant_id = $2 AND ta.activo = true
 			), '[]')
 		)
 		FROM gestao_escolar.school_classes c
@@ -182,20 +259,22 @@ func (h *Handler) ProfessorPortalHorario(w http.ResponseWriter, r *http.Request)
 	var result any
 	err := h.db.QueryRow(r.Context(), `
 		SELECT COALESCE(jsonb_agg(jsonb_build_object(
-			'id',           sl.id,
-			'dia_semana',   sl.dia_semana,
-			'hora_inicio',  sl.hora_inicio,
-			'hora_fim',     sl.hora_fim,
-			'turma',        c.nome,
-			'class_id',     c.id,
-			'disciplina',   sub.nome,
-			'subject_id',   sub.id,
-			'sala',         sl.sala
-		) ORDER BY sl.dia_semana, sl.hora_inicio), '[]')
-		FROM gestao_escolar.school_timetable_slots sl
-		JOIN gestao_escolar.school_classes c ON c.id = sl.class_id
-		JOIN gestao_escolar.school_subjects sub ON sub.id = sl.subject_id
-		WHERE sl.teacher_id = $1 AND sl.tenant_id = $2`, tid, tenID).
+			'id',          te.id,
+			'dia_semana',  te.dia_semana,
+			'hora_inicio', ts.hora_inicio,
+			'hora_fim',    ts.hora_fim,
+			'turma',       c.nome,
+			'class_id',    c.id,
+			'disciplina',  sub.nome,
+			'subject_id',  sub.id,
+			'sala',        te.sala
+		) ORDER BY te.dia_semana, ts.hora_inicio), '[]')
+		FROM gestao_escolar.school_timetable_entries te
+		JOIN gestao_escolar.school_time_slots ts ON ts.id = te.time_slot_id
+		JOIN gestao_escolar.school_classes c ON c.id = te.class_id
+		JOIN gestao_escolar.school_subjects sub ON sub.id = te.subject_id
+		WHERE te.teacher_id = $1 AND te.tenant_id = $2 AND te.activo = true`,
+		tid, tenID).
 		Scan(&result)
 	if err != nil {
 		jsonErr(w, "Erro ao obter horário", http.StatusInternalServerError)
@@ -217,13 +296,11 @@ func (h *Handler) ProfessorPortalGetPresencas(w http.ResponseWriter, r *http.Req
 		jsonErr(w, "Parâmetro 'data' é obrigatório", http.StatusBadRequest)
 		return
 	}
-
-	// Verificar que o professor lecciona esta turma
 	if classID > 0 {
 		var belongs bool
 		h.db.QueryRow(r.Context(), `
-			SELECT EXISTS(SELECT 1 FROM gestao_escolar.school_timetable_slots
-			 WHERE teacher_id=$1 AND class_id=$2 AND tenant_id=$3)`,
+			SELECT EXISTS(SELECT 1 FROM gestao_escolar.school_teacher_assignments
+			 WHERE teacher_id=$1 AND class_id=$2 AND tenant_id=$3 AND activo=true)`,
 			tid, classID, tenID).Scan(&belongs)
 		if !belongs {
 			jsonErr(w, "Sem acesso a esta turma", http.StatusForbidden)
@@ -234,16 +311,15 @@ func (h *Handler) ProfessorPortalGetPresencas(w http.ResponseWriter, r *http.Req
 	var result any
 	err := h.db.QueryRow(r.Context(), `
 		SELECT COALESCE(jsonb_agg(jsonb_build_object(
-			'id',           p.id,
-			'student_id',   p.student_id,
-			'nome',         s.nome,
-			'estado',       p.estado,
-			'justificado',  p.justificado,
-			'observacao',   p.observacao
+			'id',          a.id,
+			'student_id',  a.student_id,
+			'nome',        s.nome,
+			'estado',      a.estado,
+			'observacao',  a.observacoes
 		) ORDER BY s.nome), '[]')
-		FROM gestao_escolar.school_attendance p
-		JOIN gestao_escolar.school_students s ON s.id = p.student_id
-		WHERE p.class_id = $1 AND p.data = $2 AND p.tenant_id = $3`,
+		FROM gestao_escolar.school_attendance a
+		JOIN gestao_escolar.school_students s ON s.id = a.student_id
+		WHERE a.class_id = $1 AND a.attendance_date = $2 AND a.tenant_id = $3`,
 		classID, data, tenID).
 		Scan(&result)
 	if err != nil {
@@ -264,10 +340,9 @@ func (h *Handler) ProfessorPortalSalvarPresencas(w http.ResponseWriter, r *http.
 		ClassID   int64  `json:"turma_id"`
 		Data      string `json:"data"`
 		Presencas []struct {
-			StudentID   int64  `json:"student_id"`
-			Estado      string `json:"estado"`
-			Justificado bool   `json:"justificado"`
-			Observacao  string `json:"observacao"`
+			StudentID  int64  `json:"student_id"`
+			Estado     string `json:"estado"`
+			Observacao string `json:"observacao"`
 		} `json:"presencas"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.ClassID == 0 || body.Data == "" {
@@ -277,8 +352,8 @@ func (h *Handler) ProfessorPortalSalvarPresencas(w http.ResponseWriter, r *http.
 
 	var belongs bool
 	h.db.QueryRow(r.Context(), `
-		SELECT EXISTS(SELECT 1 FROM gestao_escolar.school_timetable_slots
-		 WHERE teacher_id=$1 AND class_id=$2 AND tenant_id=$3)`,
+		SELECT EXISTS(SELECT 1 FROM gestao_escolar.school_teacher_assignments
+		 WHERE teacher_id=$1 AND class_id=$2 AND tenant_id=$3 AND activo=true)`,
 		tid, body.ClassID, tenID).Scan(&belongs)
 	if !belongs {
 		jsonErr(w, "Sem acesso a esta turma", http.StatusForbidden)
@@ -295,12 +370,12 @@ func (h *Handler) ProfessorPortalSalvarPresencas(w http.ResponseWriter, r *http.
 	for _, p := range body.Presencas {
 		_, _ = tx.Exec(r.Context(), `
 			INSERT INTO gestao_escolar.school_attendance
-				(tenant_id, class_id, student_id, data, estado, justificado, observacao, registado_por)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-			ON CONFLICT (class_id, student_id, data) DO UPDATE
-			   SET estado=$5, justificado=$6, observacao=$7, updated_at=NOW()`,
+				(tenant_id, class_id, student_id, attendance_date, estado, observacoes, created_by)
+			VALUES ($1,$2,$3,$4,$5,$6,$7)
+			ON CONFLICT ON CONSTRAINT uq_school_attendance_entry DO UPDATE
+			   SET estado=$5, observacoes=$6, updated_at=NOW()`,
 			tenID, body.ClassID, p.StudentID, body.Data,
-			p.Estado, p.Justificado, p.Observacao, tid)
+			p.Estado, p.Observacao, tid)
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
@@ -326,8 +401,8 @@ func (h *Handler) ProfessorPortalGetNotas(w http.ResponseWriter, r *http.Request
 
 	var belongs bool
 	h.db.QueryRow(r.Context(), `
-		SELECT EXISTS(SELECT 1 FROM gestao_escolar.school_timetable_slots
-		 WHERE teacher_id=$1 AND class_id=$2 AND tenant_id=$3)`,
+		SELECT EXISTS(SELECT 1 FROM gestao_escolar.school_teacher_assignments
+		 WHERE teacher_id=$1 AND class_id=$2 AND tenant_id=$3 AND activo=true)`,
 		tid, classID, tenID).Scan(&belongs)
 	if !belongs {
 		jsonErr(w, "Sem acesso a esta turma", http.StatusForbidden)
@@ -392,8 +467,8 @@ func (h *Handler) ProfessorPortalSalvarNotas(w http.ResponseWriter, r *http.Requ
 
 	var belongs bool
 	h.db.QueryRow(r.Context(), `
-		SELECT EXISTS(SELECT 1 FROM gestao_escolar.school_timetable_slots
-		 WHERE teacher_id=$1 AND class_id=$2 AND tenant_id=$3)`,
+		SELECT EXISTS(SELECT 1 FROM gestao_escolar.school_teacher_assignments
+		 WHERE teacher_id=$1 AND class_id=$2 AND tenant_id=$3 AND activo=true)`,
 		tid, body.ClassID, tenID).Scan(&belongs)
 	if !belongs {
 		jsonErr(w, "Sem acesso a esta turma", http.StatusForbidden)
@@ -431,26 +506,20 @@ func (h *Handler) ProfessorPortalComunicacao(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
-	u := mw.GetUser(r)
 	var result any
 	err := h.db.QueryRow(r.Context(), `
 		SELECT COALESCE(jsonb_agg(jsonb_build_object(
-			'id',         m.id,
-			'assunto',    m.assunto,
-			'corpo',      m.corpo,
-			'remetente',  m.remetente_nome,
-			'data',       m.created_at,
-			'lida',       COALESCE((
-				SELECT lida FROM gestao_escolar.school_message_reads
-				 WHERE message_id = m.id AND user_id = $1
-			), false)
-		) ORDER BY m.created_at DESC), '[]')
+			'id',          m.id,
+			'titulo',      m.titulo,
+			'conteudo',    m.conteudo,
+			'tipo',        m.tipo,
+			'publicado_em', m.publicado_em
+		) ORDER BY m.publicado_em DESC), '[]')
 		FROM gestao_escolar.school_messages m
-		WHERE m.tenant_id = $2
-		  AND (m.destinatario_tipo = 'todos'
-		    OR m.destinatario_tipo = 'professores'
-		    OR (m.destinatario_tipo = 'utilizador' AND m.destinatario_id = $1))
-		LIMIT 50`, u.ID, tenID).
+		WHERE m.tenant_id = $1
+		  AND m.status = 'publicado'
+		  AND m.audience_type IN ('todos', 'professores')
+		LIMIT 50`, tenID).
 		Scan(&result)
 	if err != nil {
 		jsonErr(w, "Erro ao obter comunicações", http.StatusInternalServerError)

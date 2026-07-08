@@ -1,5 +1,6 @@
 package com.factpro.clientes.service;
 
+import com.factpro.auth.PermissionChecker;
 import com.factpro.clientes.dao.ClienteDAO;
 import com.factpro.clientes.model.Cliente;
 import org.slf4j.Logger;
@@ -39,6 +40,7 @@ public class ClienteService {
     }
 
     public Cliente save(Cliente cliente) {
+        PermissionChecker.requireCreate("clientes");
         Long id = clienteDAO.save(cliente);
         if (id == null) {
             throw new RuntimeException("Falha ao guardar o cliente.");
@@ -49,6 +51,7 @@ public class ClienteService {
     }
 
     public Cliente update(Cliente cliente) {
+        PermissionChecker.requireUpdate("clientes");
         boolean updated = clienteDAO.update(cliente);
         if (!updated) {
             throw new RuntimeException("Falha ao atualizar o cliente.");
@@ -58,6 +61,7 @@ public class ClienteService {
     }
 
     public boolean delete(Long id) {
+        PermissionChecker.requireDelete("clientes");
         boolean deleted = clienteDAO.delete(id);
         if (deleted) {
             logger.info("Client deleted: ID {}", id);

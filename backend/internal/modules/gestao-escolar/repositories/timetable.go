@@ -98,9 +98,15 @@ func (r *TimetableRepository) ListByTeacher(ctx context.Context, teacherID, tena
 	return entries, rows.Err()
 }
 
+var timetableUpdatableColumns = map[string]bool{
+	"school_year_id": true, "class_id": true, "subject_id": true, "teacher_id": true,
+	"time_slot_id": true, "dia_semana": true, "sala": true, "data_inicio": true,
+	"data_fim": true, "activo": true,
+}
+
 // Update actualiza entrada.
 func (r *TimetableRepository) Update(ctx context.Context, id, tenantID int64, fields map[string]any) error {
-	return updateByFields(ctx, r.db, "gestao_escolar.school_timetable_entries", id, tenantID, fields)
+	return updateByFields(ctx, r.db, "gestao_escolar.school_timetable_entries", id, tenantID, fields, timetableUpdatableColumns, true)
 }
 
 // Delete remove entrada.

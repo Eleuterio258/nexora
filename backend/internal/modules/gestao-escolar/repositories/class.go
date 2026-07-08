@@ -59,7 +59,13 @@ func (r *ClassRepository) Create(ctx context.Context, c *models.Class) error {
 	).Scan(&c.ID, &c.CreatedAt, &c.UpdatedAt)
 }
 
+var classUpdatableColumns = map[string]bool{
+	"school_year_id": true, "level_id": true, "series_id": true, "course_id": true,
+	"codigo": true, "nome": true, "nivel": true, "turma": true, "turno": true, "sala": true,
+	"capacidade": true, "director_teacher_id": true, "horario": true, "activo": true,
+}
+
 // Update actualiza uma turma.
 func (r *ClassRepository) Update(ctx context.Context, id, tenantID int64, fields map[string]any) error {
-	return updateByFields(ctx, r.db, "gestao_escolar.school_classes", id, tenantID, fields)
+	return updateByFields(ctx, r.db, "gestao_escolar.school_classes", id, tenantID, fields, classUpdatableColumns, true)
 }

@@ -88,6 +88,18 @@
     .notif-item-msg{font-size:.75rem;color:var(--adm-text-muted,#64748b);margin-top:2px}
     .notif-empty{padding:24px;text-align:center;color:var(--adm-text-muted,#64748b);font-size:.875rem}
     </style>
+<script>
+(function(){
+    var _k1=<?= $app->id->k1() ?>,_k2=<?= $app->id->k2() ?>;
+    var B36='0123456789abcdefghijklmnopqrstuvwxyz';
+    function rotl32(x,n){return(((x<<n)|(x>>>(32-n)))>>>0);}
+    function toB36(n){if(!n)return'0';var s='';n=n>>>0;while(n>0){s=B36[n%36]+s;n=Math.floor(n/36);}return s;}
+    window.nexoraEncodeId=function(id){
+        if(!id||id<=0)return'0';
+        return toB36(rotl32((id^_k1)>>>0,13)^_k2);
+    };
+})();
+</script>
 </head>
 <body>
 <div class="adm-wrapper">

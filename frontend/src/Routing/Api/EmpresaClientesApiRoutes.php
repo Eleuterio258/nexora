@@ -1,5 +1,5 @@
 <?php
-declare(strict_types=1);
+declare (strict_types = 1);
 
 namespace E258Tech\Routing\Api;
 
@@ -9,10 +9,10 @@ final class EmpresaClientesApiRoutes
     {
         return [
             // ── Empresa ───────────────────────────────────────────────────────────
-            'empresa_save'         => ['module' => 'empresa', 'action' => 'editar_empresa'],
-            'empresa_fiscal_save'  => ['module' => 'empresa', 'action' => 'editar_empresa'],
-            'empresa_branch_save'  => ['module' => 'empresa', 'action' => 'gerir_filiais'],
-            'empresa_licenca_save' => ['module' => 'empresa', 'action' => 'gerir_licencas'],
+            'empresa_save'            => ['module' => 'empresa', 'action' => 'editar_empresa'],
+            'empresa_fiscal_save'     => ['module' => 'empresa', 'action' => 'editar_empresa'],
+            'empresa_branch_save'     => ['module' => 'empresa', 'action' => 'gerir_filiais'],
+            'empresa_licenca_save'    => ['module' => 'empresa', 'action' => 'gerir_licencas'],
 
             // ── Clientes ──────────────────────────────────────────────────────────
             'cliente_save'            => ['module' => 'clientes', 'action' => 'gerir_clientes'],

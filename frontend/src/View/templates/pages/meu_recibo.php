@@ -1,9 +1,9 @@
-<?php
+﻿<?php
 
-$id = $app->request->queryInt('id', 0);
-if (!$id) { header('Location: /nexora/meus-recibos'); exit; }
+$idHash = $app->request->queryString('id');
+if (!$idHash) { header('Location: /nexora/meus-recibos'); exit; }
 
-$resp = $app->nexora->call('GET', "/api/self-service/recibos/$id");
+$resp = $app->nexora->call('GET', "/api/self-service/recibos/$idHash");
 if ($resp['status'] !== 200) { header('Location: /nexora/meus-recibos'); exit; }
 
 $recibo = $resp['body']['recibo'] ?? [];
@@ -28,10 +28,10 @@ $descontos = array_filter($itens, fn($i) => $i['tipo'] === 'desconto');
 $fmt = fn(float $v) => number_format($v, 2, ',', '.') . ' MT';
 
 if (($_GET['formato'] ?? '') === 'pdf') {
-    $reciboId = $recibo['id'] ?? $id;
+    $reciboId = $recibo['id'] ?? 0;
     $filename = 'recibo-vencimento-' . $reciboId . '.pdf';
 
-    $cache = $app->nexora->download("/api/self-service/recibos/$id/pdf");
+    $cache = $app->nexora->download("/api/self-service/recibos/$idHash/pdf");
     if ($cache->status === 200) {
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -62,7 +62,7 @@ if (($_GET['formato'] ?? '') === 'pdf') {
         'geradoEm'        => date('d/m/Y H:i'),
     ]);
 
-    $app->nexora->uploadBinary("/api/self-service/recibos/$id/pdf", $pdf, 'application/pdf');
+    $app->nexora->uploadBinary("/api/self-service/recibos/$idHash/pdf", $pdf, 'application/pdf');
 
     header('Content-Type: application/pdf');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
@@ -80,7 +80,7 @@ include dirname(__DIR__) . '/layouts/top.php';
 <div class="adm-page-header no-print">
     <h1 class="adm-page-title">Recibo — <?php echo htmlspecialchars($periodo) ?></h1>
     <div class="adm-page-header-actions">
-        <a class="adm-btn adm-btn-primary" href="?id=<?php echo (int) $id ?>&formato=pdf">
+        <a class="adm-btn adm-btn-primary" href="?id=<?= htmlspecialchars($idHash) ?>&formato=pdf">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px"><path d="M12 15V3M12 15l-4-4M12 15l4-4M2 17l.6 3A2 2 0 0 0 4.6 22h14.8a2 2 0 0 0 2-1.7l.6-3.3"/></svg>
             Descarregar PDF
         </a>
@@ -189,3 +189,4 @@ include dirname(__DIR__) . '/layouts/top.php';
 </div>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+

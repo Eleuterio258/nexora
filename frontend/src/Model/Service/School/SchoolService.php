@@ -16,6 +16,8 @@ final class SchoolService extends OperationalModuleService
             'year.activate' => $this->op('POST', '/api/escolar/years/{id}/activar'),
             'year.close' => $this->op('POST', '/api/escolar/years/{id}/close'),
             'term.create' => $this->op('POST', '/api/escolar/years/{id}/terms'),
+            'term.update' => $this->op('PUT', '/api/escolar/terms/{id}'),
+            'term.delete' => $this->op('DELETE', '/api/escolar/terms/{id}'),
             'class.view' => $this->op('GET', '/api/escolar/classes/{id}'),
             'class.create' => $this->op('POST', '/api/escolar/classes'),
             'class.update' => $this->op('PUT', '/api/escolar/classes/{id}'),

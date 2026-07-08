@@ -188,7 +188,7 @@ document.querySelectorAll('.kanban-col').forEach(col => {
 
 function goToCard(e, id) {
     if (e.defaultPrevented) return;
-    window.location.href = '/nexora/crm/oportunidades/form?id=' + id;
+    window.location.href = '/nexora/crm/oportunidades/form?id=' + nexoraEncodeId(id);
 }
 </script>
 

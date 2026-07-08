@@ -38,6 +38,10 @@ class ApplicationBloc extends Bloc<ApplicationEvent, ApplicationState> {
     final result = await _submitApplication(
       SubmitApplicationParams(
         jobId: event.jobId,
+        jobTitle: event.jobTitle,
+        nome: event.nome,
+        email: event.email,
+        telefone: event.telefone,
         coverLetter: event.coverLetter,
       ),
     );

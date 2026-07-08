@@ -7,7 +7,7 @@
 
     <!-- Hexágono azul com cantos arredondados (flat-top, r=44, corner r=8) -->
     <path
-        android:fillColor="#10B981"
+        android:fillColor="@color/primary_blue"
         android:pathData="
             M36,12 L64,12
             A8,8,0,0,1,76,19

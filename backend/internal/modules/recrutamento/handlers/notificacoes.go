@@ -15,30 +15,33 @@ import (
 // configNotificacoesRecrutamento devolve a configuração de notificações do tenant.
 func (h *Handler) configNotificacoesRecrutamento(ctx context.Context, tx pgx.Tx, tenantID int64) (map[string]bool, error) {
 	cfg := map[string]bool{
-		"canal_email": true,
-		"canal_sms":   false,
+		"canal_email":                    true,
+		"canal_sms":                      false,
 		"notificar_candidatura_recebida": true,
 		"notificar_em_analise":           false,
 		"notificar_entrevista_agendada":  true,
 		"notificar_aprovada":             true,
 		"notificar_rejeitada":            true,
+		"notificar_contratado":           true,
 	}
 	var rowCfg struct {
-		CanalEmail                    bool `json:"canal_email"`
-		CanalSMS                      bool `json:"canal_sms"`
-		NotificarCandidaturaRecebida  bool `json:"notificar_candidatura_recebida"`
-		NotificarEmAnalise            bool `json:"notificar_em_analise"`
-		NotificarEntrevistaAgendada   bool `json:"notificar_entrevista_agendada"`
-		NotificarAprovada             bool `json:"notificar_aprovada"`
-		NotificarRejeitada            bool `json:"notificar_rejeitada"`
+		CanalEmail                   bool `json:"canal_email"`
+		CanalSMS                     bool `json:"canal_sms"`
+		NotificarCandidaturaRecebida bool `json:"notificar_candidatura_recebida"`
+		NotificarEmAnalise           bool `json:"notificar_em_analise"`
+		NotificarEntrevistaAgendada  bool `json:"notificar_entrevista_agendada"`
+		NotificarAprovada            bool `json:"notificar_aprovada"`
+		NotificarRejeitada           bool `json:"notificar_rejeitada"`
+		NotificarContratado          bool `json:"notificar_contratado"`
 	}
 	err := tx.QueryRow(ctx, `
 		SELECT canal_email, canal_sms, notificar_candidatura_recebida, notificar_em_analise,
-		       notificar_entrevista_agendada, notificar_aprovada, notificar_rejeitada
+		       notificar_entrevista_agendada, notificar_aprovada, notificar_rejeitada,
+		       notificar_contratado
 		  FROM config_notificacoes WHERE tenant_id=$1`, tenantID).
 		Scan(&rowCfg.CanalEmail, &rowCfg.CanalSMS, &rowCfg.NotificarCandidaturaRecebida,
 			&rowCfg.NotificarEmAnalise, &rowCfg.NotificarEntrevistaAgendada,
-			&rowCfg.NotificarAprovada, &rowCfg.NotificarRejeitada)
+			&rowCfg.NotificarAprovada, &rowCfg.NotificarRejeitada, &rowCfg.NotificarContratado)
 	if err != nil && err != pgx.ErrNoRows {
 		return nil, err
 	}
@@ -49,6 +52,7 @@ func (h *Handler) configNotificacoesRecrutamento(ctx context.Context, tx pgx.Tx,
 	cfg["notificar_entrevista_agendada"] = rowCfg.NotificarEntrevistaAgendada
 	cfg["notificar_aprovada"] = rowCfg.NotificarAprovada
 	cfg["notificar_rejeitada"] = rowCfg.NotificarRejeitada
+	cfg["notificar_contratado"] = rowCfg.NotificarContratado
 	return cfg, nil
 }
 
@@ -86,7 +90,7 @@ func (h *Handler) templateRecrutamento(ctx context.Context, tx pgx.Tx, tenantID 
 		  (tenant_id, codigo, canal_tipo, assunto, corpo, variaveis, activo)
 		VALUES ($1,$2,$3,$4,$5,$6,TRUE) RETURNING id`,
 		tenantID, "recrutamento_"+evento, canalTipo, assunto, corpo,
-		json.RawMessage(`["nome","vaga_titulo","codigo_acompanhamento","estado","entrevista_data","entrevista_local","entrevista_link"]`)).Scan(&id)
+		json.RawMessage(`["nome","vaga_titulo","codigo_acompanhamento","estado","entrevista_data","entrevista_local","entrevista_link","numero_funcionario","data_admissao"]`)).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +118,9 @@ func corpoTemplatePadrao(evento string) (assunto, corpo string) {
 	case "rejeitada":
 		return "Candidatura não selecionada — {{vaga_titulo}}",
 			"Olá {{nome}},\n\nAgradecemos o teu interesse na vaga {{vaga_titulo}}. Após análise, decidimos avançar com outro perfil.\nCódigo: {{codigo_acompanhamento}}"
+	case "contratado":
+		return "Bem-vindo à equipa — {{vaga_titulo}}",
+			"Parabéns {{nome}},\n\nÉ com grande satisfação que te damos as boas-vindas. Foste seleccionado(a) para a vaga {{vaga_titulo}} e o teu processo de integração foi iniciado.\n\nNúmero de funcionário: {{numero_funcionario}}\nData de admissão: {{data_admissao}}\nCódigo de acompanhamento: {{codigo_acompanhamento}}\n\nO Departamento de Recursos Humanos entrará em contacto contigo com os próximos passos.\n\nBem-vindo(a)!"
 	default:
 		return "Atualização da candidatura", "Olá {{nome}},\n\nHouve uma atualização na tua candidatura para {{vaga_titulo}}.\nCódigo: {{codigo_acompanhamento}}"
 	}
@@ -128,7 +135,8 @@ func substituirVariaveis(texto string, vars map[string]string) string {
 }
 
 // dadosCandidaturaParaNotif devolve os dados necessários para notificação.
-func (h *Handler) dadosCandidaturaParaNotif(ctx context.Context, tx pgx.Tx, candidaturaID int64) (map[string]string, string, string, error) {
+// varsExtra permite injectar valores adicionais (ex.: número de funcionário na contratação).
+func (h *Handler) dadosCandidaturaParaNotif(ctx context.Context, tx pgx.Tx, candidaturaID int64, varsExtra map[string]string) (map[string]string, string, string, error) {
 	var nome, email, vagaTitulo, codigo, estado string
 	var entrevistaData *time.Time
 	var entrevistaLocal, entrevistaLink *string
@@ -162,11 +170,15 @@ func (h *Handler) dadosCandidaturaParaNotif(ctx context.Context, tx pgx.Tx, cand
 		"entrevista_local":      local,
 		"entrevista_link":       link,
 	}
+	for k, v := range varsExtra {
+		vars[k] = v
+	}
 	return vars, email, estado, nil
 }
 
 // notificarCandidatura dispara notificações conforme configuração do tenant.
-func (h *Handler) notificarCandidatura(ctx context.Context, tx pgx.Tx, tenantID, candidaturaID int64, evento string) error {
+// varsExtra permite injectar variáveis adicionais no template (ex.: contratação).
+func (h *Handler) notificarCandidatura(ctx context.Context, tx pgx.Tx, tenantID, candidaturaID int64, evento string, varsExtra map[string]string) error {
 	cfg, err := h.configNotificacoesRecrutamento(ctx, tx, tenantID)
 	if err != nil {
 		return err
@@ -180,7 +192,7 @@ func (h *Handler) notificarCandidatura(ctx context.Context, tx pgx.Tx, tenantID,
 		return nil
 	}
 
-	vars, email, _, err := h.dadosCandidaturaParaNotif(ctx, tx, candidaturaID)
+	vars, email, _, err := h.dadosCandidaturaParaNotif(ctx, tx, candidaturaID, varsExtra)
 	if err != nil {
 		return err
 	}
@@ -230,7 +242,14 @@ func (h *Handler) notificarCandidatura(ctx context.Context, tx pgx.Tx, tenantID,
 	_, err = tx.Exec(ctx, `
 		INSERT INTO candidatura_notas (candidatura_id, autor, tipo, conteudo)
 		VALUES ($1,'Sistema','sistema',$2)`, candidaturaID, nota)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Push: só depois da transacção COMMITar é que a nota/candidatura ficam
+	// visíveis a outras queries — por isso o envio é feito pelo chamador
+	// (ver MoverCandidatura) após tx.Commit(), não aqui dentro da tx.
+	return nil
 }
 
 // ObterConfigNotificacoes devolve a configuração de notificações do recrutamento.
@@ -245,13 +264,16 @@ func (h *Handler) ObterConfigNotificacoes(w http.ResponseWriter, r *http.Request
 		NotificarEntrevistaAgendada  bool  `json:"notificar_entrevista_agendada"`
 		NotificarAprovada            bool  `json:"notificar_aprovada"`
 		NotificarRejeitada           bool  `json:"notificar_rejeitada"`
+		NotificarContratado          bool  `json:"notificar_contratado"`
 	}
 	err := h.db.QueryRow(r.Context(), `
 		SELECT tenant_id, canal_email, canal_sms, notificar_candidatura_recebida, notificar_em_analise,
-		       notificar_entrevista_agendada, notificar_aprovada, notificar_rejeitada
+		       notificar_entrevista_agendada, notificar_aprovada, notificar_rejeitada,
+		       notificar_contratado
 		  FROM config_notificacoes WHERE tenant_id=$1`, u.TenantID).Scan(
 		&cfg.TenantID, &cfg.CanalEmail, &cfg.CanalSMS, &cfg.NotificarCandidaturaRecebida,
-		&cfg.NotificarEmAnalise, &cfg.NotificarEntrevistaAgendada, &cfg.NotificarAprovada, &cfg.NotificarRejeitada)
+		&cfg.NotificarEmAnalise, &cfg.NotificarEntrevistaAgendada, &cfg.NotificarAprovada, &cfg.NotificarRejeitada,
+		&cfg.NotificarContratado)
 	if err == pgx.ErrNoRows {
 		cfg.TenantID = u.TenantID
 		cfg.CanalEmail = true
@@ -259,6 +281,7 @@ func (h *Handler) ObterConfigNotificacoes(w http.ResponseWriter, r *http.Request
 		cfg.NotificarEntrevistaAgendada = true
 		cfg.NotificarAprovada = true
 		cfg.NotificarRejeitada = true
+		cfg.NotificarContratado = true
 		jsonOK(w, cfg, http.StatusOK)
 		return
 	}
@@ -280,6 +303,7 @@ func (h *Handler) ActualizarConfigNotificacoes(w http.ResponseWriter, r *http.Re
 		NotificarEntrevistaAgendada  *bool `json:"notificar_entrevista_agendada"`
 		NotificarAprovada            *bool `json:"notificar_aprovada"`
 		NotificarRejeitada           *bool `json:"notificar_rejeitada"`
+		NotificarContratado          *bool `json:"notificar_contratado"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonErr(w, "JSON inválido", http.StatusBadRequest)
@@ -289,8 +313,9 @@ func (h *Handler) ActualizarConfigNotificacoes(w http.ResponseWriter, r *http.Re
 	_, err := h.db.Exec(r.Context(), `
 		INSERT INTO config_notificacoes
 		  (tenant_id, canal_email, canal_sms, notificar_candidatura_recebida, notificar_em_analise,
-		   notificar_entrevista_agendada, notificar_aprovada, notificar_rejeitada)
-		VALUES ($1,COALESCE($2,TRUE),COALESCE($3,FALSE),COALESCE($4,TRUE),COALESCE($5,FALSE),COALESCE($6,TRUE),COALESCE($7,TRUE),COALESCE($8,TRUE))
+		   notificar_entrevista_agendada, notificar_aprovada, notificar_rejeitada,
+		   notificar_contratado)
+		VALUES ($1,COALESCE($2,TRUE),COALESCE($3,FALSE),COALESCE($4,TRUE),COALESCE($5,FALSE),COALESCE($6,TRUE),COALESCE($7,TRUE),COALESCE($8,TRUE),COALESCE($9,TRUE))
 		ON CONFLICT (tenant_id) DO UPDATE SET
 		  canal_email=COALESCE($2,config_notificacoes.canal_email),
 		  canal_sms=COALESCE($3,config_notificacoes.canal_sms),
@@ -299,9 +324,11 @@ func (h *Handler) ActualizarConfigNotificacoes(w http.ResponseWriter, r *http.Re
 		  notificar_entrevista_agendada=COALESCE($6,config_notificacoes.notificar_entrevista_agendada),
 		  notificar_aprovada=COALESCE($7,config_notificacoes.notificar_aprovada),
 		  notificar_rejeitada=COALESCE($8,config_notificacoes.notificar_rejeitada),
+		  notificar_contratado=COALESCE($9,config_notificacoes.notificar_contratado),
 		  updated_at=NOW()`,
 		u.TenantID, body.CanalEmail, body.CanalSMS, body.NotificarCandidaturaRecebida,
-		body.NotificarEmAnalise, body.NotificarEntrevistaAgendada, body.NotificarAprovada, body.NotificarRejeitada)
+		body.NotificarEmAnalise, body.NotificarEntrevistaAgendada, body.NotificarAprovada, body.NotificarRejeitada,
+		body.NotificarContratado)
 	if err != nil {
 		jsonErr(w, "Erro ao guardar configuração", http.StatusInternalServerError)
 		return

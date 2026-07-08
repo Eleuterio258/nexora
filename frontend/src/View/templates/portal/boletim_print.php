@@ -17,17 +17,20 @@
         .aluno-info span { color: #555; }
         .aluno-info strong { color: #000; }
 
-        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1rem 0; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px,1fr)); gap: 1rem; margin: 1rem 0; }
         .stat { border: 1px solid #ddd; border-radius: 6px; padding: .5rem .75rem; text-align: center; }
         .stat-val { font-size: 18pt; font-weight: bold; }
         .stat-label { font-size: 8pt; color: #666; margin-top: .15rem; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 10pt; }
         th { background: #0369A1; color: #fff; padding: .4rem .6rem; text-align: left; font-size: 9pt; }
+        th.center, td.center { text-align: center; }
         td { padding: .35rem .6rem; border-bottom: 1px solid #e5e7eb; }
         tr:nth-child(even) td { background: #f8fafc; }
-        .aprovado { color: #15803D; font-weight: bold; }
+        .aprovado  { color: #15803D; font-weight: bold; }
         .reprovado { color: #B91C1C; font-weight: bold; }
+        .pendente  { color: #666; }
+        .nao-lec   { color: #ccc; font-size: .85em; }
 
         .footer { margin-top: 2rem; font-size: 8pt; color: #666; border-top: 1px solid #ddd; padding-top: .5rem;
             display: flex; justify-content: space-between; }
@@ -39,6 +42,19 @@
     </style>
 </head>
 <body>
+<?php
+// Variáveis recebidas do index.php:
+// $boletim, $termos, $disciplinas, $media, $cfg, $notaMinima, $stats, $totalFaltas, $termId, $alunoInfo
+
+// Filtrar termos pelo termId se passado
+$termosVisiveis = $termId > 0
+    ? array_values(array_filter($termos, fn($t) => (int)$t['id'] === $termId))
+    : $termos;
+
+$fmtNota = fn(mixed $v): string => ($v === null || $v === '' || $v === false) ? '—' : number_format((float)$v, 1);
+$aprovadas  = (int)($stats['aprovadas']  ?? 0);
+$reprovadas = (int)($stats['reprovadas'] ?? 0);
+?>
 
 <div class="header">
     <div>
@@ -60,20 +76,22 @@
     <div><span>Nível: </span><strong><?= htmlspecialchars($m['nivel'] ?? '') ?></strong></div>
     <div><span>Ano lectivo: </span><strong><?= htmlspecialchars($m['ano_lectivo'] ?? '') ?></strong></div>
     <?php endif; ?>
-    <?php if ($termId > 0 && !empty($termos)):
-        foreach ($termos as $t) { if ((int)$t['id'] === $termId) { echo "<div><span>Período: </span><strong>" . htmlspecialchars($t['nome'] ?? '') . "</strong></div>"; break; } }
-    endif; ?>
+    <?php if ($termId > 0 && !empty($termosVisiveis)): ?>
+    <div><span>Período: </span><strong><?= htmlspecialchars($termosVisiveis[0]['nome'] ?? '') ?></strong></div>
+    <?php endif; ?>
 </div>
 
-<?php if ($media !== null): ?>
+<?php if ($media !== null || !empty($disciplinas)): ?>
 <div class="stats">
+    <?php if ($media !== null): ?>
     <div class="stat">
-        <div class="stat-val <?= (float)$media >= 10 ? 'aprovado' : 'reprovado' ?>"><?= number_format((float)$media, 1) ?></div>
+        <div class="stat-val <?= (float)$media >= $notaMinima ? 'aprovado' : 'reprovado' ?>"><?= number_format((float)$media, 1) ?></div>
         <div class="stat-label">Média geral</div>
     </div>
-    <?php if ($totalFaltas !== null): ?>
+    <?php endif; ?>
+    <?php if ($totalFaltas > 0): ?>
     <div class="stat">
-        <div class="stat-val"><?= (int)$totalFaltas ?></div>
+        <div class="stat-val"><?= $totalFaltas ?></div>
         <div class="stat-label">Total de faltas</div>
     </div>
     <?php endif; ?>
@@ -81,6 +99,12 @@
         <div class="stat-val"><?= count($disciplinas) ?></div>
         <div class="stat-label">Disciplinas</div>
     </div>
+    <?php if ($aprovadas > 0): ?>
+    <div class="stat"><div class="stat-val aprovado"><?= $aprovadas ?></div><div class="stat-label">Aprovadas</div></div>
+    <?php endif; ?>
+    <?php if ($reprovadas > 0): ?>
+    <div class="stat"><div class="stat-val reprovado"><?= $reprovadas ?></div><div class="stat-label">Reprovadas</div></div>
+    <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -89,29 +113,51 @@
     <thead>
         <tr>
             <th>Disciplina</th>
-            <th style="text-align:center">P1</th>
-            <th style="text-align:center">P2</th>
-            <th style="text-align:center">P3</th>
-            <th style="text-align:center">Exame</th>
-            <th style="text-align:center">Média</th>
-            <th style="text-align:center">Resultado</th>
-            <th style="text-align:center">Faltas</th>
+            <?php foreach ($termosVisiveis as $t): ?>
+            <th class="center"><?= htmlspecialchars($t['nome'] ?? '') ?></th>
+            <?php endforeach; ?>
+            <th class="center">Média</th>
+            <th class="center">Resultado</th>
+            <th class="center">Faltas</th>
         </tr>
     </thead>
     <tbody>
     <?php foreach ($disciplinas as $d):
-        $nota = (float)($d['media'] ?? $d['average'] ?? $d['nota'] ?? 0);
-        $aprovado = $nota >= 10;
+        $media_d  = $d['media']    ?? null;
+        $aprovado = $d['aprovado'] ?? null;
+        $faltas_d = (int)($d['faltas'] ?? 0);
+
+        // Indexar períodos por term_id
+        $periodoMap = [];
+        foreach ((array)($d['periodos'] ?? []) as $p) {
+            $periodoMap[(int)$p['term_id']] = $p;
+        }
     ?>
     <tr>
-        <td><?= htmlspecialchars($d['nome'] ?? $d['disciplina'] ?? '') ?></td>
-        <td style="text-align:center"><?= $d['p1'] ?? '—' ?></td>
-        <td style="text-align:center"><?= $d['p2'] ?? '—' ?></td>
-        <td style="text-align:center"><?= $d['p3'] ?? '—' ?></td>
-        <td style="text-align:center"><?= $d['exame'] ?? '—' ?></td>
-        <td style="text-align:center;font-weight:bold;color:<?= $aprovado ? '#15803D' : '#B91C1C' ?>"><?= number_format($nota, 1) ?></td>
-        <td style="text-align:center" class="<?= $aprovado ? 'aprovado' : 'reprovado' ?>"><?= $aprovado ? 'Aprovado' : 'Reprovado' ?></td>
-        <td style="text-align:center"><?= $d['faltas'] ?? $d['avaliacoes'] ?? '—' ?></td>
+        <td><?= htmlspecialchars($d['nome'] ?? '') ?></td>
+        <?php foreach ($termosVisiveis as $t):
+            $tid = (int)$t['id'];
+            $p   = $periodoMap[$tid] ?? null;
+        ?>
+        <td class="center">
+            <?php if ($p === null): ?>
+            <span class="nao-lec">×</span>
+            <?php elseif ($p['tem_avaliacao'] ?? false): ?>
+            <span class="<?= ($p['nota'] ?? null) !== null ? ((float)$p['nota'] >= $notaMinima ? 'aprovado' : 'reprovado') : 'pendente' ?>">
+                <?= $fmtNota($p['nota'] ?? null) ?><?= ($p['tem_exame'] ?? false) ? ' E' : '' ?>
+            </span>
+            <?php else: ?>
+            <span class="pendente">–<?= ($p['tem_exame'] ?? false) ? ' E' : '' ?></span>
+            <?php endif; ?>
+        </td>
+        <?php endforeach; ?>
+        <td class="center" style="font-weight:bold;color:<?= $aprovado === true ? '#15803D' : ($aprovado === false ? '#B91C1C' : '#666') ?>">
+            <?= $media_d !== null ? number_format((float)$media_d, 1) : '—' ?>
+        </td>
+        <td class="center <?= $aprovado === true ? 'aprovado' : ($aprovado === false ? 'reprovado' : 'pendente') ?>">
+            <?= $aprovado === true ? 'Aprovado' : ($aprovado === false ? 'Reprovado' : '—') ?>
+        </td>
+        <td class="center"><?= $faltas_d > 0 ? $faltas_d : '—' ?></td>
     </tr>
     <?php endforeach; ?>
     </tbody>

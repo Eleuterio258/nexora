@@ -76,6 +76,7 @@ public class POSPanel extends JPanel {
     private JLabel totalLabel;
     private JLabel subtotalLabel;
     private String selectedPaymentMethod;
+    private Long selectedClientId;
     private JSplitPane splitPane;
 
     // Payment buttons
@@ -547,6 +548,7 @@ public class POSPanel extends JPanel {
             }
             if (clients.size() == 1) {
                 Cliente cliente = clients.get(0);
+                selectedClientId = cliente.getId();
                 logger.info("Cliente selecionado: {} (ID: {})", cliente.getNome(), cliente.getId());
                 JOptionPane.showMessageDialog(this,
                         "Cliente: " + cliente.getNome() + "\nNIF: " + (cliente.getNif() != null ? cliente.getNif() : "N/A"),
@@ -713,51 +715,41 @@ public class POSPanel extends JPanel {
             return;
         }
 
-        if (selectedPaymentMethod == null) {
-            JOptionPane.showMessageDialog(this, "Selecione um metodo de pagamento.",
-                    "Pagamento Nao Selecionado", JOptionPane.WARNING_MESSAGE);
+        double total = carrinhoService.getTotal();
+
+        // Open payment dialog to capture payment method(s) and details
+        Frame parent = (Frame) SwingUtilities.getWindowAncestor(this);
+        PagamentoDialog paymentDialog = new PagamentoDialog(parent, total, selectedClientId);
+        paymentDialog.setVisible(true);
+
+        if (!paymentDialog.isConfirmed()) {
+            return; // User cancelled
+        }
+
+        List<Pagamento> pagamentos = paymentDialog.getPagamentos();
+        if (pagamentos.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Nenhum pagamento registado.",
+                    "Erro", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
-        Long clienteId = null;
-        if ("Fiado".equals(selectedPaymentMethod)) {
-            String input = JOptionPane.showInputDialog(this, "Selecione o cliente (ID ou nome):",
-                    "Venda a Credito", JOptionPane.QUESTION_MESSAGE);
-            if (input == null || input.isBlank()) {
-                JOptionPane.showMessageDialog(this, "Venda a credito requer um cliente.",
-                        "Erro", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            List<Cliente> clients = clienteService.search(input);
-            if (clients.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Cliente nao encontrado: " + input,
-                        "Erro", JOptionPane.ERROR_MESSAGE);
-                return;
-            }
-            clienteId = clients.get(0).getId();
-        }
+        String metodoPrincipal = paymentDialog.getSelectedMethod();
+        Long clienteId = "Fiado".equals(metodoPrincipal) ? selectedClientId : null;
 
         Venda venda = new Venda();
         venda.setTenantId(SessionManager.getInstance().getCurrentTenantId());
         venda.setUserId(SessionManager.getInstance().getCurrentUserId());
         venda.setClienteId(clienteId);
         venda.setTerminal("POS-01");
-        venda.setMetodoPagamento(selectedPaymentMethod);
+        venda.setMetodoPagamento(metodoPrincipal);
         venda.setStatus("finalizada");
         venda.setTipoDocumento("FT");
         venda.setSerieDocumento("FT");
 
         try {
-            List<Pagamento> pagamentos = new ArrayList<>();
-            Pagamento pg = new Pagamento();
-            pg.setMetodo(selectedPaymentMethod);
-            pg.setValor(carrinhoService.getTotal());
-            pg.setStatus("processado");
-            pagamentos.add(pg);
-
             Venda savedVenda = vendaService.finalizarVenda(venda, pagamentos);
 
-            if ("Fiado".equals(selectedPaymentMethod) && clienteId != null) {
+            if ("Fiado".equals(metodoPrincipal) && clienteId != null) {
                 clienteService.actualizarCreditoUsado(clienteId, savedVenda.getTotal());
             }
 
@@ -768,6 +760,7 @@ public class POSPanel extends JPanel {
             cartTableModel.refresh();
             updateSummary();
             descontoField.setText("0.00");
+            selectedClientId = null;
             loadProducts();
 
             JOptionPane.showMessageDialog(this,

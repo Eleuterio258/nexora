@@ -6,7 +6,7 @@ $activePage = 'dashboard';
 
 $encInfo   = $portalEncarregado ?? [];
 $educandos = $encInfo['educandos'] ?? [];
-$selectedId = (int)($_GET['educando_id'] ?? ($educandos[0]['student_id'] ?? 0));
+// $selectedId and $selectedHash come from the index.php closure scope
 
 // Dados do educando seleccionado
 $cobrancas  = $portalData['cobrancas']['body']  ?? [];
@@ -25,7 +25,7 @@ foreach ($cobrancas as $c) {
     if (($c['status'] ?? '') === 'parcial')  $pendente += $saldo;
     if (in_array($c['status'] ?? '', ['vencida']) || (!empty($c['data_vencimento']) && strtotime($c['data_vencimento']) < time() && $saldo > 0)) $vencido += $saldo;
 }
-$grades  = $boletim['grades'] ?? [];
+$grades  = $boletim['disciplinas'] ?? [];
 $media   = $boletim['media'] ?? null;
 $records = $presencas['records'] ?? $presencas;
 $totalPresencas = is_array($records) ? count($records) : ($presencas['total'] ?? 0);
@@ -89,7 +89,7 @@ include dirname(__FILE__) . '/layout_top.php';
         </tbody>
     </table>
     <div style="text-align:right;margin-top:.5rem">
-        <a href="/portal/encarregado/boletim?educando_id=<?= $selectedId ?>" style="font-size:.82rem;color:var(--enc-primary);font-weight:600;text-decoration:none">
+        <a href="/portal/encarregado/boletim?educando_id=<?= htmlspecialchars($selectedHash) ?>" style="font-size:.82rem;color:var(--enc-primary);font-weight:600;text-decoration:none">
             Ver boletim completo →
         </a>
     </div>

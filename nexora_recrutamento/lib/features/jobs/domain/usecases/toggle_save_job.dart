@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import 'package:equatable/equatable.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/usecases/usecase.dart';
+import '../entities/job.dart';
 import '../repositories/job_repository.dart';
 
 class ToggleSaveJob extends UseCase<Unit, ToggleSaveJobParams> {
@@ -10,15 +11,15 @@ class ToggleSaveJob extends UseCase<Unit, ToggleSaveJobParams> {
 
   @override
   Future<Either<Failure, Unit>> call(ToggleSaveJobParams params) => params.save
-      ? repository.saveJob(params.jobId)
-      : repository.unsaveJob(params.jobId);
+      ? repository.saveJob(params.job)
+      : repository.unsaveJob(params.job.id);
 }
 
 class ToggleSaveJobParams extends Equatable {
-  final int jobId;
+  final Job job;
   final bool save;
-  const ToggleSaveJobParams({required this.jobId, required this.save});
+  const ToggleSaveJobParams({required this.job, required this.save});
 
   @override
-  List<Object> get props => [jobId, save];
+  List<Object> get props => [job, save];
 }

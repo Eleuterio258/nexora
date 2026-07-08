@@ -115,7 +115,7 @@
                 </td>
                 <td>
                     <?php if ($v['total_candid'] > 0): ?>
-                    <a href="/nexora/recrutamento/candidaturas?vaga_id=<?php echo $v['id'] ?>" class="adm-badge adm-badge--blue" style="text-decoration:none">
+                    <a href="/nexora/recrutamento/candidaturas?vaga_id=<?php echo $app->id->encode((int)$v['id']) ?>" class="adm-badge adm-badge--blue" style="text-decoration:none">
                         <?php echo $v['total_candid'] ?>
                     </a>
                     <?php else: ?>
@@ -126,7 +126,7 @@
                 <?php if ($canGerirVagas): ?>
                 <td>
                     <div class="adm-actions">
-                        <a href="/nexora/recrutamento/vagas/form?id=<?php echo $v['id'] ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Editar">
+                        <a href="/nexora/recrutamento/vagas/form?id=<?php echo $app->id->encode((int)$v['id']) ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Editar">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>

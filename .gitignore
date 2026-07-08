@@ -48,6 +48,10 @@ backend/uploads/
 backend/vendor/
 backend/.env
 
+# Credenciais de service account (Firebase Admin SDK, GCP, etc.) — nunca commitar.
+backend/config/*.json
+!backend/config/*.example.json
+
 # ═══════════════════════════════════════════════════════════════
 # FRONTEND PHP — e258tech-html5/ e frontend/
 # ═══════════════════════════════════════════════════════════════

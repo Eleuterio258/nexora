@@ -225,7 +225,7 @@ include dirname(__DIR__) . '/layouts/top.php';
                     <td><span class="adm-badge <?= $eb[0] ?>"><?= $eb[1] ?></span></td>
                     <td class="adm-text-muted"><?= !empty($c['created_at']) ? date('d/m/y', strtotime($c['created_at'])) : '—' ?></td>
                     <td>
-                        <a href="/nexora/recrutamento/candidaturas/ver?id=<?= (int)($c['id'] ?? 0) ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon">
+                        <a href="/nexora/recrutamento/candidaturas/ver?id=<?= $app->id->encode((int)($c['id'] ?? 0)) ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon">
                             <i class="fa-solid fa-eye"></i>
                         </a>
                     </td>

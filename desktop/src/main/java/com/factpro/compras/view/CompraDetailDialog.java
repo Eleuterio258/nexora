@@ -1,10 +1,15 @@
 package com.factpro.compras.view;
 
+import com.factpro.auth.SessionManager;
+import com.factpro.compras.dao.CompraItemDAO;
 import com.factpro.compras.model.Compra;
+import com.factpro.compras.model.CompraItem;
 import com.factpro.compras.service.CompraService;
 import com.factpro.core.util.CurrencyFormatter;
 import com.factpro.fornecedores.model.Fornecedor;
 import com.factpro.fornecedores.service.FornecedorService;
+import com.factpro.produtos.dao.ProdutoDAO;
+import com.factpro.produtos.model.Produto;
 import net.miginfocom.swing.MigLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +35,8 @@ public class CompraDetailDialog extends JDialog {
     private final Compra compra;
     private final CompraService compraService;
     private final FornecedorService fornecedorService;
+    private final CompraItemDAO compraItemDAO;
+    private final ProdutoDAO produtoDAO;
     private boolean updated = false;
 
     public CompraDetailDialog(Frame parent, Compra compra,
@@ -38,6 +45,8 @@ public class CompraDetailDialog extends JDialog {
         this.compra = compra;
         this.compraService = compraService;
         this.fornecedorService = fornecedorService;
+        this.compraItemDAO = new CompraItemDAO();
+        this.produtoDAO = new ProdutoDAO();
 
         setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
         setSize(700, 500);
@@ -110,7 +119,8 @@ public class CompraDetailDialog extends JDialog {
         add(itemsTitle);
 
         String[] itemCols = {"Produto", "Quantidade", "Preco", "Total"};
-        CompraItemsTableModel itemModel = new CompraItemsTableModel(itemCols);
+        List<CompraItem> compraItems = compraItemDAO.findByCompraId(compra.getId());
+        CompraItemsTableModel itemModel = new CompraItemsTableModel(itemCols, compraItems, produtoDAO);
         JTable itemsTable = new JTable(itemModel);
         itemsTable.setRowHeight(26);
         itemsTable.getTableHeader().setReorderingAllowed(false);
@@ -175,7 +185,8 @@ public class CompraDetailDialog extends JDialog {
 
         if (confirm == JOptionPane.YES_OPTION) {
             try {
-                compraService.receiveCompra(compra.getId(), 1L); // TODO: session user
+                Long userId = SessionManager.getInstance().getCurrentUserId();
+                compraService.receiveCompra(compra.getId(), userId != null ? userId : 1L);
                 JOptionPane.showMessageDialog(this, "Compra recebida com sucesso.",
                         "Sucesso", JOptionPane.INFORMATION_MESSAGE);
                 updated = true;
@@ -213,10 +224,27 @@ public class CompraDetailDialog extends JDialog {
         private final String[] columns;
         private final List<Object[]> items = new ArrayList<>();
 
-        CompraItemsTableModel(String[] columns) {
+        CompraItemsTableModel(String[] columns, List<CompraItem> compraItems, ProdutoDAO produtoDAO) {
             this.columns = columns;
-            // Since there is no CompraItemDAO, we show placeholder info
-            items.add(new Object[]{"Nota: Detalhes dos itens de compra serao disponiveis quando a tabela CompraItem for implementada.", 0.0, 0.0, 0.0});
+            if (compraItems == null || compraItems.isEmpty()) {
+                items.add(new Object[]{"Nenhum item registado para esta compra.", 0.0, 0.0, 0.0});
+            } else {
+                for (CompraItem item : compraItems) {
+                    String nomeProduto = "Produto #" + item.getProdutoId();
+                    if (produtoDAO != null) {
+                        Produto p = produtoDAO.findById(item.getProdutoId());
+                        if (p != null && p.getNome() != null) {
+                            nomeProduto = p.getNome();
+                        }
+                    }
+                    items.add(new Object[]{
+                            nomeProduto,
+                            item.getQuantidade(),
+                            item.getPrecoUnitario(),
+                            item.getTotal()
+                    });
+                }
+            }
         }
 
         @Override public int getRowCount() { return items.size(); }

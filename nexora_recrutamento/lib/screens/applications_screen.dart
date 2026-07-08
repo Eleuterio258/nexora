@@ -1,61 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../features/applications/domain/entities/application.dart';
+import '../features/applications/presentation/bloc/application_bloc.dart';
 import '../widgets/nexora_logo.dart';
 import 'application_detail_screen.dart';
 import 'chat_screen.dart';
 import 'notifications_screen.dart';
 
+// ApplicationBloc é fornecido globalmente em app.dart (MultiBlocProvider) —
+// o carregamento inicial é despoletado em main_screen.dart.
 class ApplicationsScreen extends StatelessWidget {
   const ApplicationsScreen({super.key});
 
-  static const _apps = [
-    _AppData(
-      title: 'Product Designer',
-      company: 'Google',
-      location: 'Bangalore, India',
-      date: 'May 20, 2025',
-      status: 'Received',
-      logoBg: Color(0xFF1A1A2E),
-      logoText: 'G',
-      isGoogle: true,
-    ),
-    _AppData(
-      title: 'UX Researcher',
-      company: 'Amazon',
-      location: 'Hyderabad, India',
-      date: 'May 18, 2025',
-      status: 'In Review',
-      logoBg: Color(0xFF1A1A1A),
-      logoText: 'amazon',
-    ),
-    _AppData(
-      title: 'Senior Product Designer',
-      company: 'Upwork',
-      location: 'Remote',
-      date: 'May 15, 2025',
-      status: 'Interview',
-      logoBg: Color(0xFF1DBF73),
-      logoText: 'up',
-    ),
-    _AppData(
-      title: 'UI/UX Designer',
-      company: 'Microsoft',
-      location: 'Noida, India',
-      date: 'May 10, 2025',
-      status: 'Received',
-      logoBg: Color(0xFF1A1A2E),
-      logoText: 'MS',
-      isMicrosoft: true,
-    ),
-    _AppData(
-      title: 'Product Design Intern',
-      company: 'Airbnb',
-      location: 'Remote',
-      date: 'May 8, 2025',
-      status: 'In Review',
-      logoBg: Color(0xFFFF5A5F),
-      logoText: 'A',
-    ),
-  ];
+  @override
+  Widget build(BuildContext context) => const _ApplicationsView();
+}
+
+class _ApplicationsView extends StatefulWidget {
+  const _ApplicationsView();
+
+  @override
+  State<_ApplicationsView> createState() => _ApplicationsViewState();
+}
+
+class _ApplicationsViewState extends State<_ApplicationsView> {
+  String _query = '';
 
   @override
   Widget build(BuildContext context) {
@@ -107,7 +76,7 @@ class ApplicationsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 22),
                       const Text(
-                        'My Applications',
+                        'Minhas Candidaturas',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 26,
@@ -116,7 +85,7 @@ class ApplicationsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'Track your job applications and their status',
+                        'Acompanhe as suas candidaturas e o respectivo estado',
                         style: TextStyle(color: Colors.white70, fontSize: 13.5),
                       ),
                     ],
@@ -133,94 +102,95 @@ class ApplicationsScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    // Search + filter
+                    // Search
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 46,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  const SizedBox(width: 12),
-                                  Icon(
-                                    Icons.search,
+                      child: Container(
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 12),
+                            Icon(
+                              Icons.search,
+                              color: Colors.grey.shade400,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                onChanged: (v) =>
+                                    setState(() => _query = v.trim().toLowerCase()),
+                                decoration: InputDecoration(
+                                  hintText: 'Pesquisar candidaturas',
+                                  hintStyle: TextStyle(
                                     color: Colors.grey.shade400,
-                                    size: 20,
+                                    fontSize: 14,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: TextField(
-                                      decoration: InputDecoration(
-                                        hintText: 'Search applications',
-                                        hintStyle: TextStyle(
-                                          color: Colors.grey.shade400,
-                                          fontSize: 14,
-                                        ),
-                                        border: InputBorder.none,
-                                        isDense: true,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          TextButton.icon(
-                            onPressed: () {},
-                            icon: const Icon(
-                              Icons.tune,
-                              color: kPrimary,
-                              size: 18,
-                            ),
-                            label: const Text(
-                              'Filter',
-                              style: TextStyle(
-                                color: kPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
                     // Application list
                     Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: _apps.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, i) => GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ApplicationDetailScreen(
-                                title: _apps[i].title,
-                                company: _apps[i].company,
-                                location: _apps[i].location,
-                                date: _apps[i].date,
-                                status: _apps[i].status,
-                                logoBg: _apps[i].logoBg,
-                                logoText: _apps[i].logoText,
-                                isGoogle: _apps[i].isGoogle,
-                                isMicrosoft: _apps[i].isMicrosoft,
+                      child: BlocBuilder<ApplicationBloc, ApplicationState>(
+                        builder: (context, state) {
+                          if (state is ApplicationLoading ||
+                              state is ApplicationInitial) {
+                            return const Center(
+                                child: CircularProgressIndicator());
+                          }
+                          if (state is ApplicationFailureState) {
+                            return Center(
+                              child: Text(state.message,
+                                  style: TextStyle(color: Colors.grey.shade600)),
+                            );
+                          }
+                          final apps =
+                              state is ApplicationsLoaded ? state.applications : <Application>[];
+                          final filtered = _query.isEmpty
+                              ? apps
+                              : apps
+                                  .where((a) =>
+                                      a.jobTitle.toLowerCase().contains(_query))
+                                  .toList();
+
+                          if (filtered.isEmpty) {
+                            return Center(
+                              child: Text(
+                                'Ainda não submeteu nenhuma candidatura.',
+                                style: TextStyle(color: Colors.grey.shade600),
                               ),
+                            );
+                          }
+
+                          return ListView.separated(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, i) => GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ApplicationDetailScreen(
+                                    application: filtered[i],
+                                  ),
+                                ),
+                              ),
+                              child: _ApplicationCard(app: filtered[i]),
                             ),
-                          ),
-                          child: _ApplicationCard(app: _apps[i]),
-                        ),
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -234,40 +204,18 @@ class ApplicationsScreen extends StatelessWidget {
   }
 }
 
-class _AppData {
-  final String title;
-  final String company;
-  final String location;
-  final String date;
-  final String status;
-  final Color logoBg;
-  final String logoText;
-  final bool isGoogle;
-  final bool isMicrosoft;
-
-  const _AppData({
-    required this.title,
-    required this.company,
-    required this.location,
-    required this.date,
-    required this.status,
-    required this.logoBg,
-    required this.logoText,
-    this.isGoogle = false,
-    this.isMicrosoft = false,
-  });
-}
-
 class _ApplicationCard extends StatelessWidget {
-  final _AppData app;
+  final Application app;
   const _ApplicationCard({required this.app});
 
   Color get _statusColor {
     switch (app.status) {
-      case 'Interview':
+      case ApplicationStatus.interview:
         return const Color(0xFFE57C00);
-      case 'In Review':
+      case ApplicationStatus.inReview:
         return const Color(0xFF4A90D9);
+      case ApplicationStatus.rejected:
+        return const Color(0xFFB00020);
       default:
         return kPrimary;
     }
@@ -275,14 +223,19 @@ class _ApplicationCard extends StatelessWidget {
 
   Color get _statusBg {
     switch (app.status) {
-      case 'Interview':
+      case ApplicationStatus.interview:
         return const Color(0xFFFFF3E8);
-      case 'In Review':
+      case ApplicationStatus.inReview:
         return const Color(0xFFEBF3FF);
+      case ApplicationStatus.rejected:
+        return const Color(0xFFFBE9E7);
       default:
         return const Color(0xFFE8F8F0);
     }
   }
+
+  String _fmt(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   @override
   Widget build(BuildContext context) {
@@ -306,14 +259,24 @@ class _ApplicationCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildLogo(),
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A2E2A),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Center(
+                    child: NexoraLogoIcon(size: 26, isWhite: true),
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        app.title,
+                        app.jobTitle,
                         style: const TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 14.5,
@@ -321,38 +284,24 @@ class _ApplicationCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Text(
-                            app.company,
-                            style: const TextStyle(
-                              color: Color(0xFF4A5568),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.verified, color: kPrimary, size: 13),
-                        ],
+                      Text(
+                        app.company,
+                        style: const TextStyle(
+                          color: Color(0xFF4A5568),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 12,
+                      if (app.trackingCode != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          'Código: ${app.trackingCode}',
+                          style: TextStyle(
                             color: Colors.grey.shade400,
+                            fontSize: 12,
                           ),
-                          const SizedBox(width: 3),
-                          Text(
-                            app.location,
-                            style: TextStyle(
-                              color: Colors.grey.shade400,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -370,7 +319,7 @@ class _ApplicationCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  app.date,
+                  _fmt(app.appliedAt),
                   style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
                 ),
                 const Spacer(),
@@ -384,7 +333,7 @@ class _ApplicationCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    app.status,
+                    app.status.pt,
                     style: TextStyle(
                       color: _statusColor,
                       fontSize: 11,
@@ -399,99 +348,22 @@ class _ApplicationCard extends StatelessWidget {
             const SizedBox(height: 10),
             _ActionButton(
               icon: Icons.chat_bubble_outline,
-              label: 'Message Recruiter',
+              label: 'Contactar Recrutador',
               color: kPrimary,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => ChatScreen(
-                    name: 'Recruiter · ${app.company}',
-                    role: 'Talent Acquisition',
+                    candidaturaId: app.id,
+                    name: app.jobTitle,
+                    role: app.status.pt,
                     company: app.company,
-                    avatarColor: app.logoBg == const Color(0xFF1A1A2E) ||
-                            app.logoBg == const Color(0xFF1A1A1A)
-                        ? const Color(0xFF7A9BB5)
-                        : app.logoBg,
-                    online: false,
+                    avatarColor: const Color(0xFF1A2E2A),
                   ),
                 ),
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLogo() {
-    if (app.isMicrosoft) {
-      const sq = 13.0;
-      const gap = 2.5;
-      return Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A2E),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: sq,
-                    height: sq,
-                    color: const Color(0xFFF25022),
-                  ),
-                  const SizedBox(width: gap),
-                  Container(
-                    width: sq,
-                    height: sq,
-                    color: const Color(0xFF7FBA00),
-                  ),
-                ],
-              ),
-              const SizedBox(height: gap),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: sq,
-                    height: sq,
-                    color: const Color(0xFF00A4EF),
-                  ),
-                  const SizedBox(width: gap),
-                  Container(
-                    width: sq,
-                    height: sq,
-                    color: const Color(0xFFFFB900),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        color: app.logoBg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Center(
-        child: Text(
-          app.logoText,
-          style: TextStyle(
-            color: app.logoBg == Colors.white ? Colors.black87 : Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: app.logoText.length > 2 ? 9 : 16,
-          ),
         ),
       ),
     );

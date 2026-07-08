@@ -1,6 +1,7 @@
 <?php
 
-    $filtroVaga = $app->request->queryInt('vaga_id', 0) ?: 0;
+    $vagaHash   = $app->request->queryString('vaga_id');
+    $filtroVaga = $vagaHash ? $app->id->decode($vagaHash) : 0;
 
     $stages = [
     'recebida'   => ['label' => 'Recebida', 'col' => 'kanban-col--recebida'],
@@ -48,7 +49,7 @@ $pageTitle  = 'Pipeline';
         <select class="adm-select" onchange="location.href='/nexora/recrutamento/pipeline'+(this.value?'?vaga_id='+this.value:'')" style="min-width:200px">
             <option value="">Todas as vagas</option>
             <?php foreach ($vagas as $v): ?>
-            <option value="<?php echo $v['id'] ?>" <?php echo $filtroVaga == $v['id'] ? 'selected' : '' ?>>
+            <option value="<?php echo $app->id->encode((int)$v['id']) ?>" <?php echo $filtroVaga == (int)$v['id'] ? 'selected' : '' ?>>
                 <?php echo htmlspecialchars($v['titulo']) ?>
             </option>
             <?php endforeach; ?>
@@ -186,7 +187,7 @@ document.querySelectorAll('.kanban-col').forEach(col => {
 
 function goToCard(e, id) {
     if (e.defaultPrevented) return;
-    window.location.href = '/nexora/recrutamento/candidaturas/ver?id=' + id;
+    window.location.href = '/nexora/recrutamento/candidaturas/ver?id=' + nexoraEncodeId(id);
 }
 </script>
 

@@ -16,21 +16,6 @@ class AgendaRemoteDatasourceImpl implements AgendaRemoteDatasource {
   DateTime? _cachedAt;
   static const _cacheTtl = Duration(minutes: 5);
 
-  static const _subjectColors = {
-    'matematica': Color(0xFF10B981),
-    'lingua portuguesa': Color(0xFF3B82F6),
-    'ingles': Color(0xFF8B5CF6),
-    'fisica': Color(0xFFF59E0B),
-    'biologia': Color(0xFF06B6D4),
-    'quimica': Color(0xFFEC4899),
-    'historia': Color(0xFFEF4444),
-    'ed. fisica': Color(0xFF14B8A6),
-    'geografia': Color(0xFF6366F1),
-    'redacao': Color(0xFFF97316),
-    'informatica': Color(0xFF0EA5E9),
-    'desenho': Color(0xFF14B8A6),
-    'introducao ao planeamento': Color(0xFF06B6D4),
-  };
 
   @override
   Future<List<AulaEntity>> getHorario() async {
@@ -72,16 +57,36 @@ class AgendaRemoteDatasourceImpl implements AgendaRemoteDatasource {
       teacher: professor.isNotEmpty ? professor : sala,
       activity: sala.isNotEmpty ? 'Sala: $sala' : '',
       time: time,
-      icon: Icons.school_outlined,
-      color: _color(disciplina),
+      icon: _resolveIcon(e['icone'] as String?),
+      color: _resolveColor(e['cor'] as String?),
       weekday: (e['dia_semana'] ?? 1) as int,
     );
   }
 
-  static Color _color(String subject) {
-    final key = subject.toLowerCase();
-    for (final entry in _subjectColors.entries) {
-      if (key.contains(entry.key)) return entry.value;
+  static const _icons = {
+    'calculate':      Icons.calculate_outlined,
+    'science':        Icons.science_outlined,
+    'history_edu':    Icons.history_edu_outlined,
+    'sports_soccer':  Icons.sports_soccer_outlined,
+    'music_note':     Icons.music_note_outlined,
+    'brush':          Icons.brush_outlined,
+    'computer':       Icons.computer_outlined,
+    'language':       Icons.language_outlined,
+    'biotech':        Icons.biotech_outlined,
+    'public':         Icons.public_outlined,
+    'menu_book':      Icons.menu_book_outlined,
+    'functions':      Icons.functions_outlined,
+    'psychology':     Icons.psychology_outlined,
+    'architecture':   Icons.architecture_outlined,
+  };
+
+  static IconData _resolveIcon(String? apiIcon) =>
+      _icons[apiIcon] ?? Icons.school_outlined;
+
+  static Color _resolveColor(String? apiColor) {
+    if (apiColor != null && apiColor.length == 7 && apiColor.startsWith('#')) {
+      final hex = int.tryParse('0xFF${apiColor.substring(1)}');
+      if (hex != null) return Color(hex);
     }
     return const Color(0xFF64748B);
   }

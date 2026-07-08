@@ -1,0 +1,10 @@
+./actividade.go
+./avatar.go
+./decode.go
+./dispositivos.go
+./handler.go
+./notificacoes.go
+./perfis.go
+./preferencias.go
+./seguranca.go
+./tokens.go

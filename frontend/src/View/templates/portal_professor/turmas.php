@@ -34,7 +34,7 @@ require __DIR__ . '/layout_top.php';
             <td><?= htmlspecialchars($t['ano_lectivo'] ?? '—') ?></td>
             <td><?= (int)($t['total_alunos'] ?? 0) ?></td>
             <td>
-                <a href="/portal/professor/turma?id=<?= (int)($t['id'] ?? 0) ?>" class="btn-secondary" style="font-size:.78rem;padding:.3rem .7rem">
+                <a href="/portal/professor/turma?id=<?= $app->id->encode((int)($t['id'] ?? 0)) ?>" class="btn-secondary" style="font-size:.78rem;padding:.3rem .7rem">
                     <i class="fa-solid fa-eye"></i> Ver
                 </a>
             </td>

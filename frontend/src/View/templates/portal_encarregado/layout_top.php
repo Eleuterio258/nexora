@@ -81,7 +81,7 @@ $encInfo    = $portalEncarregado ?? [];
 $encNome    = htmlspecialchars($encInfo['nome'] ?? $encInfo['email'] ?? 'Encarregado');
 $educandos  = $encInfo['educandos'] ?? [];
 $activePage = $activePage ?? '';
-$selectedId = (int)($_GET['educando_id'] ?? ($educandos[0]['student_id'] ?? 0));
+// $selectedId and $selectedHash come from the index.php closure scope
 ?>
 
 <aside class="portal-sidebar">
@@ -98,7 +98,7 @@ $selectedId = (int)($_GET['educando_id'] ?? ($educandos[0]['student_id'] ?? 0));
     <div style="padding:.75rem 1rem; border-bottom:1px solid #DCFCE7;">
         <p style="font-size:.68rem;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem">Educandos</p>
         <?php foreach ($educandos as $ed): ?>
-        <a href="?educando_id=<?= (int)$ed['student_id'] ?>"
+        <a href="?educando_id=<?= htmlspecialchars($app->id->encode((int)$ed['student_id'])) ?>"
            class="educando-card <?= $selectedId === (int)$ed['student_id'] ? 'active' : '' ?>">
             <div class="educando-avatar"><?= mb_strtoupper(mb_substr($ed['aluno_nome'] ?? '?', 0, 1)) ?></div>
             <div class="educando-info">
@@ -112,19 +112,19 @@ $selectedId = (int)($_GET['educando_id'] ?? ($educandos[0]['student_id'] ?? 0));
 
     <nav class="portal-nav">
         <p class="portal-nav-label">Educando seleccionado</p>
-        <a href="/portal/encarregado?educando_id=<?= $selectedId ?>" class="portal-nav-item <?= $activePage === 'dashboard' ? 'active' : '' ?>">
+        <a href="/portal/encarregado?educando_id=<?= htmlspecialchars($selectedHash) ?>" class="portal-nav-item <?= $activePage === 'dashboard' ? 'active' : '' ?>">
             <i class="fa-solid fa-house fa-fw"></i> Resumo
         </a>
-        <a href="/portal/encarregado/boletim?educando_id=<?= $selectedId ?>" class="portal-nav-item <?= $activePage === 'boletim' ? 'active' : '' ?>">
+        <a href="/portal/encarregado/boletim?educando_id=<?= htmlspecialchars($selectedHash) ?>" class="portal-nav-item <?= $activePage === 'boletim' ? 'active' : '' ?>">
             <i class="fa-solid fa-chart-bar fa-fw"></i> Boletim
         </a>
-        <a href="/portal/encarregado/presencas?educando_id=<?= $selectedId ?>" class="portal-nav-item <?= $activePage === 'presencas' ? 'active' : '' ?>">
+        <a href="/portal/encarregado/presencas?educando_id=<?= htmlspecialchars($selectedHash) ?>" class="portal-nav-item <?= $activePage === 'presencas' ? 'active' : '' ?>">
             <i class="fa-solid fa-calendar-check fa-fw"></i> Presenças
         </a>
-        <a href="/portal/encarregado/cobrancas?educando_id=<?= $selectedId ?>" class="portal-nav-item <?= $activePage === 'cobrancas' ? 'active' : '' ?>">
+        <a href="/portal/encarregado/cobrancas?educando_id=<?= htmlspecialchars($selectedHash) ?>" class="portal-nav-item <?= $activePage === 'cobrancas' ? 'active' : '' ?>">
             <i class="fa-solid fa-file-invoice-dollar fa-fw"></i> Propinas
         </a>
-        <a href="/portal/encarregado/ocorrencias?educando_id=<?= $selectedId ?>" class="portal-nav-item <?= $activePage === 'ocorrencias' ? 'active' : '' ?>">
+        <a href="/portal/encarregado/ocorrencias?educando_id=<?= htmlspecialchars($selectedHash) ?>" class="portal-nav-item <?= $activePage === 'ocorrencias' ? 'active' : '' ?>">
             <i class="fa-solid fa-flag fa-fw"></i> Ocorrências
         </a>
     </nav>

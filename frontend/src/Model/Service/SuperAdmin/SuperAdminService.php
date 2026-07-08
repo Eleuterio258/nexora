@@ -140,7 +140,8 @@ final class SuperAdminService extends NexoraService
     {
         $response = $this->gateway->request('POST', "/api/superadmin/modules/tenants/$tenantId/$modulo", [
             'ativo' => $ativo,
-            'config' => $config,
+            // Array vazio codifica como JSON "[]"; o backend espera um objecto ("{}") para o mapa config.
+            'config' => $config ?: (object) [],
         ]);
         $this->ensureSuccess($response, 'Erro ao actualizar modulo do tenant.');
         return ['ok' => true, 'data' => $response->body];

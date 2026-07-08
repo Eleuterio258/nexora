@@ -8,7 +8,7 @@ $_bibBody    = $portalData['biblioteca']['body'] ?? [];
 $alunoInfo   = $portalData['me']['body'] ?? [];
 
 // Suporta resposta paginada {records,total,...} e array plano
-$emprestimos  = isset($_bibBody['records']) ? ($_bibBody['records'] ?? []) : $_bibBody;
+$emprestimos  = array_key_exists('records', $_bibBody) ? ($_bibBody['records'] ?? []) : $_bibBody;
 $totalPagesBib= $_bibBody['paginas'] ?? 1;
 $currentPageBib = (int)($_GET['page'] ?? 1);
 

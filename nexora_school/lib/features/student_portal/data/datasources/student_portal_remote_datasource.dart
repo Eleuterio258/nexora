@@ -19,7 +19,7 @@ abstract interface class StudentPortalRemoteDatasource {
     required String novaSenha,
   });
 
-  Future<Map<String, dynamic>> boletim({int? termId});
+  Future<Map<String, dynamic>> boletim({int? termId, int? yearId});
 
   Future<List<dynamic>> notas({int? termId, int? subjectId});
 
@@ -50,12 +50,24 @@ abstract interface class StudentPortalRemoteDatasource {
 
   Future<List<dynamic>> eventos();
 
+  Future<Map<String, dynamic>> turma();
+
+  Future<Map<String, dynamic>> noticias({int page = 1, int limit = 20});
+
   Future<Map<String, dynamic>> ocorrencias();
 
   Future<Map<String, dynamic>> biblioteca({
     int page = 1,
     int limit = 20,
     String? status,
+  });
+
+  Future<void> justificarFalta(String id, {required String motivo});
+
+  Future<void> atualizarPerfil({
+    String? telefone,
+    String? email,
+    String? endereco,
   });
 }
 
@@ -102,10 +114,10 @@ class StudentPortalRemoteDatasourceImpl implements StudentPortalRemoteDatasource
   }
 
   @override
-  Future<Map<String, dynamic>> boletim({int? termId}) {
+  Future<Map<String, dynamic>> boletim({int? termId, int? yearId}) {
     return _getMap(
       '/api/portal/aluno/me/boletim',
-      queryParameters: _clean({'term_id': termId}),
+      queryParameters: _clean({'term_id': termId, 'year_id': yearId}),
     );
   }
 
@@ -176,8 +188,48 @@ class StudentPortalRemoteDatasourceImpl implements StudentPortalRemoteDatasource
       _getList('/api/portal/aluno/me/eventos');
 
   @override
+  Future<Map<String, dynamic>> turma() =>
+      _getMap('/api/portal/aluno/me/turma');
+
+  @override
+  Future<Map<String, dynamic>> noticias({int page = 1, int limit = 20}) {
+    return _getMap(
+      '/api/portal/aluno/me/noticias',
+      queryParameters: {'page': page, 'limit': limit},
+    );
+  }
+
+  @override
   Future<Map<String, dynamic>> ocorrencias() =>
       _getMap('/api/portal/aluno/me/ocorrencias');
+
+  @override
+  Future<void> justificarFalta(String id, {required String motivo}) async {
+    await _request(
+      () => _client.auth().post(
+        '/api/portal/aluno/me/presencas/$id/justificar',
+        data: {'motivo': motivo},
+      ),
+    );
+  }
+
+  @override
+  Future<void> atualizarPerfil({
+    String? telefone,
+    String? email,
+    String? endereco,
+  }) async {
+    await _request(
+      () => _client.auth().put<void>(
+        '/api/portal/aluno/me',
+        data: _clean({
+          'telefone': telefone,
+          'email': email,
+          'endereco': endereco,
+        }),
+      ),
+    );
+  }
 
   @override
   Future<Map<String, dynamic>> biblioteca({

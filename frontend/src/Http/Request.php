@@ -41,6 +41,12 @@ final readonly class Request
         return filter_var($this->data[$key] ?? false, FILTER_VALIDATE_BOOL);
     }
 
+    public function array(string $key): array
+    {
+        $value = $this->data[$key] ?? [];
+        return is_array($value) ? $value : [];
+    }
+
     public function has(string $key): bool
     {
         return array_key_exists($key, $this->data);

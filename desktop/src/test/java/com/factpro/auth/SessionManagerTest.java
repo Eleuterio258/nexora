@@ -2,11 +2,17 @@ package com.factpro.auth;
 
 import com.factpro.auth.model.User;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class SessionManagerTest {
+
+    @BeforeEach
+    void setUp() {
+        SessionManager.resetInstance();
+    }
 
     @AfterEach
     void tearDown() {

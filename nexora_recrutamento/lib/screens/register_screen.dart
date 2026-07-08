@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../features/auth/presentation/bloc/auth_bloc.dart';
 import '../widgets/nexora_logo.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -63,9 +65,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  void _submit(BuildContext context) {
+    final nome = _nameCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
+    final confirm = _confirmPasswordCtrl.text;
+
+    if (nome.length < 2 || email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preencha todos os campos.')),
+      );
+      return;
+    }
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('A palavra-passe deve ter pelo menos 6 caracteres.')),
+      );
+      return;
+    }
+    if (password != confirm) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('As palavras-passe não coincidem.')),
+      );
+      return;
+    }
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tem de aceitar os Termos e Condições.')),
+      );
+      return;
+    }
+    context.read<AuthBloc>().add(AuthRegisterRequested(
+          nome: nome,
+          email: email,
+          password: password,
+        ));
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is AuthAuthenticated) {
+          Navigator.pushReplacementNamed(context, '/home');
+        } else if (state is AuthFailureState) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+        }
+      },
+      child: Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
@@ -234,27 +284,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         const SizedBox(height: 26),
 
                         // Sign Up button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: kPrimary,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                        BlocBuilder<AuthBloc, AuthState>(
+                          builder: (context, state) {
+                            final loading = state is AuthLoading;
+                            return SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: ElevatedButton(
+                                onPressed:
+                                    loading ? null : () => _submit(context),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: kPrimary,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: loading
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.4,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Sign Up',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                               ),
-                            ),
-                            child: const Text(
-                              'Sign Up',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 26),
 
@@ -318,6 +383,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

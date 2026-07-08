@@ -21,6 +21,7 @@ final class SchoolAdminRoutes
         'gestao_escolar'                => ['view' => 'gestao_escolar.php',                'permission' => 'gestao-escolar'],
         'escolar_dashboard'             => ['view' => 'escolar_dashboard.php',             'permission' => 'gestao-escolar'],
         'escolar_anos_lectivos'         => ['view' => 'escolar_anos_lectivos.php',          'permission' => 'gestao-escolar'],
+        'escolar_periodos'              => ['view' => 'escolar_periodos.php',               'permission' => 'gestao-escolar'],
         'escolar_turmas'                => ['view' => 'escolar_turmas.php',                'permission' => 'gestao-escolar'],
         'escolar_disciplinas'           => ['view' => 'escolar_disciplinas.php',            'permission' => 'gestao-escolar'],
         'escolar_atribuicoes'           => ['view' => 'escolar_atribuicoes.php',            'permission' => 'gestao-escolar'],
@@ -58,6 +59,7 @@ final class SchoolAdminRoutes
     private const ESCOLAR_PANEL_PATHS = [
         'escolar_dashboard'             => '/escola/dashboard',
         'escolar_anos_lectivos'         => '/escola/anos-lectivos',
+        'escolar_periodos'              => '/escola/periodos',
         'escolar_niveis'                => '/escola/niveis',
         'escolar_series'                => '/escola/series',
         'escolar_cursos'                => '/escola/cursos',

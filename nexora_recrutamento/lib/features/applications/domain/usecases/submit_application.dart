@@ -13,15 +13,31 @@ class SubmitApplication extends UseCase<Application, SubmitApplicationParams> {
   Future<Either<Failure, Application>> call(SubmitApplicationParams params) =>
       repository.submitApplication(
         jobId: params.jobId,
+        jobTitle: params.jobTitle,
+        nome: params.nome,
+        email: params.email,
+        telefone: params.telefone,
         coverLetter: params.coverLetter,
       );
 }
 
 class SubmitApplicationParams extends Equatable {
   final int jobId;
+  final String jobTitle;
+  final String nome;
+  final String email;
+  final String? telefone;
   final String coverLetter;
-  const SubmitApplicationParams({required this.jobId, required this.coverLetter});
+  const SubmitApplicationParams({
+    required this.jobId,
+    required this.jobTitle,
+    required this.nome,
+    required this.email,
+    this.telefone,
+    required this.coverLetter,
+  });
 
   @override
-  List<Object> get props => [jobId, coverLetter];
+  List<Object?> get props =>
+      [jobId, jobTitle, nome, email, telefone, coverLetter];
 }

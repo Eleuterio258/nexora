@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
-import '../widgets/nexora_logo.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../core/constants/app_assets.dart';
+import '../core/constants/app_colors.dart';
+import '../features/auth/presentation/bloc/auth_bloc.dart';
 
+/// Mostra a animacao de arranque e, assim que o [AuthBloc] souber se ha
+/// sessao guardada, navega sozinho para /home ou /onboarding.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -10,141 +15,147 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _fade;
-  late final Animation<double> _scale;
+  static const _minSplashDuration = Duration(milliseconds: 1200);
+
+  late final AnimationController _animCtrl;
+  late final Animation<double> _fadeAnim;
+  late final Animation<double> _scaleAnim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+
+    _animCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 900),
     );
-    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
-    _scale = Tween<double>(begin: 0.80, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
-    );
-    _ctrl.forward();
+
+    _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeIn);
+    _scaleAnim = Tween<double>(
+      begin: 0.85,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutBack));
+
+    _animCtrl.forward();
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _animCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _onAuthResolved(AuthState state) async {
+    await Future.delayed(_minSplashDuration);
+    if (!mounted) return;
+
+    final destination = state is AuthAuthenticated ? '/home' : '/onboarding';
+    Navigator.pushReplacementNamed(context, destination);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kPrimary,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Opacity(
-            opacity: 0.12,
-            child: Image.asset(
-              'assets/images/Background.png',
-              fit: BoxFit.cover,
-              color: Colors.white,
-              colorBlendMode: BlendMode.modulate,
-            ),
-          ),
+    final size = MediaQuery.sizeOf(context);
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
-          Center(
-            child: FadeTransition(
-              opacity: _fade,
-              child: ScaleTransition(
-                scale: _scale,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 120,
-                      height: 120,
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is AuthAuthenticated || state is AuthUnauthenticated) {
+          _onAuthResolved(state);
+        }
+      },
+      child: PopScope(
+        canPop: false,
+        child: Scaffold(
+          backgroundColor: AppColors.primaryDark,
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: Image.asset(
+                  AppAssets.splashBackground,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                ),
+              ),
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.08),
+                        AppColors.primaryDark.withValues(alpha: 0.78),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Center(
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: ScaleTransition(
+                    scale: _scaleAnim,
+                    child: Container(
+                      width: size.width * 0.62,
+                      constraints: const BoxConstraints(maxWidth: 280),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 28,
+                        vertical: 24,
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(28),
+                        color: Colors.white.withValues(alpha: 0.94),
+                        borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.18),
-                            blurRadius: 24,
-                            offset: const Offset(0, 8),
+                            blurRadius: 28,
+                            offset: const Offset(0, 14),
                           ),
                         ],
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(28),
-                        child: Image.asset(
-                          'assets/images/logo-512x512.png',
-                          fit: BoxFit.cover,
-                        ),
+                      child: Image.asset(
+                        AppAssets.nexoraLogo,
+                        fit: BoxFit.contain,
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Nexora',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'Recrutamento',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
-
-          Positioned(
-            bottom: 52,
-            left: 0,
-            right: 0,
-            child: FadeTransition(
-              opacity: _fade,
-              child: Column(
-                children: [
-                  const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2.5,
-                    ),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: bottomInset + size.height * 0.04,
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'nexora.mz',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
-                      fontSize: 12,
-                      letterSpacing: 0.8,
-                    ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: size.width * 0.45,
+                        child: LinearProgressIndicator(
+                          backgroundColor: Colors.white.withValues(alpha: 0.25),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                          minHeight: 2,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Versao 1.0.0',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.78),
+                          fontSize: size.width * 0.03,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "50942619841",
+    "project_id": "e258tech-d439e",
+    "storage_bucket": "e258tech-d439e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:50942619841:android:f76b7d8b71a39a288de440",
+        "android_client_info": {
+          "package_name": "com.e258tech.food_delivery_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYlVRtDmI6GsglkivmFNaqYjBrJsZPbZE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:50942619841:android:6647529f885b1b8e8de440",
+        "android_client_info": {
+          "package_name": "tech.e258tech.nexora_recrutamento"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYlVRtDmI6GsglkivmFNaqYjBrJsZPbZE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -60,7 +60,8 @@ include dirname(__FILE__) . '/layout_top.php';
             <tr>
                 <td><?= htmlspecialchars($c['descricao'] ?? 'Propina') ?></td>
                 <td style="font-weight:600"><?= number_format((float)($c['valor'] ?? 0), 2, ',', '.') ?> MT</td>
-                <td><?= $c['due_date'] ? date('d/m/Y', strtotime($c['due_date'])) : '—' ?></td>
+                <?php $dueDate = $c['due_date'] ?? $c['data_vencimento'] ?? $c['vencimento'] ?? null; ?>
+                <td><?= $dueDate ? date('d/m/Y', strtotime((string) $dueDate)) : '—' ?></td>
                 <td>
                     <?php if (($c['status'] ?? '') === 'vencida'): ?>
                     <span class="portal-badge badge-red">Vencida</span>
@@ -87,9 +88,9 @@ include dirname(__FILE__) . '/layout_top.php';
             <p style="font-size:.85rem">Sem avisos de momento</p>
         </div>
         <?php else: ?>
-        <div style="display:flex;flex-direction:column;gap:.6rem">
+        <div style="display:flex;flex-direction:column">
         <?php foreach (array_slice($mensagens, 0, 4) as $m): ?>
-            <div style="padding:.65rem .75rem;background:#F8FAFC;border-radius:8px;border-left:3px solid #0EA5E9">
+            <div style="padding:.65rem 0;border-bottom:1px solid #E5E7EB">
                 <div style="font-weight:600;font-size:.85rem;color:#0C4A6E"><?= htmlspecialchars($m['titulo'] ?? '') ?></div>
                 <div style="font-size:.77rem;color:#64748B;margin-top:.2rem">
                     <?= $m['publicado_em'] ? date('d/m/Y', strtotime($m['publicado_em'])) : '' ?>

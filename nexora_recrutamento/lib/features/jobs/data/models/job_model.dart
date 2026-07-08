@@ -13,36 +13,61 @@ class JobModel extends Job {
     required super.logoUrl,
     required super.postedAt,
     super.isSaved,
+    super.about,
+    super.responsibilities,
+    super.requiredQualifications,
+    super.preferredQualifications,
+    super.benefits,
+    super.numberOfPositions,
+    super.deadline,
   });
 
+  /// Mapeia o objecto "vaga" tal como devolvido pelo backend Go
+  /// (GET /api/public/recrutamento/vagas e /vagas/{id}) — sem conceito de
+  /// "empresa" ou "logo" porque é um portal de uma única entidade empregadora.
   factory JobModel.fromJson(Map<String, dynamic> json) {
     return JobModel(
       id: json['id'] as int,
-      title: json['titulo'] as String? ?? json['title'] as String? ?? '',
-      company: json['empresa'] as String? ?? json['company'] as String? ?? '',
-      location: json['localizacao'] as String? ?? json['location'] as String? ?? '',
-      type: json['tipo'] as String? ?? 'Full-time',
-      category: json['categoria'] as String? ?? json['category'] as String? ?? '',
-      description: json['descricao'] as String? ?? json['description'] as String? ?? '',
-      salary: json['salario'] as String? ?? json['salary'] as String?,
+      title: json['titulo'] as String? ?? '',
+      company: json['empresa'] as String? ?? 'E258Tech',
+      location: json['local'] as String? ?? '',
+      type: json['tipo'] as String? ?? 'Estágio',
+      category: json['area'] as String? ?? '',
+      description: json['descricao'] as String? ?? '',
+      salary: json['salario'] as String?,
       logoUrl: json['logo_url'] as String? ?? '',
-      postedAt: json['criado_em'] != null
-          ? DateTime.parse(json['criado_em'] as String)
+      postedAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
       isSaved: json['guardado'] as bool? ?? false,
+      about: json['sobre_funcao'] as String?,
+      responsibilities: _stringList(json['responsabilidades']),
+      requiredQualifications: _stringList(json['req_obrigatorios']),
+      preferredQualifications: _stringList(json['req_preferenciais']),
+      benefits: _stringList(json['oferece']),
+      numberOfPositions: json['num_vagas'] as int? ?? 1,
+      deadline: json['prazo'] != null && (json['prazo'] as String).isNotEmpty
+          ? DateTime.tryParse(json['prazo'] as String)
+          : null,
     );
   }
+
+  static List<String> _stringList(dynamic value) =>
+      (value as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [];
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'titulo': title,
-        'empresa': company,
-        'localizacao': location,
+        'local': location,
         'tipo': type,
-        'categoria': category,
+        'area': category,
         'descricao': description,
-        'salario': salary,
-        'logo_url': logoUrl,
-        'criado_em': postedAt.toIso8601String(),
+        'sobre_funcao': about,
+        'responsabilidades': responsibilities,
+        'req_obrigatorios': requiredQualifications,
+        'req_preferenciais': preferredQualifications,
+        'oferece': benefits,
+        'num_vagas': numberOfPositions,
+        'created_at': postedAt.toIso8601String(),
       };
 }

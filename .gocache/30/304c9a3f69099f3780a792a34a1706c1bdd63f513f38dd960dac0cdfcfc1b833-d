@@ -1,0 +1,10 @@
+./dashboard.go
+./features.go
+./funcionarios.go
+./handler.go
+./module_deps.go
+./modules.go
+./plans.go
+./settings.go
+./tenants.go
+./users.go

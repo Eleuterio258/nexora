@@ -1,17 +1,18 @@
-<?php
+﻿<?php
 
-$id = $app->request->queryInt('id', 0);
-if (!$id) { header('Location: /nexora/recrutamento/candidaturas'); exit; }
+$idHash = $app->request->queryString('id');
+if (!$idHash) { header('Location: /nexora/recrutamento/candidaturas'); exit; }
 
-$resp = $app->nexora->call('GET', "/api/recrutamento/candidaturas/$id");
+$resp = $app->nexora->call('GET', "/api/recrutamento/candidaturas/$idHash");
 if ($resp['status'] !== 200) { header('Location: /nexora/recrutamento/candidaturas'); exit; }
-$c = $resp['body'];
+$c  = $resp['body'];
+$id = (int) $c['id'];
 
 // Auto-transition recebida → em_analise on first view (a Nexora regista a nota de sistema)
 if ($c['estado'] === 'recebida') {
     $moveResp = $app->nexora->call('PUT', "/api/recrutamento/candidaturas/$id/estado", ['estado' => 'em_analise']);
     if ($moveResp['status'] === 200) {
-        $resp = $app->nexora->call('GET', "/api/recrutamento/candidaturas/$id");
+        $resp = $app->nexora->call('GET', "/api/recrutamento/candidaturas/$idHash");
         $c = $resp['body'] ?? $c;
     }
 }
@@ -22,6 +23,36 @@ $respostasVaga = $c['respostas_vaga'] ?? [];
 
 $csrf = $app->security->csrfToken();
 $adminUser = $app->session->user()['nome'] ?? $app->session->user()['email'] ?? 'admin';
+
+// O cargo a contratar vem definido na própria vaga (configurado uma vez em
+// Vagas → Editar) e é aplicado automaticamente ao funcionário pelo backend
+// ao contratar — não é escolhido aqui. Só se a vaga não tiver cargo definido
+// (dados antigos) é que se mostra um select manual como reserva. A faixa
+// salarial do cargo serve para sugerir o salário base.
+$vagaCargoID   = $c['vaga_cargo_id'] ?? null;
+$vagaCargoNome = $c['vaga_cargo_nome'] ?? null;
+$salarioSugerido = $c['vaga_salario_min'] ?? $c['vaga_salario_max'] ?? null;
+
+// Listas de apoio para o formulário de contratação (melhor esforço — o
+// recrutador pode não ter permissões de RH para ver unidades/horários/cargos,
+// nesse caso os selects ficam vazios e os campos continuam opcionais).
+$rhCargos = $rhUnidades = $rhHorarios = [];
+if ($c['estado'] === 'aprovada') {
+    $unidadesResp = $app->nexora->call('GET', '/api/rh/unidades');
+    $horariosResp = $app->nexora->call('GET', '/api/rh/horarios');
+    $rhUnidades = $unidadesResp['status'] === 200 ? ($unidadesResp['body'] ?? []) : [];
+    $rhHorarios = $horariosResp['status'] === 200 ? ($horariosResp['body'] ?? []) : [];
+    if (!$vagaCargoID) {
+        $cargosResp = $app->nexora->call('GET', '/api/rh/cargos');
+        $rhCargos   = $cargosResp['status'] === 200 ? ($cargosResp['body'] ?? []) : [];
+    }
+}
+
+// Socket.IO liga-se directamente do browser ao backend Go (não passa pelo
+// proxy PHP) — precisa do URL público da API (diferente do NEXORA_API_URL
+// interno usado pelas chamadas server-to-server) e do JWT actual do utilizador.
+$socketUrl   = rtrim((string) (getenv('NEXORA_PUBLIC_API_URL') ?: 'http://127.0.0.1:8080'), '/');
+$socketToken = $app->nexora->currentAccessToken();
 
 $STAGES = [
     'recebida'   => ['Recebida',   'yellow'],
@@ -266,7 +297,7 @@ include dirname(__DIR__) . '/layouts/top.php';
                             <span class="adm-detail-pair-label"><?= htmlspecialchars($r['label']) ?></span>
                             <?php if ($r['ficheiro']): ?>
                             <span class="adm-detail-pair-value">
-                                <a href="/nexora/download?type=vaga_campo&candidatura_id=<?= $c['id'] ?>&campo_id=<?= $r['campo_id'] ?>"
+                                <a href="/nexora/download?type=vaga_campo&candidatura_id=<?= $app->id->encode((int)$c['id']) ?>&campo_id=<?= $app->id->encode((int)$r['campo_id']) ?>"
                                    target="_blank" class="adm-btn adm-btn-outline adm-btn-sm">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                                     Abrir ficheiro
@@ -319,7 +350,7 @@ include dirname(__DIR__) . '/layouts/top.php';
                     };
                     $ts = strtotime($nota['created_at']);
                 ?>
-                <div class="timeline-item">
+                <div class="timeline-item" data-nota-id="<?= (int) $nota['id'] ?>">
                     <div class="timeline-dot <?= $dotClass ?>"><?= $dotIcon ?></div>
                     <div class="timeline-body">
                         <div class="timeline-header">
@@ -425,14 +456,14 @@ include dirname(__DIR__) . '/layouts/top.php';
         <div class="adm-card">
             <div class="adm-card-header"><h2 class="adm-card-title">Navegação</h2></div>
             <div class="adm-card-body" style="display:flex;flex-direction:column;gap:var(--adm-sp-2)">
-                <a href="/nexora/recrutamento/pipeline<?= $c['vaga_id'] ? '?vaga_id='.$c['vaga_id'] : '' ?>" class="adm-btn adm-btn-ghost adm-btn-sm" style="justify-content:flex-start">
+                <a href="/nexora/recrutamento/pipeline<?= $c['vaga_id'] ? '?vaga_id='.$app->id->encode((int)$c['vaga_id']) : '' ?>" class="adm-btn adm-btn-ghost adm-btn-sm" style="justify-content:flex-start">
                     Pipeline<?= $c['vaga_id'] ? ' desta vaga' : '' ?>
                 </a>
                 <?php if ($c['vaga_id']): ?>
-                <a href="/nexora/recrutamento/vagas/form?id=<?= $c['vaga_id'] ?>" class="adm-btn adm-btn-ghost adm-btn-sm" style="justify-content:flex-start">
+                <a href="/nexora/recrutamento/vagas/form?id=<?= $app->id->encode((int)$c['vaga_id']) ?>" class="adm-btn adm-btn-ghost adm-btn-sm" style="justify-content:flex-start">
                     Editar vaga
                 </a>
-                <a href="/nexora/recrutamento/candidaturas?vaga_id=<?= $c['vaga_id'] ?>" class="adm-btn adm-btn-ghost adm-btn-sm" style="justify-content:flex-start">
+                <a href="/nexora/recrutamento/candidaturas?vaga_id=<?= $app->id->encode((int)$c['vaga_id']) ?>" class="adm-btn adm-btn-ghost adm-btn-sm" style="justify-content:flex-start">
                     Outros candidatos
                 </a>
                 <?php endif; ?>
@@ -442,10 +473,156 @@ include dirname(__DIR__) . '/layouts/top.php';
     </aside>
 </div>
 
+<?php if ($c['estado'] === 'aprovada'): ?>
+<!-- Modal: Contratar Candidato -->
+<div id="modalContratar" class="adm-modal-overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div class="adm-modal-content" style="max-width:640px">
+        <div class="adm-modal-header">
+            <h3 class="adm-modal-title">Contratar <?= htmlspecialchars($c['nome']) ?></h3>
+            <button class="adm-modal-close" onclick="document.getElementById('modalContratar').style.display='none'">&times;</button>
+        </div>
+        <div class="adm-modal-body" style="padding:var(--adm-sp-5) var(--adm-sp-6);overflow-y:auto;flex:1 1 auto;min-height:0;margin-bottom:0">
+            <p style="font-size:.875rem;color:var(--adm-gray-600,#6b7280);margin-bottom:1rem">
+                Dados exigidos pela legislação laboral moçambicana para abrir o processo de admissão.
+                Cria automaticamente o registo em RH e o respectivo contrato.
+            </p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--adm-sp-4)">
+                <div class="adm-form-group">
+                    <label class="adm-label" for="ctDataNascimento">Data de Nascimento *</label>
+                    <input class="adm-input" type="date" id="ctDataNascimento" required>
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label" for="ctNacionalidade">Nacionalidade</label>
+                    <input class="adm-input" type="text" id="ctNacionalidade" value="Moçambicana">
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label" for="ctTipoDocumento">Tipo de Documento</label>
+                    <select class="adm-select" id="ctTipoDocumento">
+                        <option value="">—</option>
+                        <option value="BI">Bilhete de Identidade</option>
+                        <option value="Passaporte">Passaporte</option>
+                        <option value="DIRE">DIRE</option>
+                    </select>
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label" for="ctNumeroDocumento">Número do Documento</label>
+                    <input class="adm-input" type="text" id="ctNumeroDocumento">
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label" for="ctNuit">NUIT</label>
+                    <input class="adm-input" type="text" id="ctNuit">
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label" for="ctTipoContrato">Tipo de Contrato</label>
+                    <select class="adm-select" id="ctTipoContrato">
+                        <option value="efetivo">Efectivo</option>
+                        <option value="indeterminado">Indeterminado</option>
+                        <option value="termo_certo">Termo Certo</option>
+                        <option value="termo_incerto">Termo Incerto</option>
+                        <option value="estagio">Estágio</option>
+                        <option value="prestacao_servico">Prestação de Serviço</option>
+                    </select>
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label" for="ctDataAdmissao">Data de Admissão</label>
+                    <input class="adm-input" type="date" id="ctDataAdmissao" value="<?= date('Y-m-d') ?>">
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label" for="ctSalarioBase">Salário Base (MZN)</label>
+                    <input class="adm-input" type="number" step="0.01" min="0" id="ctSalarioBase"
+                           value="<?= $salarioSugerido !== null ? htmlspecialchars((string) $salarioSugerido) : '' ?>">
+                    <?php if ($salarioSugerido !== null): ?>
+                    <p class="adm-input-hint">Sugerido a partir da faixa salarial do cargo — ajusta se necessário.</p>
+                    <?php endif; ?>
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label">Cargo</label>
+                    <?php if ($vagaCargoNome): ?>
+                    <input class="adm-input" type="text" value="<?= htmlspecialchars($vagaCargoNome) ?>" disabled>
+                    <p class="adm-input-hint">Definido na vaga — aplicado automaticamente ao funcionário.</p>
+                    <?php else: ?>
+                    <select class="adm-select" id="ctCargo">
+                        <option value="">—</option>
+                        <?php foreach ($rhCargos as $cargo): ?>
+                        <option value="<?= (int) $cargo['id'] ?>"><?= htmlspecialchars($cargo['nome']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="adm-input-hint">Esta vaga não tem cargo definido — configura em Vagas → Editar para futuras contratações.</p>
+                    <?php endif; ?>
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label" for="ctUnidade">Unidade Organizacional</label>
+                    <select class="adm-select" id="ctUnidade">
+                        <option value="">—</option>
+                        <?php foreach ($rhUnidades as $unidade): ?>
+                        <option value="<?= (int) $unidade['id'] ?>"><?= htmlspecialchars($unidade['nome']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label" for="ctHorario">Horário de Trabalho</label>
+                    <select class="adm-select" id="ctHorario">
+                        <option value="">—</option>
+                        <?php foreach ($rhHorarios as $horario): ?>
+                        <option value="<?= (int) $horario['id'] ?>"><?= htmlspecialchars($horario['nome']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="adm-form-group">
+                    <label class="adm-label" for="ctDataFim">Data Fim (se contrato a termo)</label>
+                    <input class="adm-input" type="date" id="ctDataFim">
+                </div>
+            </div>
+
+            <div class="adm-form-group" style="margin-top:var(--adm-sp-2)">
+                <label class="adm-label">Autorização de Trabalho (apenas trabalhadores estrangeiros)</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--adm-sp-4)">
+                    <input class="adm-input" type="text" id="ctAutorizacaoTrabalho" placeholder="N.º da autorização">
+                    <input class="adm-input" type="date" id="ctDataValidadeAutorizacao" title="Validade da autorização">
+                </div>
+            </div>
+
+            <div class="adm-form-group">
+                <label class="adm-label">Contacto de Emergência (opcional)</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--adm-sp-4)">
+                    <input class="adm-input" type="text" id="ctContactoNome" placeholder="Nome">
+                    <input class="adm-input" type="text" id="ctContactoParentesco" placeholder="Parentesco">
+                    <input class="adm-input" type="text" id="ctContactoTelefone" placeholder="Telefone">
+                </div>
+            </div>
+
+            <div id="ctMsg" style="margin-top:var(--adm-sp-3)"></div>
+        </div>
+        <div class="adm-modal-footer">
+            <button class="adm-btn" onclick="document.getElementById('modalContratar').style.display='none'">Cancelar</button>
+            <button class="adm-btn adm-btn-primary" id="btnConfirmarContratar" onclick="confirmarContratacao()">
+                Confirmar Contratação
+            </button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<script src="/assets/js/vendor/socket.io.min.js"></script>
 <script>
-const CAND_ID = <?= $id ?>;
-const CSRF    = '<?= $csrf ?>';
-const ADMIN   = '<?= htmlspecialchars($adminUser) ?>';
+const CAND_ID     = <?= $id ?>;
+const CSRF        = '<?= $csrf ?>';
+const ADMIN       = '<?= htmlspecialchars($adminUser) ?>';
+const SOCKET_URL  = '<?= $socketUrl ?>';
+const SOCKET_TOKEN = '<?= $socketToken ?>';
+
+// ── Tempo real (Socket.IO) ─────────────────────────────────────
+// Liga-se directamente ao backend Go — quando o candidato envia uma
+// mensagem pela app, a nota aparece aqui sem recarregar a página.
+const socket = io(SOCKET_URL, {
+    transports: ['websocket'],
+    auth: { token: SOCKET_TOKEN },
+});
+socket.on('connect', () => socket.emit('join_candidatura', CAND_ID));
+socket.on('nova_mensagem', (nota) => {
+    if (document.querySelector(`[data-nota-id="${nota.id}"]`)) return; // já está na timeline (eco da própria nota)
+    appendTimeline(nota.tipo === 'nota' ? 'nota' : nota.tipo, nota.conteudo, nota.autor, nota.id);
+});
 
 // ── Tabs ─────────────────────────────────────────────────────
 function switchTab(name, btn) {
@@ -539,14 +716,48 @@ async function saveNota() {
 }
 
 // ── Contratar Candidato ───────────────────────────────────────
-async function contratarCandidato() {
-    if (!confirm('Confirmar contratação de ' + <?= json_encode($c['nome']) ?> + '? Esta acção é irreversível.')) return;
-    const btns = [document.getElementById('btnContratar'), document.getElementById('btnContratarSidebar')].filter(Boolean);
-    btns.forEach(b => { b.disabled = true; b.textContent = 'A contratar...'; });
+function contratarCandidato() {
+    document.getElementById('ctMsg').innerHTML = '';
+    document.getElementById('modalContratar').style.display = 'flex';
+}
+
+async function confirmarContratacao() {
+    const dataNascimento = document.getElementById('ctDataNascimento').value;
+    const ctMsg = document.getElementById('ctMsg');
+    if (!dataNascimento) {
+        ctMsg.innerHTML = '<span style="color:#b91c1c">A data de nascimento é obrigatória.</span>';
+        return;
+    }
+
+    const payload = {
+        id: CAND_ID,
+        csrf: CSRF,
+        data_nascimento: dataNascimento,
+        nacionalidade: document.getElementById('ctNacionalidade').value.trim(),
+        tipo_documento: document.getElementById('ctTipoDocumento').value,
+        numero_documento: document.getElementById('ctNumeroDocumento').value.trim(),
+        nuit: document.getElementById('ctNuit').value.trim(),
+        tipo_contrato: document.getElementById('ctTipoContrato').value,
+        data_admissao: document.getElementById('ctDataAdmissao').value,
+        salario_base: document.getElementById('ctSalarioBase').value,
+        cargo_id: document.getElementById('ctCargo')?.value ?? '',
+        unit_id: document.getElementById('ctUnidade').value,
+        horario_id: document.getElementById('ctHorario').value,
+        data_fim: document.getElementById('ctDataFim').value,
+        autorizacao_trabalho: document.getElementById('ctAutorizacaoTrabalho').value.trim(),
+        data_validade_autorizacao: document.getElementById('ctDataValidadeAutorizacao').value,
+        contacto_emergencia_nome: document.getElementById('ctContactoNome').value.trim(),
+        contacto_emergencia_parentesco: document.getElementById('ctContactoParentesco').value.trim(),
+        contacto_emergencia_telefone: document.getElementById('ctContactoTelefone').value.trim(),
+    };
+
+    const btn = document.getElementById('btnConfirmarContratar');
+    btn.disabled = true;
+    btn.textContent = 'A contratar...';
     try {
         const res  = await fetch('/nexora/api/candidatura_contratar', {
             method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({id: CAND_ID, csrf: CSRF})
+            body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (data.ok) {
@@ -554,25 +765,26 @@ async function contratarCandidato() {
             if (div) {
                 div.style.display = 'block';
                 div.innerHTML = '<strong style="color:#15803d">Contratado com sucesso!</strong><br>'
-                    + (data.rh_employee_id ? '<span style="font-size:.85rem;color:#166534">Funcionário RH criado (ID: ' + data.rh_employee_id + '). '
-                       + 'Agora crie o professor em <a href="/nexora/gestao-escolar/professores" style="color:#15803d">Gestão Escolar → Professores</a>.</span>'
-                       : '<span style="font-size:.85rem;color:#166534">' + (data.mensagem || '') + '</span>');
+                    + '<span style="font-size:.85rem;color:#166534">' + (data.mensagem || '') + '</span>';
             }
-            btns.forEach(b => { b.disabled = true; b.style.opacity = '.5'; });
+            document.getElementById('modalContratar').style.display = 'none';
+            [document.getElementById('btnContratar'), document.getElementById('btnContratarSidebar')].filter(Boolean)
+                .forEach(b => { b.disabled = true; b.style.opacity = '.5'; });
             showToast('Candidato contratado!');
             setTimeout(() => location.reload(), 2000);
         } else {
-            btns.forEach(b => { b.disabled = false; b.textContent = 'Contratar'; });
-            showToast(data.erro || 'Erro ao contratar', 'error');
+            ctMsg.innerHTML = '<span style="color:#b91c1c">' + (data.erro || 'Erro ao contratar') + '</span>';
         }
     } catch {
-        btns.forEach(b => { b.disabled = false; b.textContent = 'Contratar'; });
-        showToast('Erro de ligação', 'error');
+        ctMsg.innerHTML = '<span style="color:#b91c1c">Erro de ligação</span>';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Confirmar Contratação';
     }
 }
 
 // ── Append to timeline ────────────────────────────────────────
-function appendTimeline(tipo, conteudo) {
+function appendTimeline(tipo, conteudo, autor = ADMIN, id = null) {
     const icons = {
         nota: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
         entrevista: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
@@ -584,11 +796,12 @@ function appendTimeline(tipo, conteudo) {
 
     const el = document.createElement('div');
     el.className = 'timeline-item';
+    if (id !== null) el.dataset.notaId = id;
     el.innerHTML = `
         <div class="timeline-dot ${dotColors[tipo] || 'timeline-dot--gray'}">${icons[tipo] || ''}</div>
         <div class="timeline-body">
             <div class="timeline-header">
-                <span class="timeline-author">${ADMIN}</span>
+                <span class="timeline-author">${autor}</span>
                 <span class="timeline-time">${ts}</span>
             </div>
             <div class="timeline-content"><p>${conteudo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p></div>
@@ -611,3 +824,5 @@ function appendTimeline(tipo, conteudo) {
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+
+

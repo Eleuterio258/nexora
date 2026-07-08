@@ -1,19 +1,19 @@
-<?php
+﻿<?php
 
-    $id         = $app->request->queryInt('id', 0);
-    $isEdit     = $id > 0;
+    $idHash = $app->request->queryString('id');
+    $isEdit = $idHash !== '';
     $o          = null;
     $atividades = [];
 
     if ($isEdit) {
-    $resp = $app->nexora->call('GET', "/api/crm/oportunidades/$id");
+    $resp = $app->nexora->call('GET', "/api/crm/oportunidades/$idHash");
     if ($resp['status'] !== 200) {
         header('Location: /nexora/crm/oportunidades');
         exit;
     }
     $o = $resp['body'];
 
-    $atvResp    = $app->nexora->call('GET', '/api/crm/atividades', null, ['oportunidade_id' => $id, 'limit' => 50]);
+    $atvResp    = $app->nexora->call('GET', '/api/crm/atividades', null, ['oportunidade_id' => $idHash, 'limit' => 50]);
     $atividades = $atvResp['body']['data'] ?? [];
     }
 
@@ -397,7 +397,7 @@
     <div class="adm-card">
         <div class="adm-card-header"><h2 class="adm-card-title">Lead de Origem</h2></div>
         <div class="adm-card-body">
-            <a href="/nexora/crm/leads/form?id=<?php echo (int) $o['lead_id'] ?>" class="adm-btn adm-btn-outline" style="width:100%;justify-content:center">
+            <a href="/nexora/crm/leads/form?id=<?php echo $app->id->encode((int)$o['lead_id']) ?>" class="adm-btn adm-btn-outline" style="width:100%;justify-content:center">
                 Ver Lead #<?php echo (int) $o['lead_id'] ?>
             </a>
         </div>
@@ -532,3 +532,5 @@ document.head.appendChild(style);
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+
+

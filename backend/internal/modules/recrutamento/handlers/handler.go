@@ -9,17 +9,38 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
+	"nexora/internal/idhash"
+	"nexora/internal/push"
 	"nexora/internal/storage"
 )
 
 type Handler struct {
-	db      *pgxpool.Pool
-	cfg     *config.Config
-	storage storage.Provider
+	db       *pgxpool.Pool
+	cfg      *config.Config
+	storage  storage.Provider
+	push     *push.Service
+	realtime *RealtimeServer
+	idh      *idhash.Hasher
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider) *Handler {
-	return &Handler{db: db, cfg: cfg, storage: st}
+func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider, pushSvc *push.Service, realtime *RealtimeServer, idh *idhash.Hasher) *Handler {
+	return &Handler{db: db, cfg: cfg, storage: st, push: pushSvc, realtime: realtime, idh: idh}
+}
+
+// decodeID resolve o parâmetro "{id}" de uma rota aninhada (ex.: /candidaturas/{id})
+// para o inteiro real. O middleware global idh.Middleware() (router.go) não consegue
+// decifrar estes parâmetros — o chi só os resolve dentro do handler final de um
+// sub-router montado via r.Route(), depois de qualquer middleware (do próprio
+// sub-router ou de fora) já ter corrido. Por isso a decodificação tem de acontecer
+// aqui, explicitamente, em cada handler que lê "id" de uma rota aninhada.
+func (h *Handler) decodeID(raw string) string {
+	if _, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		return raw // já é um inteiro (ex.: chamada interna ou id não ofuscado)
+	}
+	if decoded, err := h.idh.Decode(raw); err == nil && decoded > 0 {
+		return strconv.FormatInt(decoded, 10)
+	}
+	return raw
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {

@@ -1,5 +1,6 @@
 package com.factpro.compras.service;
 
+import com.factpro.auth.PermissionChecker;
 import com.factpro.compras.dao.CompraDAO;
 import com.factpro.compras.dao.CompraItemDAO;
 import com.factpro.compras.model.Compra;
@@ -7,6 +8,7 @@ import com.factpro.compras.model.CompraItem;
 import com.factpro.produtos.dao.ProdutoDAO;
 import com.factpro.produtos.model.Produto;
 import com.factpro.stock.dao.StockMovimentoDAO;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -27,11 +29,17 @@ class CompraServiceTest {
 
     @BeforeEach
     void setUp() {
+        PermissionChecker.setTestBypass(true);
         compraDAO = mock(CompraDAO.class);
         compraItemDAO = mock(CompraItemDAO.class);
         produtoDAO = mock(ProdutoDAO.class);
         stockMovimentoDAO = mock(StockMovimentoDAO.class);
         compraService = new CompraService(compraDAO, compraItemDAO, produtoDAO, stockMovimentoDAO);
+    }
+
+    @AfterEach
+    void tearDown() {
+        PermissionChecker.setTestBypass(false);
     }
 
     @Test

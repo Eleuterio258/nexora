@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../features/auth/presentation/bloc/auth_bloc.dart';
 import '../widgets/nexora_logo.dart';
 import 'notifications_screen.dart';
 import 'personal_info_screen.dart';
@@ -9,9 +11,45 @@ import 'settings_screen.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Terminar sessão'),
+        content: const Text('Tem a certeza que pretende sair da sua conta?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Sair',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      context.read<AuthBloc>().add(const AuthLogoutRequested());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is AuthUnauthenticated) {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/login',
+            (route) => false,
+          );
+        }
+      },
+      child: Scaffold(
       backgroundColor: kPrimary,
       body: SafeArea(
         child: Column(
@@ -221,6 +259,13 @@ class ProfileScreen extends StatelessWidget {
                         onTap: () => Navigator.push(context,
                             MaterialPageRoute(builder: (_) => const SettingsScreen())),
                       ),
+                      const SizedBox(height: 14),
+                      _MenuItem(
+                        icon: Icons.logout,
+                        title: 'Logout',
+                        subtitle: 'Sign out of your account',
+                        onTap: () => _confirmLogout(context),
+                      ),
                       const SizedBox(height: 24),
                       // Complete profile card
                       Container(
@@ -310,6 +355,7 @@ class ProfileScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

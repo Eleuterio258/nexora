@@ -91,7 +91,7 @@
                 <td class="adm-fw-600"><?php echo htmlspecialchars($o['titulo']) ?></td>
                 <td>
                     <?php if ($o['lead_id']): ?>
-                    <a href="/nexora/crm/leads/form?id=<?php echo $o['lead_id'] ?>" class="adm-badge adm-badge--gray" style="text-decoration:none">Lead #<?php echo $o['lead_id'] ?></a>
+                    <a href="/nexora/crm/leads/form?id=<?php echo $app->id->encode((int)$o['lead_id']) ?>" class="adm-badge adm-badge--gray" style="text-decoration:none">Lead #<?php echo $o['lead_id'] ?></a>
                     <?php endif; ?>
                     <?php if ($o['cliente_id']): ?>
                     <span class="adm-badge adm-badge--blue">Cliente #<?php echo $o['cliente_id'] ?></span>
@@ -106,7 +106,7 @@
                 <?php if ($canGerirOportunidades): ?>
                 <td>
                     <div class="adm-actions">
-                        <a href="/nexora/crm/oportunidades/form?id=<?php echo $o['id'] ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Ver / Editar">
+                        <a href="/nexora/crm/oportunidades/form?id=<?php echo $app->id->encode((int)$o['id']) ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Ver / Editar">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>

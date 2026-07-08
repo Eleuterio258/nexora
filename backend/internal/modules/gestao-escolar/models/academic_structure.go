@@ -72,9 +72,21 @@ type CourseSubject struct {
 	LevelID              *int64    `json:"level_id,omitempty"`
 	SeriesID             *int64    `json:"series_id,omitempty"`
 	SubjectID            int64     `json:"subject_id"`
-	Obrigatoria          bool      `json:"obrigatoria"`
+	Obrigatoria          *bool     `json:"obrigatoria,omitempty"`
 	CargaHorariaSemanal  *int      `json:"carga_horaria_semanal,omitempty"`
 	Componente           string    `json:"componente"`
 	Activo               bool      `json:"activo"`
 	CreatedAt            time.Time `json:"created_at"`
+}
+
+// CourseSubjectTerm configura a presença e o exame de uma disciplina num período específico.
+// Uma linha por combinação (disciplina × período).
+// Ausência de linha = disciplina não é leccionada nesse período.
+type CourseSubjectTerm struct {
+	ID               int64    `json:"id"`
+	TenantID         int64    `json:"tenant_id"`
+	CourseSubjectID  int64    `json:"course_subject_id"`
+	TermID           int64    `json:"term_id"`
+	TemExame         bool     `json:"tem_exame"`
+	PesoExame        *float64 `json:"peso_exame,omitempty"`
 }

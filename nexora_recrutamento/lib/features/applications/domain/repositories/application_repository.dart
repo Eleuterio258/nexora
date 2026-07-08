@@ -7,6 +7,10 @@ abstract class ApplicationRepository {
   Future<Either<Failure, Application>> getApplicationById(int id);
   Future<Either<Failure, Application>> submitApplication({
     required int jobId,
+    required String jobTitle,
+    required String nome,
+    required String email,
+    String? telefone,
     required String coverLetter,
   });
 }

@@ -1,8 +1,8 @@
 <?php
 
-    $id = $app->request->queryInt('id', 0);
+    $idHash = $app->request->queryString('id');
 
-    $resp = $app->nexora->call('GET', "/api/faturacao/invoices/$id");
+    $resp = $app->nexora->call('GET', "/api/faturacao/invoices/$idHash");
     if ($resp['status'] !== 200) {
         header('Location: /nexora/faturacao/faturas');
         exit;
@@ -72,6 +72,6 @@
     $observacoes  = $fatura['observacoes'] ?? null;
 
     $footerNote = 'Documento gerado em ' . date('d/m/Y H:i') . ' — sem validade fiscal.';
-    $backUrl    = '/nexora/faturacao/faturas/form?id=' . $id;
+    $backUrl    = '/nexora/faturacao/faturas/form?id=' . $idHash;
 
     include dirname(__DIR__) . '/partials/documento_print.php';

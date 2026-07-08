@@ -50,6 +50,10 @@ services:
     environment:
       APP_ENV: ${APP_ENV:-production}
       NEXORA_API_URL: http://nexora-api:8080
+      # URL público da API, alcançável pelo browser (Socket.IO liga-se
+      # directamente ao Go, sem passar pelo proxy PHP) — diferente do
+      # NEXORA_API_URL acima, que é só para as chamadas server-to-server.
+      NEXORA_PUBLIC_API_URL: ${NEXORA_PUBLIC_API_URL:-https://api.nexora.e258tech.tech}
     volumes:
       - web_uploads:/var/www/html/uploads
     networks:

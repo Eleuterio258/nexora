@@ -40,9 +40,9 @@
 
             <div class="vagas-hero-actions" style="margin-top:1.5rem;display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
                 <a href="#sidebar-form" id="btn-candidatar-publico" class="btn-primary" onclick="setCandidaturaTipo('publica')">Candidatar-me</a>
-                <a href="/carreira/candidato/login?returnTo=/vagas" id="btn-candidatar-conta" class="btn-primary" style="background:#047857;">Entrar e candidatar-me</a>
+                <a href="<?= htmlspecialchars($app->candidatoRoutes->loginUrl('/vagas?tipo=conta')) ?>" id="btn-candidatar-conta" class="btn-primary" style="background:#047857;">Entrar e candidatar-me</a>
                 <a href="/carreira/estado" class="btn-outline">Consultar estado</a>
-                <a href="/carreira/candidato/login" class="btn-outline">Área do candidato</a>
+                <a href="<?= htmlspecialchars($app->candidatoRoutes->loginUrl()) ?>" class="btn-outline">Área do candidato</a>
             </div>
 
             <?php if ($totalVagas > 0): ?>
@@ -572,13 +572,14 @@
         const firstKey = Object.keys(VAGAS)[0];
         if (firstKey) updateSidebar(firstKey);
 
-        // Pré-preencher formulário se candidato autenticado via conta
+        // Pré-preencher formulário se candidato autenticado via conta (sessão do servidor)
         (function preFillCandidato() {
-            const id    = localStorage.getItem('candidato_id');
-            const nome  = localStorage.getItem('candidato_nome');
-            const email = localStorage.getItem('candidato_email');
-            const tel   = localStorage.getItem('candidato_telefone');
-            if (!id) return;
+            const candidato = <?= json_encode($candidatoLogado ?: null, JSON_UNESCAPED_UNICODE) ?>;
+            if (!candidato) return;
+
+            const nome  = candidato.nome;
+            const email = candidato.email;
+            const tel   = candidato.telefone;
 
             const elNome  = document.getElementById('f-nome');
             const elEmail = document.getElementById('f-email');

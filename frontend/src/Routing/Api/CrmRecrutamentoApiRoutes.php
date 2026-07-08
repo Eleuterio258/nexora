@@ -1,5 +1,5 @@
 <?php
-declare(strict_types=1);
+declare (strict_types = 1);
 
 namespace E258Tech\Routing\Api;
 
@@ -9,16 +9,16 @@ final class CrmRecrutamentoApiRoutes
     {
         return [
             // ── CRM ───────────────────────────────────────────────────────────────
-            'lead_save'           => ['module' => 'crm', 'action' => 'gerir_leads'],
-            'lead_mover'          => ['module' => 'crm', 'action' => 'mover_leads'],
-            'lead_delete'         => ['module' => 'crm', 'action' => 'eliminar_leads'],
-            'lead_converter'      => ['module' => 'crm', 'action' => 'converter_leads'],
-            'oportunidade_save'   => ['module' => 'crm', 'action' => 'gerir_oportunidades'],
-            'oportunidade_mover'  => ['module' => 'crm', 'action' => 'gerir_oportunidades'],
-            'oportunidade_perder' => ['module' => 'crm', 'action' => 'gerir_oportunidades'],
-            'oportunidade_delete' => ['module' => 'crm', 'action' => 'gerir_oportunidades'],
-            'atividade_save'      => ['module' => 'crm', 'action' => 'gerir_atividades'],
-            'atividade_concluir'  => ['module' => 'crm', 'action' => 'gerir_atividades'],
+            'lead_save'                        => ['module' => 'crm', 'action' => 'gerir_leads'],
+            'lead_mover'                       => ['module' => 'crm', 'action' => 'mover_leads'],
+            'lead_delete'                      => ['module' => 'crm', 'action' => 'eliminar_leads'],
+            'lead_converter'                   => ['module' => 'crm', 'action' => 'converter_leads'],
+            'oportunidade_save'                => ['module' => 'crm', 'action' => 'gerir_oportunidades'],
+            'oportunidade_mover'               => ['module' => 'crm', 'action' => 'gerir_oportunidades'],
+            'oportunidade_perder'              => ['module' => 'crm', 'action' => 'gerir_oportunidades'],
+            'oportunidade_delete'              => ['module' => 'crm', 'action' => 'gerir_oportunidades'],
+            'atividade_save'                   => ['module' => 'crm', 'action' => 'gerir_atividades'],
+            'atividade_concluir'               => ['module' => 'crm', 'action' => 'gerir_atividades'],
 
             // ── Recrutamento ──────────────────────────────────────────────────────
             'vaga_save'                        => ['module' => 'recrutamento', 'action' => 'gerir_vagas'],

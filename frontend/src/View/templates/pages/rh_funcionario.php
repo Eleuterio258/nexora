@@ -1,8 +1,8 @@
-<?php
+﻿<?php
 
-    $id = $app->request->queryInt('id', 0);
+    $idHash = $app->request->queryString('id');
 
-    $resp = $app->nexora->call('GET', "/api/rh/funcionarios/$id");
+    $resp = $app->nexora->call('GET', "/api/rh/funcionarios/$idHash");
     if ($resp['status'] !== 200) {
         header('Location: /nexora/rh/funcionarios');
         exit;
@@ -398,7 +398,7 @@
                     <td><span class="adm-badge <?php echo $cBadge[0] ?>"><?php echo $cBadge[1] ?></span></td>
                     <td>
                         <?php if (!empty($c['ficheiro_url'])): ?>
-                        <a href="/nexora/api/rh_contrato_pdf?id=<?php echo (int) $c['id'] ?>" target="_blank" class="adm-btn adm-btn-ghost adm-btn-sm">Ver PDF</a>
+                        <a href="/nexora/api/rh_contrato_pdf?id=<?php echo $app->id->encode((int)$c['id']) ?>" target="_blank" class="adm-btn adm-btn-ghost adm-btn-sm">Ver PDF</a>
                         <?php else: ?>—<?php endif; ?>
                     </td>
                     <td style="white-space:nowrap">
@@ -1183,7 +1183,7 @@
                     <td class="adm-fw-600"><?php echo rhValorSalarial($rv['salario_liquido'] !== null ? (float)$rv['salario_liquido'] : null, $podeVerSalarios) ?></td>
                     <td><span class="adm-badge <?php echo $rvBadge[0] ?>"><?php echo $rvBadge[1] ?></span></td>
                     <td>
-                        <a class="adm-btn adm-btn-ghost adm-btn-sm" href="/nexora/rh/recibo-vencimento?id=<?php echo (int)$rv['id'] ?>">
+                        <a class="adm-btn adm-btn-ghost adm-btn-sm" href="/nexora/rh/recibo-vencimento?id=<?php echo $app->id->encode((int)$rv['id']) ?>">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:3px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                             Ver
                         </a>
@@ -2220,3 +2220,5 @@ function eliminarDocumento(id) {
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+
+

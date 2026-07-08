@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:share_plus/share_plus.dart';
+import '../features/applications/presentation/bloc/application_bloc.dart';
+import '../features/auth/presentation/bloc/auth_bloc.dart';
+import '../features/jobs/domain/entities/job.dart';
+import '../features/jobs/presentation/bloc/job_bloc.dart';
 import '../widgets/nexora_logo.dart';
 
 class JobDetailsScreen extends StatefulWidget {
-  const JobDetailsScreen({super.key});
+  final Job job;
+  const JobDetailsScreen({super.key, required this.job});
 
   @override
   State<JobDetailsScreen> createState() => _JobDetailsScreenState();
@@ -12,7 +19,59 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
   int _tab = 0;
   bool _descExpanded = true;
   bool _reqExpanded = true;
-  bool _saved = false;
+  late bool _saved;
+
+  Job get job => widget.job;
+
+  @override
+  void initState() {
+    super.initState();
+    _saved = widget.job.isSaved;
+  }
+
+  void _toggleSave() {
+    final save = !_saved;
+    setState(() => _saved = save);
+    context.read<JobBloc>().add(JobSaveToggled(job: job, save: save));
+  }
+
+  void _share(BuildContext context) {
+    final box = context.findRenderObject() as RenderBox?;
+    // nexoraapp://vaga/<id> — abre directamente este ecrã em quem já tem a
+    // app instalada (ver DeepLinkService, registado em main.dart).
+    final link = 'nexoraapp://vaga/${job.id}';
+    SharePlus.instance.share(
+      ShareParams(
+        subject: job.title,
+        text: 'Vaga: ${job.title} — ${job.company}\n'
+            '${job.location} · ${job.type}\n\n'
+            'Vê os detalhes na app Nexora Recrutamento:\n$link',
+        sharePositionOrigin:
+            box != null ? box.localToGlobal(Offset.zero) & box.size : null,
+      ),
+    );
+  }
+
+  void _openApplySheet(BuildContext context) {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Inicie sessão para se candidatar.')),
+      );
+      return;
+    }
+    final user = authState.user;
+    // ApplicationBloc é global (app.dart) — a folha de candidatura reutiliza-o
+    // e, ao terminar, o próprio bloc é o que já alimenta Applications/Dashboard.
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _ApplySheet(job: job, nome: user.nome, email: user.email),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +108,7 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               _saved ? Icons.bookmark : Icons.bookmark_border,
               color: const Color(0xFF1A2E2A),
             ),
-            onPressed: () => setState(() => _saved = !_saved),
+            onPressed: _toggleSave,
           ),
         ],
       ),
@@ -62,9 +121,9 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Title
-                  const Text(
-                    'Senior Full Stack\nDeveloper',
-                    style: TextStyle(
+                  Text(
+                    job.title,
+                    style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
                       color: Color(0xFF1A2E2A),
@@ -76,14 +135,14 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: const [
-                        _MetaChip(icon: Icons.work_outline, label: 'Engineering'),
-                        SizedBox(width: 10),
-                        _MetaChip(icon: Icons.location_on_outlined, label: 'Bangalore, India'),
-                        SizedBox(width: 10),
-                        _MetaChip(icon: Icons.business_outlined, label: 'Hybrid'),
-                        SizedBox(width: 10),
-                        _MetaChip(icon: Icons.attach_money_outlined, label: '₹18 - ₹30 LPA'),
+                      children: [
+                        if (job.category.isNotEmpty)
+                          _MetaChip(icon: Icons.work_outline, label: job.category),
+                        if (job.category.isNotEmpty) const SizedBox(width: 10),
+                        _MetaChip(
+                            icon: Icons.location_on_outlined, label: job.location),
+                        const SizedBox(width: 10),
+                        _MetaChip(icon: Icons.business_outlined, label: job.type),
                       ],
                     ),
                   ),
@@ -100,42 +159,34 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                     ),
                     child: Row(
                       children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: kPrimary,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Center(
-                            child: NexoraLogoIcon(size: 30, isWhite: true),
-                          ),
-                        ),
+                        const NexoraLogoIcon(size: 40),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                children: const [
+                                children: [
                                   Flexible(
                                     child: Text(
-                                      'Nexora Technologies',
+                                      job.company,
                                       overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 14,
                                         color: Color(0xFF1A2E2A),
                                       ),
                                     ),
                                   ),
-                                  SizedBox(width: 4),
-                                  Icon(Icons.verified, color: kPrimary, size: 16),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.verified, color: kPrimary, size: 16),
                                 ],
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                'Building innovative digital solutions that\nempower businesses worldwide.',
+                                job.numberOfPositions > 1
+                                    ? '${job.numberOfPositions} vagas disponíveis'
+                                    : '1 vaga disponível',
                                 style: TextStyle(
                                   color: Colors.grey.shade500,
                                   fontSize: 12,
@@ -145,23 +196,6 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        OutlinedButton(
-                          onPressed: () {},
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: kPrimary),
-                            foregroundColor: kPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text('View Company',
-                              style: TextStyle(fontSize: 12)),
-                        ),
                       ],
                     ),
                   ),
@@ -170,17 +204,17 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   Row(
                     children: [
                       _TabItem(
-                          label: 'Job Description',
+                          label: 'Descrição',
                           active: _tab == 0,
                           onTap: () => setState(() => _tab = 0)),
                       const SizedBox(width: 24),
                       _TabItem(
-                          label: 'Requirements',
+                          label: 'Requisitos',
                           active: _tab == 1,
                           onTap: () => setState(() => _tab = 1)),
                       const SizedBox(width: 24),
                       _TabItem(
-                          label: 'Benefits',
+                          label: 'Benefícios',
                           active: _tab == 2,
                           onTap: () => setState(() => _tab = 2)),
                     ],
@@ -189,119 +223,90 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                   Divider(color: Colors.grey.shade200),
                   const SizedBox(height: 16),
 
-                  // ── Tab 0: Job Description ──
+                  // ── Tab 0: Descrição ──
                   if (_tab == 0) ...[
                     _ExpandableSection(
                       icon: Icons.description_outlined,
-                      title: 'About the Role',
+                      title: 'Sobre a função',
                       expanded: _descExpanded,
                       onToggle: () =>
                           setState(() => _descExpanded = !_descExpanded),
-                      child: const Text(
-                        'We are looking for a passionate and experienced Senior Full Stack Developer to join our dynamic engineering team. You will be responsible for designing, developing, and maintaining scalable web applications that deliver exceptional user experiences.\n\nYou will collaborate with cross-functional teams to define, design, and ship new features, and help shape the technical direction of our products.',
-                        style: TextStyle(
+                      child: Text(
+                        (job.about != null && job.about!.isNotEmpty)
+                            ? job.about!
+                            : job.description,
+                        style: const TextStyle(
                             color: Color(0xFF4A5568), fontSize: 14, height: 1.6),
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    _ExpandableSection(
-                      icon: Icons.work_history_outlined,
-                      title: 'Responsibilities',
-                      expanded: _reqExpanded,
-                      onToggle: () =>
-                          setState(() => _reqExpanded = !_reqExpanded),
-                      child: Column(
-                        children: const [
-                          _BulletItem('Design and implement scalable backend services and REST APIs'),
-                          _BulletItem('Build responsive, high-performance frontend interfaces with React'),
-                          _BulletItem('Collaborate with product and design teams on feature delivery'),
-                          _BulletItem('Conduct code reviews and mentor junior engineers'),
-                          _BulletItem('Ensure application security, performance, and reliability'),
-                        ],
+                    if (job.responsibilities.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      _ExpandableSection(
+                        icon: Icons.work_history_outlined,
+                        title: 'Responsabilidades',
+                        expanded: _reqExpanded,
+                        onToggle: () =>
+                            setState(() => _reqExpanded = !_reqExpanded),
+                        child: Column(
+                          children: job.responsibilities
+                              .map((r) => _BulletItem(r))
+                              .toList(),
+                        ),
                       ),
-                    ),
+                    ],
                   ],
 
-                  // ── Tab 1: Requirements ──
+                  // ── Tab 1: Requisitos ──
                   if (_tab == 1) ...[
-                    _ExpandableSection(
-                      icon: Icons.school_outlined,
-                      title: 'Qualifications',
-                      expanded: _descExpanded,
-                      onToggle: () =>
-                          setState(() => _descExpanded = !_descExpanded),
-                      child: Column(
-                        children: const [
-                          _BulletItem('Bachelor\'s degree in Computer Science or related field'),
-                          _BulletItem('5+ years of experience in full stack development'),
-                          _BulletItem('Strong proficiency in JavaScript, TypeScript and React'),
-                          _BulletItem('Experience with Node.js, Express or similar backend frameworks'),
-                          _BulletItem('Knowledge of PostgreSQL, MongoDB or Redis'),
-                          _BulletItem('Familiarity with RESTful APIs and GraphQL'),
-                        ],
+                    if (job.requiredQualifications.isNotEmpty)
+                      _ExpandableSection(
+                        icon: Icons.school_outlined,
+                        title: 'Requisitos obrigatórios',
+                        expanded: _descExpanded,
+                        onToggle: () =>
+                            setState(() => _descExpanded = !_descExpanded),
+                        child: Column(
+                          children: job.requiredQualifications
+                              .map((r) => _BulletItem(r))
+                              .toList(),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    _ExpandableSection(
-                      icon: Icons.star_outline,
-                      title: 'Nice to Have',
-                      expanded: _reqExpanded,
-                      onToggle: () =>
-                          setState(() => _reqExpanded = !_reqExpanded),
-                      child: Column(
-                        children: const [
-                          _BulletItem('Experience with cloud platforms (AWS, GCP or Azure)'),
-                          _BulletItem('Knowledge of Docker and Kubernetes'),
-                          _BulletItem('Open source contributions'),
-                          _BulletItem('Experience in an Agile/Scrum environment'),
-                        ],
+                    if (job.preferredQualifications.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      _ExpandableSection(
+                        icon: Icons.star_outline,
+                        title: 'Preferenciais',
+                        expanded: _reqExpanded,
+                        onToggle: () =>
+                            setState(() => _reqExpanded = !_reqExpanded),
+                        child: Column(
+                          children: job.preferredQualifications
+                              .map((r) => _BulletItem(r))
+                              .toList(),
+                        ),
                       ),
-                    ),
+                    ],
+                    if (job.requiredQualifications.isEmpty &&
+                        job.preferredQualifications.isEmpty)
+                      Text(
+                        'Sem requisitos específicos indicados para esta vaga.',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
                   ],
 
-                  // ── Tab 2: Benefits ──
+                  // ── Tab 2: Benefícios ──
                   if (_tab == 2) ...[
-                    _BenefitCard(
-                      icon: Icons.health_and_safety_outlined,
-                      title: 'Health & Wellness',
-                      items: const [
-                        'Full medical, dental and vision coverage',
-                        'Mental health support & counselling sessions',
-                        'Annual wellness budget of ₹25,000',
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _BenefitCard(
-                      icon: Icons.laptop_outlined,
-                      title: 'Work Flexibility',
-                      items: const [
-                        'Hybrid work model (3 days remote)',
-                        'Flexible working hours',
-                        'Home office setup allowance ₹30,000',
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _BenefitCard(
-                      icon: Icons.trending_up_outlined,
-                      title: 'Growth & Learning',
-                      items: const [
-                        'Annual learning budget of ₹50,000',
-                        'Access to online courses & certifications',
-                        'Conference attendance sponsorship',
-                        'Internal mentorship programme',
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    _BenefitCard(
-                      icon: Icons.celebration_outlined,
-                      title: 'Perks & Culture',
-                      items: const [
-                        '26 days paid leave + public holidays',
-                        'Team retreats twice a year',
-                        'Free meals at office cafeteria',
-                        'Employee stock option plan (ESOP)',
-                      ],
-                    ),
+                    if (job.benefits.isNotEmpty)
+                      _BenefitCard(
+                        icon: Icons.celebration_outlined,
+                        title: 'O que oferecemos',
+                        items: job.benefits,
+                      )
+                    else
+                      Text(
+                        'Sem benefícios específicos indicados para esta vaga.',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
                   ],
 
                   const SizedBox(height: 24),
@@ -327,7 +332,6 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Primary row: salary + Apply Now
                     Row(
                       children: [
                         Expanded(
@@ -335,91 +339,91 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text(
-                                'Salary',
-                                style: TextStyle(
+                              Text(
+                                job.deadline != null ? 'Prazo' : 'Regime',
+                                style: const TextStyle(
                                   color: Color(0xFF9AA5B1),
                                   fontSize: 11.5,
                                 ),
                               ),
                               const SizedBox(height: 2),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: const [
-                                  Text(
-                                    '₹18 – 30',
-                                    style: TextStyle(
-                                      color: Color(0xFF1A2E2A),
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'LPA',
-                                    style: TextStyle(
-                                      color: Color(0xFF9AA5B1),
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                job.deadline != null
+                                    ? '${job.deadline!.day.toString().padLeft(2, '0')}/${job.deadline!.month.toString().padLeft(2, '0')}/${job.deadline!.year}'
+                                    : job.type,
+                                style: const TextStyle(
+                                  color: Color(0xFF1A2E2A),
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(width: 12),
-                        SizedBox(
-                          height: 52,
-                          child: ElevatedButton.icon(
-                            onPressed: () {},
-                            icon: const Icon(Icons.send_rounded, size: 18),
-                            label: const Text(
-                              'Apply Now',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
+                        BlocBuilder<ApplicationBloc, ApplicationState>(
+                          builder: (context, state) {
+                            final jaCandidatou = state is ApplicationsLoaded &&
+                                state.applications
+                                    .any((a) => a.jobId == job.id);
+                            return SizedBox(
+                              height: 52,
+                              child: ElevatedButton.icon(
+                                onPressed: jaCandidatou
+                                    ? null
+                                    : () => _openApplySheet(context),
+                                icon: Icon(
+                                  jaCandidatou
+                                      ? Icons.check_circle_outline
+                                      : Icons.send_rounded,
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  jaCandidatou
+                                      ? 'Já se candidatou'
+                                      : 'Candidatar-me',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: kPrimary,
+                                  foregroundColor: Colors.white,
+                                  disabledBackgroundColor:
+                                      Colors.grey.shade300,
+                                  disabledForegroundColor:
+                                      Colors.grey.shade600,
+                                  elevation: 0,
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 24),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
                               ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: kPrimary,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
+                            );
+                          },
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
-                    // Secondary actions row
                     Row(
                       children: [
                         Expanded(
                           child: _BarAction(
                             icon: Icons.bookmark_border_rounded,
-                            label: 'Save Job',
-                            onTap: () => setState(() => _saved = !_saved),
+                            label: 'Guardar',
+                            onTap: _toggleSave,
                             active: _saved,
                           ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: _BarAction(
-                            icon: Icons.chat_bubble_outline_rounded,
-                            label: 'Message',
-                            onTap: () {},
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _BarAction(
                             icon: Icons.share_outlined,
-                            label: 'Share',
-                            onTap: () {},
+                            label: 'Partilhar',
+                            onTap: () => _share(context),
                           ),
                         ),
                       ],
@@ -430,6 +434,111 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ApplySheet extends StatefulWidget {
+  final Job job;
+  final String nome;
+  final String email;
+  const _ApplySheet({required this.job, required this.nome, required this.email});
+
+  @override
+  State<_ApplySheet> createState() => _ApplySheetState();
+}
+
+class _ApplySheetState extends State<_ApplySheet> {
+  final _coverCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _coverCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<ApplicationBloc, ApplicationState>(
+      listener: (context, state) {
+        if (state is ApplicationSubmitted) {
+          Navigator.pop(context);
+          // Actualiza a lista partilhada para Applications/Dashboard reflectirem já a nova candidatura.
+          context.read<ApplicationBloc>().add(const ApplicationsLoadRequested());
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Candidatura enviada com sucesso!')),
+          );
+        } else if (state is ApplicationFailureState) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+        }
+      },
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Candidatar-me a ${widget.job.title}',
+              style: const TextStyle(
+                  fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1A2E2A)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _coverCtrl,
+              maxLines: 5,
+              decoration: InputDecoration(
+                hintText: 'Escreva uma breve carta de apresentação (opcional)',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            BlocBuilder<ApplicationBloc, ApplicationState>(
+              builder: (context, state) {
+                final loading = state is ApplicationLoading;
+                return SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: loading
+                        ? null
+                        : () => context.read<ApplicationBloc>().add(
+                              ApplicationSubmitRequested(
+                                jobId: widget.job.id,
+                                jobTitle: widget.job.title,
+                                nome: widget.nome,
+                                email: widget.email,
+                                coverLetter: _coverCtrl.text.trim(),
+                              ),
+                            ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kPrimary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: loading
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.4, color: Colors.white),
+                          )
+                        : const Text('Enviar candidatura'),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

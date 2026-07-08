@@ -46,7 +46,7 @@ require __DIR__ . '/layout_top.php';
         <tbody>
         <?php foreach (array_slice($turmas, 0, 5) as $t): ?>
         <tr>
-            <td><a href="/portal/professor/turma?id=<?= (int)($t['id'] ?? 0) ?>" style="color:var(--prof-primary);text-decoration:none;font-weight:600"><?= htmlspecialchars($t['nome'] ?? $t['turma'] ?? '—') ?></a></td>
+            <td><a href="/portal/professor/turma?id=<?= $app->id->encode((int)($t['id'] ?? 0)) ?>" style="color:var(--prof-primary);text-decoration:none;font-weight:600"><?= htmlspecialchars($t['nome'] ?? $t['turma'] ?? '—') ?></a></td>
             <td><?= htmlspecialchars($t['disciplina'] ?? '—') ?></td>
             <td><?= (int)($t['total_alunos'] ?? 0) ?></td>
         </tr>

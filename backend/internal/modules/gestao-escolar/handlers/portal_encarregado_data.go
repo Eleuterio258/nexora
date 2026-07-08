@@ -43,14 +43,64 @@ func (h *Handler) EncarregadoBoletim(w http.ResponseWriter, r *http.Request) {
 	var grades any
 	_ = h.db.QueryRow(r.Context(), `
 		SELECT COALESCE(jsonb_agg(jsonb_build_object(
-			'subject_id', sub.id, 'nome', sub.nome,
-			'media',      ROUND(SUM(g.nota*i.peso)/NULLIF(SUM(i.peso),0),2),
-			'avaliacoes', COUNT(g.id)
-		) ORDER BY sub.nome), '[]')
-		FROM gestao_escolar.school_grades g
-		JOIN gestao_escolar.school_grade_items i ON i.id=g.grade_item_id AND i.publicado=TRUE
-		JOIN gestao_escolar.school_subjects sub ON sub.id=i.subject_id
-		WHERE `+gradeWhere+` GROUP BY sub.id, sub.nome`, gradeArgs...,
+			'subject_id', x.subject_id,
+			'nome',       x.nome,
+			'p1',         ROUND(x.p1,2),
+			'p2',         ROUND(x.p2,2),
+			'p3',         ROUND(x.p3,2),
+			'exame',      ROUND(x.exame,2),
+			'media',      ROUND(x.media,2),
+			'avaliacoes', x.avaliacoes
+		) ORDER BY x.nome), '[]')
+		FROM (
+			SELECT sub.id AS subject_id,
+			       sub.nome,
+			       AVG(g.nota) FILTER (
+			           WHERE lower(COALESCE(i.tipo,'')) <> 'exame'
+			             AND lower(COALESCE(i.nome,'')) NOT LIKE '%exame%'
+			             AND (
+			                 lower(COALESCE(t.codigo,'')) IN ('p1','t1','1')
+			              OR lower(COALESCE(t.codigo,'')) LIKE '%t1'
+			              OR lower(COALESCE(t.codigo,'')) LIKE '%-t1'
+			              OR lower(COALESCE(t.nome,'')) LIKE '1%'
+			              OR lower(COALESCE(t.nome,'')) LIKE '%primeir%'
+			             )
+			       ) AS p1,
+			       AVG(g.nota) FILTER (
+			           WHERE lower(COALESCE(i.tipo,'')) <> 'exame'
+			             AND lower(COALESCE(i.nome,'')) NOT LIKE '%exame%'
+			             AND (
+			                 lower(COALESCE(t.codigo,'')) IN ('p2','t2','2')
+			              OR lower(COALESCE(t.codigo,'')) LIKE '%t2'
+			              OR lower(COALESCE(t.codigo,'')) LIKE '%-t2'
+			              OR lower(COALESCE(t.nome,'')) LIKE '2%'
+			              OR lower(COALESCE(t.nome,'')) LIKE '%segund%'
+			             )
+			       ) AS p2,
+			       AVG(g.nota) FILTER (
+			           WHERE lower(COALESCE(i.tipo,'')) <> 'exame'
+			             AND lower(COALESCE(i.nome,'')) NOT LIKE '%exame%'
+			             AND (
+			                 lower(COALESCE(t.codigo,'')) IN ('p3','t3','3')
+			              OR lower(COALESCE(t.codigo,'')) LIKE '%t3'
+			              OR lower(COALESCE(t.codigo,'')) LIKE '%-t3'
+			              OR lower(COALESCE(t.nome,'')) LIKE '3%'
+			              OR lower(COALESCE(t.nome,'')) LIKE '%terceir%'
+			             )
+			       ) AS p3,
+			       AVG(g.nota) FILTER (
+			           WHERE lower(COALESCE(i.tipo,'')) = 'exame'
+			              OR lower(COALESCE(i.nome,'')) LIKE '%exame%'
+			       ) AS exame,
+			       SUM(g.nota*i.peso)/NULLIF(SUM(i.peso),0) AS media,
+			       COUNT(g.id) AS avaliacoes
+			FROM gestao_escolar.school_grades g
+			JOIN gestao_escolar.school_grade_items i ON i.id=g.grade_item_id AND i.publicado=TRUE
+			LEFT JOIN gestao_escolar.school_terms t ON t.id=i.term_id
+			JOIN gestao_escolar.school_subjects sub ON sub.id=i.subject_id
+			WHERE `+gradeWhere+`
+			GROUP BY sub.id, sub.nome
+		) x`, gradeArgs...,
 	).Scan(&grades)
 
 	var media *float64

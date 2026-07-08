@@ -76,7 +76,7 @@ include dirname(__DIR__) . '/layouts/top.php';
                 <td class="adm-fw-600" style="color:var(--adm-green-dark)"><?php echo $fmt($rv['salario_liquido']) ?></td>
                 <td><span class="adm-badge <?php echo $badge[0] ?>"><?php echo $badge[1] ?></span></td>
                 <td>
-                    <a class="adm-btn adm-btn-ghost adm-btn-sm" href="/nexora/meu-recibo?id=<?php echo (int)$rv['id'] ?>">
+                    <a class="adm-btn adm-btn-ghost adm-btn-sm" href="/nexora/meu-recibo?id=<?php echo $app->id->encode((int)$rv['id']) ?>">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         Ver / Imprimir
                     </a>

@@ -286,37 +286,41 @@ if (str_starts_with($uri, '/admin')) {
     $portalData  = [];
 
     match ($path) {
-        '/portal/professor', '/portal/professor/dashboard' => (function () use ($prof, $profInfo, $portalData, $viewRoot) {
+        '/portal/professor', '/portal/professor/dashboard' => (function () use ($app, $prof, $profInfo, $portalData, $viewRoot) {
             $portalData['turmas']      = $prof->api('/api/portal/professor/me/turmas');
             $portalData['horario']     = $prof->api('/api/portal/professor/me/horario');
             $portalData['comunicacao'] = $prof->api('/api/portal/professor/me/comunicacao');
             require $viewRoot . '/dashboard.php';
         })(),
-        '/portal/professor/turmas' => (function () use ($prof, $profInfo, $portalData, $viewRoot) {
+        '/portal/professor/turmas' => (function () use ($app, $prof, $profInfo, $portalData, $viewRoot) {
             $portalData['turmas'] = $prof->api('/api/portal/professor/me/turmas');
             require $viewRoot . '/turmas.php';
         })(),
-        '/portal/professor/turma' => (function () use ($prof, $profInfo, $portalData, $viewRoot) {
-            $turmaId = (int)($_GET['id'] ?? 0);
+        '/portal/professor/turma' => (function () use ($app, $prof, $profInfo, $portalData, $viewRoot) {
+            $turmaHash = $_GET['id'] ?? '';
+            $turmaId   = $turmaHash ? $app->id->decode($turmaHash) : 0;
             $portalData['turma']   = $prof->api("/api/portal/professor/me/turmas/$turmaId");
             $portalData['alunos']  = $prof->api("/api/portal/professor/me/turmas/$turmaId/alunos");
             require $viewRoot . '/turma.php';
         })(),
-        '/portal/professor/horario' => (function () use ($prof, $profInfo, $portalData, $viewRoot) {
+        '/portal/professor/horario' => (function () use ($app, $prof, $profInfo, $portalData, $viewRoot) {
             $portalData['horario'] = $prof->api('/api/portal/professor/me/horario');
             require $viewRoot . '/horario.php';
         })(),
-        '/portal/professor/presencas' => (function () use ($prof, $profInfo, $portalData, $viewRoot) {
-            $turmaId = (int)($_GET['turma_id'] ?? 0);
-            $data    = $_GET['data'] ?? date('Y-m-d');
-            $qry     = http_build_query(array_filter(['turma_id' => $turmaId ?: null, 'data' => $data]));
+        '/portal/professor/presencas' => (function () use ($app, $prof, $profInfo, $portalData, $viewRoot) {
+            $turmaHash  = $_GET['turma_id'] ?? '';
+            $turmaId    = $turmaHash ? $app->id->decode($turmaHash) : 0;
+            $data       = $_GET['data'] ?? date('Y-m-d');
+            $qry        = http_build_query(array_filter(['turma_id' => $turmaId ?: null, 'data' => $data]));
             $portalData['presencas'] = $prof->api('/api/portal/professor/me/presencas' . ($qry ? "?$qry" : ''));
             $portalData['turmas']    = $prof->api('/api/portal/professor/me/turmas');
             require $viewRoot . '/presencas.php';
         })(),
-        '/portal/professor/notas' => (function () use ($prof, $profInfo, $portalData, $viewRoot) {
-            $turmaId    = (int)($_GET['turma_id'] ?? 0);
-            $disciplina = (int)($_GET['disciplina_id'] ?? 0);
+        '/portal/professor/notas' => (function () use ($app, $prof, $profInfo, $portalData, $viewRoot) {
+            $turmaHash  = $_GET['turma_id'] ?? '';
+            $discHash   = $_GET['disciplina_id'] ?? '';
+            $turmaId    = $turmaHash ? $app->id->decode($turmaHash) : 0;
+            $disciplina = $discHash ? $app->id->decode($discHash) : 0;
             $qry = http_build_query(array_filter(['turma_id' => $turmaId ?: null, 'disciplina_id' => $disciplina ?: null]));
             $portalData['notas']  = $turmaId ? $prof->api('/api/portal/professor/me/notas' . ($qry ? "?$qry" : '')) : ['body' => []];
             $portalData['turmas'] = $prof->api('/api/portal/professor/me/turmas');
@@ -392,19 +396,19 @@ if (str_starts_with($uri, '/admin')) {
                 require $viewRoot . '/perfil.php';
             })(),
             '/portal/aluno/boletim' => (function () use ($portal, $session, $portalData, $viewRoot, $alunoInfo) {
-                $termId = (int) ($_GET['term_id'] ?? 0);
-                $qry    = $termId ? "?term_id=$termId" : '';
-                $portalData['boletim'] = $portal->api($session, "/api/portal/aluno/me/boletim$qry");
+                $portalData['boletim'] = $portal->api($session, '/api/portal/aluno/me/boletim');
                 require $viewRoot . '/boletim.php';
             })(),
             '/portal/aluno/boletim/imprimir' => (function () use ($portal, $session, $portalData, $viewRoot, $alunoInfo) {
-                $termId     = (int) ($_GET['term_id'] ?? 0);
-                $qry        = $termId ? "?term_id=$termId" : '';
-                $boletim    = $portal->api($session, "/api/portal/aluno/me/boletim$qry")['body'] ?? [];
-                $termos     = $boletim['terms'] ?? [];
-                $disciplinas= $boletim['grades'] ?? [];
-                $media      = $boletim['media'] ?? null;
-                $totalFaltas= $boletim['total_absences'] ?? null;
+                $boletim     = $portal->api($session, '/api/portal/aluno/me/boletim')['body'] ?? [];
+                $termos      = $boletim['termos'] ?? [];
+                $disciplinas = $boletim['disciplinas'] ?? [];
+                $media       = $boletim['media'] ?? null;
+                $cfg         = $boletim['config'] ?? [];
+                $notaMinima  = (float)($cfg['nota_minima'] ?? 10);
+                $stats       = $boletim['stats'] ?? [];
+                $totalFaltas = (int)($stats['faltas'] ?? 0);
+                $termId      = (int)($_GET['term_id'] ?? 0);
                 require $viewRoot . '/boletim_print.php';
             })(),
             '/portal/aluno/cobrancas' => (function () use ($portal, $session, $portalData, $viewRoot, $alunoInfo) {
@@ -456,6 +460,7 @@ if (str_starts_with($uri, '/admin')) {
 } elseif (str_starts_with($uri, '/portal/encarregado')) {
     $baseUrl    = rtrim((string) (getenv('NEXORA_API_URL') ?: 'http://127.0.0.1:8080'), '/');
     $enc        = new PortalEncarregadoController($baseUrl);
+    $app        = Application::bootstrap();
     $path       = rtrim($uri, '/');
     $viewRoot   = __DIR__ . '/src/View/templates/portal_encarregado';
 
@@ -466,7 +471,6 @@ if (str_starts_with($uri, '/admin')) {
 
     // Rotas autenticadas
     if (!$enc->isAuthenticated()) {
-        $app = Application::bootstrap();
         if ($app->session->isAuthenticated() && $app->session->hasEscopo('portal_encarregado')) {
             $app->session->clear();
         }
@@ -477,39 +481,41 @@ if (str_starts_with($uri, '/admin')) {
     $meResp            = $enc->api('/api/portal/encarregado/me');
     $portalEncarregado = $meResp['body'] ?? [];
     $educandos         = $portalEncarregado['educandos'] ?? [];
-    $selectedId        = (int)($_GET['educando_id'] ?? ($educandos[0]['student_id'] ?? 0));
+    $selectedHash      = $_GET['educando_id'] ?? '';
+    $selectedId        = $selectedHash ? $app->id->decode($selectedHash) : (int)($educandos[0]['student_id'] ?? 0);
+    $selectedHash      = $app->id->encode($selectedId);
 
     $portalData = [];
 
     match ($path) {
-        '/portal/encarregado', '/portal/encarregado/dashboard' => (function () use ($enc, $portalEncarregado, $portalData, $viewRoot, $selectedId) {
+        '/portal/encarregado', '/portal/encarregado/dashboard' => (function () use ($app, $enc, $portalEncarregado, $portalData, $viewRoot, $selectedId, $selectedHash) {
             $portalData['boletim']   = $enc->api("/api/portal/encarregado/me/educandos/$selectedId/boletim");
             $portalData['cobrancas'] = $enc->api("/api/portal/encarregado/me/educandos/$selectedId/cobrancas");
             $portalData['presencas'] = $enc->api("/api/portal/encarregado/me/educandos/$selectedId/presencas");
             require $viewRoot . '/dashboard.php';
         })(),
-        '/portal/encarregado/boletim' => (function () use ($enc, $portalEncarregado, $portalData, $viewRoot, $selectedId) {
+        '/portal/encarregado/boletim' => (function () use ($app, $enc, $portalEncarregado, $portalData, $viewRoot, $selectedId, $selectedHash) {
             $termId = (int)($_GET['term_id'] ?? 0);
             $qry    = $termId ? "?term_id=$termId" : '';
             $portalData['boletim'] = $enc->api("/api/portal/encarregado/me/educandos/$selectedId/boletim$qry");
             require $viewRoot . '/boletim.php';
         })(),
-        '/portal/encarregado/cobrancas' => (function () use ($enc, $portalEncarregado, $portalData, $viewRoot, $selectedId) {
+        '/portal/encarregado/cobrancas' => (function () use ($app, $enc, $portalEncarregado, $portalData, $viewRoot, $selectedId, $selectedHash) {
             $status = $_GET['status'] ?? '';
             $qry    = $status ? "?status=$status" : '';
             $portalData['cobrancas'] = $enc->api("/api/portal/encarregado/me/educandos/$selectedId/cobrancas$qry");
             require $viewRoot . '/cobrancas.php';
         })(),
-        '/portal/encarregado/presencas' => (function () use ($enc, $portalEncarregado, $portalData, $viewRoot, $selectedId) {
+        '/portal/encarregado/presencas' => (function () use ($app, $enc, $portalEncarregado, $portalData, $viewRoot, $selectedId, $selectedHash) {
             $mes = $_GET['mes'] ?? date('Y-m');
             $portalData['presencas'] = $enc->api("/api/portal/encarregado/me/educandos/$selectedId/presencas?mes=$mes");
             require $viewRoot . '/presencas.php';
         })(),
-        '/portal/encarregado/ocorrencias' => (function () use ($enc, $portalEncarregado, $portalData, $viewRoot, $selectedId) {
+        '/portal/encarregado/ocorrencias' => (function () use ($app, $enc, $portalEncarregado, $portalData, $viewRoot, $selectedId, $selectedHash) {
             $portalData['ocorrencias'] = $enc->api("/api/portal/encarregado/me/educandos/$selectedId/ocorrencias");
             require $viewRoot . '/ocorrencias.php';
         })(),
-        '/portal/encarregado/conta' => (function () use ($portalEncarregado, $viewRoot) {
+        '/portal/encarregado/conta' => (function () use ($app, $portalEncarregado, $viewRoot, $selectedId, $selectedHash) {
             require $viewRoot . '/conta.php';
         })(),
         default => (function () { http_response_code(404); echo 'Página não encontrada.'; })(),
@@ -518,9 +524,14 @@ if (str_starts_with($uri, '/admin')) {
     $app = Application::bootstrap();
     $app->publicApi->submitApplication();
 } elseif (str_starts_with($uri, '/api/public/')) {
-    // Proxy GET genérico para o backend Go
+    // Proxy genérico (GET/POST/PUT) para o backend Go — reencaminha corpo JSON
+    // e o cabeçalho Authorization, usado pelo portal do candidato autenticado.
     $app = Application::bootstrap();
-    $app->publicApi->proxyGet($uri);
+    $app->publicApi->proxyJson($uri, $_SERVER['REQUEST_METHOD']);
+} elseif ($uri === '/api/auth/login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Login unificado (funcionário/aluno/encarregado/candidato) — proxy directo ao backend Go.
+    $app = Application::bootstrap();
+    $app->publicApi->proxyJson($uri, 'POST');
 } elseif (str_starts_with($uri, '/api/')) {
     $app = Application::bootstrap();
     match (basename($uri, '.php')) {
@@ -538,6 +549,7 @@ if (str_starts_with($uri, '/admin')) {
         '/carreira/candidato/login'   => $app->carreira->loginCandidato(),
         '/carreira/candidato/registar'=> $app->carreira->registarCandidato(),
         '/carreira/candidato/area'    => $app->carreira->areaCandidato(),
+        '/carreira/candidato/logout'  => $app->carreira->logoutCandidato(),
         default                       => $app->home->render(),
     };
 }

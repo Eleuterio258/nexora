@@ -25,7 +25,11 @@ dependencies:
   path_provider: ^2.1.5
   path: ^1.9.1
 
-  flutter_native_splash: ^2.4.3
+  firebase_core: ^4.11.0
+  firebase_messaging: ^16.4.1
+  share_plus: ^12.0.2
+  app_links: ^7.0.0
+  socket_io_client: ^3.1.6
 
 dev_dependencies:
   flutter_test:
@@ -38,22 +42,13 @@ dev_dependencies:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/images/logo-512x512.png"
+  image_path: "assets/images/icon-launcher.png"
+  remove_alpha_ios: true
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/logo-512x512.png"
+  adaptive_icon_foreground: "assets/images/icon-launcher-adaptive.png"
   min_sdk_android: 21
   web:
     generate: false
-
-flutter_native_splash:
-  color: "#2CB87A"
-  android: true
-  ios: true
-  fullscreen: true
-  android_12:
-    color: "#2CB87A"
-    image: "assets/images/logo-512x512.png"
-    icon_background_color: "#2CB87A"
 
 flutter:
   uses-material-design: true

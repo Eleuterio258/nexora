@@ -86,6 +86,9 @@ func (s *IncidentService) UpdateIncident(ctx context.Context, id, tenantID int64
 		if err == pgx.ErrNoRows {
 			return ErrIncidentNotFound
 		}
+		if errors.Is(err, repositories.ErrInvalidColumn) {
+			return ErrIncidentInvalidData
+		}
 		return err
 	}
 	return nil

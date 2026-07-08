@@ -1,9 +1,9 @@
-<?php
+﻿<?php
 
-    $id = $app->request->queryInt('id', 0);
-    if (!$id) { header('Location: /nexora/rh/processamento-salarial'); exit; }
+    $idHash = $app->request->queryString('id');
+    if (!$idHash) { header('Location: /nexora/rh/processamento-salarial'); exit; }
 
-    $resp = $app->nexora->call('GET', "/api/rh/recibos-vencimento/$id");
+    $resp = $app->nexora->call('GET', "/api/rh/recibos-vencimento/$idHash");
     if ($resp['status'] !== 200) { header('Location: /nexora/rh/processamento-salarial'); exit; }
 
     $recibo = $resp['body']['recibo']  ?? [];
@@ -30,7 +30,7 @@
     $fmt = fn(?float $v) => $podeVerSalarios && $v !== null ? number_format($v, 2, ',', '.') . ' MT' : '—';
 
     if (($_GET['formato'] ?? '') === 'pdf') {
-        $reciboId = $recibo['id'] ?? $id;
+        $reciboId = $recibo['id'] ?? 0;
         $filename = 'recibo-vencimento-' . $reciboId . '.pdf';
 
         $cache = $app->nexora->download("/api/rh/recibos-vencimento/$id/pdf");
@@ -86,7 +86,7 @@
 <div class="adm-page-header no-print">
     <h1 class="adm-page-title">Recibo de Vencimento — <?php echo htmlspecialchars($periodo) ?></h1>
     <div class="adm-page-header-actions">
-        <a class="adm-btn adm-btn-primary" href="?id=<?php echo (int) $id ?>&formato=pdf">
+        <a class="adm-btn adm-btn-primary" href="?id=<?= htmlspecialchars($idHash) ?>&formato=pdf">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px"><path d="M12 15V3M12 15l-4-4M12 15l4-4M2 17l.6 3A2 2 0 0 0 4.6 22h14.8a2 2 0 0 0 2-1.7l.6-3.3"/></svg>
             Descarregar PDF
         </a>
@@ -94,7 +94,7 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             Imprimir
         </button>
-        <a href="/nexora/rh/folha-pagamento?id=<?php echo (int)($recibo['folha_id'] ?? 0) ?>" class="adm-btn adm-btn-outline adm-btn-sm">
+        <a href="/nexora/rh/folha-pagamento?id=<?php echo $app->id->encode((int)($recibo['folha_id'] ?? 0)) ?>" class="adm-btn adm-btn-outline adm-btn-sm">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
             Voltar
         </a>
@@ -246,3 +246,4 @@
 </div>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+

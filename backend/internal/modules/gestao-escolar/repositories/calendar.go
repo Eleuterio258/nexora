@@ -89,9 +89,15 @@ func (r *CalendarRepository) GetEventByID(ctx context.Context, id, tenantID int6
 		WHERE id=$1 AND tenant_id=$2`, id, tenantID))
 }
 
+var calendarEventUpdatableColumns = map[string]bool{
+	"school_year_id": true, "event_type_id": true, "titulo": true, "descricao": true,
+	"data_inicio": true, "data_fim": true, "hora_inicio": true, "hora_fim": true,
+	"dia_todo": true, "publico_alvo": true, "publico_alvo_id": true,
+}
+
 // UpdateEvent actualiza evento.
 func (r *CalendarRepository) UpdateEvent(ctx context.Context, id, tenantID int64, fields map[string]any) error {
-	return updateByFields(ctx, r.db, "gestao_escolar.school_calendar_events", id, tenantID, fields)
+	return updateByFields(ctx, r.db, "gestao_escolar.school_calendar_events", id, tenantID, fields, calendarEventUpdatableColumns, true)
 }
 
 // DeleteEvent remove evento.

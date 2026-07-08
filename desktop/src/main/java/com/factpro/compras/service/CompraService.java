@@ -1,5 +1,6 @@
 package com.factpro.compras.service;
 
+import com.factpro.auth.PermissionChecker;
 import com.factpro.compras.dao.CompraDAO;
 import com.factpro.compras.dao.CompraItemDAO;
 import com.factpro.compras.model.Compra;
@@ -33,6 +34,7 @@ public class CompraService {
     }
 
     public Compra save(Compra compra) {
+        PermissionChecker.requireCreate("compras");
         Long id = compraDAO.save(compra);
         if (id == null) {
             throw new RuntimeException("Falha ao guardar a compra.");
@@ -56,6 +58,7 @@ public class CompraService {
     }
 
     public Compra update(Compra compra) {
+        PermissionChecker.requireUpdate("compras");
         boolean updated = compraDAO.update(compra);
         if (!updated) {
             throw new RuntimeException("Falha ao atualizar a compra.");
@@ -69,6 +72,7 @@ public class CompraService {
      * and creates stock movements.
      */
     public void receiveCompra(Long compraId, Long userId) {
+        PermissionChecker.requireUpdate("compras");
         logger.info("Recebendo compra ID {}", compraId);
 
         Compra compra = compraDAO.findById(compraId);

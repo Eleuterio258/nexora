@@ -1,8 +1,8 @@
 <?php
 
-    $id = $app->request->queryInt('id', 0);
+    $idHash = $app->request->queryString('id');
 
-    $resp = $app->nexora->call('GET', "/api/faturacao/quotes/$id");
+    $resp = $app->nexora->call('GET', "/api/faturacao/quotes/$idHash");
     if ($resp['status'] !== 200) {
         header('Location: /nexora/faturacao/orcamentos');
         exit;
@@ -74,6 +74,6 @@
     $observacoes  = $orcamento['observacoes'] ?? null;
 
     $footerNote = 'Documento gerado em ' . date('d/m/Y H:i') . '.';
-    $backUrl    = '/nexora/faturacao/orcamentos/form?id=' . $id;
+    $backUrl    = '/nexora/faturacao/orcamentos/form?id=' . $idHash;
 
     include dirname(__DIR__) . '/partials/documento_print.php';

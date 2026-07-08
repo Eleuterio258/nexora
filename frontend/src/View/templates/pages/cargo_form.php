@@ -1,12 +1,12 @@
 <?php
 
-$id     = $app->request->queryInt('id', 0);
-$isEdit = $id > 0;
+$idHash = $app->request->queryString('id');
+$isEdit = $idHash !== '';
 $cargo  = null;
 $permsCurrent = [];
 
 if ($isEdit) {
-    $resp = $app->nexora->call('GET', "/api/auth/cargos/$id");
+    $resp = $app->nexora->call('GET', "/api/auth/cargos/$idHash");
     if ($resp['status'] !== 200) {
         header('Location: /nexora/admin/cargos');
         exit;
@@ -40,7 +40,7 @@ include dirname(__DIR__) . '/layouts/top.php';
 
 <form id="cargoForm">
     <input type="hidden" name="csrf_token" value="<?= $csrf ?>">
-    <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= $id ?>"><?php endif; ?>
+    <?php if ($isEdit): ?><input type="hidden" name="id" value="<?= (int)($cargo['id'] ?? 0) ?>"><?php endif; ?>
 
     <div class="adm-card adm-mb-6">
         <div class="adm-card-header">
@@ -133,7 +133,7 @@ function mudarEstadoCargo(ativar) {
                 const res  = await fetch('/nexora/api/cargo_estado', {
                     method: 'POST',
                     headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({id: <?= $id ?>, ativo: ativar, csrf: '<?= $csrf ?>'})
+                    body: JSON.stringify({id: <?= (int)($cargo['id'] ?? 0) ?>, ativo: ativar, csrf: '<?= $csrf ?>'})
                 });
                 const data = await res.json();
                 if (data.ok) {
@@ -157,7 +157,7 @@ async function savePerms() {
         const res  = await fetch('/nexora/api/cargo_permissoes', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({id: <?= $id ?>, permissoes, csrf: '<?= $csrf ?>'})
+            body: JSON.stringify({id: <?= (int)($cargo['id'] ?? 0) ?>, permissoes, csrf: '<?= $csrf ?>'})
         });
         const data = await res.json();
         showToast(data.ok ? 'Permissões atualizadas' : (data.error || 'Erro'), data.ok ? 'success' : 'error');
@@ -191,7 +191,7 @@ document.getElementById('cargoForm').addEventListener('submit', async function(e
             btn.disabled = false;
             btn.innerHTML = originalHtml;
             <?php else: ?>
-            window.location.href = '/nexora/admin/cargos/form?id=' + data.id + '&msg=' + encodeURIComponent(data.msg || 'Cargo criado com sucesso.');
+            window.location.href = '/nexora/admin/cargos/form?id=' + nexoraEncodeId(data.id) + '&msg=' + encodeURIComponent(data.msg || 'Cargo criado com sucesso.');
             <?php endif; ?>
         } else {
             msgEl.innerHTML = `<div class="adm-alert adm-alert--error">${data.error || 'Erro ao guardar.'}</div>`;

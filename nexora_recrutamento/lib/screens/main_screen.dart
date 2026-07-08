@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../features/applications/presentation/bloc/application_bloc.dart';
+import '../features/auth/presentation/bloc/auth_bloc.dart';
+import '../features/jobs/presentation/bloc/job_bloc.dart';
 import '../widgets/nexora_logo.dart';
 import 'dashboard_screen.dart';
 import 'jobs_screen.dart';
@@ -16,13 +20,26 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _index = 0;
 
-  static final _pages = <Widget>[
-    const DashboardScreen(),
-    const JobsScreen(),
-    const ApplicationsScreen(),
-    const MessagesScreen(),
-    const ProfileScreen(),
+  final _pages = const <Widget>[
+    DashboardScreen(),
+    JobsScreen(),
+    ApplicationsScreen(),
+    MessagesScreen(),
+    ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Carregamento inicial único: JobBloc/ApplicationBloc são globais
+    // (fornecidos em app.dart), por isso só pedimos os dados uma vez aqui,
+    // logo que a sessão do candidato está confirmada.
+    final authState = context.read<AuthBloc>().state;
+    final tenantId =
+        authState is AuthAuthenticated ? authState.user.tenantId : null;
+    context.read<JobBloc>().add(JobsLoadRequested(tenantId: tenantId));
+    context.read<ApplicationBloc>().add(const ApplicationsLoadRequested());
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -115,7 +115,7 @@ func (h *Handler) CriarCampoCustom(w http.ResponseWriter, r *http.Request) {
 // ActualizarCampoCustom atualiza um campo existente.
 func (h *Handler) ActualizarCampoCustom(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id := h.decodeID(chi.URLParam(r, "id"))
 	var body struct {
 		Codigo      *string  `json:"codigo"`
 		Label       *string  `json:"label"`
@@ -190,7 +190,7 @@ func (h *Handler) ActualizarCampoCustom(w http.ResponseWriter, r *http.Request) 
 // EliminarCampoCustom remove um campo customizável.
 func (h *Handler) EliminarCampoCustom(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id := h.decodeID(chi.URLParam(r, "id"))
 	tag, err := h.db.Exec(r.Context(), `
 		DELETE FROM candidatura_campos_custom
 		 WHERE id=$1 AND tenant_id=$2`, id, u.TenantID)

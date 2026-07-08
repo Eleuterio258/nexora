@@ -1,8 +1,8 @@
-<?php
+﻿<?php
 
-    $id = $app->request->queryInt('id', 0);
+    $idHash = $app->request->queryString('id');
 
-    $resp = $app->nexora->call('GET', "/api/pos/sales/$id");
+    $resp = $app->nexora->call('GET', "/api/pos/sales/$idHash");
     if ($resp['status'] !== 200) {
         header('Location: /nexora/pos/vendas');
         exit;
@@ -247,3 +247,5 @@ function cancelarVenda() {
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+
+

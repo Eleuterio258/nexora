@@ -1,17 +1,26 @@
-<?php
+﻿<?php
 
-    $id     = $app->request->queryInt('id', 0);
-    $isEdit = $id > 0;
+    $idHash = $app->request->queryString('id');
+    $isEdit = $idHash !== '';
     $vaga   = null;
 
     if ($isEdit) {
-    $resp = $app->nexora->call('GET', "/api/recrutamento/vagas/$id");
+    $resp = $app->nexora->call('GET', "/api/recrutamento/vagas/$idHash");
     if ($resp['status'] !== 200) {
         header('Location: /nexora/recrutamento/vagas');
         exit;
     }
     $vaga = $resp['body'];
     }
+
+    // Cargos de RH disponíveis para associar à vaga — o cargo escolhido aqui
+    // é aplicado automaticamente ao funcionário quando um candidato desta
+    // vaga é contratado (ver ContratarCandidato no backend), e a sua faixa
+    // salarial é usada para sugerir o salário base nesse momento.
+    $cargosResp = $app->nexora->call('GET', '/api/rh/cargos');
+    $rhCargos   = $cargosResp['status'] === 200
+        ? array_values(array_filter($cargosResp['body'] ?? [], static fn(array $c): bool => (bool) ($c['ativo'] ?? false)))
+        : [];
 
     $csrf       = $app->security->csrfToken();
     $pageTitle  = $isEdit ? 'Editar Vaga' : 'Nova Vaga';
@@ -53,6 +62,27 @@
                            placeholder="ex: Tecnologia Web"
                            value="<?php echo $app->view->field($vaga, 'area') ?>">
                     <p class="adm-input-hint">Usado como identificador do separador na página pública.</p>
+                </div>
+            </div>
+
+            <div class="adm-form-row">
+                <div class="adm-form-group">
+                    <label class="adm-label" for="f-cargo_id">Cargo a Contratar <span style="color:var(--adm-red)">*</span></label>
+                    <select class="adm-select" id="f-cargo_id" name="cargo_id" required>
+                        <option value="">Seleccionar cargo…</option>
+                        <?php foreach ($rhCargos as $cargo): ?>
+                        <option value="<?php echo (int) $cargo['id'] ?>" <?php echo (int) ($vaga['cargo_id'] ?? 0) === (int) $cargo['id'] ? 'selected' : '' ?>>
+                            <?php echo htmlspecialchars($cargo['nome']) ?>
+                            <?php if ($cargo['salario_min'] || $cargo['salario_max']): ?>
+                                (<?php echo number_format((float) ($cargo['salario_min'] ?? $cargo['salario_max']), 0, ',', '.') ?><?php echo $cargo['salario_max'] ? '–' . number_format((float) $cargo['salario_max'], 0, ',', '.') : '' ?> MZN)
+                            <?php endif; ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="adm-input-hint">
+                        Cargo de RH aplicado automaticamente ao funcionário quando um candidato desta vaga for contratado; a sua faixa salarial sugere o salário base nesse momento.
+                        <?php if (empty($rhCargos)): ?>Nenhum cargo activo configurado — cria um primeiro em Recursos Humanos → Cargos.<?php endif; ?>
+                    </p>
                 </div>
             </div>
 
@@ -517,3 +547,5 @@ carregarCamposVaga();
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+
+

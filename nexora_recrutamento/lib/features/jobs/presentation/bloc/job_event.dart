@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../domain/entities/job.dart';
 
 abstract class JobEvent extends Equatable {
   const JobEvent();
@@ -7,9 +8,10 @@ abstract class JobEvent extends Equatable {
 class JobsLoadRequested extends JobEvent {
   final String? category;
   final String? query;
-  const JobsLoadRequested({this.category, this.query});
+  final int? tenantId;
+  const JobsLoadRequested({this.category, this.query, this.tenantId});
   @override
-  List<Object?> get props => [category, query];
+  List<Object?> get props => [category, query, tenantId];
 }
 
 class JobRefreshRequested extends JobEvent {
@@ -19,11 +21,11 @@ class JobRefreshRequested extends JobEvent {
 }
 
 class JobSaveToggled extends JobEvent {
-  final int jobId;
+  final Job job;
   final bool save;
-  const JobSaveToggled({required this.jobId, required this.save});
+  const JobSaveToggled({required this.job, required this.save});
   @override
-  List<Object> get props => [jobId, save];
+  List<Object> get props => [job, save];
 }
 
 class JobDetailRequested extends JobEvent {

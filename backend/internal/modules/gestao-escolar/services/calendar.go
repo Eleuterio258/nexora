@@ -87,6 +87,9 @@ func (s *CalendarService) UpdateEvent(ctx context.Context, id, tenantID int64, f
 		if err == pgx.ErrNoRows {
 			return ErrCalendarNotFound
 		}
+		if errors.Is(err, repositories.ErrInvalidColumn) {
+			return ErrCalendarInvalidData
+		}
 		return err
 	}
 	return nil

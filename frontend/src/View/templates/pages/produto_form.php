@@ -1,14 +1,14 @@
-<?php
+﻿<?php
 
-    $id     = $app->request->queryInt('id', 0);
-    $isEdit = $id > 0;
+    $idHash = $app->request->queryString('id');
+    $isEdit = $idHash !== '';
 
     $produto   = null;
     $precos    = [];
     $variantes = [];
 
     if ($isEdit) {
-        $resp = $app->nexora->call('GET', "/api/produtos/$id");
+        $resp = $app->nexora->call('GET', "/api/produtos/$idHash");
         if ($resp['status'] !== 200) {
             header('Location: /nexora/produtos');
             exit;
@@ -409,7 +409,7 @@ document.getElementById('produtoForm').addEventListener('submit', async function
                 btn.disabled = false;
                 btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Guardar alterações`;
             } else {
-                window.location.href = '/nexora/produtos/form?id=' + data.id + '&msg=' + encodeURIComponent(data.msg || 'Produto criado com sucesso.');
+                window.location.href = '/nexora/produtos/form?id=' + nexoraEncodeId(data.id) + '&msg=' + encodeURIComponent(data.msg || 'Produto criado com sucesso.');
             }
         } else {
             msgEl.innerHTML = `<div class="adm-alert adm-alert--error">${data.erro || 'Erro ao guardar.'}</div>`;
@@ -488,3 +488,5 @@ document.head.appendChild(style);
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+
+

@@ -42,7 +42,7 @@
                 <div class="form-msg" id="registar-msg" style="display:none;margin-top:1rem;"></div>
 
                 <hr style="margin:1.5rem 0;border:0;border-top:1px solid #e5e7eb;">
-                <p style="text-align:center;">Já tens conta? <a href="/carreira/candidato/login" style="color:#2563eb;text-decoration:underline;">Entrar</a></p>
+                <p style="text-align:center;">Já tens conta? <a href="<?= htmlspecialchars($app->candidatoRoutes->loginUrl()) ?>" style="color:#2563eb;text-decoration:underline;">Entrar</a></p>
             </div>
 
             <div style="margin-top:1.5rem;text-align:center;">
@@ -76,7 +76,7 @@
                     msg.className = 'form-msg sucesso';
                     msg.textContent = 'Conta criada com sucesso! Redirecionando...';
                     msg.style.display = 'flex';
-                    setTimeout(() => window.location.href = '/carreira/candidato/login', 1500);
+                    setTimeout(() => window.location.href = <?= json_encode($app->candidatoRoutes->loginUrl(), JSON_UNESCAPED_UNICODE) ?>, 1500);
                 } else {
                     msg.className = 'form-msg erro';
                     msg.textContent = data.error || 'Erro ao criar conta.';

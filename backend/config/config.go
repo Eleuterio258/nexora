@@ -29,8 +29,14 @@ type Config struct {
 	UploadsDir          string
 	UploadMaxMB         int64
 
+	// ID obfuscation — same salt must be set in PHP frontend (JWT_SECRET is reused)
+	IDHashSalt string
+
 	// Pagamentos — webhook do gateway
 	GatewayWebhookSecret string
+
+	// Firebase Admin SDK — notificações push (FCM)
+	FirebaseCredentialsFile string
 
 	// Nexora-Pay — gateway de pagamento (M-Pesa, eMola, mKesh)
 	NexoraPayBaseURL        string
@@ -83,7 +89,9 @@ func Load() *Config {
 		RecruitmentTenantID:  envInt("RECRUITMENT_TENANT_ID", 1),
 		UploadsDir:           env("UPLOADS_DIR", "./uploads"),
 		UploadMaxMB:          envInt("UPLOAD_MAX_MB", 3),
+		IDHashSalt:              env("JWT_SECRET", "change-me-secret"),
 		GatewayWebhookSecret:    env("GATEWAY_WEBHOOK_SECRET", ""),
+		FirebaseCredentialsFile: env("FIREBASE_CREDENTIALS_FILE", "./config/e258tech-d439e.json"),
 		NexoraPayBaseURL:        env("NEXORA_PAY_BASE_URL", "http://nexora-pay:3000"),
 		NexoraPayAPIKey:         env("NEXORA_PAY_API_KEY", ""),
 		NexoraPayServiceAccount: env("NEXORA_PAY_SERVICE_ACCOUNT", "gestao-escolar"),

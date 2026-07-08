@@ -13,14 +13,26 @@ import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/student_portal/data/datasources/student_portal_remote_datasource.dart';
 import '../../features/student_portal/data/repositories/student_portal_repository_impl.dart';
 import '../../features/student_portal/domain/repositories/student_portal_repository.dart';
+import '../../features/student_portal/domain/usecases/get_student_biblioteca_usecase.dart';
 import '../../features/student_portal/domain/usecases/get_student_boletim_usecase.dart';
+import '../../features/student_portal/domain/usecases/get_student_eventos_usecase.dart';
 import '../../features/student_portal/domain/usecases/get_student_financeiro_usecase.dart';
 import '../../features/student_portal/domain/usecases/get_student_home_data_usecase.dart';
+import '../../features/student_portal/domain/usecases/get_student_mensagens_usecase.dart';
+import '../../features/student_portal/domain/usecases/get_student_noticias_usecase.dart';
+import '../../features/student_portal/domain/usecases/get_student_ocorrencias_usecase.dart';
 import '../../features/student_portal/domain/usecases/get_student_presencas_usecase.dart';
+import '../../features/student_portal/domain/usecases/get_student_turma_usecase.dart';
+import '../../features/student_portal/presentation/cubit/student_biblioteca_cubit.dart';
 import '../../features/student_portal/presentation/cubit/student_boletim_cubit.dart';
+import '../../features/student_portal/presentation/cubit/student_eventos_cubit.dart';
 import '../../features/student_portal/presentation/cubit/student_financeiro_cubit.dart';
 import '../../features/student_portal/presentation/cubit/student_home_cubit.dart';
+import '../../features/student_portal/presentation/cubit/student_mensagens_cubit.dart';
+import '../../features/student_portal/presentation/cubit/student_noticias_cubit.dart';
+import '../../features/student_portal/presentation/cubit/student_ocorrencias_cubit.dart';
 import '../../features/student_portal/presentation/cubit/student_presencas_cubit.dart';
+import '../../features/student_portal/presentation/cubit/student_turma_cubit.dart';
 import '../../features/agenda/data/datasources/agenda_remote_datasource.dart';
 import '../../features/agenda/data/repositories/agenda_repository_impl.dart';
 import '../../features/agenda/domain/repositories/agenda_repository.dart';
@@ -63,6 +75,12 @@ Future<void> setupDependencies() async {
   sl.registerLazySingleton(() => GetStudentBoletimUseCase(sl()));
   sl.registerLazySingleton(() => GetStudentFinanceiroUseCase(sl()));
   sl.registerLazySingleton(() => GetStudentPresencasUseCase(sl()));
+  sl.registerLazySingleton(() => GetStudentMensagensUseCase(sl()));
+  sl.registerLazySingleton(() => GetStudentTurmaUseCase(sl()));
+  sl.registerLazySingleton(() => GetStudentNoticiasUseCase(sl()));
+  sl.registerLazySingleton(() => GetStudentEventosUseCase(sl()));
+  sl.registerLazySingleton(() => GetStudentOcorrenciasUseCase(sl()));
+  sl.registerLazySingleton(() => GetStudentBibliotecaUseCase(sl()));
 
   // BLoC — Auth
   sl.registerFactory(() => AuthBloc(loginUseCase: sl()));
@@ -72,6 +90,12 @@ Future<void> setupDependencies() async {
   sl.registerFactory(() => StudentBoletimCubit(sl()));
   sl.registerFactory(() => StudentFinanceiroCubit(sl()));
   sl.registerFactory(() => StudentPresencasCubit(sl()));
+  sl.registerFactory(() => StudentMensagensCubit(sl()));
+  sl.registerFactory(() => StudentTurmaCubit(sl()));
+  sl.registerFactory(() => StudentNoticiasCubit(sl()));
+  sl.registerFactory(() => StudentEventosCubit(sl()));
+  sl.registerFactory(() => StudentOcorrenciasCubit(sl()));
+  sl.registerFactory(() => StudentBibliotecaCubit(sl()));
 
   // ── Agenda ─────────────────────────────────────────────────────────────────
   sl.registerLazySingleton<AgendaRemoteDatasource>(() => AgendaRemoteDatasourceImpl(sl()));

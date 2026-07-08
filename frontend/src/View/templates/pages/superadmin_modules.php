@@ -49,7 +49,7 @@ include dirname(__DIR__) . '/layouts/top.php';
 <div style="background:var(--adm-white);border:1px solid var(--adm-gray-200);border-radius:var(--adm-radius-md);overflow:hidden;box-shadow:var(--adm-shadow-card)">
     <?php foreach ($modules as $i => $m):
         $key   = $m['key'];
-        $ativo = isset($tenantModules[$key]) ? (bool) $tenantModules[$key]['ativo'] : true;
+        $ativo = isset($tenantModules[$key]) ? (bool) $tenantModules[$key]['ativo'] : false;
         $isLast = $i === array_key_last($modules);
     ?>
     <div style="display:flex;align-items:center;gap:var(--adm-sp-4);padding:var(--adm-sp-4) var(--adm-sp-6);<?= $isLast ? '' : 'border-bottom:1px solid var(--adm-gray-100);' ?>">
@@ -82,7 +82,7 @@ async function toggleModule(tenantId, modulo, ativo) {
         headers: {'Content-Type': 'application/json', 'X-CSRF-Token': '<?= $csrf ?>'},
         body: JSON.stringify({tenant_id: tenantId, modulo, ativo})
     }).then(r => r.json());
-    if (!res.ok) showToast(res.error || 'Erro ao actualizar módulo', 'error');
+    if (!res.ok) showToast(res.erro || res.error || 'Erro ao actualizar módulo', 'error');
     else showToast(ativo ? 'Módulo activado' : 'Módulo desactivado');
 }
 
@@ -94,7 +94,7 @@ async function resetModulos(tenantId) {
         body: JSON.stringify({tenant_id: tenantId})
     }).then(r => r.json());
     if (res.ok) location.reload();
-    else showToast(res.error || 'Erro ao resetar módulos', 'error');
+    else showToast(res.erro || res.error || 'Erro ao resetar módulos', 'error');
 }
 </script>
 

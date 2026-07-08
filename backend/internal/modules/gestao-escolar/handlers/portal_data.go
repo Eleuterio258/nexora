@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,67 +11,246 @@ import (
 )
 
 // ── GET /api/portal/aluno/me/boletim ─────────────────────────────────────────
-// Retorna médias por disciplina + lista de períodos para o selector.
+// Resposta inteligente: o backend calcula tudo; o PHP apenas renderiza.
 
 func (h *Handler) PortalBoletim(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetAlunoUser(r)
-	termID, _ := strconv.ParseInt(r.URL.Query().Get("term_id"), 10, 64)
+	ctx := r.Context()
 
-	gradeWhere := "g.student_id=$1 AND g.tenant_id=$2"
-	gradeArgs := []any{u.ID, u.TenantID}
-	if termID > 0 {
-		gradeArgs = append(gradeArgs, termID)
-		gradeWhere += " AND i.term_id=$3"
-	}
+	// ── 1. Contexto do aluno (turma, nível, série, config de avaliação) ──────
+	var (
+		classID      int64
+		levelID      *int64
+		seriesID     *int64
+		notaMinima   float64 = 10
+		escalaMaxima float64 = 20
+		sistema      string  = "0-20"
+		nomePeriodo  string  = "Trimestre"
+	)
+	_ = h.db.QueryRow(ctx, `
+		SELECT c.id, c.level_id, c.series_id,
+		       COALESCE(sl.nota_minima_aprovacao, 10),
+		       COALESCE(sl.escala_maxima, 20),
+		       COALESCE(sl.sistema_avaliacao, '0-20'),
+		       COALESCE(sl.nomenclatura_periodo, 'Trimestre')
+		FROM gestao_escolar.school_enrollments e
+		JOIN gestao_escolar.school_classes c ON c.id = e.class_id
+		LEFT JOIN gestao_escolar.school_levels sl ON sl.id = c.level_id
+		WHERE e.student_id=$1 AND e.tenant_id=$2 AND e.status='activa'
+		LIMIT 1`,
+		u.ID, u.TenantID,
+	).Scan(&classID, &levelID, &seriesID, &notaMinima, &escalaMaxima, &sistema, &nomePeriodo)
 
-	// Médias ponderadas por disciplina (só avaliações publicadas)
-	var grades any
-	_ = h.db.QueryRow(r.Context(), `
+	// ── 2. Anos lectivos nos quais o aluno esteve matriculado ────────────────
+	anos := json.RawMessage("[]")
+	_ = h.db.QueryRow(ctx, `
+		SELECT COALESCE(jsonb_agg(to_jsonb(sy) ORDER BY sy.data_inicio DESC), '[]')
+		FROM gestao_escolar.school_years sy
+		JOIN gestao_escolar.school_enrollments e
+		    ON e.school_year_id = sy.id AND e.student_id=$1 AND e.tenant_id=$2`,
+		u.ID, u.TenantID,
+	).Scan(&anos)
+
+	// ── 3. Períodos relevantes: só com avaliações publicadas OU no currículo ─
+	termos := json.RawMessage("[]")
+	_ = h.db.QueryRow(ctx, `
 		SELECT COALESCE(jsonb_agg(jsonb_build_object(
-			'subject_id', x.subject_id,
-			'nome',       x.nome,
-			'media',      ROUND(x.media,2),
-			'avaliacoes', x.avaliacoes
-		) ORDER BY x.nome), '[]')
-		FROM (
-			SELECT sub.id AS subject_id,
-			       sub.nome,
-			       SUM(g.nota*i.peso)/NULLIF(SUM(i.peso),0) AS media,
-			       COUNT(g.id) AS avaliacoes
-			FROM gestao_escolar.school_grades g
-			JOIN gestao_escolar.school_grade_items i ON i.id=g.grade_item_id AND i.publicado=TRUE
-			JOIN gestao_escolar.school_subjects sub ON sub.id=i.subject_id
-			WHERE `+gradeWhere+`
-			GROUP BY sub.id, sub.nome
-		) x`, gradeArgs...,
-	).Scan(&grades)
-
-	// Média geral (média das médias por disciplina)
-	var mediaGeral *float64
-	_ = h.db.QueryRow(r.Context(), `
-		SELECT ROUND(AVG(disc_avg),2) FROM (
-			SELECT SUM(g.nota*i.peso)/NULLIF(SUM(i.peso),0) disc_avg
-			FROM gestao_escolar.school_grades g
-			JOIN gestao_escolar.school_grade_items i ON i.id=g.grade_item_id AND i.publicado=TRUE
-			WHERE `+gradeWhere+` GROUP BY i.subject_id
-		) x`, gradeArgs...,
-	).Scan(&mediaGeral)
-
-	// Períodos disponíveis para o selector
-	var terms any
-	_ = h.db.QueryRow(r.Context(), `
-		SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY t.data_inicio), '[]')
+			'id',          t.id,
+			'nome',        t.nome,
+			'tipo',        t.tipo,
+			'data_inicio', t.data_inicio,
+			'data_fim',    t.data_fim,
+			'ordem',       t.ordem,
+			'ano_id',      sy.id,
+			'ano_nome',    sy.nome,
+			'ano_status',  sy.status
+		) ORDER BY sy.data_inicio DESC, t.data_inicio), '[]')
 		FROM gestao_escolar.school_terms t
+		JOIN gestao_escolar.school_years sy ON sy.id = t.school_year_id
+		WHERE t.level_id = $3
+		AND (
+			EXISTS (
+				SELECT 1 FROM gestao_escolar.school_grade_items gi
+				WHERE gi.class_id = $4 AND gi.term_id = t.id
+				  AND gi.publicado = TRUE AND gi.tenant_id = $2
+			)
+			OR EXISTS (
+				SELECT 1 FROM gestao_escolar.school_course_subject_terms cst
+				JOIN gestao_escolar.school_course_subjects cs ON cs.id = cst.course_subject_id
+				WHERE cst.term_id = t.id AND cs.tenant_id = $2
+				  AND ($5::bigint IS NULL OR cs.series_id IS NULL OR cs.series_id = $5)
+			)
+		)`,
+		u.ID, u.TenantID, levelID, classID, seriesID,
+	).Scan(&termos)
+
+	// ── 4. Período activo (data actual > primeiro com avaliações > primeiro) ─
+	var activeTermID *int64
+	_ = h.db.QueryRow(ctx, `
+		SELECT t.id FROM gestao_escolar.school_terms t
 		JOIN gestao_escolar.school_enrollments e
 		    ON e.school_year_id = t.school_year_id
-		   AND e.student_id = $1 AND e.tenant_id = $2 AND e.status = 'activa'`,
+		   AND e.student_id=$1 AND e.tenant_id=$2
+		WHERE t.level_id = $3
+		ORDER BY
+			CASE WHEN CURRENT_DATE BETWEEN t.data_inicio AND t.data_fim THEN 0 ELSE 1 END,
+			EXISTS (
+				SELECT 1 FROM gestao_escolar.school_grade_items gi
+				JOIN gestao_escolar.school_enrollments e2
+				    ON e2.class_id = gi.class_id AND e2.student_id=$1
+				   AND e2.tenant_id=$2 AND e2.status='activa'
+				WHERE gi.term_id = t.id AND gi.publicado = TRUE
+			)::int DESC,
+			t.data_inicio
+		LIMIT 1`,
+		u.ID, u.TenantID, levelID,
+	).Scan(&activeTermID)
+
+	// ── 5. Disciplinas com breakdown completo por período ────────────────────
+	// Cada disciplina devolve:
+	//   media, aprovado, faltas
+	//   periodos[]: {term_id, nota, tem_exame, peso_exame, leccionada, tem_avaliacao}
+	//
+	// Disciplinas com grade_items sem term_id (anuais) aparecem na lista com periodos=[].
+	// A query de subject_medias inclui ALL grade_items (com e sem term_id).
+	// A query de active_pairs só inclui os que têm term_id (para o breakdown por período).
+	disciplinas := json.RawMessage("[]")
+	_ = h.db.QueryRow(ctx, `
+		WITH
+		-- Disciplinas com notas (independentemente de term_id)
+		subjects_with_grades AS (
+			SELECT DISTINCT gi.subject_id
+			FROM gestao_escolar.school_grade_items gi
+			WHERE gi.class_id=$3 AND gi.tenant_id=$2 AND gi.publicado=TRUE
+		),
+		-- Pares subject+term com avaliações publicadas (só com term_id)
+		active_pairs AS (
+			SELECT DISTINCT gi.subject_id, gi.term_id
+			FROM gestao_escolar.school_grade_items gi
+			WHERE gi.class_id=$3 AND gi.tenant_id=$2
+			  AND gi.publicado=TRUE AND gi.term_id IS NOT NULL
+		),
+		-- Média ponderada por período
+		period_avgs AS (
+			SELECT gi.subject_id, gi.term_id,
+			       ROUND((SUM(g.nota * gi.peso) / NULLIF(SUM(gi.peso),0))::numeric, 2) AS nota
+			FROM gestao_escolar.school_grade_items gi
+			LEFT JOIN gestao_escolar.school_grades g
+			    ON g.grade_item_id=gi.id AND g.student_id=$1
+			WHERE gi.class_id=$3 AND gi.tenant_id=$2
+			  AND gi.publicado=TRUE AND gi.term_id IS NOT NULL
+			GROUP BY gi.subject_id, gi.term_id
+		),
+		-- Média ponderada global por disciplina (inclui anuais sem term_id)
+		subject_medias AS (
+			SELECT gi.subject_id,
+			       ROUND((SUM(g.nota * gi.peso) / NULLIF(SUM(gi.peso),0))::numeric, 2) AS media
+			FROM gestao_escolar.school_grade_items gi
+			LEFT JOIN gestao_escolar.school_grades g
+			    ON g.grade_item_id=gi.id AND g.student_id=$1
+			WHERE gi.class_id=$3 AND gi.tenant_id=$2 AND gi.publicado=TRUE
+			GROUP BY gi.subject_id
+		),
+		-- Configuração do currículo por período
+		curriculum AS (
+			SELECT cs.subject_id, cst.term_id, cst.tem_exame, cst.peso_exame
+			FROM gestao_escolar.school_course_subject_terms cst
+			JOIN gestao_escolar.school_course_subjects cs ON cs.id=cst.course_subject_id
+			WHERE cs.tenant_id=$2
+			  AND ($4::bigint IS NULL OR cs.series_id IS NULL OR cs.series_id=$4)
+		),
+		-- Pares subject+term vindos de avaliações ou do currículo (para o breakdown)
+		all_pairs AS (
+			SELECT subject_id, term_id FROM active_pairs
+			UNION
+			SELECT subject_id, term_id FROM curriculum
+		),
+		-- Faltas por disciplina
+		subject_faltas AS (
+			SELECT a.subject_id, COUNT(*) AS faltas
+			FROM gestao_escolar.school_attendance a
+			WHERE a.student_id=$1 AND a.tenant_id=$2 AND a.status='falta'
+			GROUP BY a.subject_id
+		)
+		SELECT COALESCE(jsonb_agg(jsonb_build_object(
+			'subject_id', sub.id,
+			'nome',       sub.nome,
+			'media',      sm.media,
+			'aprovado',   CASE WHEN sm.media IS NOT NULL THEN sm.media >= $5 ELSE NULL END,
+			'faltas',     COALESCE(sf.faltas, 0),
+			'periodos',   COALESCE((
+				SELECT jsonb_agg(jsonb_build_object(
+					'term_id',       ap2.term_id,
+					'nota',          pa.nota,
+					'tem_exame',     COALESCE(c.tem_exame, false),
+					'peso_exame',    c.peso_exame,
+					'leccionada',    (c.term_id IS NOT NULL OR act.term_id IS NOT NULL),
+					'tem_avaliacao', act.term_id IS NOT NULL
+				) ORDER BY ap2.term_id)
+				FROM all_pairs ap2
+				LEFT JOIN period_avgs pa   ON pa.subject_id=ap2.subject_id  AND pa.term_id=ap2.term_id
+				LEFT JOIN curriculum c     ON c.subject_id=ap2.subject_id   AND c.term_id=ap2.term_id
+				LEFT JOIN active_pairs act ON act.subject_id=ap2.subject_id AND act.term_id=ap2.term_id
+				WHERE ap2.subject_id=sub.id
+			), '[]'::jsonb)
+		) ORDER BY sub.nome), '[]'::jsonb)
+		-- Listar todas as disciplinas com notas OU no currículo
+		FROM (
+			SELECT subject_id FROM subjects_with_grades
+			UNION
+			SELECT subject_id FROM curriculum
+		) dist
+		JOIN gestao_escolar.school_subjects sub ON sub.id=dist.subject_id
+		LEFT JOIN subject_medias sm ON sm.subject_id=sub.id
+		LEFT JOIN subject_faltas sf ON sf.subject_id=sub.id`,
+		u.ID, u.TenantID, classID, seriesID, notaMinima,
+	).Scan(&disciplinas)
+
+	// ── 6. Estatísticas globais ──────────────────────────────────────────────
+	var mediaGeral *float64
+	var totalDisc, aprovadas, reprovadas int64
+	_ = h.db.QueryRow(ctx, `
+		SELECT
+			ROUND(AVG(media)::numeric, 2),
+			COUNT(*) FILTER (WHERE media IS NOT NULL),
+			COUNT(*) FILTER (WHERE media >= $3),
+			COUNT(*) FILTER (WHERE media IS NOT NULL AND media < $3)
+		FROM (
+			SELECT gi.subject_id,
+			       SUM(g.nota * gi.peso) / NULLIF(SUM(gi.peso), 0) AS media
+			FROM gestao_escolar.school_grade_items gi
+			LEFT JOIN gestao_escolar.school_grades g ON g.grade_item_id=gi.id AND g.student_id=$1
+			WHERE gi.class_id=$2 AND gi.tenant_id=$4 AND gi.publicado=TRUE
+			GROUP BY gi.subject_id
+		) sm`,
+		u.ID, classID, notaMinima, u.TenantID,
+	).Scan(&mediaGeral, &totalDisc, &aprovadas, &reprovadas)
+
+	var totalFaltas int64
+	_ = h.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM gestao_escolar.school_attendance
+		WHERE student_id=$1 AND tenant_id=$2 AND status='falta'`,
 		u.ID, u.TenantID,
-	).Scan(&terms)
+	).Scan(&totalFaltas)
 
 	jsonOK(w, map[string]any{
-		"grades": grades,
-		"media":  mediaGeral,
-		"terms":  terms,
+		"config": map[string]any{
+			"nota_minima":          notaMinima,
+			"escala_maxima":        escalaMaxima,
+			"sistema_avaliacao":    sistema,
+			"nomenclatura_periodo": nomePeriodo,
+		},
+		"active_term_id": activeTermID,
+		"media":          mediaGeral,
+		"stats": map[string]any{
+			"total":      totalDisc,
+			"aprovadas":  aprovadas,
+			"reprovadas": reprovadas,
+			"faltas":     totalFaltas,
+		},
+		"anos":        anos,
+		"termos":      termos,
+		"disciplinas": disciplinas,
 	}, http.StatusOK)
 }
 
@@ -199,9 +379,12 @@ func (h *Handler) PortalHorario(w http.ResponseWriter, r *http.Request) {
 	err = h.db.QueryRow(r.Context(), `
 		SELECT COALESCE(jsonb_agg(
 			to_jsonb(te) || jsonb_build_object(
-				'slot', to_jsonb(ts),
-				'disciplina', sub.nome,
-				'professor', COALESCE(t.nome_completo, '')
+				'slot',        to_jsonb(ts),
+				'disciplina',  sub.nome,
+				'subject_id',  sub.id,
+				'cor',         sub.cor,
+				'icone',       sub.icone,
+				'professor',   COALESCE(t.nome_completo, '')
 			) ORDER BY te.dia_semana, ts.hora_inicio
 		), '[]')
 		FROM gestao_escolar.school_timetable_entries te
@@ -317,11 +500,11 @@ func (h *Handler) PortalPresencas(w http.ResponseWriter, r *http.Request) {
 	).Scan(&records)
 
 	jsonOK(w, map[string]any{
-		"records":  records,
-		"total":    total,
-		"pagina":   page,
+		"records":    records,
+		"total":      total,
+		"pagina":     page,
 		"por_pagina": limit,
-		"paginas":  (total + limit - 1) / limit,
+		"paginas":    (total + limit - 1) / limit,
 	}, http.StatusOK)
 }
 
@@ -393,20 +576,22 @@ func (h *Handler) PortalBiblioteca(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var total int64
-	_ = h.db.QueryRow(r.Context(),
+	if err := h.db.QueryRow(r.Context(),
 		"SELECT COUNT(*) FROM gestao_escolar.school_library_loans l WHERE "+where, args...,
-	).Scan(&total)
+	).Scan(&total); err != nil {
+		jsonErr(w, "Erro ao obter empréstimos", http.StatusInternalServerError)
+		return
+	}
 
 	paginatedArgs := append(args, limit, offset)
 	var records any
-	_ = h.db.QueryRow(r.Context(), `
+	err := h.db.QueryRow(r.Context(), `
 		SELECT COALESCE(jsonb_agg(
 			to_jsonb(l) || jsonb_build_object(
 				'livro_titulo',    b.titulo,
 				'livro_autor',     b.autor,
 				'livro_isbn',      b.isbn,
-				'livro_categoria', b.categoria,
-				'capa_url',        b.capa_url
+				'livro_categoria', b.categoria
 			) ORDER BY l.emprestado_em DESC
 		), '[]')
 		FROM gestao_escolar.school_library_loans l
@@ -414,6 +599,10 @@ func (h *Handler) PortalBiblioteca(w http.ResponseWriter, r *http.Request) {
 		WHERE `+where+fmt.Sprintf(` LIMIT $%d OFFSET $%d`, len(paginatedArgs)-1, len(paginatedArgs)),
 		paginatedArgs...,
 	).Scan(&records)
+	if err != nil {
+		jsonErr(w, "Erro ao obter empréstimos", http.StatusInternalServerError)
+		return
+	}
 
 	jsonOK(w, map[string]any{
 		"records":    records,

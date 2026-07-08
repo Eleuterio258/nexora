@@ -5,10 +5,8 @@ import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.plot.PiePlot;
 import org.jfree.chart.plot.RingPlot;
-import org.jfree.chart.ui.ApplicationFrame;
 import org.jfree.data.general.DefaultPieDataset;
-import org.jfree.data.general.DefaultCategoryDataset;
-import org.jfree.chart.ChartUtils;
+import org.jfree.data.category.DefaultCategoryDataset;
 
 import java.awt.*;
 import java.io.File;
@@ -66,7 +64,6 @@ public class ChartUtils {
 
         RingPlot plot = (RingPlot) chart.getPlot();
         plot.setSectionDepth(0.35);
-        plot.setSeparation(0.02);
         plot.setLabelFont(new Font("Segoe UI", Font.PLAIN, 11));
         plot.setNoDataMessage("Sem dados disponiveis");
 
@@ -104,6 +101,6 @@ public class ChartUtils {
      */
     public static void exportChartAsImage(ChartPanel chartPanel, File file, 
                                           int width, int height) throws IOException {
-        ChartUtils.saveChartAsPNG(file, chartPanel.getChart(), width, height);
+        org.jfree.chart.ChartUtils.saveChartAsPNG(file, chartPanel.getChart(), width, height);
     }
 }

@@ -1,5 +1,6 @@
 package com.factpro.produtos.service;
 
+import com.factpro.auth.PermissionChecker;
 import com.factpro.produtos.dao.CategoriaDAO;
 import com.factpro.produtos.dao.ProdutoDAO;
 import com.factpro.produtos.model.Produto;
@@ -57,6 +58,7 @@ public class ProdutoService {
     }
 
     public Produto save(Produto produto) {
+        PermissionChecker.requireCreate("produtos");
         Long id = produtoDAO.save(produto);
         if (id == null) {
             throw new RuntimeException("Falha ao guardar o produto.");
@@ -67,6 +69,7 @@ public class ProdutoService {
     }
 
     public Produto update(Produto produto) {
+        PermissionChecker.requireUpdate("produtos");
         boolean updated = produtoDAO.update(produto);
         if (!updated) {
             throw new RuntimeException("Falha ao atualizar o produto.");
@@ -76,6 +79,7 @@ public class ProdutoService {
     }
 
     public boolean delete(Long id) {
+        PermissionChecker.requireDelete("produtos");
         boolean deleted = produtoDAO.delete(id);
         if (deleted) {
             logger.info("Product deleted: ID {}", id);
@@ -89,6 +93,7 @@ public class ProdutoService {
      * Increases stock for a product and records a stock movement.
      */
     public void entradaStock(Long produtoId, double quantidade, String motivo) {
+        PermissionChecker.requireUpdate("stock");
         logger.info("Stock entry for produto {}: qty={}, motivo={}", produtoId, quantidade, motivo);
 
         int qty = (int) Math.round(quantidade);
@@ -112,6 +117,7 @@ public class ProdutoService {
      * Decreases stock for a product and records a stock movement.
      */
     public void saidaStock(Long produtoId, double quantidade, String motivo) {
+        PermissionChecker.requireUpdate("stock");
         logger.info("Stock exit for produto {}: qty={}, motivo={}", produtoId, quantidade, motivo);
 
         int qty = (int) Math.round(quantidade);
@@ -135,6 +141,7 @@ public class ProdutoService {
      * Manual stock adjustment. Tipo should be "entrada" or "saida".
      */
     public void ajusteStock(Long produtoId, double quantidade, String tipo, String motivo) {
+        PermissionChecker.requireUpdate("stock");
         logger.info("Stock adjustment for produto {}: qty={}, tipo={}, motivo={}", produtoId, quantidade, tipo, motivo);
 
         int qty = (int) Math.round(quantidade);

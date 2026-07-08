@@ -1,7 +1,8 @@
 <?php
 declare(strict_types=1);
 
-$quadroId = (int) ($_GET['id'] ?? 0);
+$idHash   = $app->request->queryString('id');
+$quadroId = $idHash ? $app->id->decode($idHash) : 0;
 if ($quadroId <= 0) {
     header('Location: ' . $app->routes->path('tarefas'));
     exit;
@@ -243,7 +244,7 @@ async function soltar(e, listaDestinoId) {
 }
 
 function verCartao(id) {
-    window.location.href = CARTAO_URL + '?id=' + id + '&back=' + encodeURIComponent(location.href);
+    window.location.href = CARTAO_URL + '?id=' + nexoraEncodeId(id) + '&back=' + encodeURIComponent(location.href);
 }
 
 function abrirModalLista() {

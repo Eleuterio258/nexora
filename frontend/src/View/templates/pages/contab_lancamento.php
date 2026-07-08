@@ -1,12 +1,12 @@
-<?php
+﻿<?php
 
-    $id = $app->request->queryInt('id', 0);
-    if ($id <= 0) {
+    $idHash = $app->request->queryString('id');
+    if ($idHash === '') {
         header('Location: ' . $app->routes->path('contab_lancamentos'));
         exit;
     }
 
-    $resp = $app->nexora->call('GET', "/api/contabilidade/journal-entries/$id");
+    $resp = $app->nexora->call('GET', "/api/contabilidade/journal-entries/$idHash");
     if ($resp['status'] !== 200) {
         header('Location: ' . $app->routes->path('contab_lancamentos'));
         exit;
@@ -254,7 +254,7 @@ function estornarLancamento() {
                 const data = await res.json();
                 if (data.ok) {
                     showToast('Lançamento estornado com sucesso.');
-                    setTimeout(() => window.location.href = '/nexora/contabilidade/lancamento?id=' + data.id, 700);
+                    setTimeout(() => window.location.href = '/nexora/contabilidade/lancamento?id=' + nexoraEncodeId(data.id), 700);
                 } else {
                     showToast(data.erro || 'Erro', 'error');
                 }
@@ -265,3 +265,5 @@ function estornarLancamento() {
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
+
+

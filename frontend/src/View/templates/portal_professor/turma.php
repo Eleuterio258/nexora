@@ -33,10 +33,10 @@ require __DIR__ . '/layout_top.php';
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
         <p class="portal-card-title" style="margin:0;border:none"><i class="fa-solid fa-users" style="color:var(--prof-primary)"></i> Lista de Alunos</p>
         <div style="display:flex;gap:.5rem">
-            <a href="/portal/professor/presencas?turma_id=<?= (int)($_GET['id'] ?? 0) ?>" class="btn-primary" style="font-size:.8rem">
+            <a href="/portal/professor/presencas?turma_id=<?= htmlspecialchars($_GET['id'] ?? '') ?>" class="btn-primary" style="font-size:.8rem">
                 <i class="fa-solid fa-calendar-check"></i> Registar Presenças
             </a>
-            <a href="/portal/professor/notas?turma_id=<?= (int)($_GET['id'] ?? 0) ?>" class="btn-secondary" style="font-size:.8rem">
+            <a href="/portal/professor/notas?turma_id=<?= htmlspecialchars($_GET['id'] ?? '') ?>" class="btn-secondary" style="font-size:.8rem">
                 <i class="fa-solid fa-star-half-stroke"></i> Lançar Notas
             </a>
         </div>

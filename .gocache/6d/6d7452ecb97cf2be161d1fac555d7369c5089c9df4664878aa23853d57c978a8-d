@@ -1,0 +1,14 @@
+./adapter-type.go
+./adapter.go
+./broadcast-operator.go
+./client.go
+./namespace-type.go
+./namespace.go
+./parent-broadcast-adapter.go
+./parent-namespace.go
+./remote-socket.go
+./server-options.go
+./server.go
+./session-aware-adapter.go
+./socket.go
+./typed-events.go

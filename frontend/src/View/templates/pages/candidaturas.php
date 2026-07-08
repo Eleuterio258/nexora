@@ -1,7 +1,8 @@
 <?php
 
 // Filters
-$filtroVaga   = $app->request->queryInt('vaga_id', 0) ?: 0;
+$vagaHash     = $app->request->queryString('vaga_id');
+$filtroVaga   = $vagaHash ? $app->id->decode($vagaHash) : 0;
 $filtroEstado = $app->request->queryEnum(
     'estado',
     ['recebida', 'em_analise', 'entrevista', 'aprovada', 'rejeitada']
@@ -139,7 +140,7 @@ include dirname(__DIR__) . '/layouts/top.php';
                 </td>
                 <td>
                     <div class="adm-actions">
-                        <a href="/nexora/recrutamento/candidaturas/ver?id=<?= $c['id'] ?>"
+                        <a href="/nexora/recrutamento/candidaturas/ver?id=<?= $app->id->encode((int)$c['id']) ?>"
                            class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Ver detalhes">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>

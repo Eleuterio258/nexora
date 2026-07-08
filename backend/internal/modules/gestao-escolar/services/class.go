@@ -85,6 +85,9 @@ func (s *ClassService) Update(ctx context.Context, id, tenantID int64, fields ma
 		if err == pgx.ErrNoRows {
 			return ErrClassNotFound
 		}
+		if errors.Is(err, repositories.ErrInvalidColumn) {
+			return ErrClassInvalidData
+		}
 		return err
 	}
 	return nil

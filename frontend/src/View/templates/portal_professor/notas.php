@@ -5,8 +5,8 @@ $turmas       = $portalData['turmas']['body']['data'] ?? $portalData['turmas']['
 $notasRaw     = $portalData['notas']['body']['data']  ?? $portalData['notas']['body']  ?? [];
 $alunos       = $notasRaw['alunos'] ?? $notasRaw ?? [];
 $periodos     = $notasRaw['periodos'] ?? [];
-$turmaId      = (int)($_GET['turma_id'] ?? 0);
-$disciplinaId = (int)($_GET['disciplina_id'] ?? 0);
+$turmaId      = $turmaId      ?? 0; // decoded by index.php
+$disciplinaId = $disciplina   ?? 0; // decoded by index.php
 
 require __DIR__ . '/layout_top.php';
 ?>
@@ -18,8 +18,8 @@ require __DIR__ . '/layout_top.php';
             <select name="turma_id" style="padding:.45rem .75rem;border:1px solid #E2E8F0;border-radius:8px;font-size:.85rem;min-width:160px" id="sel-turma">
                 <option value="">Seleccionar turma</option>
                 <?php foreach ($turmas as $t): ?>
-                <option value="<?= (int)($t['id'] ?? 0) ?>"
-                    data-disc-id="<?= (int)($t['disciplina_id'] ?? 0) ?>"
+                <option value="<?= $app->id->encode((int)($t['id'] ?? 0)) ?>"
+                    data-disc-id="<?= $app->id->encode((int)($t['disciplina_id'] ?? 0)) ?>"
                     <?= $turmaId === (int)($t['id'] ?? 0) ? 'selected' : '' ?>>
                     <?= htmlspecialchars($t['nome'] ?? $t['turma'] ?? '') ?> – <?= htmlspecialchars($t['disciplina'] ?? '') ?>
                 </option>

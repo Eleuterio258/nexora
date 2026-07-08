@@ -70,7 +70,26 @@
       "Bash(curl -s --max-time 20 -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36\" \"https://www.bancomoc.mz/pt/areas-de-actuacao/economia-e-financas/taxas-de-cambio/\")",
       "Bash(curl -s --max-time 20 -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36\" \"https://www.bancomoc.mz/pt/\")",
       "Bash(curl -s --max-time 30 -A \"Mozilla/5.0\" -L \"https://www.bancomoc.mz/media/wmphwvdx/taxas-de-c%C3%A2mbio-do-final-do-periodo.xlsx\" -o \"C:/Users/ELEUTE~1/AppData/Local/Temp/bm_rates.xlsx\")",
-      "Read(//d/projecto/e-258tech/flutter/offline_first_flutter_clean_ac_2024/lib/core/rest_client/**)"
+      "Read(//d/projecto/e-258tech/flutter/offline_first_flutter_clean_ac_2024/lib/core/rest_client/**)",
+      "Bash(xargs -I{} docker exec pg psql -U postgres -d nexora_erp -t -c \"{}\")",
+      "Bash(grep -rn \"path\\(.*\\\\$\\\\|routes->path.*id\\\\|\\\\?id=\\\\|['\\\\\"]id['\\\\\"] *=>\" d:/projecto/e-258tech/2026/factPro/frontend/src/ --include=\"*.php\")",
+      "Bash(xargs grep -l \"type Subject\\\\|type Term\\\\|type School \")",
+      "Bash(python -c \"from PIL import Image; print\\('PIL OK'\\)\")",
+      "Bash(npm ls *)",
+      "Bash(npx --yes sharp --version)",
+      "Bash(xargs grep -ln \"^type Room\")",
+      "Bash(go doc *)",
+      "Bash(powershell -Command \"Stop-Process -Id 10852 -Force\")",
+      "Bash(powershell -Command \"Get-Process -Id 19216 | Select-Object Id,ProcessName,Path\")",
+      "Bash(powershell -Command \"Stop-Process -Id 19216 -Force\")",
+      "Bash(python -c ' *)",
+      "Bash(powershell -Command \"Stop-Process -Id 26948 -Force\")",
+      "Bash(curl -s -X POST http://localhost:8080/api/recrutamento/candidaturas/13/notas -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlc2NvcG8iOiJlcnAiLCJleHAiOjE3ODMyODQyODYsImlhdCI6MTc4MzI4MzM4NiwianRpIjoiMzIxNzA0ZTgxYTlkODc3ZDNiN2RlYTkzYWYzMTRkZDQiLCJzdWIiOjEyOCwidGlkIjo1LCJ0aXBvIjoiZnVuY2lvbmFyaW8ifQ.i6LRPoSzjnAIHLyVTR9QlBvf953ImQ67Mb6ih49rUIA' -H 'Content-Type: application/json' -d '{\"conteudo\":\"teste realtime socket.io\"}')",
+      "Bash(awk '{print $5}')",
+      "Bash(find /c/Users/Eleuterio/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_doc_scanner-0.0.20/example -iname *.dart)",
+      "Bash(xargs grep -l \"Pdf\\\\|pdfUri\")",
+      "Bash(flutter test *)",
+      "Bash(powershell -Command \"Stop-Process -Id 10196 -Force\")"
     ]
   }
 }

@@ -1,5 +1,7 @@
 package com.factpro.vendas.service;
 
+import com.factpro.auth.PermissionChecker;
+import com.factpro.core.event.EventManager;
 import com.factpro.core.exception.BusinessException;
 import com.factpro.core.exception.StockInsuficienteException;
 import com.factpro.produtos.dao.ProdutoDAO;
@@ -46,6 +48,7 @@ public class VendaService {
      * updates stock, creates stock movements, and returns the saved venda.
      */
     public Venda finalizarVenda(Venda venda, List<Pagamento> pagamentos) {
+        PermissionChecker.requireCreate("vendas");
         logger.info("Finalizing sale for clienteId {}", venda.getClienteId());
 
         // 1. Validate stock availability
@@ -99,6 +102,14 @@ public class VendaService {
             int qty = (int) Math.round(item.getQuantidade());
             produtoDAO.updateStock(item.getProdutoId(), -qty);
 
+            // Check low stock after update
+            Produto updatedProduct = produtoDAO.findById(item.getProdutoId());
+            if (updatedProduct != null && updatedProduct.getStockMinimo() != null
+                    && updatedProduct.getStockAtual() <= updatedProduct.getStockMinimo()) {
+                EventManager.getInstance().emit("stock_baixo",
+                        new Object[]{updatedProduct.getNome(), updatedProduct.getStockAtual()});
+            }
+
             // Create stock movement
             StockMovimento movimento = new StockMovimento();
             movimento.setTenantId(venda.getTenantId());
@@ -130,6 +141,7 @@ public class VendaService {
      * Cancels a sale: updates status to 'cancelada' and restores stock.
      */
     public boolean cancelarVenda(Long vendaId, Long userId, String motivo) {
+        PermissionChecker.require("vendas:cancel");
         logger.info("Cancelling sale ID {} by user {} - reason: {}", vendaId, userId, motivo);
 
         Venda venda = vendaDAO.findById(vendaId);
@@ -168,6 +180,10 @@ public class VendaService {
         }
 
         logger.info("Sale {} cancelled successfully", vendaId);
+
+        // Emit cancellation event for notifications
+        EventManager.getInstance().emit("venda_cancelada", venda);
+
         return true;
     }
 

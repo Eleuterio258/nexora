@@ -23,6 +23,7 @@ public class AuditDAO extends BaseDAO<AuditLog> {
         log.setDescricao(rs.getString("descricao"));
         log.setIpAddress(rs.getString("ip_address"));
         log.setSucesso(rs.getObject("sucesso") != null ? rs.getBoolean("sucesso") : true);
+        log.setUsuarioNome(rs.getString("usuario_nome"));
         log.setCriadoEm(rs.getString("criado_em"));
         return log;
     }

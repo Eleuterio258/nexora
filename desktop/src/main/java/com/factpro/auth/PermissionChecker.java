@@ -15,13 +15,33 @@ public class PermissionChecker {
 
     private static final Logger logger = LoggerFactory.getLogger(PermissionChecker.class);
 
+    // Modo de teste: quando ativo, todas as verificacoes de permissao sao ignoradas.
+    // Deve ser usado APENAS em testes unitarios.
+    private static boolean testBypass = false;
+
+    /**
+     * Ativa/desativa o bypass de verificacao de permissoes para testes.
+     * ATENCAO: usar apenas em testes unitarios.
+     */
+    public static synchronized void setTestBypass(boolean bypass) {
+        testBypass = bypass;
+    }
+
+    private static boolean isBypassActive() {
+        return testBypass;
+    }
+
     /**
      * Verifica se o utilizador tem a permissao especificada.
      * @throws SecurityException se nao tiver permissao
      */
     public static void require(String permission) {
+        if (isBypassActive()) {
+            return;
+        }
+
         SessionManager session = SessionManager.getInstance();
-        
+
         if (!session.isAuthenticated()) {
             logger.warn("Tentativa de acesso sem autenticacao: {}", permission);
             throw new SecurityException("Utilizador nao autenticado.");
@@ -51,8 +71,12 @@ public class PermissionChecker {
      * Verifica se o utilizador tem pelo menos uma das permissoes.
      */
     public static void requireAny(String... permissions) {
+        if (isBypassActive()) {
+            return;
+        }
+
         SessionManager session = SessionManager.getInstance();
-        
+
         if (!session.isAuthenticated()) {
             logger.warn("Tentativa de acesso sem autenticacao");
             throw new SecurityException("Utilizador nao autenticado.");

@@ -51,6 +51,27 @@ final class NexoraClient implements NexoraGateway
         return ['status' => $response->status, 'body' => $response->body];
     }
 
+    /**
+     * Chamada autenticada com um Bearer token explícito (não o do admin nem o
+     * do pedido recebido) — usada pelos portais que guardam o próprio token
+     * na sessão PHP (ex.: portal do candidato).
+     */
+    public function callWithBearer(
+        string $method,
+        string $path,
+        ?array $payload,
+        string $token,
+        array $query = []
+    ): array {
+        $response = $this->json(
+            $method,
+            $this->url($path, $query),
+            $payload,
+            ['Authorization: Bearer ' . $token]
+        );
+        return ['status' => $response->status, 'body' => $response->body];
+    }
+
     public function publicRequest(
         string $method,
         string $path,
@@ -62,6 +83,9 @@ final class NexoraClient implements NexoraGateway
         if ($ip = $this->clientIp()) {
             $headers[] = 'X-Forwarded-For: ' . $ip;
         }
+        if ($auth = $this->incomingAuthorization()) {
+            $headers[] = 'Authorization: ' . $auth;
+        }
 
         return $this->json(
             $method,
@@ -70,6 +94,24 @@ final class NexoraClient implements NexoraGateway
             $headers,
             $curlOptions
         );
+    }
+
+    /**
+     * Lê o cabeçalho Authorization do pedido recebido, para o reencaminhar
+     * ao backend Go nos proxies públicos (ex.: sessão do portal de candidatos).
+     */
+    private function incomingAuthorization(): ?string
+    {
+        $header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
+        if (!$header && function_exists('getallheaders')) {
+            foreach (getallheaders() as $name => $value) {
+                if (strcasecmp($name, 'Authorization') === 0) {
+                    $header = $value;
+                    break;
+                }
+            }
+        }
+        return $header ?: null;
     }
 
     public function callPublic(
@@ -96,6 +138,16 @@ final class NexoraClient implements NexoraGateway
         return $this->json('POST', $this->baseUrl . '/api/auth/refresh', [
             'refresh_token' => $refreshToken,
         ]);
+    }
+
+    /**
+     * Devolve o access token JWT actual do utilizador em sessão — usado para
+     * autenticar ligações Socket.IO feitas directamente do browser ao backend
+     * Go (o handshake não passa pelo proxy PHP, ao contrário do REST).
+     */
+    public function currentAccessToken(): string
+    {
+        return $this->tokens->accessToken();
     }
 
     public function logout(string $accessToken): void

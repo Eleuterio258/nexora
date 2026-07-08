@@ -20,9 +20,10 @@ class JobLoading extends JobState {
 class JobsLoaded extends JobState {
   final List<Job> jobs;
   final String? activeCategory;
-  const JobsLoaded(this.jobs, {this.activeCategory});
+  final int? tenantId;
+  const JobsLoaded(this.jobs, {this.activeCategory, this.tenantId});
   @override
-  List<Object?> get props => [jobs, activeCategory];
+  List<Object?> get props => [jobs, activeCategory, tenantId];
 }
 
 class JobDetailLoaded extends JobState {

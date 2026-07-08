@@ -4,7 +4,8 @@ $activePage  = 'presencas';
 $turmas      = $portalData['turmas']['body']['data']    ?? $portalData['turmas']['body']    ?? [];
 $presencaRaw = $portalData['presencas']['body']['data'] ?? $portalData['presencas']['body'] ?? [];
 $alunos      = $presencaRaw['alunos'] ?? $presencaRaw ?? [];
-$turmaId     = (int)($_GET['turma_id'] ?? 0);
+$turmaId     = $turmaId ?? 0; // decoded by index.php from hash
+$turmaIdHash = $_GET['turma_id'] ?? '';
 $dataHoje    = $_GET['data'] ?? date('Y-m-d');
 
 require __DIR__ . '/layout_top.php';
@@ -17,7 +18,7 @@ require __DIR__ . '/layout_top.php';
             <select name="turma_id" style="padding:.45rem .75rem;border:1px solid #E2E8F0;border-radius:8px;font-size:.85rem;min-width:160px">
                 <option value="">Seleccionar turma</option>
                 <?php foreach ($turmas as $t): ?>
-                <option value="<?= (int)($t['id'] ?? 0) ?>" <?= $turmaId === (int)($t['id'] ?? 0) ? 'selected' : '' ?>>
+                <option value="<?= $app->id->encode((int)($t['id'] ?? 0)) ?>" <?= $turmaId === (int)($t['id'] ?? 0) ? 'selected' : '' ?>>
                     <?= htmlspecialchars($t['nome'] ?? $t['turma'] ?? '') ?> – <?= htmlspecialchars($t['disciplina'] ?? '') ?>
                 </option>
                 <?php endforeach; ?>

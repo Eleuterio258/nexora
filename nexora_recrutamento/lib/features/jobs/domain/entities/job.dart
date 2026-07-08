@@ -5,13 +5,20 @@ class Job extends Equatable {
   final String title;
   final String company;
   final String location;
-  final String type;       // Full-time, Part-time, Remote, Hybrid
-  final String category;
+  final String type;       // regime: Presencial, Híbrido, Remoto...
+  final String category;   // área da vaga
   final String description;
   final String? salary;
   final String logoUrl;
   final DateTime postedAt;
   final bool isSaved;
+  final String? about;
+  final List<String> responsibilities;
+  final List<String> requiredQualifications;
+  final List<String> preferredQualifications;
+  final List<String> benefits;
+  final int numberOfPositions;
+  final DateTime? deadline;
 
   const Job({
     required this.id,
@@ -25,6 +32,13 @@ class Job extends Equatable {
     required this.logoUrl,
     required this.postedAt,
     this.isSaved = false,
+    this.about,
+    this.responsibilities = const [],
+    this.requiredQualifications = const [],
+    this.preferredQualifications = const [],
+    this.benefits = const [],
+    this.numberOfPositions = 1,
+    this.deadline,
   });
 
   Job copyWith({bool? isSaved}) => Job(
@@ -39,6 +53,13 @@ class Job extends Equatable {
         logoUrl: logoUrl,
         postedAt: postedAt,
         isSaved: isSaved ?? this.isSaved,
+        about: about,
+        responsibilities: responsibilities,
+        requiredQualifications: requiredQualifications,
+        preferredQualifications: preferredQualifications,
+        benefits: benefits,
+        numberOfPositions: numberOfPositions,
+        deadline: deadline,
       );
 
   @override

@@ -33,6 +33,7 @@ final class RecrutamentoController
             'req_obrigatorios' => $filterList('req_obrigatorios'),
             'req_preferenciais' => $filterList('req_preferenciais'),
             'oferece' => $filterList('oferece'),
+            'cargo_id' => $request->int('cargo_id'),
         ]));
     }
 
@@ -135,6 +136,39 @@ final class RecrutamentoController
 
     public function candidaturaContratar(Request $request, AdminApiDependencies $d): ApiResult
     {
-        return $d->result(fn() => $d->recruitment->contratar($request->int('id') ?? 0));
+        $id = $request->int('id') ?? 0;
+
+        $contactoNome = $request->string('contacto_emergencia_nome');
+        $contactoTelefone = $request->string('contacto_emergencia_telefone');
+        $contactosEmergencia = [];
+        if ($contactoNome !== '' && $contactoTelefone !== '') {
+            $contactosEmergencia[] = [
+                'nome' => $contactoNome,
+                'parentesco' => $request->string('contacto_emergencia_parentesco') ?: null,
+                'telefone' => $contactoTelefone,
+                'email' => $request->string('contacto_emergencia_email') ?: null,
+            ];
+        }
+
+        $payload = [
+            'tipo_contrato' => $request->string('tipo_contrato') ?: null,
+            'salario_base' => $request->float('salario_base'),
+            'data_admissao' => $request->string('data_admissao') ?: null,
+            'data_nascimento' => $request->string('data_nascimento') ?: null,
+            'cargo_id' => $request->int('cargo_id'),
+            'unit_id' => $request->int('unit_id'),
+            'horario_id' => $request->int('horario_id'),
+            'data_fim' => $request->string('data_fim') ?: null,
+            'nacionalidade' => $request->string('nacionalidade') ?: null,
+            'tipo_documento' => $request->string('tipo_documento') ?: null,
+            'numero_documento' => $request->string('numero_documento') ?: null,
+            'nuit' => $request->string('nuit') ?: null,
+            'autorizacao_trabalho' => $request->string('autorizacao_trabalho') ?: null,
+            'data_validade_autorizacao' => $request->string('data_validade_autorizacao') ?: null,
+            'criar_professor' => $request->bool('criar_professor'),
+            'contactos_emergencia' => $contactosEmergencia,
+        ];
+
+        return $d->result(fn() => $d->recruitment->contratar($id, $payload));
     }
 }

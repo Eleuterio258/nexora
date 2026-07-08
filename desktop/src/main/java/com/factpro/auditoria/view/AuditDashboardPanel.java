@@ -46,6 +46,7 @@ public class AuditDashboardPanel extends JPanel {
     // Graficos
     private ChartPanel pieChartPanel;
     private ChartPanel barChartPanel;
+    private JPanel chartsPanel;
     
     // Stats
     private JLabel totalLabel;
@@ -217,7 +218,7 @@ public class AuditDashboardPanel extends JPanel {
         centerPanel.add(statsPanel, BorderLayout.NORTH);
         
         // Charts panel
-        JPanel chartsPanel = new JPanel(new MigLayout("fill, wrap 2, gap 10, ins 10"));
+        chartsPanel = new JPanel(new MigLayout("fill, wrap 2, gap 10, ins 10"));
         chartsPanel.setBorder(BorderFactory.createTitledBorder("Estatisticas Visuais"));
         centerPanel.add(chartsPanel, BorderLayout.CENTER);
         
@@ -285,20 +286,10 @@ public class AuditDashboardPanel extends JPanel {
         Map<String, Integer> barDataInt = new HashMap<>();
         barData.forEach((k, v) -> barDataInt.put(k, v.intValue()));
         
-        // Create charts
-        if (pieChartPanel != null) {
-            pieChartPanel.getParent().remove();
-        }
-        if (barChartPanel != null) {
-            barChartPanel.getParent().remove();
-        }
-        
         pieChartPanel = ChartUtils.createPieChart("Distribuicao por Status", pieData);
         barChartPanel = ChartUtils.createBarChart("Logs por Recurso", "Recurso", "Quantidade", barDataInt);
-        
-        // Add to charts panel
-        Container parent = ((JPanel) getParent()).getComponent(1);
-        if (parent instanceof JPanel chartsPanel) {
+
+        if (chartsPanel != null) {
             chartsPanel.removeAll();
             chartsPanel.add(pieChartPanel, "grow");
             chartsPanel.add(barChartPanel, "grow");

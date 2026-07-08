@@ -44,6 +44,11 @@ final class AdminSession
             $_SESSION['enc_info']       = $body['encarregado'];
             $_SESSION['enc_expires_at'] = time() + (int) ($body['expires_in'] ?? 28800);
         }
+        if (($_SESSION['nexora_tipo'] ?? '') === 'candidato' && !empty($body['candidato'])) {
+            $_SESSION['candidato_token']      = $body['access_token'] ?? '';
+            $_SESSION['candidato_info']       = $body['candidato'];
+            $_SESSION['candidato_expires_at'] = time() + (int) ($body['expires_in'] ?? 2592000);
+        }
         $escoposRaw = is_array($body['escopo'] ?? null) ? $body['escopo'] : [$body['escopo'] ?? ''];
         if (in_array('portal_professor', $escoposRaw, true)) {
             $_SESSION['prof_token']      = $body['access_token'] ?? '';
@@ -278,6 +283,9 @@ final class AdminSession
         if ($this->hasEscopo('portal_encarregado')) {
             return '/portal/encarregado';
         }
+        if ($this->hasEscopo('portal_candidato')) {
+            return '/carreira/candidato/area';
+        }
         return '/nexora/';
     }
 
@@ -286,7 +294,7 @@ final class AdminSession
         if (is_array($escopo)) {
             $escopos = array_values(array_unique(array_filter(
                 array_map('strval', $escopo),
-                static fn(string $value): bool => in_array($value, ['erp', 'escola', 'portal_aluno', 'portal_encarregado', 'portal_professor', 'superadmin'], true)
+                static fn(string $value): bool => in_array($value, ['erp', 'escola', 'portal_aluno', 'portal_encarregado', 'portal_professor', 'portal_candidato', 'superadmin'], true)
             )));
             return $escopos ?: ['erp'];
         }
@@ -295,6 +303,7 @@ final class AdminSession
             'portal_aluno'        => ['portal_aluno'],
             'portal_encarregado'  => ['portal_encarregado'],
             'portal_professor'    => ['portal_professor'],
+            'portal_candidato'    => ['portal_candidato'],
             'superadmin'          => ['superadmin'],
             default               => ['erp'],
         };
@@ -313,6 +322,9 @@ final class AdminSession
         }
         if (in_array('portal_professor', $escopos, true)) {
             return 'portal_professor';
+        }
+        if (in_array('portal_candidato', $escopos, true)) {
+            return 'portal_candidato';
         }
         $hasEscola = in_array('escola', $escopos, true);
         return $hasEscola ? 'escola' : 'erp';

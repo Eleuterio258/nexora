@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
 const kPrimary = Color(0xFF2CB87A);
-const kPrimaryDark = Color(0xFF176B4A);
-const kPrimaryLight = Color(0xFF3DC97B);
 
 class NexoraLogoIcon extends StatelessWidget {
   final double size;
@@ -11,68 +9,18 @@ class NexoraLogoIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    final image = Image.asset(
+      'assets/logos/logo.png',
       width: size,
       height: size,
-      child: CustomPaint(painter: _NLogoPainter(isWhite: isWhite)),
+      fit: BoxFit.contain,
+    );
+    if (!isWhite) return image;
+    return ColorFiltered(
+      colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+      child: image,
     );
   }
-}
-
-class _NLogoPainter extends CustomPainter {
-  final bool isWhite;
-  const _NLogoPainter({this.isWhite = false});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final t = w * 0.21;
-
-    void drawN(Color color) {
-      final fill = Paint()
-        ..color = color
-        ..style = PaintingStyle.fill;
-      final stroke = Paint()
-        ..color = color
-        ..strokeWidth = t
-        ..strokeCap = StrokeCap.butt
-        ..style = PaintingStyle.stroke;
-      canvas.drawRect(Rect.fromLTWH(0, 0, t, h), fill);
-      canvas.drawRect(Rect.fromLTWH(w - t, 0, t, h), fill);
-      canvas.drawLine(Offset(t / 2, 0), Offset(w - t / 2, h), stroke);
-    }
-
-    if (isWhite) {
-      drawN(Colors.white);
-      return;
-    }
-
-    final darkClip = Path()
-      ..moveTo(0, 0)
-      ..lineTo(w * 0.63, 0)
-      ..lineTo(w * 0.37, h)
-      ..lineTo(0, h)
-      ..close();
-    canvas.save();
-    canvas.clipPath(darkClip);
-    drawN(kPrimaryDark);
-    canvas.restore();
-
-    final lightClip = Path()
-      ..moveTo(w * 0.63, 0)
-      ..lineTo(w, 0)
-      ..lineTo(w, h)
-      ..lineTo(w * 0.37, h)
-      ..close();
-    canvas.save();
-    canvas.clipPath(lightClip);
-    drawN(kPrimaryLight);
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // White-on-white background painter for login/register

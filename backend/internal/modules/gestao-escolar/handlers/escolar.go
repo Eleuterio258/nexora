@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -87,6 +88,32 @@ func appendSchoolFilter(where *string, args *[]any, column, value string) {
 }
 
 // Anos lectivos e periodos.
+func (h *Handler) ListarPeriodosLectivos(w http.ResponseWriter, r *http.Request) {
+	u := mw.GetUser(r)
+	yearID  := r.URL.Query().Get("year_id")
+	levelID := r.URL.Query().Get("level_id")
+	where := "t.tenant_id=$1"
+	args := []any{u.TenantID}
+	if yearID != "" {
+		args = append(args, yearID)
+		where += fmt.Sprintf(" AND t.school_year_id=$%d", len(args))
+	}
+	if levelID != "" {
+		args = append(args, levelID)
+		where += fmt.Sprintf(" AND t.level_id=$%d", len(args))
+	}
+	h.schoolList(w, r, `SELECT COALESCE(jsonb_agg(jsonb_build_object(
+		'id',t.id,'nome',t.nome,'tipo',t.tipo,'codigo',t.codigo,
+		'data_inicio',t.data_inicio,'data_fim',t.data_fim,'peso',t.peso,'ordem',t.ordem,
+		'school_year_id',t.school_year_id,'ano_nome',y.nome,
+		'level_id',t.level_id,'level_nome',sl.nome
+	) ORDER BY t.school_year_id,sl.nome,t.ordem),'[]')
+	FROM gestao_escolar.school_terms t
+	JOIN gestao_escolar.school_years y ON y.id=t.school_year_id
+	JOIN gestao_escolar.school_levels sl ON sl.id=t.level_id
+	WHERE `+where, args...)
+}
+
 func (h *Handler) ListarAnosLectivos(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetUser(r)
 	h.schoolList(w, r, `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.data_inicio DESC),'[]')
@@ -157,12 +184,63 @@ func (h *Handler) CriarPeriodoLectivo(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "JSON invalido", 400)
 		return
 	}
-	h.schoolCreate(w, r, `INSERT INTO gestao_escolar.school_terms(tenant_id,school_year_id,codigo,nome,data_inicio,data_fim,peso)
-		SELECT $1,y.id,j.codigo,j.nome,j.data_inicio,j.data_fim,COALESCE(j.peso,1)
+	if body == nil || string(body) == "null" || !json.Valid(body) {
+		jsonErr(w, "JSON invalido", 400)
+		return
+	}
+	var bmap map[string]any
+	_ = json.Unmarshal(body, &bmap)
+	if _, ok := bmap["level_id"]; !ok || bmap["level_id"] == nil || bmap["level_id"] == "" {
+		jsonErr(w, "level_id obrigatório: cada período pertence a um nível de ensino", 422)
+		return
+	}
+	h.schoolCreate(w, r, `INSERT INTO gestao_escolar.school_terms(tenant_id,school_year_id,codigo,nome,tipo,data_inicio,data_fim,peso,ordem,level_id)
+		SELECT $1,y.id,j.codigo,j.nome,COALESCE(NULLIF(j.tipo,''),'trimestre'),j.data_inicio,j.data_fim,COALESCE(j.peso,1),
+		       COALESCE(j.ordem,(SELECT COALESCE(MAX(t2.ordem),0)+1 FROM gestao_escolar.school_terms t2 WHERE t2.school_year_id=y.id)),
+		       ($3::jsonb->>'level_id')::bigint
 		FROM gestao_escolar.school_years y,jsonb_to_record($3::jsonb)
-		AS j(codigo text,nome text,data_inicio date,data_fim date,peso numeric)
+		AS j(codigo text,nome text,tipo text,data_inicio date,data_fim date,peso numeric,ordem int)
 		WHERE y.id=$2 AND y.tenant_id=$1 AND j.codigo<>'' RETURNING school_terms.id`,
 		u.TenantID, chi.URLParam(r, "id"), body)
+}
+
+func (h *Handler) ActualizarPeriodoLectivo(w http.ResponseWriter, r *http.Request) {
+	u := mw.GetUser(r)
+	body, err := schoolBody(r)
+	if err != nil {
+		jsonErr(w, "JSON invalido", 400)
+		return
+	}
+	h.schoolUpdate(w, r, `UPDATE gestao_escolar.school_terms SET
+		nome       = COALESCE(NULLIF($1::jsonb->>'nome',''), nome),
+		tipo       = COALESCE(NULLIF($1::jsonb->>'tipo',''), tipo),
+		codigo     = COALESCE(NULLIF($1::jsonb->>'codigo',''), codigo),
+		data_inicio= COALESCE(($1::jsonb->>'data_inicio')::date, data_inicio),
+		data_fim   = COALESCE(($1::jsonb->>'data_fim')::date, data_fim),
+		peso       = COALESCE(($1::jsonb->>'peso')::numeric, peso),
+		ordem      = COALESCE(($1::jsonb->>'ordem')::int, ordem),
+		level_id   = CASE WHEN $1::jsonb ? 'level_id' AND ($1::jsonb->>'level_id') <> '' THEN ($1::jsonb->>'level_id')::bigint ELSE level_id END
+		WHERE id=$2 AND tenant_id=$3`, body, chi.URLParam(r, "id"), u.TenantID)
+}
+
+func (h *Handler) EliminarPeriodoLectivo(w http.ResponseWriter, r *http.Request) {
+	u := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+	var hasGrades bool
+	_ = h.db.QueryRow(r.Context(),
+		`SELECT EXISTS(SELECT 1 FROM gestao_escolar.school_grade_items gi WHERE gi.term_id=$1 AND gi.tenant_id=$2)`,
+		id, u.TenantID).Scan(&hasGrades)
+	if hasGrades {
+		jsonErr(w, "Não é possível eliminar um período com avaliações lançadas", 409)
+		return
+	}
+	tag, err := h.db.Exec(r.Context(),
+		`DELETE FROM gestao_escolar.school_terms WHERE id=$1 AND tenant_id=$2`, id, u.TenantID)
+	if err != nil || tag.RowsAffected() == 0 {
+		jsonErr(w, "Período não encontrado", 404)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // Turmas, disciplinas e atribuicoes.
@@ -267,6 +345,30 @@ func (h *Handler) ObterDisciplina(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetUser(r)
 	h.schoolOne(w, r, `SELECT to_jsonb(s) FROM gestao_escolar.school_subjects s
 		WHERE s.id=$1 AND s.tenant_id=$2`, chi.URLParam(r, "id"), u.TenantID)
+}
+
+func (h *Handler) ActualizarDisciplina(w http.ResponseWriter, r *http.Request) {
+	u := mw.GetUser(r)
+	body, err := schoolBody(r)
+	if err != nil {
+		jsonErr(w, "JSON invalido", 400)
+		return
+	}
+	h.schoolUpdate(w, r, `UPDATE gestao_escolar.school_subjects SET
+		codigo=COALESCE(NULLIF($1::jsonb->>'codigo',''),codigo),
+		nome=COALESCE(NULLIF($1::jsonb->>'nome',''),nome),
+		descricao=COALESCE($1::jsonb->>'descricao',descricao),
+		carga_horaria=COALESCE(($1::jsonb->>'carga_horaria')::int,carga_horaria),
+		nota_minima=COALESCE(($1::jsonb->>'nota_minima')::numeric,nota_minima),
+		activo=COALESCE(($1::jsonb->>'activo')::boolean,activo),
+		updated_at=NOW()
+		WHERE id=$2 AND tenant_id=$3`, body, chi.URLParam(r, "id"), u.TenantID)
+}
+
+func (h *Handler) RemoverDisciplina(w http.ResponseWriter, r *http.Request) {
+	u := mw.GetUser(r)
+	h.schoolUpdate(w, r, `DELETE FROM gestao_escolar.school_subjects WHERE id=$1 AND tenant_id=$2`,
+		chi.URLParam(r, "id"), u.TenantID)
 }
 
 func (h *Handler) AtribuirProfessor(w http.ResponseWriter, r *http.Request) {

@@ -339,7 +339,7 @@ async function criarLancamento() {
         const data2 = await res.json();
         if (data2.ok) {
             showToast(data2.msg || 'Lançamento criado com sucesso.');
-            setTimeout(() => window.location.href = '/nexora/contabilidade/lancamento?id=' + data2.id, 700);
+            setTimeout(() => window.location.href = '/nexora/contabilidade/lancamento?id=' + nexoraEncodeId(data2.id), 700);
         } else {
             document.getElementById('formMsg').innerHTML = `<div class="adm-alert adm-alert--error">${data2.erro || 'Erro ao guardar.'}</div>`;
             btn.disabled = false;

@@ -89,6 +89,9 @@ func (s *AcademicStructureService) UpdateLevel(ctx context.Context, id, tenantID
 		if err == pgx.ErrNoRows {
 			return ErrAcademicNotFound
 		}
+		if errors.Is(err, repositories.ErrInvalidColumn) {
+			return ErrAcademicInvalidData
+		}
 		return err
 	}
 	return nil
@@ -141,6 +144,9 @@ func (s *AcademicStructureService) UpdateSeries(ctx context.Context, id, tenantI
 	if err := s.repo.UpdateSeries(ctx, id, tenantID, fields); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrAcademicNotFound
+		}
+		if errors.Is(err, repositories.ErrInvalidColumn) {
+			return ErrAcademicInvalidData
 		}
 		return err
 	}
@@ -201,6 +207,9 @@ func (s *AcademicStructureService) UpdateCourse(ctx context.Context, id, tenantI
 		if err == pgx.ErrNoRows {
 			return ErrAcademicNotFound
 		}
+		if errors.Is(err, repositories.ErrInvalidColumn) {
+			return ErrAcademicInvalidData
+		}
 		return err
 	}
 	return nil
@@ -209,6 +218,179 @@ func (s *AcademicStructureService) UpdateCourse(ctx context.Context, id, tenantI
 // DeleteCourse remove um curso.
 func (s *AcademicStructureService) DeleteCourse(ctx context.Context, id, tenantID int64) error {
 	if err := s.repo.DeleteCourse(ctx, id, tenantID); err != nil {
+		if err == pgx.ErrNoRows {
+			return ErrAcademicNotFound
+		}
+		if isFKViolation(err) {
+			return ErrAcademicHasChildren
+		}
+		return err
+	}
+	return nil
+}
+
+// --- Cycles ---
+
+// CreateCycle cria um ciclo dentro de um nível.
+func (s *AcademicStructureService) CreateCycle(ctx context.Context, c *models.Cycle) error {
+	c.Codigo, c.Nome = normalizeCodeName(c.Codigo, c.Nome)
+	if c.TenantID == 0 || c.LevelID == 0 || c.Codigo == "" || c.Nome == "" {
+		return ErrAcademicInvalidData
+	}
+	return s.repo.CreateCycle(ctx, c)
+}
+
+// ListCycles lista ciclos, opcionalmente filtrados por nível.
+func (s *AcademicStructureService) ListCycles(ctx context.Context, tenantID, levelID int64) ([]models.Cycle, error) {
+	return s.repo.ListCycles(ctx, tenantID, levelID)
+}
+
+// GetCycle obtém um ciclo.
+func (s *AcademicStructureService) GetCycle(ctx context.Context, id, tenantID int64) (*models.Cycle, error) {
+	c, err := s.repo.GetCycleByID(ctx, id, tenantID)
+	if err == pgx.ErrNoRows {
+		return nil, ErrAcademicNotFound
+	}
+	return c, err
+}
+
+// UpdateCycle actualiza um ciclo.
+func (s *AcademicStructureService) UpdateCycle(ctx context.Context, id, tenantID int64, fields map[string]any) error {
+	if len(fields) == 0 {
+		return ErrAcademicInvalidData
+	}
+	if err := s.repo.UpdateCycle(ctx, id, tenantID, fields); err != nil {
+		if err == pgx.ErrNoRows {
+			return ErrAcademicNotFound
+		}
+		if errors.Is(err, repositories.ErrInvalidColumn) {
+			return ErrAcademicInvalidData
+		}
+		return err
+	}
+	return nil
+}
+
+// DeleteCycle remove um ciclo.
+func (s *AcademicStructureService) DeleteCycle(ctx context.Context, id, tenantID int64) error {
+	if err := s.repo.DeleteCycle(ctx, id, tenantID); err != nil {
+		if err == pgx.ErrNoRows {
+			return ErrAcademicNotFound
+		}
+		if isFKViolation(err) {
+			return ErrAcademicHasChildren
+		}
+		return err
+	}
+	return nil
+}
+
+// --- CourseSubjects (currículo) ---
+
+// CreateCourseSubject associa uma disciplina a um curso, nível ou série — é a
+// operação que permite a cada escola (tenant) definir livremente o seu currículo.
+func (s *AcademicStructureService) CreateCourseSubject(ctx context.Context, cs *models.CourseSubject) error {
+	cs.Componente = strings.TrimSpace(cs.Componente)
+	if cs.TenantID == 0 || cs.SubjectID == 0 {
+		return ErrAcademicInvalidData
+	}
+	semAmbito := (cs.CourseID == nil || *cs.CourseID == 0) &&
+		(cs.LevelID == nil || *cs.LevelID == 0) &&
+		(cs.SeriesID == nil || *cs.SeriesID == 0)
+	if semAmbito {
+		return ErrAcademicInvalidData
+	}
+	if cs.Componente == "" {
+		cs.Componente = "teorica"
+	}
+	if cs.Obrigatoria == nil {
+		obrigatoria := true
+		cs.Obrigatoria = &obrigatoria
+	}
+	return s.repo.CreateCourseSubject(ctx, cs)
+}
+
+// ListCourseSubjects lista o currículo, opcionalmente filtrado.
+func (s *AcademicStructureService) ListCourseSubjects(ctx context.Context, tenantID int64, f repositories.ListCourseSubjectsFilter) ([]models.CourseSubject, error) {
+	return s.repo.ListCourseSubjects(ctx, tenantID, f)
+}
+
+// GetCourseSubject obtém um item do currículo.
+func (s *AcademicStructureService) GetCourseSubject(ctx context.Context, id, tenantID int64) (*models.CourseSubject, error) {
+	cs, err := s.repo.GetCourseSubjectByID(ctx, id, tenantID)
+	if err == pgx.ErrNoRows {
+		return nil, ErrAcademicNotFound
+	}
+	return cs, err
+}
+
+// UpdateCourseSubject actualiza um item do currículo.
+func (s *AcademicStructureService) UpdateCourseSubject(ctx context.Context, id, tenantID int64, fields map[string]any) error {
+	if len(fields) == 0 {
+		return ErrAcademicInvalidData
+	}
+	if err := s.repo.UpdateCourseSubject(ctx, id, tenantID, fields); err != nil {
+		if err == pgx.ErrNoRows {
+			return ErrAcademicNotFound
+		}
+		if errors.Is(err, repositories.ErrInvalidColumn) {
+			return ErrAcademicInvalidData
+		}
+		return err
+	}
+	return nil
+}
+
+// DeleteCourseSubject remove um item do currículo.
+func (s *AcademicStructureService) DeleteCourseSubject(ctx context.Context, id, tenantID int64) error {
+	if err := s.repo.DeleteCourseSubject(ctx, id, tenantID); err != nil {
+		if err == pgx.ErrNoRows {
+			return ErrAcademicNotFound
+		}
+		if isFKViolation(err) {
+			return ErrAcademicHasChildren
+		}
+		return err
+	}
+	return nil
+}
+
+// --- CourseSubjectTerms ---
+
+// CreateCourseSubjectTerm configura a presença/exame de uma disciplina num período.
+// Ausência de configuração para um período significa que a disciplina não é leccionada nesse período.
+func (s *AcademicStructureService) CreateCourseSubjectTerm(ctx context.Context, t *models.CourseSubjectTerm) error {
+	if t.TenantID == 0 || t.CourseSubjectID == 0 || t.TermID == 0 {
+		return ErrAcademicInvalidData
+	}
+	return s.repo.CreateCourseSubjectTerm(ctx, t)
+}
+
+// ListCourseSubjectTerms lista a configuração por período de um item do currículo.
+func (s *AcademicStructureService) ListCourseSubjectTerms(ctx context.Context, tenantID, courseSubjectID int64) ([]models.CourseSubjectTerm, error) {
+	return s.repo.ListCourseSubjectTerms(ctx, tenantID, courseSubjectID)
+}
+
+// UpdateCourseSubjectTerm actualiza a configuração de uma disciplina num período.
+func (s *AcademicStructureService) UpdateCourseSubjectTerm(ctx context.Context, id, tenantID int64, fields map[string]any) error {
+	if len(fields) == 0 {
+		return ErrAcademicInvalidData
+	}
+	if err := s.repo.UpdateCourseSubjectTerm(ctx, id, tenantID, fields); err != nil {
+		if err == pgx.ErrNoRows {
+			return ErrAcademicNotFound
+		}
+		if errors.Is(err, repositories.ErrInvalidColumn) {
+			return ErrAcademicInvalidData
+		}
+		return err
+	}
+	return nil
+}
+
+// DeleteCourseSubjectTerm remove a configuração de uma disciplina num período.
+func (s *AcademicStructureService) DeleteCourseSubjectTerm(ctx context.Context, id, tenantID int64) error {
+	if err := s.repo.DeleteCourseSubjectTerm(ctx, id, tenantID); err != nil {
 		if err == pgx.ErrNoRows {
 			return ErrAcademicNotFound
 		}

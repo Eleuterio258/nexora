@@ -7,15 +7,10 @@ class UserModel extends User {
     required super.email,
     required super.role,
     required super.token,
+    super.refreshToken,
+    super.code,
+    super.cargo,
+    super.modulos,
+    super.expiresIn,
   });
-
-  factory UserModel.fromJson(Map<String, dynamic> json, String token) {
-    return UserModel(
-      id: json['id'].toString(),
-      name: json['name'] as String,
-      email: json['email'] as String,
-      role: json['role'] as String,
-      token: token,
-    );
-  }
 }

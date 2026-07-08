@@ -90,9 +90,15 @@ func (r *IncidentRepository) GetIncidentByID(ctx context.Context, id, tenantID i
 		WHERE id=$1 AND tenant_id=$2`, id, tenantID))
 }
 
+var incidentUpdatableColumns = map[string]bool{
+	"school_year_id": true, "student_id": true, "enrollment_id": true, "incident_type_id": true,
+	"reported_by": true, "data_ocorrencia": true, "hora_ocorrencia": true, "local": true,
+	"descricao": true, "testemunhas": true, "anexos": true, "status": true,
+}
+
 // UpdateIncident actualiza ocorrência.
 func (r *IncidentRepository) UpdateIncident(ctx context.Context, id, tenantID int64, fields map[string]any) error {
-	return updateByFields(ctx, r.db, "gestao_escolar.school_student_incidents", id, tenantID, fields)
+	return updateByFields(ctx, r.db, "gestao_escolar.school_student_incidents", id, tenantID, fields, incidentUpdatableColumns, true)
 }
 
 // CreateIncidentType cria tipo.
