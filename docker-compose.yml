@@ -6,7 +6,7 @@ services:
     container_name: nexora-api
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD}@postgres:5432/nexora_erp?sslmode=disable
+      DATABASE_URL: ${DATABASE_URL:-postgres://${DB_USER:-postgres}:${DB_PASSWORD}@postgres:5432/nexora_erp?sslmode=disable}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
@@ -37,6 +37,9 @@ services:
       - "traefik.enable=true"
       # HTTPS — api.nexora.e258tech.tech
       - "traefik.http.routers.nexora-api.rule=Host(`api.nexora.e258tech.tech`)"
+      # Prioridade explícita: bate o router catch-all `backend_saas`
+      # (HostRegexp(`^.+\.e258tech\.tech$`)) que de outra forma captura este host.
+      - "traefik.http.routers.nexora-api.priority=1000"
       - "traefik.http.routers.nexora-api.entrypoints=websecure"
       - "traefik.http.routers.nexora-api.tls=true"
       - "traefik.http.routers.nexora-api.tls.certresolver=le"
@@ -91,6 +94,7 @@ services:
       - "traefik.http.routers.e258tech-http.middlewares=e258tech-https"
       # ── Subdomínio nexora.e258tech.tech (área autenticada ERP) ──
       - "traefik.http.routers.nexora.rule=Host(`nexora.e258tech.tech`)"
+      - "traefik.http.routers.nexora.priority=1000"
       - "traefik.http.routers.nexora.entrypoints=websecure"
       - "traefik.http.routers.nexora.tls=true"
       - "traefik.http.routers.nexora.tls.certresolver=le"
