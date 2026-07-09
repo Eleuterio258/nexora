@@ -152,9 +152,65 @@
         .portal-empty { text-align: center; padding: 3rem 1rem; color: #94A3B8; }
         .portal-empty i { font-size: 2.5rem; display: block; margin-bottom: .75rem; }
 
+        /* ── Mobile: sidebar → barra de navegação inferior ── */
         @media (max-width: 640px) {
-            .portal-sidebar { display: none; }
-            .portal-main { margin-left: 0; }
+            body { display: block; }
+
+            .portal-sidebar {
+                width: 100%;
+                top: auto; left: 0; right: 0; bottom: 0;
+                flex-direction: row;
+                align-items: stretch;
+                border-right: none;
+                border-top: 1px solid #E0F2FE;
+                box-shadow: 0 -2px 12px rgba(2, 132, 199, .08);
+                padding: 0 0 env(safe-area-inset-bottom, 0px);
+                overflow-x: auto;
+                overflow-y: hidden;
+                -webkit-overflow-scrolling: touch;
+                z-index: 60;
+            }
+            /* elementos que não pertencem a uma barra inferior */
+            .portal-sidebar-header,
+            .portal-nav-label { display: none; }
+
+            .portal-nav,
+            .portal-sidebar-footer {
+                display: flex;
+                flex-direction: row;
+                flex: 0 0 auto;
+                padding: 0;
+                border: none;
+                overflow: visible;
+            }
+
+            .portal-nav-item {
+                flex: 0 0 auto;
+                flex-direction: column;
+                justify-content: center;
+                gap: .15rem;
+                min-width: 62px;
+                padding: .5rem .35rem;
+                margin: 0;
+                border-radius: 0;
+                font-size: .62rem;
+                font-weight: 600;
+                line-height: 1.1;
+                text-align: center;
+                white-space: nowrap;
+            }
+            .portal-nav-item i { width: auto; font-size: 1.1rem; }
+            .portal-nav-item.active {
+                background: transparent;
+                color: var(--portal-primary-dark);
+                box-shadow: inset 0 -3px 0 var(--portal-primary);
+            }
+
+            .portal-main {
+                margin-left: 0;
+                /* espaço para a barra inferior (respeita a safe-area do iOS) */
+                padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+            }
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
