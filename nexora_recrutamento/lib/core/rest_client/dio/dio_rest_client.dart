@@ -9,7 +9,7 @@ class DioRestClient implements RestClient {
   late final Dio _dio;
 
   final _defaultOptions = BaseOptions(
-    baseUrl: "http://192.168.168.219:8080",
+    baseUrl: "https://api.nexora.e258tech.tech",
     connectTimeout: const Duration(milliseconds: 5000),
     receiveTimeout: const Duration(milliseconds: 3000),
   );

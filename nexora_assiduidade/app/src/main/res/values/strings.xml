@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">Nexora Assiduidade</string>
+    
+    <!-- Funcionario -->
+    <string name="agenda">Agenda</string>
+    <string name="pesquisar_agenda">Pesquisar agenda…</string>
+    <string name="nova_reuniao">Nova Reunião</string>
+    <string name="titulo_reuniao">Título da Reunião</string>
+    <string name="data_reuniao">Data da Reunião</string>
+    <string name="hora_reuniao">Hora da Reunião</string>
+    <string name="titulo_item">Título do Item</string>
+    <string name="descricao_item">Descrição do item</string>
+    <string name="duracao">Duração</string>
+    <string name="duracao_item">30 minutos</string>
+    <string name="conversas">Conversas</string>
+    <string name="pesquisar_conversa">Pesquisar conversa…</string>
+    <string name="nenhuma_conversa">Nenhuma conversa ainda</string>
+</resources>

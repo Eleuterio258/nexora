@@ -25,8 +25,8 @@ class LoginActivity : AppCompatActivity() {
 
         // Pré-preencher credenciais em debug
         if (BuildConfig.DEBUG) {
-            binding.etEmail?.setText("eleuterio3d@gmail.com")
-            binding.etPassword?.setText("Nexora@2026")
+            binding.etEmail?.setText("olimpia.chitlhango@e258tech.mz")
+            binding.etPassword?.setText("1234567890")
         }
 
         // Redirecionar se já autenticado

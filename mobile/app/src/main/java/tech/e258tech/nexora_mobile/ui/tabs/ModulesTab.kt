@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import tech.e258tech.nexora_mobile.R
 import tech.e258tech.nexora_mobile.app
 import tech.e258tech.nexora_mobile.data.model.ModuloAcesso
-import tech.e258tech.nexora_mobile.ui.screens.main.MainActivity
+import tech.e258tech.nexora_mobile.ui.screens.main.BaseTabActivity
 
 internal data class ModuleItem(
     val name: String,
@@ -23,7 +23,7 @@ internal data class ModuleItem(
     val iconTint: Int,
 )
 
-internal class ModulesTab(private val activity: MainActivity) {
+internal class ModulesTab(private val activity: BaseTabActivity) {
 
 
     fun show() {

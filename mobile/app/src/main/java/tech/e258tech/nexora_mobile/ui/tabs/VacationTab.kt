@@ -12,10 +12,10 @@ import tech.e258tech.nexora_mobile.R
 import tech.e258tech.nexora_mobile.app
 import tech.e258tech.nexora_mobile.data.model.PedidoFerias
 import tech.e258tech.nexora_mobile.data.model.TipoAusencia
-import tech.e258tech.nexora_mobile.ui.screens.main.MainActivity
+import tech.e258tech.nexora_mobile.ui.screens.main.BaseTabActivity
 import tech.e258tech.nexora_mobile.utils.Result
 
-internal class VacationTab(private val activity: MainActivity) {
+internal class VacationTab(private val activity: BaseTabActivity) {
 
     fun show() {
         renderLoading()

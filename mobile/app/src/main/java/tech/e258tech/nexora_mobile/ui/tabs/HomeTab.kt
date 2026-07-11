@@ -12,18 +12,12 @@ import kotlinx.coroutines.launch
 import tech.e258tech.nexora_mobile.R
 import tech.e258tech.nexora_mobile.app
 import tech.e258tech.nexora_mobile.data.model.HomeResponse
-import tech.e258tech.nexora_mobile.ui.screens.main.MainActivity
+import tech.e258tech.nexora_mobile.ui.screens.main.BaseTabActivity
 import tech.e258tech.nexora_mobile.utils.Result
 
-internal class HomeTab(private val activity: MainActivity) {
+internal class HomeTab(private val activity: BaseTabActivity) {
 
     private var cachedHome: HomeResponse? = null
-
-    fun setupDashboard() {
-        activity.lifecycleScope.launch {
-            activity.binding.tvUserName.text = activity.app.tokenManager.getUserNome().ifBlank { "Utilizador" }
-        }
-    }
 
     fun show() {
         renderLoading()

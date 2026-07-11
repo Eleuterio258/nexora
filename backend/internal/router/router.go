@@ -43,6 +43,7 @@ import (
 	assDH "nexora/internal/modules/assinatura-digital/handlers"
 	assH "nexora/internal/modules/assinaturas/handlers"
 	finH "nexora/internal/modules/financeiro/handlers"
+	hardwareH "nexora/internal/modules/hardware/handlers"
 	mmH "nexora/internal/modules/multi-moeda/handlers"
 	notifH "nexora/internal/modules/notifications/handlers"
 	segH "nexora/internal/modules/seguranca/handlers"
@@ -114,6 +115,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	aprov := aprovH.New(db, cfg)
 	super := superH.New(db, cfg)
 	tarefas := tarefasH.New(db, cfg)
+	hardware := hardwareH.New(db, cfg)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
@@ -123,7 +125,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{cfg.CORSOrigin},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-API-Key", "X-Device-Serial"},
 		AllowCredentials: true,
 	}))
 
@@ -2404,6 +2406,51 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.With(mw.RequirePermission(db, "tarefas", "mover_cartoes")).Put("/mover", tarefas.MoverCartao)
 				r.With(mw.RequirePermission(db, "tarefas", "mover_cartoes")).Post("/concluir", tarefas.ConcluirCartao)
 				r.With(mw.RequirePermission(db, "tarefas", "eliminar_cartoes")).Delete("/", tarefas.EliminarCartao)
+			})
+		})
+	})
+
+	// ── Hardware / Terminais de Acesso (/api/hardware) ───────────────────────
+	r.Route("/api/hardware", func(r chi.Router) {
+		// Endpoints públicos para dispositivos autenticados por API Key
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireDeviceAuth(db))
+
+			r.Post("/events", hardware.ReceberEvento)
+			r.Post("/events/generic", hardware.ReceberEventoGenerico)
+			r.Post("/events/zkteco", hardware.ReceberEventoZKTeco)
+			r.Post("/events/batch", hardware.ReceberEventosEmLote)
+			r.Get("/ping", hardware.Ping)
+		})
+
+		// Gestão de dispositivos e eventos (admin do tenant)
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequireAuth(cfg.JWTSecret, db))
+
+			r.With(mw.RequirePermission(db, "hardware", "ver_eventos")).
+				Get("/events", hardware.ListarEventos)
+
+			r.Get("/drivers", hardware.ListarDrivers)
+
+			r.With(mw.RequirePermission(db, "hardware", "ver_dispositivos")).
+				Get("/devices", hardware.ListarDispositivos)
+			r.With(mw.RequirePermission(db, "hardware", "gerir_dispositivos")).
+				Post("/devices", hardware.CriarDispositivo)
+			r.Route("/devices/{id}", func(r chi.Router) {
+				r.With(mw.RequirePermission(db, "hardware", "ver_dispositivos")).
+					Get("/", hardware.ObterDispositivo)
+				r.With(mw.RequirePermission(db, "hardware", "gerir_dispositivos")).
+					Put("/", hardware.ActualizarDispositivo)
+				r.With(mw.RequirePermission(db, "hardware", "gerir_dispositivos")).
+					Post("/toggle", hardware.AlternarEstadoDispositivo)
+				r.With(mw.RequirePermission(db, "hardware", "gerir_dispositivos")).
+					Post("/rotate-key", hardware.GerarNovaChave)
+				r.With(mw.RequirePermission(db, "hardware", "ver_dispositivos")).
+					Get("/users", hardware.ListarDeviceUsers)
+				r.With(mw.RequirePermission(db, "hardware", "gerir_dispositivos")).
+					Post("/users", hardware.CriarDeviceUser)
+				r.With(mw.RequirePermission(db, "hardware", "gerir_dispositivos")).
+					Delete("/users/{mappingId}", hardware.RemoverDeviceUser)
 			})
 		})
 	})

@@ -340,12 +340,16 @@ class _InfoLinha extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: valueBold ? FontWeight.bold : FontWeight.w600,
-              color: valueColor ?? _navy,
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: valueBold ? FontWeight.bold : FontWeight.w600,
+                color: valueColor ?? _navy,
+              ),
             ),
           ),
         ],

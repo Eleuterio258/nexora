@@ -10,18 +10,18 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import tech.e258tech.nexora_mobile.R
-import tech.e258tech.nexora_mobile.ui.screens.main.MainActivity
+import tech.e258tech.nexora_mobile.ui.screens.main.BaseTabActivity
 
 internal data class PageRow(val title: String, val subtitle: String, val value: String)
 
-internal fun MainActivity.renderListPage(title: String, subtitle: String, rows: List<PageRow>) {
+internal fun BaseTabActivity.renderListPage(title: String, subtitle: String, rows: List<PageRow>) {
     binding.mainContent.setPadding(0, 0, 0, dp(78) + currentBottomInset)
     binding.mainContent.removeAllViews()
     binding.mainContent.addView(buildPageTitle(title, subtitle))
     binding.mainContent.addRowsWithDividers(rows)
 }
 
-internal fun MainActivity.buildPageTitle(title: String, subtitle: String): LinearLayout =
+internal fun BaseTabActivity.buildPageTitle(title: String, subtitle: String): LinearLayout =
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(20), dp(24), dp(20), dp(8))
@@ -31,7 +31,7 @@ internal fun MainActivity.buildPageTitle(title: String, subtitle: String): Linea
         })
     }
 
-internal fun MainActivity.buildPageCard(row: PageRow): LinearLayout =
+internal fun BaseTabActivity.buildPageCard(row: PageRow): LinearLayout =
     buildActionRow(
         title = row.title,
         subtitle = row.subtitle,
@@ -39,7 +39,7 @@ internal fun MainActivity.buildPageCard(row: PageRow): LinearLayout =
         iconRes = android.R.drawable.ic_menu_info_details,
     )
 
-internal fun MainActivity.buildActionRow(
+internal fun BaseTabActivity.buildActionRow(
     title: String,
     subtitle: String,
     value: String? = null,
@@ -100,7 +100,7 @@ internal fun MainActivity.buildActionRow(
     }
 }
 
-internal fun MainActivity.buildElevatedPageCard(row: PageRow): LinearLayout =
+internal fun BaseTabActivity.buildElevatedPageCard(row: PageRow): LinearLayout =
     LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
@@ -136,12 +136,12 @@ internal fun MainActivity.buildElevatedPageCard(row: PageRow): LinearLayout =
 
 internal fun LinearLayout.addRowsWithDividers(rows: List<PageRow>) {
     rows.forEachIndexed { index, row ->
-        addView((context as MainActivity).buildPageCard(row))
-        if (index < rows.lastIndex) addView((context as MainActivity).buildDivider())
+        addView((context as BaseTabActivity).buildPageCard(row))
+        if (index < rows.lastIndex) addView((context as BaseTabActivity).buildDivider())
     }
 }
 
-internal fun MainActivity.buildDivider(): View =
+internal fun BaseTabActivity.buildDivider(): View =
     View(this).apply {
         layoutParams = LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -153,7 +153,7 @@ internal fun MainActivity.buildDivider(): View =
         setBackgroundColor(getColor(R.color.border_color))
     }
 
-internal fun MainActivity.textView(
+internal fun BaseTabActivity.textView(
     value: String,
     size: Float,
     colorRes: Int,
@@ -166,11 +166,11 @@ internal fun MainActivity.textView(
     if (bold) typeface = Typeface.DEFAULT_BOLD
 }
 
-internal fun MainActivity.oval(color: Int): GradientDrawable =
+internal fun BaseTabActivity.oval(color: Int): GradientDrawable =
     GradientDrawable().apply {
         shape = GradientDrawable.OVAL
         setColor(color)
     }
 
-internal fun MainActivity.dp(value: Int): Int =
+internal fun BaseTabActivity.dp(value: Int): Int =
     (value * resources.displayMetrics.density).toInt()

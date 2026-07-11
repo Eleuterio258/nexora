@@ -61,6 +61,12 @@ type Config struct {
 	MinioBucket       string
 	MinioUseSSL       bool
 	MinioRegion       string
+
+	// Hardware — worker MQTT (opcional; desligado se MQTTBrokerURL vazio)
+	MQTTBrokerURL string
+	MQTTClientID  string
+	MQTTUsername  string
+	MQTTPassword  string
 }
 
 func Load() *Config {
@@ -112,6 +118,11 @@ func Load() *Config {
 		MinioBucket:      env("MINIO_BUCKET", "nexora"),
 		MinioUseSSL:      envBool("MINIO_USE_SSL", false),
 		MinioRegion:      env("MINIO_REGION", "us-east-1"),
+
+		MQTTBrokerURL: env("MQTT_BROKER_URL", ""),
+		MQTTClientID:  env("MQTT_CLIENT_ID", "nexora-hardware-worker"),
+		MQTTUsername:  env("MQTT_USERNAME", ""),
+		MQTTPassword:  env("MQTT_PASSWORD", ""),
 	}
 }
 

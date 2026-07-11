@@ -8,9 +8,9 @@ import kotlinx.coroutines.launch
 import tech.e258tech.nexora_mobile.R
 import tech.e258tech.nexora_mobile.app
 import tech.e258tech.nexora_mobile.ui.screens.login.LoginActivity
-import tech.e258tech.nexora_mobile.ui.screens.main.MainActivity
+import tech.e258tech.nexora_mobile.ui.screens.main.BaseTabActivity
 
-internal class ProfileTab(private val activity: MainActivity) {
+internal class ProfileTab(private val activity: BaseTabActivity) {
 
     fun show() {
         activity.binding.mainContent.apply {

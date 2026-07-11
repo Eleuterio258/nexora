@@ -18,10 +18,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Dispositivo físico → IP da máquina na rede local
-        // Emulador          → usar 10.0.2.2
-        buildConfigField("String", "API_BASE_URL", "\"http://192.168.168.219:8080/\"")
-        buildConfigField("String", "WS_BASE_URL",  "\"ws://192.168.168.219:8080/\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://api.nexora.e258tech.tech/\"")
+        buildConfigField("String", "WS_BASE_URL",  "\"wss://api.nexora.e258tech.tech/\"")
     }
 
     buildTypes {

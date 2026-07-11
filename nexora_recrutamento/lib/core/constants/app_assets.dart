@@ -2,6 +2,7 @@ abstract class AppAssets {
   // ── Logos ────────────────────────────────────────────────────────────────────
   static const String splashLogo  = 'assets/logos/logo.png';
   static const String nexoraLogo  = 'assets/logos/nexora_logo.png';
+  static const String nexoraLogoWhite = 'assets/logos/nexora_logo_white.svg';
 
   // ── Ilustrações ──────────────────────────────────────────────────────────────
   static const String onboarding1      = 'assets/illustrations/onboarding_1.png';

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../core/constants/app_assets.dart';
 import '../core/constants/app_colors.dart';
 import '../features/auth/presentation/bloc/auth_bloc.dart';
@@ -15,7 +16,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  static const _minSplashDuration = Duration(milliseconds: 1200);
+  static const _minSplashDuration = Duration(seconds: 3);
 
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeAnim;
@@ -96,27 +97,14 @@ class _SplashScreenState extends State<SplashScreen>
                   opacity: _fadeAnim,
                   child: ScaleTransition(
                     scale: _scaleAnim,
-                    child: Container(
+                    child: SizedBox(
                       width: size.width * 0.62,
-                      constraints: const BoxConstraints(maxWidth: 280),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 28,
-                        vertical: 24,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.94),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.18),
-                            blurRadius: 28,
-                            offset: const Offset(0, 14),
-                          ),
-                        ],
-                      ),
-                      child: Image.asset(
-                        AppAssets.nexoraLogo,
-                        fit: BoxFit.contain,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 280),
+                        child: SvgPicture.asset(
+                          AppAssets.nexoraLogoWhite,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ),
                   ),

@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_gravity="bottom"
+    android:background="@color/white"
+    android:elevation="8dp"
+    android:gravity="center"
+    android:orientation="horizontal"
+    android:paddingHorizontal="4dp"
+    android:paddingTop="5dp"
+    android:paddingBottom="5dp"
+    android:minHeight="@dimen/internal_nav_height">
+
+    <LinearLayout
+        android:id="@+id/navHome"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingHorizontal="2dp">
+
+        <ImageView
+            android:id="@+id/navHomeIcon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:contentDescription="Inicio"
+            android:src="@android:drawable/ic_menu_compass"
+            android:tint="@color/primary_blue" />
+
+        <TextView
+            android:id="@+id/navHomeLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="Inicio"
+            android:textColor="@color/primary_blue"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/navModules"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingHorizontal="2dp">
+
+        <ImageView
+            android:id="@+id/navModulesIcon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:contentDescription="Módulos"
+            android:src="@android:drawable/ic_dialog_dialer"
+            android:tint="@color/text_hint" />
+
+        <TextView
+            android:id="@+id/navModulesLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="Módulos"
+            android:textColor="@color/text_hint"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/navChat"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingHorizontal="2dp">
+
+        <ImageView
+            android:id="@+id/navChatIcon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:contentDescription="Chat"
+            android:src="@android:drawable/ic_dialog_email"
+            android:tint="@color/text_hint" />
+
+        <TextView
+            android:id="@+id/navChatLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="Chat"
+            android:textColor="@color/text_hint"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/navVacation"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingHorizontal="2dp">
+
+        <ImageView
+            android:id="@+id/navVacationIcon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:contentDescription="Férias"
+            android:src="@android:drawable/ic_menu_my_calendar"
+            android:tint="@color/text_hint" />
+
+        <TextView
+            android:id="@+id/navVacationLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="Férias"
+            android:textColor="@color/text_hint"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/navAttendance"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingHorizontal="2dp">
+
+        <ImageView
+            android:id="@+id/navAttendanceIcon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:contentDescription="Assiduidade"
+            android:src="@android:drawable/ic_menu_recent_history"
+            android:tint="@color/text_hint" />
+
+        <TextView
+            android:id="@+id/navAttendanceLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="Assiduidade"
+            android:textColor="@color/text_hint"
+            android:textSize="8sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/navProfile"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingHorizontal="2dp">
+
+        <ImageView
+            android:id="@+id/navProfileIcon"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:contentDescription="Perfil"
+            android:src="@android:drawable/ic_menu_manage"
+            android:tint="@color/text_hint" />
+
+        <TextView
+            android:id="@+id/navProfileLabel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:gravity="center"
+            android:maxLines="1"
+            android:text="Perfil"
+            android:textColor="@color/text_hint"
+            android:textSize="9sp" />
+    </LinearLayout>
+</LinearLayout>

@@ -23,10 +23,10 @@ import tech.e258tech.nexora_mobile.data.model.Conversa
 import tech.e258tech.nexora_mobile.data.model.Mensagem
 import tech.e258tech.nexora_mobile.data.model.WsMensagemRecebida
 import tech.e258tech.nexora_mobile.data.repository.ChatRepository
-import tech.e258tech.nexora_mobile.ui.screens.main.MainActivity
+import tech.e258tech.nexora_mobile.ui.screens.main.BaseTabActivity
 import tech.e258tech.nexora_mobile.utils.Result
 
-internal class ChatTab(private val activity: MainActivity) {
+internal class ChatTab(private val activity: BaseTabActivity) {
 
     private var activeContact: ChatContact? = null
     private var inputBar: LinearLayout? = null
@@ -396,7 +396,7 @@ internal class ChatTab(private val activity: MainActivity) {
 
     private fun setupHeader(contact: ChatContact) {
         removeHeader()
-        activity.binding.normalHeader.visibility = View.GONE
+        activity.binding.appBarLayout.normalHeader.visibility = View.GONE
 
         val rippleValue = TypedValue()
         activity.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, rippleValue, true)
@@ -438,7 +438,7 @@ internal class ChatTab(private val activity: MainActivity) {
             })
         }
 
-        activity.binding.appBarLayout.addView(header)
+        activity.binding.appBarLayout.root.addView(header)
         headerView = header
     }
 
@@ -448,13 +448,13 @@ internal class ChatTab(private val activity: MainActivity) {
     }
 
     private fun removeHeader() {
-        headerView?.let { activity.binding.appBarLayout.removeView(it) }
+        headerView?.let { activity.binding.appBarLayout.root.removeView(it) }
         headerView = null
     }
 
     private fun restoreNormalHeader() {
         removeHeader()
-        activity.binding.normalHeader.visibility = View.VISIBLE
+        activity.binding.appBarLayout.normalHeader.visibility = View.VISIBLE
     }
 
     private fun renderMessage(message: String) {

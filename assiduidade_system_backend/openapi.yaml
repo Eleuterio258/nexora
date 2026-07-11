@@ -1,0 +1,963 @@
+openapi: 3.0.3
+info:
+  title: FaceClock API
+  version: 1.0.0
+  description: API principal do MVP de registro de ponto com reconhecimento facial.
+servers:
+  - url: https://api.faceclock.local
+tags:
+  - name: Auth
+  - name: Consents
+  - name: Biometric
+  - name: Clock
+  - name: Admin
+  - name: Audit
+  - name: Integrations
+  - name: Monitoring
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+    LoginResponse:
+      type: object
+      required: [access_token, token_type, expires_in, user]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          example: 3600
+        user:
+          $ref: '#/components/schemas/UserSummary'
+    UserSummary:
+      type: object
+      required: [id, employee_code, full_name, role, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_code:
+          type: string
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [COLABORADOR, GESTOR_RH, ADMIN_SISTEMA, AUDITOR]
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, TERMINATED]
+    ConsentPayload:
+      type: object
+      required: [term_version, consent_hash, accepted_at]
+      properties:
+        term_version:
+          type: string
+        consent_hash:
+          type: string
+        accepted_at:
+          type: string
+          format: date-time
+    ConsentCreateRequest:
+      type: object
+      required: [user_id, term_version, consent_hash, accepted_at]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        term_version:
+          type: string
+        consent_hash:
+          type: string
+        accepted_at:
+          type: string
+          format: date-time
+        legal_basis:
+          type: string
+          enum: [CONSENT, LEGAL_OBLIGATION, LEGITIMATE_INTEREST]
+    ConsentResponse:
+      type: object
+      required: [id, user_id, term_version, consent_hash, legal_basis, accepted_at, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        term_version:
+          type: string
+        consent_hash:
+          type: string
+        legal_basis:
+          type: string
+          enum: [CONSENT, LEGAL_OBLIGATION, LEGITIMATE_INTEREST]
+        accepted_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    EnrollRequest:
+      type: object
+      required: [user_id, captures]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        captures:
+          type: array
+          minItems: 3
+          items:
+            type: object
+            required: [image_base64]
+            properties:
+              image_base64:
+                type: string
+              angle:
+                type: string
+                example: front
+    EnrollResponse:
+      type: object
+      required: [template_id, user_id, model_version, status]
+      properties:
+        template_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        model_version:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE]
+    VerifyRequest:
+      type: object
+      required: [user_id, device_id, image_base64]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+          format: uuid
+        image_base64:
+          type: string
+        geo_lat:
+          type: number
+          format: double
+        geo_lng:
+          type: number
+          format: double
+    VerifyResponse:
+      type: object
+      required: [match, confidence_score, liveness_score, timestamp]
+      properties:
+        match:
+          type: boolean
+        user_id:
+          type: string
+          format: uuid
+        confidence_score:
+          type: number
+          format: double
+        liveness_score:
+          type: number
+          format: double
+        timestamp:
+          type: string
+          format: date-time
+        reason:
+          type: string
+    ClockRegisterRequest:
+      type: object
+      required: [idempotency_key, user_id, device_id, event_type, recorded_at, source]
+      properties:
+        idempotency_key:
+          type: string
+        user_id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+          enum: [ENTRY, BREAK_START, BREAK_END, EXIT]
+        recorded_at:
+          type: string
+          format: date-time
+        source:
+          type: string
+          enum: [ONLINE, OFFLINE_SYNC, MANUAL, INTEGRATION]
+        confidence_score:
+          type: number
+          format: double
+        liveness_score:
+          type: number
+          format: double
+        geo_lat:
+          type: number
+          format: double
+        geo_lng:
+          type: number
+          format: double
+    ClockRecord:
+      type: object
+      required: [id, user_id, event_type, recorded_at, source, sync_status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+          enum: [ENTRY, BREAK_START, BREAK_END, EXIT]
+        recorded_at:
+          type: string
+          format: date-time
+        source:
+          type: string
+          enum: [ONLINE, OFFLINE_SYNC, MANUAL, INTEGRATION]
+        sync_status:
+          type: string
+          enum: [SYNCED, PENDING, FAILED]
+        confidence_score:
+          type: number
+          format: double
+        liveness_score:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+    ClockSyncRequest:
+      type: object
+      required: [record_ids]
+      properties:
+        record_ids:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+    ClockSyncResponse:
+      type: object
+      required: [synced_record_ids, not_found_record_ids, total_requested, total_synced]
+      properties:
+        synced_record_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        not_found_record_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        total_requested:
+          type: integer
+        total_synced:
+          type: integer
+    AdjustmentRequestInput:
+      type: object
+      required: [reason]
+      properties:
+        clock_record_id:
+          type: string
+          format: uuid
+        requested_event_type:
+          type: string
+          enum: [ENTRY, BREAK_START, BREAK_END, EXIT]
+        requested_recorded_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+    AdjustmentReviewRequest:
+      type: object
+      required: [status, review_notes]
+      properties:
+        status:
+          type: string
+          enum: [APPROVED, REJECTED]
+        review_notes:
+          type: string
+    AdjustmentRequest:
+      type: object
+      required: [id, user_id, status, reason, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        clock_record_id:
+          type: string
+          format: uuid
+        requested_event_type:
+          type: string
+          enum: [ENTRY, BREAK_START, BREAK_END, EXIT]
+        requested_recorded_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED, CANCELLED]
+        review_notes:
+          type: string
+        reviewer_id:
+          type: string
+          format: uuid
+        reviewed_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    PaginatedClockRecords:
+      type: object
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClockRecord'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+    PaginatedAdjustmentRequests:
+      type: object
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdjustmentRequest'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+    ExportResponse:
+      type: object
+      required: [download_url, format]
+      properties:
+        download_url:
+          type: string
+          format: uri
+        format:
+          type: string
+          enum: [csv]
+    AuditLog:
+      type: object
+      required: [id, actor_type, action, entity_type, payload_hash, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor_type:
+          type: string
+        actor_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        entity_type:
+          type: string
+        entity_id:
+          type: string
+          format: uuid
+        payload_hash:
+          type: string
+        previous_hash:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    PaginatedAuditLogs:
+      type: object
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLog'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+    PayrollPushRequest:
+      type: object
+      required: [provider_name, records]
+      properties:
+        provider_name:
+          type: string
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClockRecord'
+    PayrollPushResponse:
+      type: object
+      required: [batch_id, accepted_records, rejected_records, status]
+      properties:
+        batch_id:
+          type: string
+          format: uuid
+        accepted_records:
+          type: integer
+        rejected_records:
+          type: integer
+        status:
+          type: string
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Realiza autenticacao administrativa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login realizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Credenciais invalidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/consents:
+    post:
+      tags: [Consents]
+      security:
+        - bearerAuth: []
+      summary: Registra consentimento do usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentCreateRequest'
+      responses:
+        '201':
+          description: Consentimento registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentResponse'
+  /api/v1/consents/users/{user_id}/active:
+    get:
+      tags: [Consents]
+      security:
+        - bearerAuth: []
+      summary: Consulta consentimento ativo de um usuario
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Consentimento ativo retornado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsentResponse'
+        '404':
+          description: Consentimento ativo nao encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/biometric/enroll:
+    post:
+      tags: [Biometric]
+      security:
+        - bearerAuth: []
+      summary: Cadastra biometria facial do colaborador
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrollRequest'
+      responses:
+        '201':
+          description: Biometria cadastrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollResponse'
+        '400':
+          description: Captura invalida ou consentimento ausente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Consentimento ativo obrigatorio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/biometric/verify:
+    post:
+      tags: [Biometric]
+      security:
+        - bearerAuth: []
+      summary: Verifica biometria facial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+      responses:
+        '200':
+          description: Resultado da verificacao
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyResponse'
+        '422':
+          description: Imagem ou usuario invalido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/clock/register:
+    post:
+      tags: [Clock]
+      security:
+        - bearerAuth: []
+      summary: Registra evento de ponto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClockRegisterRequest'
+      responses:
+        '201':
+          description: Registro persistido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClockRecord'
+        '409':
+          description: Chave idempotente ja utilizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/clock/sync:
+    post:
+      tags: [Clock]
+      security:
+        - bearerAuth: []
+      summary: Sincroniza registros de ponto pendentes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClockSyncRequest'
+      responses:
+        '200':
+          description: Resultado da sincronizacao
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClockSyncResponse'
+  /api/v1/clock/me:
+    get:
+      tags: [Clock]
+      security:
+        - bearerAuth: []
+      summary: Lista historico do colaborador autenticado
+      parameters:
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Historico retornado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedClockRecords'
+  /api/v1/clock/adjustments:
+    post:
+      tags: [Clock]
+      security:
+        - bearerAuth: []
+      summary: Solicita ajuste de ponto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdjustmentRequestInput'
+      responses:
+        '201':
+          description: Ajuste criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdjustmentRequest'
+        '403':
+          description: Tentativa de ajustar registro de outro usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Registro de ponto nao encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Dados insuficientes para criar ajuste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/admin/clock-records:
+    get:
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      summary: Consulta administrativa de registros
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: unit_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: event_type
+          schema:
+            type: string
+            enum: [ENTRY, BREAK_START, BREAK_END, EXIT]
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Lista paginada de registros
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedClockRecords'
+  /api/v1/admin/reports/export:
+    get:
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      summary: Exporta relatorio administrativo basico
+      parameters:
+        - in: query
+          name: unit_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: format
+          schema:
+            type: string
+            enum: [csv]
+      responses:
+        '200':
+          description: Link de exportacao gerado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportResponse'
+  /api/v1/admin/reports/export.csv:
+    get:
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      summary: Exporta relatorio administrativo em CSV
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: unit_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: event_type
+          schema:
+            type: string
+            enum: [ENTRY, BREAK_START, BREAK_END, EXIT]
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: CSV exportado
+          content:
+            text/csv:
+              schema:
+                type: string
+  /api/v1/admin/adjustments:
+    get:
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      summary: Lista solicitacoes de ajuste
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED, CANCELLED]
+        - in: query
+          name: user_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Lista paginada de ajustes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAdjustmentRequests'
+  /api/v1/admin/adjustments/{adjustment_id}:
+    patch:
+      tags: [Admin]
+      security:
+        - bearerAuth: []
+      summary: Aprova ou rejeita ajuste de ponto
+      parameters:
+        - in: path
+          name: adjustment_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdjustmentReviewRequest'
+      responses:
+        '200':
+          description: Ajuste revisado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdjustmentRequest'
+        '409':
+          description: Solicitacao ja revisada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Solicitacao nao encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/integrations/payroll/push:
+    post:
+      tags: [Integrations]
+      security:
+        - bearerAuth: []
+      summary: Envia registros consolidados para integracao externa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayrollPushRequest'
+      responses:
+        '202':
+          description: Lote aceito para processamento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PayrollPushResponse'
+  /api/v1/audit/logs:
+    get:
+      tags: [Audit]
+      security:
+        - bearerAuth: []
+      summary: Consulta logs de auditoria
+      parameters:
+        - in: query
+          name: entity_type
+          schema:
+            type: string
+        - in: query
+          name: entity_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: start_date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end_date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: page_size
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Lista paginada de logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAuditLogs'
+  /metrics:
+    get:
+      tags: [Monitoring]
+      summary: Expoe metricas basicas do servico
+      responses:
+        '200':
+          description: Metricas em texto simples
+          content:
+            text/plain:
+              schema:
+                type: string
