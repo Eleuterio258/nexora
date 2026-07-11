@@ -1,7 +1,0 @@
-./binary.go
-./decoder.go
-./encoder.go
-./index.go
-./is-binary.go
-./parser.go
-./type.go

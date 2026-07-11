@@ -1,9 +1,0 @@
-./accounting.go
-./approval.go
-./client.go
-./financial.go
-./hr.go
-./invoicing.go
-./notification.go
-./system_config.go
-./treasury.go

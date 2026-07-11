@@ -1,9 +1,0 @@
-./academic_structure.go
-./class.go
-./discipline.go
-./enrollment.go
-./fee.go
-./grade.go
-./models.go
-./teacher.go
-./timetable.go
