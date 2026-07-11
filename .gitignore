@@ -47,6 +47,7 @@ backend/*.out
 backend/uploads/
 backend/vendor/
 backend/.env
+.gocache/
 
 # Credenciais de service account (Firebase Admin SDK, GCP, etc.) — nunca commitar.
 backend/config/*.json
