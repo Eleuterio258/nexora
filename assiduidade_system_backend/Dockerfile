@@ -20,6 +20,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Etapa 2 — modelos dlib para face_recognition
 RUN pip install --no-cache-dir git+https://github.com/ageitgey/face_recognition_models
 
+# Etapa 4 — dependências de runtime do facenet-pytorch removidas pelo --no-deps
+# (o --no-deps evita puxar a variante CUDA do torch, mas também omite o tqdm)
+RUN pip install --no-cache-dir tqdm
+
 COPY . .
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
