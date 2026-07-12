@@ -4,10 +4,10 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import tech.e258tech.nexora_assiduidade.R
 
 /**
@@ -28,7 +28,7 @@ class RequestsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         
         val recyclerView = view.findViewById<RecyclerView>(R.id.recyclerViewRequests)
-        val btnNewRequest = view.findViewById<Button>(R.id.btnNewRequest)
+        val btnNewRequest = view.findViewById<FloatingActionButton>(R.id.btnNewRequest)
         
         recyclerView.layoutManager = LinearLayoutManager(context)
         

@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -82,7 +83,10 @@ class HistoryFragment : Fragment() {
                 tvEmpty.visibility = View.GONE
                 recyclerView.visibility = View.VISIBLE
                 recyclerView.adapter = HistoryAdapter(items)
-            } catch (_: Exception) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (!isAdded) return@launch
                 tvEmpty.visibility = View.VISIBLE
                 tvEmpty.text = "Nao foi possivel carregar o historico."
                 recyclerView.visibility = View.GONE

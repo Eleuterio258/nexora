@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import ActorContext, apply_tenant, get_actor
-from app.models import FingerprintTemplate, User
+from app.models import FingerprintTemplate
 
 router = APIRouter(tags=["Fingerprint"])
 
@@ -45,16 +45,12 @@ def enroll_fingerprint(
     actor: ActorContext = Depends(get_actor),
 ) -> FingerprintResponse:
     """Regista um template de impressão digital para um utilizador."""
-    user = db.scalar(
-        apply_tenant(select(User).where(User.id == request.user_id), actor, User)
-    )
-    if not user:
-        raise HTTPException(status_code=404, detail="Utilizador nao encontrado.")
+    erp_user_id = request.user_id
 
     existing = db.scalar(
         apply_tenant(
             select(FingerprintTemplate).where(
-                FingerprintTemplate.user_id == request.user_id,
+                FingerprintTemplate.erp_user_id == erp_user_id,
                 FingerprintTemplate.finger_type == request.finger_type,
             ),
             actor,
@@ -67,7 +63,7 @@ def enroll_fingerprint(
         db.add(
             FingerprintTemplate(
                 tenant_id=actor.tenant_id,
-                user_id=request.user_id,
+                erp_user_id=erp_user_id,
                 finger_type=request.finger_type,
                 template_base64=request.template_base64,
             )
@@ -102,7 +98,7 @@ def identify_fingerprint(
         if template.template_base64 == request.template_base64:
             return FingerprintResponse(
                 success=True,
-                user_id=template.user_id,
+                user_id=template.erp_user_id,
                 message="Impressão digital identificada.",
             )
 
@@ -121,7 +117,7 @@ def delete_fingerprint_enrollment(
 ) -> dict:
     """Remove o enrolamento de impressão digital de um utilizador."""
     stmt = apply_tenant(
-        select(FingerprintTemplate).where(FingerprintTemplate.user_id == user_id),
+        select(FingerprintTemplate).where(FingerprintTemplate.erp_user_id == user_id),
         actor,
         FingerprintTemplate,
     )

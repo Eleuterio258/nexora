@@ -10,6 +10,7 @@ import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
 import tech.e258tech.nexora_assiduidade.data.model.response.ClockRecordResponse
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
+import tech.e258tech.nexora_assiduidade.utils.OfflineEventCrypto
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 import tech.e258tech.nexora_assiduidade.work.SyncAttendanceWorker
 
@@ -73,17 +74,17 @@ class AttendanceRepository(context: Context) {
         errorMessage: String?
     ): RegisterResult {
         val entity = PendingEventEntity(
-            userId = request.user_id,
-            deviceId = request.device_id,
-            eventType = request.event_type,
-            recordedAt = request.recorded_at,
-            source = request.source,
+            userId = OfflineEventCrypto.encrypt(request.user_id) ?: request.user_id,
+            deviceId = OfflineEventCrypto.encrypt(request.device_id) ?: request.device_id,
+            eventType = OfflineEventCrypto.encrypt(request.event_type) ?: request.event_type,
+            recordedAt = OfflineEventCrypto.encrypt(request.recorded_at) ?: request.recorded_at,
+            source = OfflineEventCrypto.encrypt(request.source) ?: request.source,
             confidenceScore = request.confidence_score,
             livenessScore = request.liveness_score,
             geoLat = request.geo_lat,
             geoLng = request.geo_lng,
-            imageBase64 = request.image_base64,
-            idempotencyKey = request.idempotency_key,
+            imageBase64 = OfflineEventCrypto.encrypt(request.image_base64),
+            idempotencyKey = OfflineEventCrypto.encrypt(request.idempotency_key) ?: request.idempotency_key,
             syncStatus = PendingEventEntity.SyncStatus.PENDING,
             errorMessage = errorMessage
         )

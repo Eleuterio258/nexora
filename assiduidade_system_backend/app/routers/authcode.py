@@ -1,143 +1,98 @@
 """
 Router para códigos de autenticação auxiliares: PIN e TOTP.
 
-O TOTP é gerado a partir de um segredo partilhado com o utilizador. O PIN
-é um código numérico de 6 digitos armazenado como hash bcrypt.
-
-Em producao, o segredo TOTP deve ser apresentado ao utilizador como QR Code
-ou enviado por canal seguro. Aqui mantem-se o essencial para validacao.
+No modelo stateless, PIN e TOTP são geridos e validados pelo Nexora ERP
+(`/api/authcode/*`, ver `backend/internal/modules/auth/handlers/authcode.go`).
+Este router é um proxy fino: reencaminha o pedido/token para o ERP e devolve
+a mesma resposta, sem persistir nem validar nada localmente.
 """
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Header, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
-import pyotp
-
-from app.database import get_db
-from app.deps import ActorContext, apply_tenant, get_actor
-from app.models import User
-from app.security import get_password_hash, verify_password
+from app.erp_client import ERPResponseError, ERPUnavailableError, erp_client
 
 router = APIRouter(tags=["Auth Code"])
 
 
 class PinValidateRequest(BaseModel):
-    user_id: str
-    pin: str = Field(..., min_length=4, max_length=20)
+    email: str = Field(..., min_length=1)
+    pin: str = Field(..., min_length=1)
 
 
 class TotpValidateRequest(BaseModel):
-    user_id: str
-    code: str = Field(..., min_length=6, max_length=6)
+    email: str = Field(..., min_length=1)
+    code: str = Field(..., min_length=1)
 
 
-class AuthCodeResponse(BaseModel):
-    valid: bool
-    method: str
-    message: str
+class TotpSetupRequest(BaseModel):
+    password: str | None = None
 
 
-class TotpSetupResponse(BaseModel):
-    secret: str
-    provisioning_uri: str
-    message: str
+class AdminSetPinRequest(BaseModel):
+    user_id: int
+    pin: str = Field(..., min_length=6)
 
 
-def _get_user(db: Session, user_id: str, actor: ActorContext) -> User:
-    user = db.scalar(
-        apply_tenant(select(User).where(User.id == user_id), actor, User)
-    )
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilizador nao encontrado.")
-    return user
-
-
-@router.post("/authcode/pin/validate", response_model=AuthCodeResponse)
-def validate_pin(
-    request: PinValidateRequest,
-    db: Session = Depends(get_db),
-    actor: ActorContext = Depends(get_actor),
-) -> AuthCodeResponse:
-    """Valida um PIN numerico associado ao utilizador."""
-    user = _get_user(db, request.user_id, actor)
-
-    if not user.pin_hash:
+def _require_authorization(authorization: str | None) -> str:
+    if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="PIN nao configurado para este utilizador.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization: Bearer <token> obrigatorio.",
         )
-
-    if not verify_password(request.pin, user.pin_hash):
-        return AuthCodeResponse(valid=False, method="PIN", message="PIN invalido.")
-
-    return AuthCodeResponse(valid=True, method="PIN", message="PIN valido.")
+    return authorization
 
 
-@router.post("/authcode/totp/setup", response_model=TotpSetupResponse)
-def setup_totp(
-    user_id: str,
-    db: Session = Depends(get_db),
-    actor: ActorContext = Depends(get_actor),
-) -> TotpSetupResponse:
-    """Gera um novo segredo TOTP para o utilizador."""
-    user = _get_user(db, user_id, actor)
-
-    secret = pyotp.random_base32()
-    user.totp_secret = secret
-    db.commit()
-
-    issuer = "FaceClock"
-    provisioning_uri = pyotp.totp.TOTP(secret).provisioning_uri(
-        name=user.email or user.employee_code,
-        issuer_name=issuer,
-    )
-
-    return TotpSetupResponse(
-        secret=secret,
-        provisioning_uri=provisioning_uri,
-        message="Segredo TOTP gerado. Escaneie o QR Code ou guarde o segredo de forma segura.",
-    )
-
-
-@router.post("/authcode/totp/validate", response_model=AuthCodeResponse)
-def validate_totp(
-    request: TotpValidateRequest,
-    db: Session = Depends(get_db),
-    actor: ActorContext = Depends(get_actor),
-) -> AuthCodeResponse:
-    """Valida um codigo TOTP de 6 digitos."""
-    user = _get_user(db, request.user_id, actor)
-
-    if not user.totp_secret:
+async def _proxy_erp_call(call) -> Any:
+    try:
+        return await call()
+    except ERPUnavailableError as exc:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="TOTP nao configurado para este utilizador.",
-        )
-
-    totp = pyotp.TOTP(user.totp_secret)
-    if totp.verify(request.code, valid_window=1):
-        return AuthCodeResponse(valid=True, method="TOTP", message="Codigo TOTP valido.")
-
-    return AuthCodeResponse(valid=False, method="TOTP", message="Codigo TOTP invalido.")
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"ERP indisponivel: {exc}",
+        ) from exc
+    except ERPResponseError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
-@router.post("/authcode/admin/set-pin")
-def admin_set_pin(
-    user_id: str,
-    pin: str = Query(..., min_length=4, max_length=20),
-    db: Session = Depends(get_db),
-    actor: ActorContext = Depends(get_actor),
+@router.post("/authcode/pin/validate")
+async def validate_pin(payload: PinValidateRequest) -> dict[str, Any]:
+    """Login alternativo por PIN, delegado no Nexora ERP."""
+    return await _proxy_erp_call(
+        lambda: erp_client.authcode_pin_validate(payload.email, payload.pin)
+    )
+
+
+@router.post("/authcode/totp/validate")
+async def validate_totp(payload: TotpValidateRequest) -> dict[str, Any]:
+    """Login alternativo por código TOTP, delegado no Nexora ERP."""
+    return await _proxy_erp_call(
+        lambda: erp_client.authcode_totp_validate(payload.email, payload.code)
+    )
+
+
+@router.post("/authcode/totp/setup")
+async def setup_totp(
+    payload: TotpSetupRequest,
+    authorization: str | None = Header(default=None, alias="Authorization"),
 ) -> dict[str, Any]:
-    """Endpoint administrativo para configurar o PIN de um utilizador."""
-    if actor.role not in ("ADMIN_SISTEMA", "GESTOR_RH"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissao.")
+    """Configura TOTP para o utilizador autenticado, delegado no Nexora ERP."""
+    token = _require_authorization(authorization)
+    return await _proxy_erp_call(
+        lambda: erp_client.authcode_totp_setup(token, payload.password)
+    )
 
-    user = _get_user(db, user_id, actor)
-    user.pin_hash = get_password_hash(pin)
-    db.commit()
 
-    return {"success": True, "message": "PIN configurado com sucesso."}
+@router.post("/authcode/admin/set-pin", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_set_pin(
+    payload: AdminSetPinRequest,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+) -> None:
+    """Define o PIN de outro utilizador. O Nexora ERP valida a permissão
+    `auth:pin_admin` de quem chama — este router só reencaminha o pedido."""
+    token = _require_authorization(authorization)
+    await _proxy_erp_call(
+        lambda: erp_client.authcode_admin_set_pin(token, payload.user_id, payload.pin)
+    )

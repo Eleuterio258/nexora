@@ -45,6 +45,11 @@ func StartJobs(ctx context.Context, db *pgxpool.Pool, notif contracts.Notificati
 	go runDaily(ctx, "process-subscription-renewals", func() {
 		processSubscriptionRenewals(db)
 	})
+
+	// Marcação de faltas (ausência de evento num dia útil) — diário
+	go runDaily(ctx, "process-daily-absences", func() {
+		processDailyAbsences(db)
+	})
 }
 
 // ── helpers de agendamento ────────────────────────────────────────────────────
@@ -411,6 +416,115 @@ func processSubscriptionRenewals(db *pgxpool.Pool) {
 	if processed > 0 {
 		log.Printf("[background] process-subscription-renewals: %d assinaturas renovadas", processed)
 	}
+}
+
+// ── faltas por ausência de evento (tipo='falta') ─────────────────────────────
+
+// processDailyAbsences marca tipo='falta' em rh.presencas para funcionários
+// com horário de trabalho configurado que, no dia útil anterior (segundo
+// horarios_trabalho.dias_semana), não tiveram qualquer entrada registada e
+// não têm uma ausência aprovada (férias/doença/etc.) a cobrir esse dia.
+//
+// Corre sempre referente ao dia ANTERIOR: no dia corrente ainda pode surgir
+// um evento de entrada mais tarde, por isso só faz sentido decidir 'falta'
+// depois do dia útil ter terminado por completo.
+//
+// Complementa calcularTipoPresenca em hardware/service/processor.go, que só
+// decide 'presente'/'atraso' a partir de um evento já recebido — 'falta' só
+// é detectável pela AUSÊNCIA de qualquer evento, o que exigia esta rotina
+// diária (documentado como pendente em CONTRATO-INTEGRACAO-ERP.md e no
+// comentário da Fase 4 em processor.go).
+//
+// dias_semana usa convenção ISO (1=segunda ... 7=domingo), consistente com o
+// valor por omissão '1,2,3,4,5' (segunda a sexta) usado em toda a BD.
+func processDailyAbsences(db *pgxpool.Pool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	data := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	marcadas, err := processAbsencesForDate(ctx, db, data)
+	if err != nil {
+		log.Printf("[background] process-daily-absences: %v", err)
+		return
+	}
+	if marcadas > 0 {
+		log.Printf("[background] process-daily-absences: %d faltas marcadas (%s)", marcadas, data)
+	}
+}
+
+// processAbsencesForDate aplica a lógica de processDailyAbsences a uma data
+// específica (formato "2006-01-02"), devolvendo quantas faltas foram
+// marcadas. Extraído para ser exercitável em testes sem depender de
+// time.Now() — a lógica de produção (processDailyAbsences) chama isto
+// sempre com "ontem".
+func processAbsencesForDate(ctx context.Context, db *pgxpool.Pool, data string) (int, error) {
+	dataRef, err := time.Parse("2006-01-02", data)
+	if err != nil {
+		return 0, fmt.Errorf("data inválida: %w", err)
+	}
+	isoWeekday := int(dataRef.Weekday())
+	if isoWeekday == 0 {
+		isoWeekday = 7
+	}
+	diaSemana := fmt.Sprintf("%d", isoWeekday)
+
+	rows, err := db.Query(ctx, `
+		SELECT f.id, f.tenant_id
+		  FROM rh.funcionarios f
+		  JOIN rh.horarios_trabalho h ON h.id = f.horario_id
+		 WHERE f.estado = 'ativo'
+		   AND h.ativo = TRUE
+		   AND f.data_admissao <= $1::date
+		   AND (f.data_saida IS NULL OR f.data_saida >= $1::date)
+		   AND $2 = ANY (SELECT trim(dia) FROM unnest(string_to_array(h.dias_semana, ',')) AS dia)
+		   AND NOT EXISTS (
+		       SELECT 1 FROM rh.presencas p
+		        WHERE p.funcionario_id = f.id AND p.data = $1::date
+		          AND p.hora_entrada IS NOT NULL AND p.hora_entrada <> ''
+		   )
+		   AND NOT EXISTS (
+		       SELECT 1 FROM rh.ausencias a
+		        WHERE a.funcionario_id = f.id
+		          AND a.estado = 'aprovado'
+		          AND $1::date BETWEEN a.data_inicio AND a.data_fim
+		   )`,
+		data, diaSemana)
+	if err != nil {
+		return 0, fmt.Errorf("query: %w", err)
+	}
+	defer rows.Close()
+
+	type funcTenant struct {
+		funcionarioID int64
+		tenantID      int64
+	}
+	var alvos []funcTenant
+	for rows.Next() {
+		var ft funcTenant
+		if err := rows.Scan(&ft.funcionarioID, &ft.tenantID); err != nil {
+			continue
+		}
+		alvos = append(alvos, ft)
+	}
+	rows.Close()
+
+	var marcadas int
+	for _, ft := range alvos {
+		_, err := db.Exec(ctx, `
+			INSERT INTO rh.presencas (tenant_id, funcionario_id, data, tipo, observacoes)
+			VALUES ($1, $2, $3::date, 'falta', 'Falta detectada automaticamente (sem registo de entrada)')
+			ON CONFLICT (funcionario_id, data)
+			DO UPDATE SET tipo = 'falta',
+			              observacoes = 'Falta detectada automaticamente (sem registo de entrada)'`,
+			ft.tenantID, ft.funcionarioID, data)
+		if err != nil {
+			log.Printf("[background] process-daily-absences: insert funcionario_id=%d: %v", ft.funcionarioID, err)
+			continue
+		}
+		marcadas++
+	}
+
+	return marcadas, nil
 }
 
 // ── alertas de stock mínimo ───────────────────────────────────────────────────

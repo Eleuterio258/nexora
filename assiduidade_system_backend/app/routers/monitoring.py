@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import PlainTextResponse
 
 from app.biometric_metrics import biometric_metrics
+from app.erp_sync_metrics import erp_sync_metrics
 
 
 router = APIRouter(tags=["Monitoring"])
@@ -35,5 +36,6 @@ def metrics(request: Request) -> str:
         lines.append(f'http_requests_by_path{{path="{sanitized_path}"}} {count}')
 
     lines.extend(biometric_metrics.to_prometheus_format())
+    lines.extend(erp_sync_metrics.to_prometheus_format())
 
     return "\n".join(lines) + "\n"

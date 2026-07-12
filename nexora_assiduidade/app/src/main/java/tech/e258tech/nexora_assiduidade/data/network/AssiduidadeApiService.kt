@@ -7,33 +7,29 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Query
 import tech.e258tech.nexora_assiduidade.data.model.AdjustmentRequestInput
+import tech.e258tech.nexora_assiduidade.data.model.ClockBatchRegisterRequest
 import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
 import tech.e258tech.nexora_assiduidade.data.model.FaceVerifyRequest
 import tech.e258tech.nexora_assiduidade.data.model.GeoValidateRequest
-import tech.e258tech.nexora_assiduidade.data.model.LoginRequest
 import tech.e258tech.nexora_assiduidade.data.model.NFCValidateRequest
 import tech.e258tech.nexora_assiduidade.data.model.PinValidateRequest
 import tech.e258tech.nexora_assiduidade.data.model.QRValidateRequest
-import tech.e258tech.nexora_assiduidade.data.model.RefreshTokenRequest
 import tech.e258tech.nexora_assiduidade.data.model.response.AdjustmentRequestResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ClockRecordResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.ClockBatchRegisterResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.FaceVerifyResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.GeoValidateResponse
-import tech.e258tech.nexora_assiduidade.data.model.response.LoginResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.AuthCodeResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.NFCValidateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.QRValidateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.PaginatedAdjustmentRequestsResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.PaginatedClockRecordsResponse
-import tech.e258tech.nexora_assiduidade.data.model.response.RefreshTokenResponse
 
 interface AssiduidadeApiService {
 
-    @POST("auth/login")
-    suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
-
-    @POST("auth/refresh")
-    suspend fun refreshToken(@Body request: RefreshTokenRequest): Response<RefreshTokenResponse>
+    // Login/refresh removidos (Fase 6) — identidade vem sempre do ERP
+    // (ver ErpApiService.login, data/model/ErpLoginRequest.kt). O FaceClock
+    // ja nao expoe /auth/login nem /auth/refresh (app/routers/auth.py vazio).
 
     @POST("biometric/verify")
     suspend fun verifyFace(
@@ -70,6 +66,12 @@ interface AssiduidadeApiService {
         @Header("Authorization") token: String,
         @Body request: ClockRegisterRequest
     ): Response<ClockRecordResponse>
+
+    @POST("clock/register/batch")
+    suspend fun registerClockBatch(
+        @Header("Authorization") token: String,
+        @Body request: ClockBatchRegisterRequest
+    ): Response<ClockBatchRegisterResponse>
 
     @GET("clock/me")
     suspend fun getMyClockRecords(

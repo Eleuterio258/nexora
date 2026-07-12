@@ -199,59 +199,15 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) loginFuncionario(w http.ResponseWriter, r *http.Request, userID, tenantID int64, nome, email, tipo, escopo string) {
-	accessToken, err := h.signAccess(userID, tenantID, tipo, escopo)
-	if err != nil {
-		jsonErr(w, "Erro interno", http.StatusInternalServerError)
-		return
-	}
-	refreshToken, err := h.signRefresh(userID)
-	if err != nil {
-		jsonErr(w, "Erro interno", http.StatusInternalServerError)
-		return
-	}
-
-	expiresAt := time.Now().Add(h.cfg.JWTExpiresIn)
-	if err := h.insertSession(r, userID, mw.HashToken(accessToken), expiresAt); err != nil {
-		jsonErr(w, "Erro ao criar sessão", http.StatusInternalServerError)
-		return
-	}
-
-	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, userID)
-
-	// Carregar cargo, módulos e features para enriquecer a resposta do login.
-	userAccess, _ := models.LoadUserAccess(r.Context(), h.db, userID)
-
-	userObj := map[string]interface{}{
-		"id":     userID,
-		"nome":   nome,
-		"email":  email,
-		"escopo": escoposPorTipoEscopo(tipo, escopo),
-	}
-	modulos := []models.ModuloAcesso{}
-	features := []string{}
-	if userAccess != nil {
-		userObj["tenant_id"] = userAccess.TenantID
-		userObj["cargo_id"] = userAccess.CargoID
-		if userAccess.CargoNome != nil {
-			userObj["cargo"] = *userAccess.CargoNome
-		}
-		modulos = userAccess.Modulos
-		features = userAccess.Features
-	} else {
-		userObj["tenant_id"] = tenantID
-	}
-
-	jsonOK(w, map[string]interface{}{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
-		"token_type":    "Bearer",
-		"expires_in":    int(h.cfg.JWTExpiresIn.Seconds()),
-		"tipo":          tipo,
-		"escopo":        escoposPorTipoEscopo(tipo, escopo),
-		"user":          userObj,
-		"modulos":       modulos,
-		"features":      features,
-	}, http.StatusOK)
+	h.issueFuncionarioTokens(w, r, &userIdentity{
+		id:       userID,
+		tenantID: tenantID,
+		nome:     nome,
+		email:    email,
+		estado:   "ativo",
+		tipo:     tipo,
+		escopo:   escopo,
+	})
 }
 
 func (h *Handler) loginAluno(w http.ResponseWriter, r *http.Request, userID int64, nome string) {
@@ -818,25 +774,52 @@ func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 
 // ── Gateway Validate ──────────────────────────────────────────────────────────
 
+// gatewayAppRole traduz a identidade ERP (tipo + permissões RBAC) para o
+// vocabulário de role usado por consumidores externos de confiança (hoje só o
+// FaceClock, via GET /api/auth/gateway/validate) — "ADMIN_SISTEMA"/"GESTOR_RH"/
+// "COLABORADOR". O ERP não tem estes três roles como conceito nativo (só
+// `tipo` + permissões RBAC finas), por isso este mapeamento vive aqui, não no
+// consumidor: só o ERP sabe calcular permissões a partir de cargo/permissões
+// diretas/tipo. GESTOR_RH é definido operacionalmente como "tem a permissão
+// recursos-humanos.aprovar_ausencias" — a mesma que already protege
+// POST /api/rh/ausencias/{id}/aprovar no router (não existe um role
+// dedicado "gestor" na tabela auth.users.tipo).
+func gatewayAppRole(ua *models.UserAccess) string {
+	if ua.Tipo == "superadmin" {
+		return "ADMIN_SISTEMA"
+	}
+	if ua.Can("recursos-humanos", "aprovar_ausencias") {
+		return "GESTOR_RH"
+	}
+	return "COLABORADOR"
+}
+
 func (h *Handler) GatewayValidate(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	var id, tenantID int64
-	var nome, email, escopo string
+	var nome, email, escopo, tipo string
 	err := h.db.QueryRow(r.Context(), `
-		SELECT u.id, COALESCE(m.tenant_id, 0), u.nome, u.email, COALESCE(NULLIF(m.escopo, ''), 'erp')
+		SELECT u.id, COALESCE(m.tenant_id, 0), u.nome, u.email, COALESCE(NULLIF(m.escopo, ''), 'erp'), u.tipo
 		  FROM users u LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
 		 WHERE u.id = $1`, user.ID).
-		Scan(&id, &tenantID, &nome, &email, &escopo)
+		Scan(&id, &tenantID, &nome, &email, &escopo, &tipo)
 	if err != nil {
 		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
 		return
 	}
+
+	appRole := "COLABORADOR"
+	if ua, err := models.LoadUserAccess(r.Context(), h.db, id); err == nil {
+		appRole = gatewayAppRole(ua)
+	}
+
 	w.Header().Set("X-Auth-User-Id", itoa(id))
 	w.Header().Set("X-Auth-Tenant-Id", itoa(tenantID))
 	w.Header().Set("X-Auth-Session-Id", itoa(user.SessionID))
 	w.Header().Set("X-Auth-User-Email", email)
 	w.Header().Set("X-Auth-User-Name", nome)
 	w.Header().Set("X-Auth-User-Scope", escopo)
+	w.Header().Set("X-Auth-User-Role", appRole)
 	w.WriteHeader(http.StatusNoContent)
 }
 

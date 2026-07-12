@@ -35,8 +35,36 @@
                 android:id="@+id/etEmployeeId"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="ID do Funcionário" />
+                android:hint="ID do Funcionário (ver ecrã Equipa)"
+                android:inputType="number" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <RadioGroup
+            android:id="@+id/rgEventType"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tilEmployeeId">
+
+            <RadioButton
+                android:id="@+id/rbEntrada"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:checked="true"
+                android:text="Entrada" />
+
+            <RadioButton
+                android:id="@+id/rbSaida"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Saída" />
+
+        </RadioGroup>
 
         <Button
             android:id="@+id/btnRegister"
@@ -46,7 +74,17 @@
             android:text="Registrar"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tilEmployeeId" />
+            app:layout_constraintTop_toBottomOf="@id/rgEventType" />
+
+        <TextView
+            android:id="@+id/tvRegistoStatus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:textColor="@color/text_muted"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/btnRegister" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>

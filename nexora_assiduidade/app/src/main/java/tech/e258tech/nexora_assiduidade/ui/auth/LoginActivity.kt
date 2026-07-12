@@ -15,15 +15,18 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.LoginRequest
+import tech.e258tech.nexora_assiduidade.data.model.ErpLoginRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.ui.main.MainActivity
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
+import tech.e258tech.nexora_assiduidade.utils.RoleUtils
 import tech.e258tech.nexora_assiduidade.work.SyncAttendanceWorker
 import tech.e258tech.nexora_assiduidade.utils.Constants.DEMO_FUNCIONARIO_EMAIL
 import tech.e258tech.nexora_assiduidade.utils.Constants.DEMO_FUNCIONARIO_PASSWORD
 import tech.e258tech.nexora_assiduidade.utils.Constants.DEMO_GESTOR_EMAIL
 import tech.e258tech.nexora_assiduidade.utils.Constants.DEMO_GESTOR_PASSWORD
+import tech.e258tech.nexora_assiduidade.utils.Constants.DEMO_ADMIN_EMAIL
+import tech.e258tech.nexora_assiduidade.utils.Constants.DEMO_ADMIN_PASSWORD
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 class LoginActivity : AppCompatActivity() {
@@ -37,6 +40,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var btnLogin: Button
     private lateinit var btnDemoFuncionario: View
     private lateinit var btnDemoGestor: View
+    private lateinit var btnDemoAdmin: View
     private lateinit var progressBar: ProgressBar
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,6 +71,7 @@ class LoginActivity : AppCompatActivity() {
         btnLogin = findViewById(R.id.btnLogin)
         btnDemoFuncionario = findViewById(R.id.btnDemoFuncionario)
         btnDemoGestor = findViewById(R.id.btnDemoGestor)
+        btnDemoAdmin = findViewById(R.id.btnDemoAdmin)
         progressBar = findViewById(R.id.progressBar)
     }
 
@@ -92,16 +97,23 @@ class LoginActivity : AppCompatActivity() {
             etEmail.setText(DEMO_GESTOR_EMAIL)
             etPassword.setText(DEMO_GESTOR_PASSWORD)
         }
+
+        btnDemoAdmin.setOnClickListener {
+            etEmail.setText(DEMO_ADMIN_EMAIL)
+            etPassword.setText(DEMO_ADMIN_PASSWORD)
+        }
     }
 
-    private fun performLogin(username: String, password: String) {
+    private fun performLogin(email: String, password: String) {
         setLoading(true)
 
         uiScope.launch {
             try {
+                // Fase 6: login passa a ser feito directamente no Nexora ERP
+                // (nao no FaceClock) — ver ErpLoginRequest/ErpLoginResponse.
                 val response = withContext(Dispatchers.IO) {
-                    RetrofitClient.assiduidadeApiService.login(
-                        LoginRequest(username = username, password = password)
+                    RetrofitClient.erpApiService.login(
+                        ErpLoginRequest(email = email, password = password)
                     )
                 }
 
@@ -115,14 +127,15 @@ class LoginActivity : AppCompatActivity() {
                 }
 
                 val payload = response.body() ?: return@launch
+                val role = RoleUtils.fromErpLogin(payload.tipo, payload.modulos)
                 sessionManager.saveSession(
                     token = payload.access_token,
                     refreshToken = payload.refresh_token,
-                    userId = payload.user.id,
-                    userName = payload.user.full_name,
-                    userEmail = payload.user.employee_code,
-                    userRole = payload.user.role,
-                    employeeCode = payload.user.employee_code
+                    userId = payload.user.id.toString(),
+                    userName = payload.user.nome,
+                    userEmail = payload.user.email,
+                    userRole = role,
+                    employeeCode = payload.user.email
                 )
                 Toast.makeText(
                     this@LoginActivity,
@@ -134,7 +147,7 @@ class LoginActivity : AppCompatActivity() {
             } catch (_: Exception) {
                 Toast.makeText(
                     this@LoginActivity,
-                    "Nao foi possivel ligar ao backend de assiduidade.",
+                    "Nao foi possivel ligar ao ERP.",
                     Toast.LENGTH_LONG
                 ).show()
             } finally {

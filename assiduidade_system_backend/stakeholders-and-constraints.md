@@ -222,3 +222,4 @@ Itens que dependem de decisao de negocio ou trabalho de engenharia fora do escop
 - orcar formalmente custo de infraestrutura de producao (provedor, dimensionamento, SLA contratado)
 - automatizar e testar o processo de backup/restauracao do banco de dados
 - avaliar contratacao/definicao de politica de retencao formal junto a juridico/DPO (RF-14, LGPD)
+

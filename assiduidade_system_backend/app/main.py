@@ -18,7 +18,7 @@ from app.bootstrap import seed_data
 from app.limiter import limiter
 from app.config import settings
 from app.database import Base, SessionLocal, engine
-from app.routers import admin, audit, auth, authcode, biometric, clock, consents, devices, face_templates, fingerprint, integrations, methods, monitoring, reports, sync, units, users
+from app.routers import attendance_config, audit, auth, authcode, biometric, clock, consents, fingerprint, liveness, methods, monitoring
 
 
 logger = logging.getLogger("faceclock.api")
@@ -29,8 +29,10 @@ if not logger.handlers:
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
     logger.info("FaceClock API starting up (version=%s)", app_instance.version)
+    logger.info("Environment: %s", settings.environment)
     logger.info("Database: %s", settings.database_url)
     logger.info("Docs: %s", settings.docs_url)
+    settings.assert_production_secrets()
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("Database schema ensured.")
@@ -54,7 +56,7 @@ async def lifespan(app_instance: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="API principal do MVP de registro de ponto com reconhecimento facial.",
+    description="Gateway stateless de captura e validacao biométrica de assiduidade. Apenas templates biométricos (face/digital) são persistidos localmente; todo o resto é delegado ao Nexora ERP.",
     docs_url=settings.docs_url,
     openapi_url=settings.openapi_url,
     lifespan=lifespan,
@@ -85,18 +87,12 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(authcode.router, prefix="/api/v1")
 app.include_router(consents.router, prefix="/api/v1")
 app.include_router(biometric.router, prefix="/api/v1")
+app.include_router(liveness.router, prefix="/api/v1")
 app.include_router(clock.router, prefix="/api/v1")
-app.include_router(admin.router, prefix="/api/v1")
-app.include_router(users.router, prefix="/api/v1")
-app.include_router(devices.router, prefix="/api/v1")
-app.include_router(units.router, prefix="/api/v1")
-app.include_router(face_templates.router, prefix="/api/v1")
 app.include_router(fingerprint.router, prefix="/api/v1")
 app.include_router(methods.router, prefix="/api/v1")
-app.include_router(sync.router, prefix="/api/v1")
-app.include_router(integrations.router, prefix="/api/v1")
+app.include_router(attendance_config.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
-app.include_router(reports.router, prefix="/api/v1")
 app.include_router(monitoring.router)
 
 

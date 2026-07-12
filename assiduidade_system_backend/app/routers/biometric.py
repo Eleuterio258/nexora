@@ -2,16 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.audit_chain import chain_audit_hash
 from app.biometric_metrics import biometric_metrics
 from app.config import settings
 from app.database import get_db
 from app.deps import ActorContext, apply_tenant, get_actor
 from app.limiter import limiter
-from app.models import AuditLogModel, Consent, FaceTemplate, User
-from app.schemas.common import TemplateStatus
+from app.models import FaceTemplate
+from app.schemas.common import SourceType, TemplateStatus
 from app.schemas.requests import EnrollRequest, VerifyRequest
 from app.schemas.responses import EnrollResponse, VerifyResponse
+from app.services.attendance_validation import validar_metodo_assiduidade
 from app.services.biometric import (
     MODEL_VERSION,
     assess_capture_quality,
@@ -40,26 +40,11 @@ def enroll_biometric(
     db: Session = Depends(get_db),
     actor: ActorContext = Depends(get_actor),
 ) -> EnrollResponse:
-    user = db.scalar(
-        apply_tenant(select(User).where(User.id == str(payload.user_id)), actor, User)
-    )
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario nao encontrado.")
+    erp_user_id = str(payload.user_id)
 
-    consent = db.scalar(
-        apply_tenant(
-            select(Consent)
-            .where(Consent.user_id == user.id, Consent.revoked_at.is_(None))
-            .order_by(Consent.accepted_at.desc()),
-            actor,
-            Consent,
-        )
-    )
-    if not consent:
-        raise HTTPException(
-            status_code=403,
-            detail="Consentimento ativo obrigatorio para cadastro biometrico.",
-        )
+    # TODO: validar consentimento LGPD activo via ERP (Fase 6)
+    # antes de permitir enrollment. Por enquanto assume consentimento
+    # gerido externamente.
 
     approved_embeddings: list[list[float]] = []
     approved_quality_scores: list[float] = []
@@ -109,31 +94,16 @@ def enroll_biometric(
 
     template = FaceTemplate(
         tenant_id=actor.tenant_id,
-        user_id=user.id,
-        consent_id=consent.id,
+        erp_user_id=erp_user_id,
         model_version=MODEL_VERSION,
         embedding=serialize_embedding(template_embedding),
         quality_score=average_quality,
         status=TemplateStatus.ACTIVE,
     )
     db.add(template)
-    db.flush()
+    db.commit()
     biometric_metrics.record_enroll_success()
 
-    chained_hash = chain_audit_hash(db, consent.consent_hash)
-    db.add(
-        AuditLogModel(
-            tenant_id=actor.tenant_id,
-            actor_type=actor.role,
-            actor_id=actor.id or str(payload.user_id),
-            action="BIOMETRIC_ENROLL",
-            entity_type="face_template",
-            entity_id=template.id,
-            payload_hash=consent.consent_hash,
-            previous_hash=chained_hash,
-        )
-    )
-    db.commit()
     return EnrollResponse(
         template_id=template.id,
         user_id=payload.user_id,
@@ -144,17 +114,15 @@ def enroll_biometric(
 
 @router.post("/biometric/verify", response_model=VerifyResponse)
 @limiter.limit("30/minute")
-def verify_biometric(
+async def verify_biometric(
     request: Request,
     payload: VerifyRequest,
     db: Session = Depends(get_db),
     actor: ActorContext = Depends(get_actor),
 ) -> VerifyResponse:
-    user = db.scalar(
-        apply_tenant(select(User).where(User.id == str(payload.user_id)), actor, User)
-    )
-    if not user:
-        raise HTTPException(status_code=422, detail="Usuario invalido.")
+    await validar_metodo_assiduidade(SourceType.FACIAL)
+
+    erp_user_id = str(payload.user_id)
 
     try:
         quality_score, quality_reason = assess_capture_quality(payload.image_base64)
@@ -193,7 +161,7 @@ def verify_biometric(
     active_template = db.scalar(
         apply_tenant(
             select(FaceTemplate).where(
-                FaceTemplate.user_id == str(payload.user_id),
+                FaceTemplate.erp_user_id == erp_user_id,
                 FaceTemplate.status == TemplateStatus.ACTIVE,
             ),
             actor,

@@ -23,13 +23,13 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            buildConfigField("String", "ERP_BASE_URL", "\"https://apiomnisyserp.u-tech.co.mz/\"")
-            buildConfigField("String", "ASSIDUIDADE_BASE_URL", "\"https://api-assiduidade.u-tech.co.mz/api/v1/\"")
+            buildConfigField("String", "ERP_BASE_URL", "\"https://api.nexora.e258tech.tech/\"")
+            buildConfigField("String", "ASSIDUIDADE_BASE_URL", "\"https://asseduidade.e258tech.tech/api/v1/\"")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
             buildConfigField("String", "ERP_BASE_URL", "\"http://192.168.168.171:8080/\"")
-            buildConfigField("String", "ASSIDUIDADE_BASE_URL", "\"http://192.168.168.171:8001/api/v1/\"")
+            buildConfigField("String", "ASSIDUIDADE_BASE_URL", "\"http://10.0.2.2:8001/api/v1/\"")
         }
     }
 

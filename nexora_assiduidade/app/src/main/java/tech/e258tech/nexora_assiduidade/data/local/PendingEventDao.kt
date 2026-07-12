@@ -21,6 +21,9 @@ interface PendingEventDao {
     @Query("SELECT * FROM pending_events WHERE syncStatus = :status ORDER BY createdAt ASC")
     suspend fun getByStatus(status: String): List<PendingEventEntity>
 
+    @Query("SELECT * FROM pending_events WHERE syncStatus IN (:statuses) ORDER BY createdAt ASC LIMIT :limit")
+    suspend fun getByStatuses(statuses: List<String>, limit: Int = 100): List<PendingEventEntity>
+
     @Query("SELECT * FROM pending_events ORDER BY createdAt ASC LIMIT :limit")
     suspend fun getAll(limit: Int = 100): List<PendingEventEntity>
 

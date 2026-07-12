@@ -40,8 +40,33 @@ object Constants {
     const val LOCATION_TIMEOUT = 10000L
     const val LOCATION_MIN_DISTANCE = 10f
 
-    const val DEMO_FUNCIONARIO_EMAIL = "COLAB_001"
-    const val DEMO_FUNCIONARIO_PASSWORD = "Test@2026"
+    const val DEMO_FUNCIONARIO_EMAIL = "olimpia.chitlhango@e258tech.mz"
+    const val DEMO_FUNCIONARIO_PASSWORD = "1234567890"
     const val DEMO_GESTOR_EMAIL = "GESTOR_RH"
     const val DEMO_GESTOR_PASSWORD = "RH@2026"
+    const val DEMO_ADMIN_EMAIL = "ADMIN_SISTEMA"
+    const val DEMO_ADMIN_PASSWORD = "Admin@2026"
+
+    // WebSocket chat events (backend ERP /ws/chat)
+    const val WS_CHAT_PATH = "/ws/chat"
+    const val WS_EVENT_MESSAGE = "message"
+    const val WS_EVENT_MESSAGE_ACK = "message_ack"
+    const val WS_EVENT_TYPING = "typing"
+    const val WS_EVENT_STOP_TYPING = "stop_typing"
+    const val WS_EVENT_JOINED = "joined"
+    const val WS_EVENT_USER_ONLINE = "user_online"
+    const val WS_EVENT_USER_OFFLINE = "user_offline"
+    const val WS_EVENT_ERROR = "error"
+    const val WS_EVENT_NOTIFICATION_COUNT = "notification_count"
+
+    const val WS_ACTION_JOIN = "join"
+    const val WS_ACTION_LEAVE = "leave"
+    const val WS_ACTION_MESSAGE = "message"
+    const val WS_ACTION_TYPING = "typing"
+    const val WS_ACTION_STOP_TYPING = "stop_typing"
+    const val WS_ACTION_MARK_READ = "mark_read"
+    const val WS_ACTION_MARK_ALL_READ = "mark_all_read"
+
+    const val CHAT_TYPE_PRIVATE = "individual"
+    const val CHAT_TYPE_GROUP = "grupo"
 }

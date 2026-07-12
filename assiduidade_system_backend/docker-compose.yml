@@ -10,8 +10,10 @@ services:
       - path: .env
         required: false
     environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:admin@pg:5432/faceclock}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
+      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-}
       SEED_DATA_ON_STARTUP: "false"
       PORT: "8000"
     healthcheck:

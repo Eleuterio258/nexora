@@ -1,0 +1,374 @@
+"""stateless_cleanup_biometric_only
+
+Revision ID: 8f610dec7ea3
+Revises: 202607120001
+Create Date: 2026-07-12 03:00:00.000000
+"""
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision = '8f610dec7ea3'
+down_revision = '202607120001'
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    # Drop all non-biometric tables and their dependencies
+    op.drop_table('adjustment_requests', if_exists=True)
+    op.drop_table('integration_batches', if_exists=True)
+    op.drop_table('clock_records', if_exists=True)
+    op.drop_table('consents', if_exists=True)
+    op.drop_table('audit_logs', if_exists=True)
+    op.drop_table('qr_code_tokens', if_exists=True)
+    op.drop_table('devices', if_exists=True)
+    op.drop_table('users', if_exists=True)
+    op.drop_table('units', if_exists=True)
+    op.drop_table('tenants', if_exists=True)
+
+    # Recreate face_templates without FKs and with erp references
+    op.drop_table('face_templates', if_exists=True)
+    op.create_table(
+        'face_templates',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('erp_user_id', sa.String(length=50), nullable=False),
+        sa.Column('erp_funcionario_id', sa.String(length=50), nullable=True),
+        sa.Column('consent_version', sa.String(length=30), nullable=True),
+        sa.Column('model_version', sa.String(length=50), nullable=False),
+        sa.Column('embedding', sa.LargeBinary(), nullable=False),
+        sa.Column('quality_score', sa.Numeric(precision=5, scale=4), nullable=True),
+        sa.Column(
+            'status',
+            sa.Enum('ACTIVE', 'REVOKED', 'DELETED', name='templatestatus'),
+            nullable=False,
+        ),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('revoked_at', sa.DateTime(timezone=True), nullable=True),
+        sa.PrimaryKeyConstraint('id'),
+    )
+    op.create_index(op.f('ix_face_templates_tenant_id'), 'face_templates', ['tenant_id'], unique=False)
+    op.create_index(op.f('ix_face_templates_erp_user_id'), 'face_templates', ['erp_user_id'], unique=False)
+    op.create_index(op.f('ix_face_templates_erp_funcionario_id'), 'face_templates', ['erp_funcionario_id'], unique=False)
+
+    # Recreate fingerprint_templates without FKs and with erp references
+    op.drop_table('fingerprint_templates', if_exists=True)
+    op.create_table(
+        'fingerprint_templates',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('erp_user_id', sa.String(length=50), nullable=False),
+        sa.Column('erp_funcionario_id', sa.String(length=50), nullable=True),
+        sa.Column('finger_type', sa.String(length=50), nullable=False),
+        sa.Column('template_base64', sa.Text(), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint('id'),
+    )
+    op.create_index(op.f('ix_fingerprint_templates_tenant_id'), 'fingerprint_templates', ['tenant_id'], unique=False)
+    op.create_index(
+        op.f('ix_fingerprint_templates_erp_user_id'), 'fingerprint_templates', ['erp_user_id'], unique=False
+    )
+    op.create_index(
+        op.f('ix_fingerprint_templates_erp_funcionario_id'), 'fingerprint_templates', ['erp_funcionario_id'], unique=False
+    )
+
+
+def downgrade() -> None:
+    # Reverse: drop biometric tables and restore the old schema.
+    # This is a best-effort downgrade that recreates the original tables
+    # (minus data). It mirrors the initial schema migration.
+    op.drop_index(op.f('ix_fingerprint_templates_erp_funcionario_id'), table_name='fingerprint_templates')
+    op.drop_index(op.f('ix_fingerprint_templates_erp_user_id'), table_name='fingerprint_templates')
+    op.drop_index(op.f('ix_fingerprint_templates_tenant_id'), table_name='fingerprint_templates')
+    op.drop_table('fingerprint_templates')
+    op.drop_index(op.f('ix_face_templates_erp_funcionario_id'), table_name='face_templates')
+    op.drop_index(op.f('ix_face_templates_erp_user_id'), table_name='face_templates')
+    op.drop_index(op.f('ix_face_templates_tenant_id'), table_name='face_templates')
+    op.drop_table('face_templates')
+
+    op.create_table(
+        'tenants',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('external_id', sa.String(length=100), nullable=True),
+        sa.Column('name', sa.String(length=150), nullable=False),
+        sa.Column('code', sa.String(length=50), nullable=False),
+        sa.Column('active', sa.Boolean(), nullable=False),
+        sa.Column('settings_json', sa.JSON(), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('code'),
+    )
+    op.create_index(op.f('ix_tenants_external_id'), 'tenants', ['external_id'], unique=True)
+
+    op.create_table(
+        'units',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('code', sa.String(length=50), nullable=False),
+        sa.Column('name', sa.String(length=150), nullable=False),
+        sa.Column('timezone', sa.String(length=100), nullable=False),
+        sa.Column('active', sa.Boolean(), nullable=False),
+        sa.Column('geo_lat', sa.Numeric(precision=10, scale=7), nullable=True),
+        sa.Column('geo_lng', sa.Numeric(precision=10, scale=7), nullable=True),
+        sa.Column('allowed_radius_meters', sa.Integer(), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id']),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('tenant_id', 'code', name='uix_tenant_unit_code'),
+    )
+    op.create_index(op.f('ix_units_tenant_id'), 'units', ['tenant_id'], unique=False)
+
+    op.create_table(
+        'devices',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('device_code', sa.String(length=100), nullable=False),
+        sa.Column('display_name', sa.String(length=150), nullable=False),
+        sa.Column('unit_id', sa.String(length=36), nullable=True),
+        sa.Column(
+            'type',
+            sa.Enum('WEB', 'MOBILE', 'TOTEM', 'KIOSK', 'API', name='devicetype'),
+            nullable=False,
+        ),
+        sa.Column(
+            'status',
+            sa.Enum('ACTIVE', 'INACTIVE', 'BLOCKED', name='devicestatus'),
+            nullable=False,
+        ),
+        sa.Column('last_seen_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id']),
+        sa.ForeignKeyConstraint(['unit_id'], ['units.id']),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('tenant_id', 'device_code', name='uix_tenant_device_code'),
+    )
+    op.create_index(op.f('ix_devices_tenant_id'), 'devices', ['tenant_id'], unique=False)
+
+    op.create_table(
+        'users',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('erp_user_id', sa.String(length=50), nullable=True),
+        sa.Column('employee_code', sa.String(length=50), nullable=False),
+        sa.Column('full_name', sa.String(length=200), nullable=False),
+        sa.Column('email', sa.String(length=200), nullable=True),
+        sa.Column('phone', sa.String(length=30), nullable=True),
+        sa.Column('nfc_tag', sa.String(length=100), nullable=True),
+        sa.Column('pin_hash', sa.String(length=255), nullable=True),
+        sa.Column('totp_secret', sa.String(length=255), nullable=True),
+        sa.Column('password_hash', sa.String(length=255), nullable=False),
+        sa.Column('unit_id', sa.String(length=36), nullable=True),
+        sa.Column(
+            'role',
+            sa.Enum('COLABORADOR', 'GESTOR_RH', 'ADMIN_SISTEMA', 'AUDITOR', name='userrole'),
+            nullable=False,
+        ),
+        sa.Column(
+            'status',
+            sa.Enum('ACTIVE', 'INACTIVE', 'TERMINATED', name='userstatus'),
+            nullable=False,
+        ),
+        sa.Column('hired_at', sa.Date(), nullable=True),
+        sa.Column('terminated_at', sa.Date(), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id']),
+        sa.ForeignKeyConstraint(['unit_id'], ['units.id']),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('nfc_tag'),
+        sa.UniqueConstraint('tenant_id', 'employee_code', name='uix_tenant_employee_code'),
+    )
+    op.create_index(op.f('ix_users_erp_user_id'), 'users', ['erp_user_id'], unique=False)
+    op.create_index(op.f('ix_users_tenant_id'), 'users', ['tenant_id'], unique=False)
+
+    op.create_table(
+        'audit_logs',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('actor_id', sa.String(length=36), nullable=True),
+        sa.Column('actor_type', sa.String(length=50), nullable=False),
+        sa.Column('action', sa.String(length=100), nullable=False),
+        sa.Column('entity_type', sa.String(length=100), nullable=False),
+        sa.Column('entity_id', sa.String(length=36), nullable=True),
+        sa.Column('payload_hash', sa.String(length=128), nullable=False),
+        sa.Column('previous_hash', sa.String(length=128), nullable=True),
+        sa.Column('metadata', sa.JSON(), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(['actor_id'], ['users.id']),
+        sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id']),
+        sa.PrimaryKeyConstraint('id'),
+    )
+    op.create_index(op.f('ix_audit_logs_tenant_id'), 'audit_logs', ['tenant_id'], unique=False)
+
+    op.create_table(
+        'clock_records',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('idempotency_key', sa.String(length=100), nullable=False),
+        sa.Column('user_id', sa.String(length=36), nullable=False),
+        sa.Column('device_id', sa.String(length=36), nullable=True),
+        sa.Column(
+            'event_type',
+            sa.Enum('ENTRY', 'BREAK_START', 'BREAK_END', 'EXIT', name='eventtype'),
+            nullable=False,
+        ),
+        sa.Column(
+            'source',
+            sa.Enum(
+                'ONLINE', 'OFFLINE_SYNC', 'MANUAL', 'PIN', 'INTEGRATION',
+                'FINGERPRINT', 'FACIAL', 'SELFIE_GPS', 'QR_CODE', 'NFC', 'GEOLOCATION',
+                name='sourcetype',
+            ),
+            nullable=False,
+        ),
+        sa.Column(
+            'sync_status',
+            sa.Enum('SYNCED', 'PENDING', 'FAILED', name='syncstatus'),
+            nullable=False,
+        ),
+        sa.Column('recorded_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('confidence_score', sa.Numeric(precision=5, scale=4), nullable=True),
+        sa.Column('liveness_score', sa.Numeric(precision=5, scale=4), nullable=True),
+        sa.Column('geo_lat', sa.Numeric(precision=10, scale=7), nullable=True),
+        sa.Column('geo_lng', sa.Numeric(precision=10, scale=7), nullable=True),
+        sa.Column('payload', sa.JSON(), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(['device_id'], ['devices.id']),
+        sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id']),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id']),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('tenant_id', 'idempotency_key', name='uix_tenant_idempotency_key'),
+    )
+    op.create_index(op.f('ix_clock_records_tenant_id'), 'clock_records', ['tenant_id'], unique=False)
+
+    op.create_table(
+        'consents',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('user_id', sa.String(length=36), nullable=False),
+        sa.Column('term_version', sa.String(length=30), nullable=False),
+        sa.Column('consent_hash', sa.String(length=128), nullable=False),
+        sa.Column(
+            'legal_basis',
+            sa.Enum('CONSENT', 'LEGAL_OBLIGATION', 'LEGITIMATE_INTEREST', name='legalbasistype'),
+            nullable=False,
+        ),
+        sa.Column('accepted_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('revoked_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id']),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id']),
+        sa.PrimaryKeyConstraint('id'),
+    )
+    op.create_index(op.f('ix_consents_tenant_id'), 'consents', ['tenant_id'], unique=False)
+
+    op.create_table(
+        'qr_code_tokens',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('token', sa.String(length=255), nullable=False),
+        sa.Column('location_id', sa.String(length=100), nullable=True),
+        sa.Column('payload', sa.JSON(), nullable=True),
+        sa.Column('used', sa.Boolean(), nullable=False),
+        sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('used_at', sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id']),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('token'),
+    )
+    op.create_index(op.f('ix_qr_code_tokens_tenant_id'), 'qr_code_tokens', ['tenant_id'], unique=False)
+
+    op.create_table(
+        'fingerprint_templates',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('user_id', sa.String(length=36), nullable=False),
+        sa.Column('finger_type', sa.String(length=50), nullable=False),
+        sa.Column('template_base64', sa.Text(), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id']),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id']),
+        sa.PrimaryKeyConstraint('id'),
+    )
+    op.create_index(op.f('ix_fingerprint_templates_tenant_id'), 'fingerprint_templates', ['tenant_id'], unique=False)
+
+    op.create_table(
+        'integration_batches',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('provider_name', sa.String(length=100), nullable=False),
+        sa.Column('requested_by', sa.String(length=36), nullable=True),
+        sa.Column('status', sa.String(length=30), nullable=False),
+        sa.Column('total_records', sa.Integer(), nullable=False),
+        sa.Column('accepted_records', sa.Integer(), nullable=False),
+        sa.Column('rejected_records', sa.Integer(), nullable=False),
+        sa.Column('request_payload', sa.JSON(), nullable=True),
+        sa.Column('response_payload', sa.JSON(), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('finished_at', sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(['requested_by'], ['users.id']),
+        sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id']),
+        sa.PrimaryKeyConstraint('id'),
+    )
+    op.create_index(op.f('ix_integration_batches_tenant_id'), 'integration_batches', ['tenant_id'], unique=False)
+
+    op.create_table(
+        'adjustment_requests',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('user_id', sa.String(length=36), nullable=False),
+        sa.Column('clock_record_id', sa.String(length=36), nullable=True),
+        sa.Column(
+            'requested_event_type',
+            sa.Enum('ENTRY', 'BREAK_START', 'BREAK_END', 'EXIT', name='eventtype'),
+            nullable=True,
+        ),
+        sa.Column('requested_recorded_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('reason', sa.Text(), nullable=False),
+        sa.Column(
+            'status',
+            sa.Enum('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', name='adjustmentstatus'),
+            nullable=False,
+        ),
+        sa.Column('reviewer_id', sa.String(length=36), nullable=True),
+        sa.Column('review_notes', sa.Text(), nullable=True),
+        sa.Column('reviewed_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+        sa.ForeignKeyConstraint(['clock_record_id'], ['clock_records.id']),
+        sa.ForeignKeyConstraint(['reviewer_id'], ['users.id']),
+        sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id']),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id']),
+        sa.PrimaryKeyConstraint('id'),
+    )
+    op.create_index(op.f('ix_adjustment_requests_tenant_id'), 'adjustment_requests', ['tenant_id'], unique=False)
+
+    op.create_table(
+        'face_templates',
+        sa.Column('id', sa.String(length=36), nullable=False),
+        sa.Column('tenant_id', sa.String(length=36), nullable=True),
+        sa.Column('user_id', sa.String(length=36), nullable=False),
+        sa.Column('consent_id', sa.String(length=36), nullable=False),
+        sa.Column('model_version', sa.String(length=50), nullable=False),
+        sa.Column('embedding', sa.LargeBinary(), nullable=False),
+        sa.Column('quality_score', sa.Numeric(precision=5, scale=4), nullable=True),
+        sa.Column(
+            'status',
+            sa.Enum('ACTIVE', 'REVOKED', 'DELETED', name='templatestatus'),
+            nullable=False,
+        ),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('revoked_at', sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(['consent_id'], ['consents.id']),
+        sa.ForeignKeyConstraint(['tenant_id'], ['tenants.id']),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id']),
+        sa.PrimaryKeyConstraint('id'),
+    )
+    op.create_index(op.f('ix_face_templates_tenant_id'), 'face_templates', ['tenant_id'], unique=False)

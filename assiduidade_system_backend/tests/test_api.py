@@ -1,3 +1,8 @@
+import asyncio
+import uuid
+from datetime import datetime, timezone
+from uuid import UUID
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -5,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, get_db
 from app.main import app
-from app.security import get_password_hash
+from app.schemas.common import EventType, SourceType, TemplateStatus
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test_faceclock.db"
 
@@ -13,11 +18,18 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+def _clean_qr_store():
+    from app.routers.methods import _qr_store
+    _qr_store.clear()
+
+
 @pytest.fixture(autouse=True)
 def setup_and_teardown_db():
+    _clean_qr_store()
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+    _clean_qr_store()
 
 
 @pytest.fixture
@@ -44,53 +56,40 @@ def client(db_session):
 
 
 @pytest.fixture
-def admin_user(db_session):
-    from app.models import User
-    from app.schemas.common import UserRole, UserStatus
+def admin_headers():
+    return {"X-Auth-User-Id": "admin-erp-42", "X-Auth-User-Role": "ADMIN_SISTEMA"}
 
-    user = User(
-        employee_code="TESTADM",
-        full_name="Test Admin",
-        email="testadmin@faceclock.local",
-        password_hash=get_password_hash("admin123"),
-        role=UserRole.ADMIN_SISTEMA,
-        status=UserStatus.ACTIVE,
+
+@pytest.fixture
+def collab_headers():
+    return {"X-Auth-User-Id": "collab-erp-99", "X-Auth-User-Role": "COLABORADOR"}
+
+
+@pytest.fixture
+def erp_user_id():
+    return "erp-user-123"
+
+
+@pytest.fixture
+def sample_face_template(db_session, erp_user_id):
+    from app.models import FaceTemplate
+    from app.services.biometric import serialize_embedding
+
+    template = FaceTemplate(
+        tenant_id=None,
+        erp_user_id=erp_user_id,
+        erp_funcionario_id=None,
+        model_version="test-v1",
+        embedding=serialize_embedding([0.1] * 512),
+        quality_score=0.9,
+        status=TemplateStatus.ACTIVE,
     )
-    db_session.add(user)
+    db_session.add(template)
     db_session.commit()
-    db_session.refresh(user)
-    return user
+    db_session.refresh(template)
+    return template
 
 
-@pytest.fixture
-def admin_headers(admin_user):
-    """Identidade do chamador, informada por quem autenticou (ERP), nao por token.
-    Este servico confia no cabecalho X-User-Id/X-User-Role."""
-    return {"X-User-Id": admin_user.id, "X-User-Role": "ADMIN_SISTEMA"}
-
-
-@pytest.fixture
-def collab_user(db_session):
-    from app.models import User
-    from app.schemas.common import UserRole, UserStatus
-
-    user = User(
-        employee_code="TESTCOL",
-        full_name="Test Colaborador",
-        email="testcol@faceclock.local",
-        password_hash=get_password_hash("colab123"),
-        role=UserRole.COLABORADOR,
-        status=UserStatus.ACTIVE,
-    )
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
-    return user
-
-
-@pytest.fixture
-def collab_headers(collab_user):
-    return {"X-User-Id": collab_user.id, "X-User-Role": "COLABORADOR"}
 
 
 # ============================================================
@@ -106,361 +105,285 @@ class TestHealthCheck:
 
 
 # ============================================================
-# TESTES: Units CRUD
-# ============================================================
-class TestUnitsCRUD:
-    def test_create_unit(self, client, admin_headers):
-        response = client.post(
-            "/api/v1/admin/units",
-            json={"code": "TEST01", "name": "Test Unit"},
-            headers=admin_headers,
-        )
-        assert response.status_code == 201
-        data = response.json()
-        assert data["code"] == "TEST01"
-        assert data["active"] is True
-
-    def test_create_unit_duplicate_code(self, client, admin_headers):
-        client.post(
-            "/api/v1/admin/units",
-            json={"code": "DUP01", "name": "First"},
-            headers=admin_headers,
-        )
-        response = client.post(
-            "/api/v1/admin/units",
-            json={"code": "DUP01", "name": "Second"},
-            headers=admin_headers,
-        )
-        assert response.status_code == 409
-
-    def test_list_units(self, client, admin_headers):
-        client.post(
-            "/api/v1/admin/units",
-            json={"code": "LIST01", "name": "List Unit"},
-            headers=admin_headers,
-        )
-        response = client.get("/api/v1/admin/units", headers=admin_headers)
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total"] >= 1
-
-    def test_update_unit(self, client, admin_headers):
-        create_resp = client.post(
-            "/api/v1/admin/units",
-            json={"code": "UPD01", "name": "Update Me"},
-            headers=admin_headers,
-        )
-        unit_id = create_resp.json()["id"]
-
-        response = client.patch(
-            f"/api/v1/admin/units/{unit_id}",
-            json={"name": "Updated Name"},
-            headers=admin_headers,
-        )
-        assert response.status_code == 200
-        assert response.json()["name"] == "Updated Name"
-
-    def test_deactivate_unit(self, client, admin_headers):
-        create_resp = client.post(
-            "/api/v1/admin/units",
-            json={"code": "DEL01", "name": "Delete Me"},
-            headers=admin_headers,
-        )
-        unit_id = create_resp.json()["id"]
-
-        response = client.delete(
-            f"/api/v1/admin/units/{unit_id}",
-            headers=admin_headers,
-        )
-        assert response.status_code == 204
-
-
-# ============================================================
-# TESTES: Users CRUD
-# ============================================================
-class TestUsersCRUD:
-    def test_create_user(self, client, admin_headers):
-        response = client.post(
-            "/api/v1/admin/users",
-            json={
-                "employee_code": "NEWUSER",
-                "full_name": "New User",
-                "email": "newuser@test.com",
-                "password": "password123",
-            },
-            headers=admin_headers,
-        )
-        assert response.status_code == 201
-        data = response.json()
-        assert data["employee_code"] == "NEWUSER"
-
-    def test_create_user_duplicate_code(self, client, admin_headers, admin_user):
-        response = client.post(
-            "/api/v1/admin/users",
-            json={
-                "employee_code": "TESTADM",
-                "full_name": "Duplicate",
-                "password": "pass123",
-            },
-            headers=admin_headers,
-        )
-        assert response.status_code == 409
-
-    def test_list_users(self, client, admin_headers):
-        response = client.get("/api/v1/admin/users", headers=admin_headers)
-        assert response.status_code == 200
-        assert response.json()["total"] >= 1
-
-    def test_update_user_password(self, client, admin_headers, collab_user):
-        response = client.patch(
-            f"/api/v1/admin/users/{collab_user.id}",
-            json={"password": "newpassword456"},
-            headers=admin_headers,
-        )
-        assert response.status_code == 200
-
-    def test_deactivate_user(self, client, admin_headers, collab_user):
-        response = client.delete(
-            f"/api/v1/admin/users/{collab_user.id}",
-            headers=admin_headers,
-        )
-        assert response.status_code == 204
-
-
-# ============================================================
-# TESTES: Devices CRUD
-# ============================================================
-class TestDevicesCRUD:
-    def test_create_device(self, client, admin_headers):
-        response = client.post(
-            "/api/v1/admin/devices",
-            json={
-                "device_code": "DEV001",
-                "display_name": "Device 001",
-                "type": "TOTEM",
-            },
-            headers=admin_headers,
-        )
-        assert response.status_code == 201
-        data = response.json()
-        assert data["device_code"] == "DEV001"
-
-    def test_create_device_duplicate_code(self, client, admin_headers):
-        client.post(
-            "/api/v1/admin/devices",
-            json={"device_code": "DUPDEV", "display_name": "First", "type": "WEB"},
-            headers=admin_headers,
-        )
-        response = client.post(
-            "/api/v1/admin/devices",
-            json={"device_code": "DUPDEV", "display_name": "Second", "type": "WEB"},
-            headers=admin_headers,
-        )
-        assert response.status_code == 409
-
-
-# ============================================================
-# TESTES: Consents
+# TESTES: Consents (apenas efeito local nos templates)
 # ============================================================
 class TestConsents:
-    def test_create_consent(self, client, admin_headers, collab_user):
-        response = client.post(
-            "/api/v1/consents",
-            json={
-                "user_id": collab_user.id,
-                "term_version": "1.0.0",
-                "consent_hash": "abc123def456",
-                "accepted_at": "2026-01-01T00:00:00Z",
-            },
-            headers=admin_headers,
-        )
-        assert response.status_code == 201
-
-    def test_revoke_consent(self, client, admin_headers, collab_user):
-        client.post(
-            "/api/v1/consents",
-            json={
-                "user_id": collab_user.id,
-                "term_version": "1.0.0",
-                "consent_hash": "revoke123",
-                "accepted_at": "2026-01-01T00:00:00Z",
-            },
-            headers=admin_headers,
-        )
-        response = client.post(
-            f"/api/v1/consents/users/{collab_user.id}/revoke",
-            headers=admin_headers,
-        )
-        assert response.status_code == 200
-        assert response.json()["revoked_at"] is not None
-
-
-# ============================================================
-# TESTES: Biometric
-# ============================================================
-class TestBiometric:
-    def test_enroll_rejects_capture_with_low_liveness(
-        self,
-        client,
-        admin_headers,
-        collab_user,
-        monkeypatch,
+    def test_revoke_consent_deactivates_face_templates(
+        self, client, admin_headers, erp_user_id, sample_face_template, db_session
     ):
-        client.post(
-            "/api/v1/consents",
-            json={
-                "user_id": collab_user.id,
-                "term_version": "1.0.0",
-                "consent_hash": "bio-consent-123",
-                "accepted_at": "2026-01-01T00:00:00Z",
-            },
+        response = client.post(
+            f"/api/v1/consents/users/{erp_user_id}/revoke",
             headers=admin_headers,
-        )
-
-        monkeypatch.setattr(
-            "app.routers.biometric.assess_capture_quality",
-            lambda _: (0.95, None),
-        )
-        monkeypatch.setattr(
-            "app.routers.biometric.build_embedding",
-            lambda _: [0.1] * 512,
-        )
-        monkeypatch.setattr(
-            "app.routers.biometric.estimate_liveness",
-            lambda _, quality_score=None: 0.10,
-        )
-
-        response = client.post(
-            "/api/v1/biometric/enroll",
-            json={
-                "user_id": collab_user.id,
-                "captures": [
-                    {"image_base64": "aGVsbG8="},
-                    {"image_base64": "d29ybGQ="},
-                    {"image_base64": "dGVzdA=="},
-                ],
-            },
-            headers=admin_headers,
-        )
-
-        assert response.status_code == 400
-        assert "liveness_failed" in response.json()["detail"]
-
-
-# ============================================================
-# TESTES: Clock Records
-# ============================================================
-class TestClockRecords:
-    def test_register_clock(self, client, collab_headers, collab_user):
-        response = client.post(
-            "/api/v1/clock/register",
-            json={
-                "idempotency_key": "test-001",
-                "user_id": collab_user.id,
-                "device_id": "00000000-0000-0000-0000-000000000000",
-                "event_type": "ENTRY",
-                "recorded_at": "2026-04-13T08:00:00Z",
-                "source": "ONLINE",
-            },
-            headers=collab_headers,
-        )
-        assert response.status_code == 201
-        data = response.json()
-        assert data["event_type"] == "ENTRY"
-
-    def test_register_duplicate_idempotent(self, client, collab_headers, collab_user):
-        client.post(
-            "/api/v1/clock/register",
-            json={
-                "idempotency_key": "dup-key-001",
-                "user_id": collab_user.id,
-                "device_id": "00000000-0000-0000-0000-000000000000",
-                "event_type": "ENTRY",
-                "recorded_at": "2026-04-13T08:00:00Z",
-                "source": "ONLINE",
-            },
-            headers=collab_headers,
-        )
-        response = client.post(
-            "/api/v1/clock/register",
-            json={
-                "idempotency_key": "dup-key-001",
-                "user_id": collab_user.id,
-                "device_id": "00000000-0000-0000-0000-000000000000",
-                "event_type": "ENTRY",
-                "recorded_at": "2026-04-13T08:00:00Z",
-                "source": "ONLINE",
-            },
-            headers=collab_headers,
-        )
-        assert response.status_code == 409
-
-    def test_get_my_clock_records(self, client, collab_headers, collab_user):
-        response = client.get(
-            "/api/v1/clock/me",
-            params={"user_id": collab_user.id},
-            headers=collab_headers,
         )
         assert response.status_code == 200
-        assert "items" in response.json()
+        db_session.refresh(sample_face_template)
+        assert sample_face_template.status == TemplateStatus.REVOKED
 
+    def test_delete_biometric_data_removes_templates(
+        self, client, admin_headers, erp_user_id, db_session
+    ):
+        from app.models import FaceTemplate, FingerprintTemplate
+        from app.services.biometric import serialize_embedding
 
-# ============================================================
-# TESTES: Adjustment Requests
-# ============================================================
-class TestAdjustments:
-    def test_request_adjustment(self, client, collab_headers, collab_user):
-        response = client.post(
-            "/api/v1/clock/adjustments",
-            params={"user_id": collab_user.id},
-            json={
-                "requested_recorded_at": "2026-04-13T08:00:00Z",
-                "reason": "Esqueci de bater ponto",
-            },
-            headers=collab_headers,
+        face = FaceTemplate(
+            tenant_id=None,
+            erp_user_id=erp_user_id,
+            model_version="test-v1",
+            embedding=serialize_embedding([0.2] * 512),
         )
-        assert response.status_code == 201
-        data = response.json()
-        assert data["status"] == "PENDING"
-
-    def test_cancel_adjustment(self, client, collab_headers, collab_user):
-        create_resp = client.post(
-            "/api/v1/clock/adjustments",
-            params={"user_id": collab_user.id},
-            json={
-                "requested_recorded_at": "2026-04-14T08:00:00Z",
-                "reason": "Cancel test",
-            },
-            headers=collab_headers,
+        finger = FingerprintTemplate(
+            tenant_id=None,
+            erp_user_id=erp_user_id,
+            finger_type="right_thumb",
+            template_base64="dGVzdA==",
         )
-        adj_id = create_resp.json()["id"]
+        db_session.add_all([face, finger])
+        db_session.commit()
 
         response = client.delete(
-            f"/api/v1/clock/adjustments/{adj_id}",
-            params={"user_id": collab_user.id},
-            headers=collab_headers,
+            f"/api/v1/consents/users/{erp_user_id}/biometric-data",
+            headers=admin_headers,
         )
         assert response.status_code == 204
+        assert db_session.query(FaceTemplate).count() == 0
+        assert db_session.query(FingerprintTemplate).count() == 0
 
 
 # ============================================================
-# TESTES: Audit Logs
+# TESTES: Fingerprint
 # ============================================================
-class TestAuditLogs:
-    def test_list_audit_logs(self, client, admin_headers):
-        response = client.get("/api/v1/audit/logs", headers=admin_headers)
+class TestFingerprint:
+    def test_enroll_and_identify(self, client, admin_headers, erp_user_id):
+        response = client.post(
+            "/api/v1/fingerprint/enroll",
+            json={
+                "user_id": erp_user_id,
+                "finger_type": "right_thumb",
+                "template_base64": "dGVzdDE=",
+            },
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+
+        response = client.post(
+            "/api/v1/fingerprint/identify",
+            json={"template_base64": "dGVzdDE="},
+            headers=admin_headers,
+        )
         assert response.status_code == 200
         data = response.json()
-        assert "items" in data
-        assert "total" in data
+        assert data["success"] is True
+        assert data["user_id"] == erp_user_id
 
-
-# ============================================================
-# TESTES: Metrics
-# ============================================================
-class TestMetrics:
-    def test_metrics_endpoint(self, client):
-        response = client.get("/metrics")
+    def test_delete_fingerprint_enrollment(self, client, admin_headers, erp_user_id):
+        client.post(
+            "/api/v1/fingerprint/enroll",
+            json={
+                "user_id": erp_user_id,
+                "finger_type": "right_thumb",
+                "template_base64": "dGVzdDE=",
+            },
+            headers=admin_headers,
+        )
+        response = client.delete(
+            f"/api/v1/fingerprint/enroll/{erp_user_id}",
+            headers=admin_headers,
+        )
         assert response.status_code == 200
-        assert response.headers["content-type"] == "text/plain; charset=utf-8"
-        assert "http_requests_total" in response.text
+        assert response.json()["success"] is True
+
+
+# ============================================================
+# TESTES: QR Code (em memoria)
+# ============================================================
+class TestQRCode:
+    def test_generate_and_validate_qr(self, client, admin_headers):
+        response = client.post(
+            "/api/v1/qr/generate",
+            json={"location_id": "sala-1", "session_duration_seconds": 60},
+            headers=admin_headers,
+        )
+        assert response.status_code == 201
+        data = response.json()
+        qr_code = data["qr_code"]
+
+        response = client.post(
+            "/api/v1/qr/validate",
+            json={"qr_code": qr_code},
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        assert response.json()["valid"] is True
+
+    def test_validate_used_qr_fails(self, client, admin_headers):
+        response = client.post(
+            "/api/v1/qr/generate",
+            json={"session_duration_seconds": 60},
+            headers=admin_headers,
+        )
+        qr_code = response.json()["qr_code"]
+
+        client.post(
+            "/api/v1/qr/validate",
+            json={"qr_code": qr_code},
+            headers=admin_headers,
+        )
+        response = client.post(
+            "/api/v1/qr/validate",
+            json={"qr_code": qr_code},
+            headers=admin_headers,
+        )
+        assert response.status_code == 400
+
+
+# ============================================================
+# TESTES: Biometric (mockado)
+# ============================================================
+class TestBiometric:
+    def test_enroll_and_verify_with_mocked_pipeline(
+        self, client, admin_headers, monkeypatch
+    ):
+        from app.routers import biometric as biometric_router
+
+        fixed_embedding = [0.5] * 512
+        user_uuid = str(uuid.uuid4())
+
+        monkeypatch.setattr(biometric_router, "assess_capture_quality", lambda _: (0.95, None))
+        monkeypatch.setattr(biometric_router, "build_embedding", lambda _: fixed_embedding)
+        monkeypatch.setattr(biometric_router, "estimate_liveness", lambda _, **kw: 0.95)
+
+        captures = [{"image_base64": "fake", "angle": "front"} for _ in range(3)]
+        response = client.post(
+            "/api/v1/biometric/enroll",
+            json={"user_id": user_uuid, "captures": captures},
+            headers=admin_headers,
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["user_id"] == user_uuid
+        assert data["status"] == TemplateStatus.ACTIVE
+
+        response = client.post(
+            "/api/v1/biometric/verify",
+            json={
+                "user_id": user_uuid,
+                "device_id": str(uuid.uuid4()),
+                "image_base64": "fake",
+            },
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["match"] is True
+        assert data["user_id"] == user_uuid
+
+    def test_verify_without_enrollment_returns_not_enrolled(
+        self, client, admin_headers, monkeypatch
+    ):
+        from app.routers import biometric as biometric_router
+
+        user_uuid = str(uuid.uuid4())
+
+        monkeypatch.setattr(biometric_router, "assess_capture_quality", lambda _: (0.95, None))
+        monkeypatch.setattr(biometric_router, "build_embedding", lambda _: [0.5] * 512)
+        monkeypatch.setattr(biometric_router, "estimate_liveness", lambda _, **kw: 0.95)
+
+        response = client.post(
+            "/api/v1/biometric/verify",
+            json={
+                "user_id": user_uuid,
+                "device_id": str(uuid.uuid4()),
+                "image_base64": "fake",
+            },
+            headers=admin_headers,
+        )
+        assert response.status_code == 200
+        assert response.json()["reason"] == "user_not_enrolled"
+
+
+# ============================================================
+# TESTES: Attendance Config (proxy ERP)
+# ============================================================
+class TestAttendanceConfig:
+    def test_get_tenant_attendance_config_erp_unavailable(self, client, admin_headers, monkeypatch):
+        from app.erp_client import ERPUnavailableError
+        from app.routers import attendance_config
+
+        async def fail():
+            raise ERPUnavailableError("ERP offline")
+
+        monkeypatch.setattr(attendance_config, "_get_config_cached", lambda: fail())
+        response = client.get("/api/v1/tenant/attendance-config", headers=admin_headers)
+        assert response.status_code == 503
+
+
+# ============================================================
+# TESTES: Metodos delegados / obsoletos
+# ============================================================
+class TestDelegatedOrObsoleteEndpoints:
+    def test_clock_sync_is_gone(self, client, admin_headers):
+        response = client.post("/api/v1/clock/sync", json={"record_ids": []}, headers=admin_headers)
+        assert response.status_code == 410
+
+    def test_audit_logs_is_not_implemented(self, client, admin_headers):
+        response = client.get("/api/v1/audit/logs", headers=admin_headers)
+        assert response.status_code == 501
+
+    def test_consents_create_is_not_implemented(self, client, admin_headers):
+        response = client.post(
+            "/api/v1/consents",
+            json={
+                "user_id": str(uuid.uuid4()),
+                "term_version": "1",
+                "consent_hash": "abc",
+                "accepted_at": "2026-01-01T00:00:00Z",
+            },
+            headers=admin_headers,
+        )
+        assert response.status_code == 501
+
+
+# ============================================================
+# TESTES: ERP Client
+# ============================================================
+class TestErpClientBatch:
+    def test_send_attendance_events_batch_empty_list_short_circuits(self):
+        from app.erp_client import ERPClient
+
+        client = ERPClient()
+        client.base_url = "http://erp.invalido.local"
+        result = asyncio.run(client.send_attendance_events_batch([]))
+        assert result == {"total": 0, "processed": 0, "failed": 0, "results": []}
+
+    def test_send_attendance_events_batch_rejects_over_100(self):
+        from app.erp_client import ERPClient
+
+        client = ERPClient()
+        client.base_url = "http://erp.invalido.local"
+        with pytest.raises(ValueError):
+            asyncio.run(client.send_attendance_events_batch([{"EmployeeNo": "x"}] * 101))
+
+
+# ============================================================
+# TESTES: ERP Attendance Forwarder
+# ============================================================
+class TestErpAttendanceForwarderPayload:
+    def test_build_clock_event_payload(self):
+        from datetime import datetime
+        from app.services.erp_attendance_forwarder import build_clock_event_payload
+
+        dt = datetime.now(timezone.utc)
+        user_id = UUID("12345678-1234-5678-1234-567812345678")
+        payload = build_clock_event_payload(
+            user_id=user_id,
+            employee_code="EMP001",
+            device_code="TOTEM-01",
+            event_type=EventType.ENTRY,
+            recorded_at=dt,
+            source=SourceType.FACIAL,
+        )
+        assert payload["device_serial"] == "TOTEM-01"
+        assert payload["employee_no"] == "EMP001"
+        assert payload["direction"] == "in"
+        assert payload["credential_type"] == "face"

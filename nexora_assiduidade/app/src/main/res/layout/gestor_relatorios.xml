@@ -27,4 +27,16 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tvRelatoriosTitle" />
 
+    <TextView
+        android:id="@+id/tvRelatoriosEmpty"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="24dp"
+        android:text="Sem dados de relatório."
+        android:textColor="@color/text_muted"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvRelatoriosTitle" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

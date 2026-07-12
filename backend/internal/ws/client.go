@@ -47,6 +47,7 @@ type Incoming struct {
 	Conteudo     string `json:"conteudo"`
 	TipoMensagem string `json:"tipo_mensagem"`
 	NotifID      int64  `json:"notif_id"`
+	ClientID     string `json:"client_id"`
 }
 
 // ServeWS faz o upgrade HTTP → WebSocket e inicia as goroutines de I/O.
@@ -198,8 +199,23 @@ func (c *Client) handleIncoming(raw []byte) {
 			c.send <- encode(EvtError, "sem acesso a esta conversa")
 			return
 		}
-		msgID := c.persistMessage(inc.ConversaID, inc.Conteudo)
-		if msgID == 0 { return }
+
+		msgID := c.persistMessage(inc.ConversaID, inc.Conteudo, inc.ClientID)
+		if msgID == 0 {
+			c.send <- encode(EvtError, "falha ao guardar mensagem")
+			return
+		}
+
+		// ACK directo ao remetente (confirma que o servidor persistiu)
+		if inc.ClientID != "" {
+			select {
+			case c.send <- encode(EvtMessageAck, map[string]any{
+				"client_id": inc.ClientID,
+				"id":        msgID,
+			}):
+			default:
+			}
+		}
 
 		// Buscar nome do autor
 		var autorNome string
@@ -215,6 +231,7 @@ func (c *Client) handleIncoming(raw []byte) {
 			"tipo":         "texto",
 			"created_at":   time.Now().UTC().Format(time.RFC3339),
 			"minha":        false,
+			"client_id":    inc.ClientID,
 		}
 		msg := encode(EvtMessage, payload)
 		c.hub.BroadcastRoom(inc.ConversaID, msg)
@@ -266,11 +283,29 @@ func (c *Client) isParticipant(conversaID int64) bool {
 	return ok
 }
 
-func (c *Client) persistMessage(conversaID int64, conteudo string) int64 {
+func (c *Client) persistMessage(conversaID int64, conteudo string, clientID string) int64 {
 	var id int64
-	c.db.QueryRow(context.Background(), `
+	if clientID != "" {
+		// Deduplicação: se o client_id já existir, devolve o id existente.
+		err := c.db.QueryRow(context.Background(), `
+			INSERT INTO chat_mensagens (conversa_id, autor_id, conteudo, tipo, client_id)
+			VALUES ($1,$2,$3,'texto',$4)
+			ON CONFLICT (conversa_id, client_id) DO UPDATE SET conteudo = EXCLUDE.conteudo
+			RETURNING id`,
+			conversaID, c.UserID, conteudo, clientID).Scan(&id)
+		if err != nil {
+			log.Printf("[ws] persistMessage error: %v", err)
+			return 0
+		}
+		return id
+	}
+	err := c.db.QueryRow(context.Background(), `
 		INSERT INTO chat_mensagens (conversa_id, autor_id, conteudo, tipo)
 		VALUES ($1,$2,$3,'texto') RETURNING id`,
 		conversaID, c.UserID, conteudo).Scan(&id)
+	if err != nil {
+		log.Printf("[ws] persistMessage error: %v", err)
+		return 0
+	}
 	return id
 }

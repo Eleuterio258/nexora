@@ -1,0 +1,111 @@
+services:
+
+  # ── API Go (backend) ──────────────────────────────────────────
+  api:
+    build: ./backend
+    container_name: nexora-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD}@nexora-db:5432/nexora_erp?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      PORT: 8080
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://nexora.e258tech.tech}
+      UPLOADS_DIR: ./uploads
+      AVATAR_DIR: ./avatars
+      GATEWAY_WEBHOOK_SECRET: ${GATEWAY_WEBHOOK_SECRET:-}
+      # Nexora-Pay corre como serviço externo independente
+      NEXORA_PAY_BASE_URL: ${NEXORA_PAY_BASE_URL:-https://pay.e258tech.tech}
+      NEXORA_PAY_API_KEY: ${NEXORA_PAY_API_KEY}
+      NEXORA_PAY_SERVICE_ACCOUNT: ${NEXORA_PAY_SERVICE_ACCOUNT:-gestao-escolar}
+    volumes:
+      - api_uploads:/app/uploads
+      - api_avatars:/app/avatars
+    networks:
+      - e258techmozambique
+    labels:
+      - "traefik.enable=true"
+      # HTTPS — api.nexora.e258tech.tech
+      - "traefik.http.routers.nexora-api.rule=Host(`api.nexora.e258tech.tech`)"
+      - "traefik.http.routers.nexora-api.entrypoints=websecure"
+      - "traefik.http.routers.nexora-api.tls=true"
+      - "traefik.http.routers.nexora-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.nexora-api.loadbalancer.server.port=8080"
+      # Redirect HTTP → HTTPS
+      - "traefik.http.routers.nexora-api-http.rule=Host(`api.nexora.e258tech.tech`)"
+      - "traefik.http.routers.nexora-api-http.entrypoints=web"
+      - "traefik.http.routers.nexora-api-http.middlewares=e258tech-https"
+      - "traefik.http.middlewares.e258tech-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.e258tech-https.redirectscheme.permanent=true"
+
+  # ── Frontend PHP ──────────────────────────────────────────────
+  web:
+    build: ./frontend
+    container_name: nexora-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      NEXORA_API_URL: http://nexora-api:8080
+      # URL público da API, alcançável pelo browser (Socket.IO liga-se
+      # directamente ao Go, sem passar pelo proxy PHP) — diferente do
+      # NEXORA_API_URL acima, que é só para as chamadas server-to-server.
+      NEXORA_PUBLIC_API_URL: ${NEXORA_PUBLIC_API_URL:-https://api.nexora.e258tech.tech}
+    volumes:
+      - web_uploads:/var/www/html/uploads
+    networks:
+      - e258techmozambique
+    labels:
+      - "traefik.enable=true"
+      # HTTPS — e258tech.tech
+      - "traefik.http.routers.e258tech.rule=Host(`e258tech.tech`)"
+      - "traefik.http.routers.e258tech.entrypoints=websecure"
+      - "traefik.http.routers.e258tech.tls=true"
+      - "traefik.http.routers.e258tech.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.e258tech.middlewares=e258tech-sec"
+      - "traefik.http.services.e258tech.loadbalancer.server.port=80"
+      # ── Cabeçalhos de segurança ──────────────────────────────
+      - "traefik.http.middlewares.e258tech-sec.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.e258tech-sec.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.e258tech-sec.headers.contentTypeNosniff=true"
+      - "traefik.http.middlewares.e258tech-sec.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.e258tech-sec.headers.customFrameOptionsValue=SAMEORIGIN"
+      - "traefik.http.middlewares.e258tech-sec.headers.referrerPolicy=strict-origin-when-cross-origin"
+      - "traefik.http.middlewares.e258tech-sec.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.nexora.e258tech.tech;"
+      - "traefik.http.middlewares.e258tech-sec.headers.customResponseHeaders.X-Powered-By="
+      - "traefik.http.middlewares.e258tech-sec.headers.customResponseHeaders.Server="
+      # Redirect HTTP → HTTPS (domínio principal)
+      - "traefik.http.routers.e258tech-http.rule=Host(`e258tech.tech`)"
+      - "traefik.http.routers.e258tech-http.entrypoints=web"
+      - "traefik.http.routers.e258tech-http.middlewares=e258tech-https"
+      # ── Subdomínio nexora.e258tech.tech (área autenticada ERP) ──
+      - "traefik.http.routers.nexora.rule=Host(`nexora.e258tech.tech`)"
+      - "traefik.http.routers.nexora.entrypoints=websecure"
+      - "traefik.http.routers.nexora.tls=true"
+      - "traefik.http.routers.nexora.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nexora.service=e258tech"
+      - "traefik.http.routers.nexora.middlewares=nexora-rootredir,e258tech-sec"
+      - "traefik.http.middlewares.nexora-rootredir.redirectregex.regex=^https://nexora\\.e258tech\\.tech/?$$"
+      - "traefik.http.middlewares.nexora-rootredir.redirectregex.replacement=https://nexora.e258tech.tech/nexora/"
+      - "traefik.http.middlewares.nexora-rootredir.redirectregex.permanent=false"
+      # Redirect HTTP → HTTPS (subdomínio nexora)
+      - "traefik.http.routers.nexora-http.rule=Host(`nexora.e258tech.tech`)"
+      - "traefik.http.routers.nexora-http.entrypoints=web"
+      - "traefik.http.routers.nexora-http.middlewares=e258tech-https"
+
+# ── Volumes ───────────────────────────────────────────────────
+volumes:
+  api_uploads:
+    driver: local
+  api_avatars:
+    driver: local
+  web_uploads:
+    driver: local
+
+# ── Redes ─────────────────────────────────────────────────────
+networks:
+  e258techmozambique:
+    external: true

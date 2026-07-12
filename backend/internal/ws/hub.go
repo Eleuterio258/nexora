@@ -8,6 +8,7 @@ import (
 // Event types enviados ao cliente
 const (
 	EvtMessage           = "message"
+	EvtMessageAck        = "message_ack"
 	EvtTyping            = "typing"
 	EvtStopTyping        = "stop_typing"
 	EvtJoined            = "joined"

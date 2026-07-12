@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/gestorBottomNav"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/surface"
+    android:orientation="horizontal"
+    android:elevation="6dp"
+    android:paddingTop="1dp">
+
+    <LinearLayout
+        android:id="@+id/navGestorDashboard"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:id="@+id/navGestorDashboardIcon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:contentDescription="Dashboard"
+            android:src="@drawable/ic_nav_home" />
+
+        <TextView
+            android:id="@+id/navGestorDashboardLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Dashboard"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/navGestorEquipa"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:id="@+id/navGestorEquipaIcon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:contentDescription="Equipa"
+            android:src="@drawable/ic_nav_profile" />
+
+        <TextView
+            android:id="@+id/navGestorEquipaLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Equipa"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/navGestorFerias"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:id="@+id/navGestorFeriasIcon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:contentDescription="Férias"
+            android:src="@drawable/ic_nav_vacation" />
+
+        <TextView
+            android:id="@+id/navGestorFeriasLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Férias"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/navGestorRelatorios"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:id="@+id/navGestorRelatoriosIcon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:contentDescription="Relatórios"
+            android:src="@drawable/ic_nav_modules" />
+
+        <TextView
+            android:id="@+id/navGestorRelatoriosLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Relatórios"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/navGestorMais"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:id="@+id/navGestorMaisIcon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:contentDescription="Mais"
+            android:src="@drawable/ic_nav_more" />
+
+        <TextView
+            android:id="@+id/navGestorMaisLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Mais"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+</LinearLayout>

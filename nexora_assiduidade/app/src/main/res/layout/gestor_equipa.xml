@@ -27,4 +27,16 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tvEquipaTitle" />
 
+    <TextView
+        android:id="@+id/tvEquipaEmpty"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="24dp"
+        android:text="Sem funcionários para mostrar."
+        android:textColor="@color/text_muted"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvEquipaTitle" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
