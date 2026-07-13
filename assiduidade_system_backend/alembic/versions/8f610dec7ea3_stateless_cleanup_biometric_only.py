@@ -16,6 +16,14 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Drop child tables that hold FKs first so parent drops don't fail
+    # (face_templates.consent_id -> consents, etc.)
+    op.drop_table('face_templates', if_exists=True)
+    op.drop_table('fingerprint_templates', if_exists=True)
+    # Postgres enum types are not dropped with the table; remove it so the
+    # face_templates recreation below can create it fresh (idempotent).
+    op.execute('DROP TYPE IF EXISTS templatestatus')
+
     # Drop all non-biometric tables and their dependencies
     op.drop_table('adjustment_requests', if_exists=True)
     op.drop_table('integration_batches', if_exists=True)
@@ -29,7 +37,6 @@ def upgrade() -> None:
     op.drop_table('tenants', if_exists=True)
 
     # Recreate face_templates without FKs and with erp references
-    op.drop_table('face_templates', if_exists=True)
     op.create_table(
         'face_templates',
         sa.Column('id', sa.String(length=36), nullable=False),
@@ -54,7 +61,6 @@ def upgrade() -> None:
     op.create_index(op.f('ix_face_templates_erp_funcionario_id'), 'face_templates', ['erp_funcionario_id'], unique=False)
 
     # Recreate fingerprint_templates without FKs and with erp references
-    op.drop_table('fingerprint_templates', if_exists=True)
     op.create_table(
         'fingerprint_templates',
         sa.Column('id', sa.String(length=36), nullable=False),
