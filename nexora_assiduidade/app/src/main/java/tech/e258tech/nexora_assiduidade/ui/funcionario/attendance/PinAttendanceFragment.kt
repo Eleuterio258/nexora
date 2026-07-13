@@ -24,13 +24,17 @@ import tech.e258tech.nexora_assiduidade.data.repository.AttendanceRepository
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.Constants
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
+import tech.e258tech.nexora_assiduidade.utils.RoleUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
  * Tela de registo de presenca por PIN.
  *
  * O utilizador seleciona Entrada/Saida, digita o PIN e o codigo e validado
- * no backend via /authcode/pin/validate. Se valido, regista o ponto.
+ * directamente no Nexora ERP via POST /api/authcode/pin/validate (deixou de
+ * passar pelo proxy do FaceClock em 2026-07-12) — devolve um login completo
+ * (tokens+utilizador), tal como /api/auth/login, por isso a sessao e
+ * actualizada com o resultado antes de registar o ponto.
  */
 class PinAttendanceFragment : Fragment() {
 
@@ -90,9 +94,8 @@ class PinAttendanceFragment : Fragment() {
     }
 
     private fun validatePinAndRegister(pin: String, eventType: String) {
-        val userId = sessionManager.getUserId()
-        val token = sessionManager.getToken()
-        if (userId.isNullOrBlank() || token.isNullOrBlank()) {
+        val email = sessionManager.getUserEmail()
+        if (email.isNullOrBlank()) {
             Toast.makeText(context, "Sessao invalida. Faca login novamente.", Toast.LENGTH_LONG).show()
             return
         }
@@ -102,13 +105,22 @@ class PinAttendanceFragment : Fragment() {
         uiScope.launch {
             val validateResult: Pair<Boolean, String?> = withContext(Dispatchers.IO) {
                 try {
-                    val response = RetrofitClient.assiduidadeApiService.validatePin(
-                        ApiUtils.bearerToken(token),
-                        PinValidateRequest(user_id = userId, pin = pin)
+                    val response = RetrofitClient.erpApiService.validatePin(
+                        PinValidateRequest(email = email, pin = pin)
                     )
                     if (response.isSuccessful && response.body() != null) {
-                        val body = response.body()!!
-                        body.valid to body.message
+                        val payload = response.body()!!
+                        val role = RoleUtils.fromErpLogin(payload.tipo, payload.modulos)
+                        sessionManager.saveSession(
+                            token = payload.access_token,
+                            refreshToken = payload.refresh_token,
+                            userId = payload.user.id.toString(),
+                            userName = payload.user.nome,
+                            userEmail = payload.user.email,
+                            userRole = role,
+                            employeeCode = payload.user.email
+                        )
+                        true to null
                     } else {
                         false to ApiUtils.errorMessage(response)
                     }
@@ -123,6 +135,12 @@ class PinAttendanceFragment : Fragment() {
             if (!valid) {
                 btnValidatePin.isEnabled = true
                 Toast.makeText(context, message ?: "PIN invalido.", Toast.LENGTH_LONG).show()
+                return@launch
+            }
+
+            val userId = sessionManager.getUserId() ?: run {
+                btnValidatePin.isEnabled = true
+                Toast.makeText(context, "Sessao invalida apos validacao do PIN.", Toast.LENGTH_LONG).show()
                 return@launch
             }
 

@@ -1,0 +1,40 @@
+# Ignorar node_modules em TODOS os projetos
+node_modules/
+**/node_modules/
+
+# dependencias
+bower_components/
+jspm_packages/
+
+# Pastas de build
+dist/
+build/
+out/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Arquivos temporarios
+*.tmp
+*.temp
+.cache/
+
+# Variaveis de ambiente
+.env
+.env.local
+.env.*.local

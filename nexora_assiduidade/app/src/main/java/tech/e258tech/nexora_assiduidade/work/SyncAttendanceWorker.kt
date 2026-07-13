@@ -12,15 +12,26 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
+import tech.e258tech.nexora_assiduidade.BuildConfig
 import tech.e258tech.nexora_assiduidade.data.local.AppDatabase
 import tech.e258tech.nexora_assiduidade.data.local.PendingEventEntity
-import tech.e258tech.nexora_assiduidade.data.model.ClockBatchRegisterRequest
 import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
-import tech.e258tech.nexora_assiduidade.utils.ApiUtils
+import tech.e258tech.nexora_assiduidade.utils.HardwareEventMapper
 import tech.e258tech.nexora_assiduidade.utils.OfflineEventCrypto
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
+/**
+ * Reenvia eventos de ponto guardados offline.
+ *
+ * Desde 2026-07-13 chama `POST /api/hardware/events/generic` directamente no
+ * Nexora ERP, um por um (API Key de device) — deixou de usar o
+ * `clock/register/batch` do FaceClock (removido). O ERP não expõe hoje um
+ * lote autenticado por device com o mesmo contrato simples, por isso o
+ * "lote" é agora um ciclo de chamadas individuais em vez de um único pedido
+ * HTTP; o volume é baixo (só acumula depois de períodos offline) por isso
+ * não é um problema de desempenho real.
+ */
 class SyncAttendanceWorker(
     context: Context,
     params: WorkerParameters
@@ -47,8 +58,14 @@ class SyncAttendanceWorker(
             dao.update(event.copy(syncStatus = PendingEventEntity.SyncStatus.SYNCING))
         }
 
-        val eventsByIdempotencyKey = mutableMapOf<String, PendingEventEntity>()
-        val requests = pendingEvents.mapNotNull { event ->
+        val employeeCode = HardwareEventMapper.resolveEmployeeCode(sessionManager)
+        if (employeeCode == null) {
+            markBatchFailed(pendingEvents, "Nao foi possivel identificar o funcionario no ERP.")
+            return Result.retry()
+        }
+
+        var anyFailed = false
+        for (event in pendingEvents) {
             val request = event.toClockRegisterRequest()
             if (request == null) {
                 dao.update(
@@ -57,52 +74,41 @@ class SyncAttendanceWorker(
                         errorMessage = "Falha ao decifrar evento offline."
                     )
                 )
-            } else {
-                eventsByIdempotencyKey[request.idempotency_key] = event
-            }
-            request
-        }
-
-        if (requests.isEmpty()) {
-            return Result.failure()
-        }
-
-        return try {
-            val response = RetrofitClient.assiduidadeApiService.registerClockBatch(
-                ApiUtils.bearerToken(token),
-                ClockBatchRegisterRequest(requests)
-            )
-
-            if (!response.isSuccessful || response.body() == null) {
-                markBatchFailed(pendingEvents, ApiUtils.errorMessage(response))
-                return Result.retry()
+                anyFailed = true
+                continue
             }
 
-            val body = response.body()!!
-            body.accepted.forEach { accepted ->
-                eventsByIdempotencyKey[accepted.idempotency_key]?.let { dao.delete(it) }
-            }
-
-            body.rejected.forEach { rejected ->
-                eventsByIdempotencyKey[rejected.idempotency_key]?.let { event ->
-                    if (rejected.status_code == 409) {
-                        dao.delete(event)
-                    } else {
-                        dao.update(
-                            event.copy(
-                                syncStatus = PendingEventEntity.SyncStatus.FAILED,
-                                errorMessage = rejected.detail ?: "Evento rejeitado pelo backend."
-                            )
+            try {
+                val eventRequest = HardwareEventMapper.toGenericHardwareEvent(request, employeeCode)
+                val response = RetrofitClient.erpApiService.registerEventDevice(
+                    BuildConfig.DEVICE_API_KEY,
+                    eventRequest
+                )
+                if (response.isSuccessful && response.body()?.processed == true) {
+                    dao.delete(event)
+                } else {
+                    dao.update(
+                        event.copy(
+                            syncStatus = PendingEventEntity.SyncStatus.FAILED,
+                            errorMessage = response.body()?.error
+                                ?: response.errorBody()?.string()
+                                ?: "Evento rejeitado pelo ERP (HTTP ${response.code()})."
                         )
-                    }
+                    )
+                    anyFailed = true
                 }
+            } catch (e: Exception) {
+                dao.update(
+                    event.copy(
+                        syncStatus = PendingEventEntity.SyncStatus.FAILED,
+                        errorMessage = e.message ?: "Erro desconhecido"
+                    )
+                )
+                anyFailed = true
             }
-
-            if (body.rejected.isEmpty()) Result.success() else Result.retry()
-        } catch (e: Exception) {
-            markBatchFailed(pendingEvents, e.message ?: "Erro desconhecido")
-            Result.retry()
         }
+
+        return if (anyFailed) Result.retry() else Result.success()
     }
 
     private suspend fun markBatchFailed(events: List<PendingEventEntity>, message: String) {

@@ -15,12 +15,20 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.AdjustmentRequestInput
+import tech.e258tech.nexora_assiduidade.data.model.JustificacaoRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
+/**
+ * Justificação de falta, submetida directamente ao Nexora ERP
+ * (POST /api/self-service/assiduidade/justificacoes) desde 2026-07-13 —
+ * deixou de passar pelo proxy do FaceClock. O ecrã só recolhe motivo+
+ * descrição (sem selector de dia/hora), por isso mapeia para uma
+ * "justificação" (tipo="falta", data=hoje), não para um pedido de correcção
+ * de ponto (que exigiria indicar o dia e a hora certa).
+ */
 class JustifyAbsenceFragment : Fragment() {
 
     private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -71,11 +79,12 @@ class JustifyAbsenceFragment : Fragment() {
         uiScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
-                    RetrofitClient.assiduidadeApiService.createAdjustment(
+                    RetrofitClient.erpApiService.criarJustificacao(
                         ApiUtils.bearerToken(token),
-                        AdjustmentRequestInput(
-                            requested_recorded_at = DateTimeUtils.nowForApi(),
-                            reason = reason
+                        JustificacaoRequest(
+                            tipo = "falta",
+                            data = DateTimeUtils.todayForApi(),
+                            motivo = reason
                         )
                     )
                 }

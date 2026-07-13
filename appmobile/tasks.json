@@ -1,0 +1,18 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run Love2D Game",
+            "type": "shell",
+            "command": "if exist \"C:\\Program Files\\LOVE\\love.exe\" (\"C:\\Program Files\\LOVE\\love.exe\" \"${workspaceFolder}\\game\") else if exist \"C:\\Program Files (x86)\\LOVE\\love.exe\" (\"C:\\Program Files (x86)\\LOVE\\love.exe\" \"${workspaceFolder}\\game\") else (echo LOVE2D not found. Install LOVE and update .vscode\\tasks.json if needed. && exit /b 1)",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ]
+}

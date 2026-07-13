@@ -11,10 +11,14 @@ object DateTimeUtils {
     private val apiFormatter: SimpleDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.getDefault()).apply {
         timeZone = TimeZone.getDefault()
     }
+    private val apiDateFormatter: SimpleDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     private val dateFormatter: SimpleDateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     private val dateTimeFormatter: SimpleDateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
 
     fun nowForApi(): String = apiFormatter.format(Date())
+
+    /** Data de hoje no formato YYYY-MM-DD (campo `data DATE` do ERP, ex.: justificações). */
+    fun todayForApi(): String = apiDateFormatter.format(Date())
 
     fun formatDateTime(value: String): String {
         return parse(value)?.let { dateTimeFormatter.format(it) } ?: value

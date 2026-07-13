@@ -21,9 +21,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import tech.e258tech.nexora_assiduidade.BuildConfig
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
-import tech.e258tech.nexora_assiduidade.data.model.NFCValidateRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.data.repository.AttendanceRepository
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
@@ -34,8 +34,10 @@ import tech.e258tech.nexora_assiduidade.utils.SessionManager
 /**
  * Tela de registo de presenca por cartao NFC.
  *
- * Aguarda a descoberta de uma tag NFC, extrai o identificador e envia para
- * o backend /nfc/validate. Se valido, regista o ponto.
+ * Aguarda a descoberta de uma tag NFC, extrai o identificador e valida
+ * directamente no Nexora ERP (`GET /api/hardware/assiduidade/nfc/validar`,
+ * API Key de device) desde 2026-07-13 — deixou de passar pelo proxy do
+ * FaceClock. Se valido, regista o ponto.
  */
 class NfcAttendanceFragment : Fragment() {
 
@@ -168,13 +170,13 @@ class NfcAttendanceFragment : Fragment() {
         uiScope.launch {
             val validateResult: Pair<Boolean, String?> = withContext(Dispatchers.IO) {
                 try {
-                    val response = RetrofitClient.assiduidadeApiService.validateNFC(
-                        ApiUtils.bearerToken(token),
-                        NFCValidateRequest(nfc_tag = payload ?: nfcId)
+                    val response = RetrofitClient.erpApiService.validateNfcDevice(
+                        BuildConfig.DEVICE_API_KEY,
+                        tagUid = payload ?: nfcId
                     )
                     if (response.isSuccessful && response.body() != null) {
                         val body = response.body()!!
-                        body.valid to body.message
+                        body.valid to body.reason
                     } else {
                         false to ApiUtils.errorMessage(response)
                     }

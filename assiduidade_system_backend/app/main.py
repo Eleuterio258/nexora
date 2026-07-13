@@ -2,15 +2,12 @@ from contextlib import asynccontextmanager
 import json
 import logging
 import os
-import secrets
 import time
-from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from slowapi.errors import RateLimitExceeded
 
@@ -18,7 +15,7 @@ from app.bootstrap import seed_data
 from app.limiter import limiter
 from app.config import settings
 from app.database import Base, SessionLocal, engine
-from app.routers import attendance_config, audit, auth, authcode, biometric, clock, consents, fingerprint, liveness, methods, monitoring
+from app.routers import audit, biometric, fingerprint, liveness, monitoring
 
 
 logger = logging.getLogger("faceclock.api")
@@ -83,23 +80,11 @@ app.add_middleware(
 # Request body size limit (10MB)
 app.state.max_request_body_size = int(os.getenv("MAX_REQUEST_BODY_SIZE_BYTES", "10485760"))
 
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(authcode.router, prefix="/api/v1")
-app.include_router(consents.router, prefix="/api/v1")
 app.include_router(biometric.router, prefix="/api/v1")
 app.include_router(liveness.router, prefix="/api/v1")
-app.include_router(clock.router, prefix="/api/v1")
 app.include_router(fingerprint.router, prefix="/api/v1")
-app.include_router(methods.router, prefix="/api/v1")
-app.include_router(attendance_config.router, prefix="/api/v1")
 app.include_router(audit.router, prefix="/api/v1")
 app.include_router(monitoring.router)
-
-
-# Serve static files (dashboard and totem)
-static_dir = Path(__file__).parent.parent / "static"
-if static_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 
 @app.exception_handler(RateLimitExceeded)

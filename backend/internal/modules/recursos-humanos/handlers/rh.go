@@ -50,7 +50,8 @@ func (h *Handler) ListarUnidades(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT u.id, u.codigo, u.nome, u.tipo, u.descricao, u.parent_id, p.nome, u.responsavel_id, f.nome_completo, u.ativo,
-		       (SELECT COUNT(*) FROM rh.funcionarios fu WHERE fu.unit_id = u.id)
+		       (SELECT COUNT(*) FROM rh.funcionarios fu WHERE fu.unit_id = u.id),
+		       u.latitude, u.longitude, u.raio_metros
 		  FROM rh.unidades_organizacionais u
 		  LEFT JOIN rh.funcionarios f ON f.id = u.responsavel_id
 		  LEFT JOIN rh.unidades_organizacionais p ON p.id = u.parent_id
@@ -58,22 +59,25 @@ func (h *Handler) ListarUnidades(w http.ResponseWriter, r *http.Request) {
 		 ORDER BY u.nome`, user.TenantID)
 	defer rows.Close()
 	type Row struct {
-		ID              int64   `json:"id"`
-		Codigo          string  `json:"codigo"`
-		Nome            string  `json:"nome"`
-		Tipo            string  `json:"tipo"`
-		Descricao       *string `json:"descricao"`
-		ParentID        *int64  `json:"parent_id"`
-		UnidadePaiNome  *string `json:"unidade_pai_nome"`
-		ResponsavelID   *int64  `json:"responsavel_id"`
-		ResponsavelNome *string `json:"responsavel_nome"`
-		Ativo           bool    `json:"ativo"`
-		NumFuncionarios int     `json:"num_funcionarios"`
+		ID              int64    `json:"id"`
+		Codigo          string   `json:"codigo"`
+		Nome            string   `json:"nome"`
+		Tipo            string   `json:"tipo"`
+		Descricao       *string  `json:"descricao"`
+		ParentID        *int64   `json:"parent_id"`
+		UnidadePaiNome  *string  `json:"unidade_pai_nome"`
+		ResponsavelID   *int64   `json:"responsavel_id"`
+		ResponsavelNome *string  `json:"responsavel_nome"`
+		Ativo           bool     `json:"ativo"`
+		NumFuncionarios int      `json:"num_funcionarios"`
+		Latitude        *float64 `json:"latitude"`
+		Longitude       *float64 `json:"longitude"`
+		RaioMetros      *float64 `json:"raio_metros"`
 	}
 	data := []Row{}
 	for rows.Next() {
 		var u Row
-		if rows.Scan(&u.ID, &u.Codigo, &u.Nome, &u.Tipo, &u.Descricao, &u.ParentID, &u.UnidadePaiNome, &u.ResponsavelID, &u.ResponsavelNome, &u.Ativo, &u.NumFuncionarios) == nil {
+		if rows.Scan(&u.ID, &u.Codigo, &u.Nome, &u.Tipo, &u.Descricao, &u.ParentID, &u.UnidadePaiNome, &u.ResponsavelID, &u.ResponsavelNome, &u.Ativo, &u.NumFuncionarios, &u.Latitude, &u.Longitude, &u.RaioMetros) == nil {
 			data = append(data, u)
 		}
 	}
@@ -122,13 +126,16 @@ func (h *Handler) ActualizarUnidade(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 	var body struct {
-		Codigo        *string `json:"codigo"`
-		Nome          *string `json:"nome"`
-		Tipo          *string `json:"tipo"`
-		Descricao     *string `json:"descricao"`
-		ResponsavelID *int64  `json:"responsavel_id"`
-		ParentID      *int64  `json:"parent_id"`
-		Ativo         *bool   `json:"ativo"`
+		Codigo        *string  `json:"codigo"`
+		Nome          *string  `json:"nome"`
+		Tipo          *string  `json:"tipo"`
+		Descricao     *string  `json:"descricao"`
+		ResponsavelID *int64   `json:"responsavel_id"`
+		ParentID      *int64   `json:"parent_id"`
+		Ativo         *bool    `json:"ativo"`
+		Latitude      *float64 `json:"latitude"`
+		Longitude     *float64 `json:"longitude"`
+		RaioMetros    *float64 `json:"raio_metros"`
 	}
 	json.NewDecoder(r.Body).Decode(&body)
 	if body.Tipo != nil && *body.Tipo != "" && !tiposUnidadeValidos[*body.Tipo] {
@@ -138,9 +145,11 @@ func (h *Handler) ActualizarUnidade(w http.ResponseWriter, r *http.Request) {
 	_, err := h.db.Exec(r.Context(), `
 		UPDATE rh.unidades_organizacionais SET codigo=COALESCE($1,codigo), nome=COALESCE($2,nome), tipo=COALESCE($3,tipo),
 		  descricao=COALESCE($4,descricao), responsavel_id=COALESCE($5,responsavel_id), parent_id=COALESCE($6,parent_id),
-		  ativo=COALESCE($7,ativo), updated_at=NOW()
-		WHERE id=$8 AND tenant_id=$9`,
-		body.Codigo, body.Nome, body.Tipo, body.Descricao, body.ResponsavelID, body.ParentID, body.Ativo, id, user.TenantID)
+		  ativo=COALESCE($7,ativo), latitude=COALESCE($8,latitude), longitude=COALESCE($9,longitude),
+		  raio_metros=COALESCE($10,raio_metros), updated_at=NOW()
+		WHERE id=$11 AND tenant_id=$12`,
+		body.Codigo, body.Nome, body.Tipo, body.Descricao, body.ResponsavelID, body.ParentID, body.Ativo,
+		body.Latitude, body.Longitude, body.RaioMetros, id, user.TenantID)
 	if err != nil {
 		if isUniqueViolation(err) {
 			jsonErr(w, "Unidade já existe", http.StatusConflict)
@@ -793,10 +802,10 @@ func (h *Handler) ObterConfiguracoesRH(w http.ResponseWriter, r *http.Request) {
 	}
 	// defaults
 	defaults := map[string]string{
-		"rh.prefixo_funcionario":         "FUNC",
-		"rh.separador_funcionario":        "-",
-		"rh.digitos_funcionario":          "3",
-		"rh.numero_inicial_funcionario":   "1",
+		"rh.prefixo_funcionario":        "FUNC",
+		"rh.separador_funcionario":      "-",
+		"rh.digitos_funcionario":        "3",
+		"rh.numero_inicial_funcionario": "1",
 	}
 	for k, v := range defaults {
 		if cfg[k] == nil {

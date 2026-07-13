@@ -35,10 +35,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
-import tech.e258tech.nexora_assiduidade.data.model.GeoValidateRequest
-import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.data.repository.AttendanceRepository
-import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.Constants
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
@@ -46,9 +43,12 @@ import tech.e258tech.nexora_assiduidade.utils.SessionManager
 /**
  * Tela de registo de presenca por selfie + GPS.
  *
- * Captura uma selfie e obtem a localizacao atual do dispositivo. Antes de
- * registar, valida as coordenadas no backend /geolocation/validate. O registo
- * e enviado com os metadados de localizacao e a selfie como prova de presenca.
+ * Captura uma selfie e obtem a localizacao atual do dispositivo. O geofencing
+ * real (`GET /api/hardware/assiduidade/geofence/validar` no Nexora ERP)
+ * exige um `unidade_id` que este ecra nao recolhe (sem selector de unidade),
+ * tal como acontecia no proxy do FaceClock — por isso continua permissivo
+ * aqui, so regista as coordenadas para auditoria. O registo e enviado com os
+ * metadados de localizacao e a selfie como prova de presenca.
  */
 class SelfieGpsAttendanceFragment : Fragment() {
 
@@ -207,35 +207,9 @@ class SelfieGpsAttendanceFragment : Fragment() {
         }
 
         uiScope.launch {
-            val validateResult: Pair<Boolean, String?> = withContext(Dispatchers.IO) {
-                try {
-                    val response = RetrofitClient.assiduidadeApiService.validateGeolocation(
-                        ApiUtils.bearerToken(token),
-                        GeoValidateRequest(
-                            latitude = location.latitude,
-                            longitude = location.longitude
-                        )
-                    )
-                    if (response.isSuccessful && response.body() != null) {
-                        val body = response.body()!!
-                        body.valid to body.message
-                    } else {
-                        false to ApiUtils.errorMessage(response)
-                    }
-                } catch (e: Exception) {
-                    false to (e.message ?: "Erro na validacao da localizacao")
-                }
-            }
-
-            val valid = validateResult.first
-            val message = validateResult.second
-
-            if (!valid) {
-                setLoading(false)
-                Toast.makeText(context, message ?: "Localizacao fora da area permitida.", Toast.LENGTH_LONG).show()
-                return@launch
-            }
-
+            // Sem unidade seleccionada nao ha geofencing real a validar (ver
+            // nota na classe) — mantem-se permissivo, tal como o proxy do
+            // FaceClock fazia quando unit_id vinha vazio.
             val request = ClockRegisterRequest(
                 idempotency_key = UUID.randomUUID().toString(),
                 user_id = userId,

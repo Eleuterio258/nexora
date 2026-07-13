@@ -22,9 +22,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import tech.e258tech.nexora_assiduidade.BuildConfig
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
-import tech.e258tech.nexora_assiduidade.data.model.QRValidateRequest
+import tech.e258tech.nexora_assiduidade.data.model.QRValidateDeviceRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.data.repository.AttendanceRepository
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
@@ -35,8 +36,10 @@ import tech.e258tech.nexora_assiduidade.utils.SessionManager
 /**
  * Tela de registo de presenca por leitura de QR Code.
  *
- * Usa a biblioteca ZXing (journeyapps) para ler um QR Code e envia o conteudo
- * para o backend /qr/validate. Se valido, regista o ponto.
+ * Usa a biblioteca ZXing (journeyapps) para ler um QR Code e valida-o
+ * directamente no Nexora ERP (`POST /api/hardware/assiduidade/qr/validar`,
+ * API Key de device) desde 2026-07-13 — deixou de passar pelo proxy do
+ * FaceClock. Se valido, regista o ponto.
  */
 class QrCodeAttendanceFragment : Fragment() {
 
@@ -129,13 +132,13 @@ class QrCodeAttendanceFragment : Fragment() {
         uiScope.launch {
             val validateResult: Pair<Boolean, String?> = withContext(Dispatchers.IO) {
                 try {
-                    val response = RetrofitClient.assiduidadeApiService.validateQR(
-                        ApiUtils.bearerToken(token),
-                        QRValidateRequest(qr_code = qrCode, user_id = userId)
+                    val response = RetrofitClient.erpApiService.validateQrDevice(
+                        BuildConfig.DEVICE_API_KEY,
+                        QRValidateDeviceRequest(qr_code = qrCode)
                     )
                     if (response.isSuccessful && response.body() != null) {
                         val body = response.body()!!
-                        body.valid to body.message
+                        body.valid to null
                     } else {
                         false to ApiUtils.errorMessage(response)
                     }

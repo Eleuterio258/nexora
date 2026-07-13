@@ -17,27 +17,24 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import tech.e258tech.nexora_assiduidade.BuildConfig
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
+import tech.e258tech.nexora_assiduidade.utils.HardwareEventMapper
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 import java.util.UUID
 
 /**
  * Registo Manual de Assiduidade — o gestor marca ponto em nome de um
- * funcionário (ex.: esqueceu o telemóvel, avaria de dispositivo). Chama
- * POST /clock/register do FaceClock com `user_id` diferente do do próprio
- * gestor — só permitido a ADMIN_SISTEMA/GESTOR_RH (ver
- * app/routers/clock.py, `_create_clock_record`, verificação adicionada
- * nesta mesma sessão).
- *
- * Nota de risco conhecido: o FaceClock está a meio de uma reescrita
- * "stateless" (ver CONTRATO-INTEGRACAO-ERP.md) e o contrato exacto de
- * `user_id` (espaço de IDs do ERP vs FaceClock) ainda pode mudar — usa-se
- * aqui o ID numérico do funcionário tal como devolvido por
- * GET /api/rh/funcionarios (ecrã Equipa), convertido para string.
+ * funcionário (ex.: esqueceu o telemóvel, avaria de dispositivo). Desde
+ * 2026-07-13 chama `POST /api/hardware/events/generic` directamente no
+ * Nexora ERP (API Key de device embutida no APK) — deixou de passar pelo
+ * proxy do FaceClock. O `funcionarioId` introduzido é o ID numérico tal como
+ * devolvido por GET /api/rh/funcionarios (ecrã Equipa) — `rh.funcionarios.id`,
+ * resolvido para `employee_no` via `HardwareEventMapper.resolveEmployeeCodeById`.
  */
 class RegistoManualFragment : Fragment() {
 
@@ -88,6 +85,20 @@ class RegistoManualFragment : Fragment() {
 
         uiScope.launch {
             try {
+                val funcionarioIdLong = funcionarioId.toLongOrNull()
+                if (funcionarioIdLong == null) {
+                    tvStatus.text = "ID do funcionário inválido."
+                    return@launch
+                }
+
+                val employeeCode = withContext(Dispatchers.IO) {
+                    HardwareEventMapper.resolveEmployeeCodeById(funcionarioIdLong)
+                }
+                if (employeeCode == null) {
+                    tvStatus.text = "Funcionário não encontrado no ERP."
+                    return@launch
+                }
+
                 val request = ClockRegisterRequest(
                     idempotency_key = UUID.randomUUID().toString(),
                     user_id = funcionarioId,
@@ -96,8 +107,9 @@ class RegistoManualFragment : Fragment() {
                     recorded_at = DateTimeUtils.nowForApi(),
                     source = "MANUAL",
                 )
+                val eventRequest = HardwareEventMapper.toGenericHardwareEvent(request, employeeCode)
                 val response = withContext(Dispatchers.IO) {
-                    RetrofitClient.assiduidadeApiService.registerClock(ApiUtils.bearerToken(token), request)
+                    RetrofitClient.erpApiService.registerEventDevice(BuildConfig.DEVICE_API_KEY, eventRequest)
                 }
 
                 tvStatus.text = if (response.isSuccessful) {
@@ -109,7 +121,7 @@ class RegistoManualFragment : Fragment() {
                 throw e
             } catch (e: Exception) {
                 if (!isAdded) return@launch
-                tvStatus.text = "Falha ao comunicar com o FaceClock."
+                tvStatus.text = "Falha ao comunicar com o ERP."
                 Toast.makeText(context, "Não foi possível registar.", Toast.LENGTH_LONG).show()
             } finally {
                 if (isAdded) btnRegister.isEnabled = true

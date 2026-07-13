@@ -1711,6 +1711,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Get("/", rh.ListarFuncionarios)
 				r.Get("/proximo-numero", rh.ProximoNumeroFuncionario)
 				r.Get("/{id}", rh.ObterFuncionario)
+				r.Get("/{id}/nfc-tags", rh.ListarNFCTags)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "recursos-humanos", "ver_recibos"))
@@ -1721,6 +1722,8 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Post("/", rh.CriarFuncionario)
 				r.Put("/{id}", rh.ActualizarFuncionario)
 				r.Post("/{id}/desligar", rh.DesligarFuncionario)
+				r.Post("/{id}/nfc-tags", rh.CriarNFCTag)
+				r.Delete("/nfc-tags/{id}", rh.RemoverNFCTag)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "recursos-humanos", "ver_salarios"))
@@ -1818,6 +1821,16 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Post("/{id}/rejeitar", rh.RejeitarAusencia)
 				r.Post("/{id}/gozar", rh.MarcarAusenciaGozada)
 				r.Post("/{id}/cancelar", rh.CancelarAusencia)
+			})
+		})
+
+		// Pedidos de correção de ponto
+		r.Route("/correcoes-ponto", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequirePermission(db, "assiduidade", "aprovar_correcao"))
+				r.Get("/", rh.ListarPedidosCorrecaoPendentes)
+				r.Post("/{id}/aprovar", rh.AprovarPedidoCorrecao)
+				r.Post("/{id}/rejeitar", rh.RejeitarPedidoCorrecao)
 			})
 		})
 
@@ -2268,6 +2281,12 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Use(mw.RequirePermission(db, "assiduidade", "justificar"))
 				r.Post("/justificacoes", ss.CriarJustificacao)
 			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequirePermission(db, "assiduidade", "corrigir_ponto"))
+				r.Post("/correcoes", ss.CriarPedidoCorrecao)
+				r.Get("/correcoes", ss.ListarPedidosCorrecao)
+				r.Post("/correcoes/{id}/cancelar", ss.CancelarPedidoCorrecao)
+			})
 		})
 
 		// Recibos de vencimento (self-service — apenas os próprios)
@@ -2450,6 +2469,14 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Get("/assiduidade/config", rh.ObterConfigAssiduidadeDevice)
 			r.Get("/assiduidade/funcionarios", rh.ListarFuncionariosIntegracao)
 			r.Get("/assiduidade/funcionarios/{id}", rh.ObterFuncionarioIntegracao)
+			r.Get("/assiduidade/geofence/validar", rh.ValidarGeofenceDevice)
+			r.Post("/assiduidade/consentimentos", rh.CriarConsentimentoDevice)
+			r.Get("/assiduidade/consentimentos", rh.ListarConsentimentosDevice)
+			r.Get("/assiduidade/consentimentos/activo", rh.ObterConsentimentoActivoDevice)
+			r.Post("/assiduidade/consentimentos/revogar", rh.RevogarConsentimentoDevice)
+			r.Post("/assiduidade/qr/gerar", rh.GerarQRDevice)
+			r.Post("/assiduidade/qr/validar", rh.ValidarQRDevice)
+			r.Get("/assiduidade/nfc/validar", rh.ValidarNFCDevice)
 		})
 
 		// Gestão de dispositivos e eventos (admin do tenant)

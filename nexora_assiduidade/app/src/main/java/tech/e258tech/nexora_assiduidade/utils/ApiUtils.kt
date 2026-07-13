@@ -17,7 +17,11 @@ object ApiUtils {
         }
 
         return runCatching {
-            gson.fromJson(body, JsonObject::class.java).get("detail")?.asString
+            val json = gson.fromJson(body, JsonObject::class.java)
+            // "detail" e o formato de erro do FaceClock (FastAPI); "error" e o
+            // do Nexora ERP (Go) — desde 2026-07-13 varios ecras falam
+            // directamente com o ERP, por isso tem de aceitar os dois.
+            json.get("detail")?.asString ?: json.get("error")?.asString
         }.getOrNull().orEmpty().ifBlank {
             "Falha na comunicacao com o servidor."
         }

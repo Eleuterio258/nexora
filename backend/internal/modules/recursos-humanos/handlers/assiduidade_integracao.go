@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
@@ -153,4 +155,71 @@ func (h *Handler) ObterFuncionarioIntegracao(w http.ResponseWriter, r *http.Requ
 	}
 	f.Role = "COLABORADOR"
 	jsonOK(w, f, http.StatusOK)
+}
+
+// GET /api/hardware/assiduidade/geofence/validar?unidade_id=&latitude=&longitude=
+// Valida se as coordenadas recebidas estão dentro do raio permitido da
+// unidade indicada. Se a unidade não tiver geofencing configurado
+// (latitude/longitude/raio_metros nulos), a validação é permissiva
+// (valid=true, reason=geofence_not_configured) — mantém o comportamento
+// anterior do FaceClock como fallback explícito em vez de bloquear tenants
+// que ainda não configuraram nenhuma unidade.
+func (h *Handler) ValidarGeofenceDevice(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	tenantID, err := resolveSaasTenantID(h, r, user.TenantID)
+	if err != nil {
+		jsonErr(w, "Dispositivo sem empresa/tenant associado correctamente", http.StatusUnprocessableEntity)
+		return
+	}
+
+	unidadeID := r.URL.Query().Get("unidade_id")
+	lat, errLat := strconv.ParseFloat(r.URL.Query().Get("latitude"), 64)
+	lon, errLon := strconv.ParseFloat(r.URL.Query().Get("longitude"), 64)
+	if unidadeID == "" || errLat != nil || errLon != nil {
+		jsonErr(w, "unidade_id, latitude e longitude são obrigatórios", http.StatusBadRequest)
+		return
+	}
+
+	var nome string
+	var refLat, refLon, raio *float64
+	err = h.db.QueryRow(r.Context(), `
+		SELECT nome, latitude, longitude, raio_metros
+		  FROM rh.unidades_organizacionais
+		 WHERE id=$1 AND tenant_id=$2`, unidadeID, tenantID).
+		Scan(&nome, &refLat, &refLon, &raio)
+	if err != nil {
+		jsonErr(w, "Unidade não encontrada", http.StatusNotFound)
+		return
+	}
+
+	if refLat == nil || refLon == nil || raio == nil {
+		jsonOK(w, map[string]any{
+			"valid":     true,
+			"unit_name": nome,
+			"reason":    "geofence_not_configured",
+		}, http.StatusOK)
+		return
+	}
+
+	distance := haversineMeters(*refLat, *refLon, lat, lon)
+	jsonOK(w, map[string]any{
+		"valid":           distance <= *raio,
+		"unit_name":       nome,
+		"distance_meters": distance,
+		"radius_meters":   *raio,
+	}, http.StatusOK)
+}
+
+// haversineMeters calcula a distância em metros entre duas coordenadas
+// geográficas (fórmula de Haversine, raio da Terra = 6371 km).
+func haversineMeters(lat1, lon1, lat2, lon2 float64) float64 {
+	const earthRadiusMeters = 6371000.0
+	toRad := func(deg float64) float64 { return deg * math.Pi / 180 }
+
+	dLat := toRad(lat2 - lat1)
+	dLon := toRad(lon2 - lon1)
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(toRad(lat1))*math.Cos(toRad(lat2))*math.Sin(dLon/2)*math.Sin(dLon/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	return earthRadiusMeters * c
 }

@@ -61,7 +61,7 @@ class HistoryFragment : Fragment() {
         uiScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
-                    RetrofitClient.assiduidadeApiService.getMyClockRecords(
+                    RetrofitClient.erpApiService.getMinhaAssiduidade(
                         ApiUtils.bearerToken(token)
                     )
                 }
@@ -73,7 +73,7 @@ class HistoryFragment : Fragment() {
                     return@launch
                 }
 
-                val items = response.body()?.items.orEmpty()
+                val items = response.body().orEmpty()
                 if (items.isEmpty()) {
                     tvEmpty.visibility = View.VISIBLE
                     recyclerView.visibility = View.GONE

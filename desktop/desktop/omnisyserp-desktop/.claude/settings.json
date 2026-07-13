@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/projecto/u-tech/2026/omnisyserp/**)",
+      "Bash(xargs grep *)"
+    ]
+  }
+}

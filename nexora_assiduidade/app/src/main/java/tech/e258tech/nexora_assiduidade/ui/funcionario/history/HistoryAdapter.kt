@@ -6,11 +6,11 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.response.ClockRecordResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.PresencaResponse
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
 
 class HistoryAdapter(
-    private val items: List<ClockRecordResponse>
+    private val items: List<PresencaResponse>
 ) : RecyclerView.Adapter<HistoryAdapter.HistoryViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): HistoryViewHolder {
@@ -26,22 +26,27 @@ class HistoryAdapter(
     override fun getItemCount(): Int = items.size
 
     class HistoryViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        private val tvEvent: TextView = itemView.findViewById(R.id.tvEventType)
-        private val tvDateTime: TextView = itemView.findViewById(R.id.tvRecordDateTime)
-        private val tvSource: TextView = itemView.findViewById(R.id.tvRecordSource)
-        private val tvSync: TextView = itemView.findViewById(R.id.tvRecordSyncStatus)
+        private val tvTipo: TextView = itemView.findViewById(R.id.tvEventType)
+        private val tvHoras: TextView = itemView.findViewById(R.id.tvRecordDateTime)
+        private val tvTrabalhadas: TextView = itemView.findViewById(R.id.tvRecordSource)
+        private val tvObservacao: TextView = itemView.findViewById(R.id.tvRecordSyncStatus)
 
-        fun bind(item: ClockRecordResponse) {
-            tvEvent.text = when (item.event_type) {
-                "ENTRY" -> "Entrada"
-                "EXIT" -> "Saida"
-                "BREAK_START" -> "Inicio de pausa"
-                "BREAK_END" -> "Fim de pausa"
-                else -> item.event_type
+        fun bind(item: PresencaResponse) {
+            tvTipo.text = when (item.tipo) {
+                "atraso" -> "Atraso"
+                "falta" -> "Falta"
+                else -> "Presente"
             }
-            tvDateTime.text = DateTimeUtils.formatDateTime(item.recorded_at)
-            tvSource.text = "Origem: ${item.source}"
-            tvSync.text = "Sync: ${item.sync_status}"
+            val data = DateTimeUtils.formatDate(item.data)
+            val entrada = item.hora_entrada ?: "--:--"
+            val saida = item.hora_saida ?: "--:--"
+            tvHoras.text = "$data — entrada $entrada, saida $saida"
+
+            tvTrabalhadas.text = item.horas_trabalhadas?.let { "Horas trabalhadas: %.1f".format(it) }
+                ?: "Horas trabalhadas: —"
+
+            tvObservacao.text = item.observacao.orEmpty()
+            tvObservacao.visibility = if (item.observacao.isNullOrBlank()) View.GONE else View.VISIBLE
         }
     }
 }

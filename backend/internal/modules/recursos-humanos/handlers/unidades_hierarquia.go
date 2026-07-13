@@ -12,22 +12,26 @@ import (
 )
 
 type unidadeRow struct {
-	ID              int64   `json:"id"`
-	Codigo          string  `json:"codigo"`
-	Nome            string  `json:"nome"`
-	Tipo            string  `json:"tipo"`
-	Descricao       *string `json:"descricao"`
-	ParentID        *int64  `json:"parent_id"`
-	UnidadePaiNome  *string `json:"unidade_pai_nome"`
-	ResponsavelID   *int64  `json:"responsavel_id"`
-	ResponsavelNome *string `json:"responsavel_nome"`
-	Ativo           bool    `json:"ativo"`
-	NumFuncionarios int     `json:"num_funcionarios"`
+	ID              int64    `json:"id"`
+	Codigo          string   `json:"codigo"`
+	Nome            string   `json:"nome"`
+	Tipo            string   `json:"tipo"`
+	Descricao       *string  `json:"descricao"`
+	ParentID        *int64   `json:"parent_id"`
+	UnidadePaiNome  *string  `json:"unidade_pai_nome"`
+	ResponsavelID   *int64   `json:"responsavel_id"`
+	ResponsavelNome *string  `json:"responsavel_nome"`
+	Ativo           bool     `json:"ativo"`
+	NumFuncionarios int      `json:"num_funcionarios"`
+	Latitude        *float64 `json:"latitude"`
+	Longitude       *float64 `json:"longitude"`
+	RaioMetros      *float64 `json:"raio_metros"`
 }
 
 const unidadeSelect = `
 	SELECT u.id, u.codigo, u.nome, u.tipo, u.descricao, u.parent_id, p.nome, u.responsavel_id, f.nome_completo, u.ativo,
-	       (SELECT COUNT(*) FROM rh.funcionarios fu WHERE fu.unit_id = u.id)
+	       (SELECT COUNT(*) FROM rh.funcionarios fu WHERE fu.unit_id = u.id),
+	       u.latitude, u.longitude, u.raio_metros
 	  FROM rh.unidades_organizacionais u
 	  LEFT JOIN rh.funcionarios f ON f.id = u.responsavel_id
 	  LEFT JOIN rh.unidades_organizacionais p ON p.id = u.parent_id
@@ -37,7 +41,7 @@ func scanUnidades(rows pgx.Rows) []unidadeRow {
 	data := []unidadeRow{}
 	for rows.Next() {
 		var u unidadeRow
-		if rows.Scan(&u.ID, &u.Codigo, &u.Nome, &u.Tipo, &u.Descricao, &u.ParentID, &u.UnidadePaiNome, &u.ResponsavelID, &u.ResponsavelNome, &u.Ativo, &u.NumFuncionarios) == nil {
+		if rows.Scan(&u.ID, &u.Codigo, &u.Nome, &u.Tipo, &u.Descricao, &u.ParentID, &u.UnidadePaiNome, &u.ResponsavelID, &u.ResponsavelNome, &u.Ativo, &u.NumFuncionarios, &u.Latitude, &u.Longitude, &u.RaioMetros) == nil {
 			data = append(data, u)
 		}
 	}

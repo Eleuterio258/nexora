@@ -6,10 +6,34 @@ Ver proposta-arquitetura-assiduidade-erp.md secção 9.6 e
 CONTRATO-INTEGRACAO-ERP.md.
 """
 
+import time
+from typing import Any
+
 from fastapi import HTTPException, status
 
-from app.erp_client import ERPUnavailableError
+from app.erp_client import ERPUnavailableError, erp_client
 from app.schemas.common import SourceType
+
+_CACHE_TTL_SECONDS = 60.0
+_cache: dict[str, Any] | None = None
+_cache_expires_at: float = 0.0
+
+
+async def _get_config_cached() -> dict[str, Any]:
+    """Cache em memória (60s) da config de assiduidade do ERP — evita bater
+    no ERP a cada chamada de `/biometric/verify`/`/liveness/verify`. Movido
+    para aqui em 2026-07-13 quando `app/routers/attendance_config.py` (o
+    endpoint HTTP `GET /tenant/attendance-config`) foi removido; este cache
+    já não serve nenhum endpoint, só esta validação interna.
+    """
+    global _cache, _cache_expires_at
+    now = time.monotonic()
+    if _cache is not None and now < _cache_expires_at:
+        return _cache
+    config = await erp_client.get_attendance_config()
+    _cache = config
+    _cache_expires_at = now + _CACHE_TTL_SECONDS
+    return config
 
 # SourceType do FaceClock -> chave de método na configuração do ERP.
 # ONLINE/OFFLINE_SYNC/INTEGRATION são modos de transporte do registo (como o
@@ -51,8 +75,6 @@ async def validar_metodo_assiduidade(source: SourceType) -> None:
     metodo = _SOURCE_TO_METODO.get(source)
     if metodo is None:
         return
-
-    from app.routers.attendance_config import _get_config_cached
 
     try:
         config = await _get_config_cached()
