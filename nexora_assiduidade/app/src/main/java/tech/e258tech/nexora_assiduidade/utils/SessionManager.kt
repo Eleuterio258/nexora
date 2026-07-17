@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import tech.e258tech.nexora_assiduidade.data.model.response.ErpModuloAcesso
 import java.util.UUID
 
 /**
@@ -78,7 +81,8 @@ class SessionManager(context: Context) {
         userName: String,
         userEmail: String,
         userRole: String,
-        employeeCode: String
+        employeeCode: String,
+        modulos: List<ErpModuloAcesso> = emptyList()
     ) {
         encryptedPrefs.edit().apply {
             putString(Constants.KEY_USER_TOKEN, token)
@@ -88,14 +92,29 @@ class SessionManager(context: Context) {
             putString(Constants.KEY_USER_EMAIL, userEmail)
             putString(Constants.KEY_USER_ROLE, userRole)
             putString(Constants.KEY_EMPLOYEE_CODE, employeeCode)
+            putString(Constants.KEY_MODULOS_JSON, Gson().toJson(modulos))
             putBoolean(Constants.KEY_IS_LOGGED_IN, true)
             apply()
         }
     }
 
+    /** Actualiza só o access token — usado por [tech.e258tech.nexora_assiduidade.data.network.AuthAuthenticator] após renovar a sessão via refresh_token. */
+    fun updateAccessToken(token: String) {
+        encryptedPrefs.edit().putString(Constants.KEY_USER_TOKEN, token).apply()
+    }
+
     fun isLoggedIn(): Boolean = encryptedPrefs.getBoolean(Constants.KEY_IS_LOGGED_IN, false)
 
     fun getToken(): String? = encryptedPrefs.getString(Constants.KEY_USER_TOKEN, null)
+
+    /** Permissões RBAC finas devolvidas no login (modulos[].acoes) — ver [PermissionUtils]. */
+    fun getModulos(): List<ErpModuloAcesso> {
+        val json = encryptedPrefs.getString(Constants.KEY_MODULOS_JSON, null) ?: return emptyList()
+        return runCatching {
+            val type = object : TypeToken<List<ErpModuloAcesso>>() {}.type
+            Gson().fromJson<List<ErpModuloAcesso>>(json, type)
+        }.getOrNull() ?: emptyList()
+    }
 
     fun getRefreshToken(): String? = encryptedPrefs.getString(Constants.KEY_REFRESH_TOKEN, null)
 

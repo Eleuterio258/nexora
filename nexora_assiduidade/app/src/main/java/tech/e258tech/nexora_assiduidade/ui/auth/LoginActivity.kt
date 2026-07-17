@@ -14,6 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import tech.e258tech.nexora_assiduidade.BuildConfig
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.model.ErpLoginRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
@@ -88,6 +89,15 @@ class LoginActivity : AppCompatActivity() {
             performLogin(username, password)
         }
 
+        // Botões de atalho com credenciais fixas — só em builds de debug,
+        // nunca em release (ver plano "alinhar login ao backend").
+        if (!BuildConfig.DEBUG) {
+            btnDemoFuncionario.visibility = View.GONE
+            btnDemoGestor.visibility = View.GONE
+            btnDemoAdmin.visibility = View.GONE
+            return
+        }
+
         btnDemoFuncionario.setOnClickListener {
             etEmail.setText(DEMO_FUNCIONARIO_EMAIL)
             etPassword.setText(DEMO_FUNCIONARIO_PASSWORD)
@@ -135,7 +145,8 @@ class LoginActivity : AppCompatActivity() {
                     userName = payload.user.nome,
                     userEmail = payload.user.email,
                     userRole = role,
-                    employeeCode = payload.user.email
+                    employeeCode = payload.user.email,
+                    modulos = payload.modulos
                 )
                 Toast.makeText(
                     this@LoginActivity,

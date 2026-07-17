@@ -19,11 +19,12 @@ type contextKey string
 const UserKey contextKey = "authUser"
 
 type AuthUser struct {
-	ID        int64
-	TenantID  int64
-	SessionID int64
-	Tipo      string // "superadmin" | "funcionario"
-	Escopo    string // "erp" | "escola"
+	ID           int64
+	TenantID     int64
+	SessionID    int64
+	MembershipID int64  // auth.memberships.id usado neste login; 0 se não houver (ex.: superadmin)
+	Tipo         string // "superadmin" | "funcionario"
+	Escopo       string // "erp" | "escola"
 }
 
 func HashToken(token string) string {
@@ -88,6 +89,8 @@ func RequireAuth(jwtSecret string, pool *pgxpool.Pool) func(http.Handler) http.H
 			if escopo == "" {
 				escopo = "erp"
 			}
+			midRaw, _ := claims["mid"].(float64)
+			membershipID := int64(midRaw)
 
 			// Rejeitar pedidos fora do escopo antes de consultar a base de dados.
 			if tipo != "superadmin" && !escopoPermitidoParaPath(r.URL.Path, escopo) {
@@ -100,13 +103,19 @@ func RequireAuth(jwtSecret string, pool *pgxpool.Pool) func(http.Handler) http.H
 			var estado string
 			var tenantID int64
 
+			// Filtrar a membership por id (não só por user_id) é o que torna
+			// esta resolução de tenant determinística agora que um user pode
+			// ter mais de uma membership (ver migration 20260713000002) — o
+			// mid vem de um JWT assinado, por isso confiável, mas o AND
+			// m.user_id = u.id fica como defesa adicional contra um token
+			// mal formado apontar para a membership de outra pessoa.
 			err = pool.QueryRow(r.Context(), `
 				SELECT s.id, s.ativa, u.estado, COALESCE(m.tenant_id, 0)
 				  FROM auth.sessions s
 				  JOIN auth.users u ON u.id = s.user_id
-				  LEFT JOIN auth.memberships m ON m.user_id = u.id
+				  LEFT JOIN auth.memberships m ON m.id = $3 AND m.user_id = u.id
 				 WHERE s.token_hash = $1 AND s.user_id = $2`,
-				HashToken(rawToken), userID,
+				HashToken(rawToken), userID, membershipID,
 			).Scan(&sessionID, &ativa, &estado, &tenantID)
 
 			if err != nil || !ativa {
@@ -119,7 +128,8 @@ func RequireAuth(jwtSecret string, pool *pgxpool.Pool) func(http.Handler) http.H
 			}
 
 			ctx := context.WithValue(r.Context(), UserKey, &AuthUser{
-				ID: userID, TenantID: tenantID, SessionID: sessionID, Tipo: tipo, Escopo: escopo,
+				ID: userID, TenantID: tenantID, SessionID: sessionID,
+				MembershipID: membershipID, Tipo: tipo, Escopo: escopo,
 			})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -153,6 +163,7 @@ func RequireJWT(jwtSecret string) func(http.Handler) http.Handler {
 			}
 			userID := int64(subRaw)
 			tidRaw, _ := claims["tid"].(float64)
+			midRaw, _ := claims["mid"].(float64)
 			tipo, _ := claims["tipo"].(string)
 			if tipo == "" {
 				tipo = "funcionario"
@@ -167,7 +178,7 @@ func RequireJWT(jwtSecret string) func(http.Handler) http.Handler {
 			}
 
 			ctx := context.WithValue(r.Context(), UserKey, &AuthUser{
-				ID: userID, TenantID: int64(tidRaw), Tipo: tipo, Escopo: escopo,
+				ID: userID, TenantID: int64(tidRaw), MembershipID: int64(midRaw), Tipo: tipo, Escopo: escopo,
 			})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -195,7 +206,7 @@ func RequirePermissionAny(pool *pgxpool.Pool, perms []authModels.Permission) fun
 				next.ServeHTTP(w, r)
 				return
 			}
-			access, err := authModels.LoadUserAccess(r.Context(), pool, user.ID)
+			access, err := authModels.LoadUserAccess(r.Context(), pool, user.ID, user.MembershipID)
 			if err != nil {
 				JSONErr(w, "Sem permissão", http.StatusForbidden)
 				return

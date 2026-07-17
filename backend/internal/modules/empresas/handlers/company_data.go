@@ -3,9 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"nexora/internal/shared/pessoas"
 )
 
 // ── Settings ──────────────────────────────────────────────────────────────────
@@ -197,11 +199,19 @@ func (h *Handler) AdicionarContacto(w http.ResponseWriter, r *http.Request) {
 		Principal *bool   `json:"principal"`
 	}
 	json.NewDecoder(r.Body).Decode(&body)
+
+	var pessoaID *int64
+	if body.Nome != nil && strings.TrimSpace(*body.Nome) != "" {
+		if pid, err := pessoas.EnsurePessoa(r.Context(), h.db, *body.Nome); err == nil {
+			pessoaID = &pid
+		}
+	}
+
 	var cid int64
 	h.db.QueryRow(r.Context(), `
-		INSERT INTO company_contacts (company_id, tipo, nome, telefone, email, principal)
-		VALUES ($1, COALESCE($2,'geral'), $3, $4, $5, COALESCE($6,FALSE)) RETURNING id`,
-		id, body.Tipo, body.Nome, body.Telefone, body.Email, body.Principal).Scan(&cid)
+		INSERT INTO company_contacts (company_id, tipo, nome, telefone, email, principal, pessoa_id)
+		VALUES ($1, COALESCE($2,'geral'), $3, $4, $5, COALESCE($6,FALSE), $7) RETURNING id`,
+		id, body.Tipo, body.Nome, body.Telefone, body.Email, body.Principal, pessoaID).Scan(&cid)
 	jsonOK(w, map[string]any{"id": cid}, http.StatusCreated)
 }
 

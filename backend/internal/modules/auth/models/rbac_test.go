@@ -18,10 +18,10 @@ func TestLoadUserAccess_SuperadminBypass(t *testing.T) {
 		AddRow(int64(1), "superadmin", "erp", (*int64)(nil), (*string)(nil))
 
 	mock.ExpectQuery("SELECT COALESCE\\(m\\.tenant_id, 0\\).*").
-		WithArgs(int64(1)).
+		WithArgs(int64(1), int64(0)).
 		WillReturnRows(rows)
 
-	ua, err := LoadUserAccess(context.Background(), mock, 1)
+	ua, err := LoadUserAccess(context.Background(), mock, 1, 0)
 	require.NoError(t, err)
 
 	assert.True(t, ua.Can("faturacao", "ver"))
@@ -96,7 +96,7 @@ func TestLoadUserAccess_FiltraEscopo(t *testing.T) {
 			userRows := pgxmock.NewRows([]string{"tenant_id", "tipo", "escopo", "cargo_id", "cargo_nome"}).
 				AddRow(int64(1), "funcionario", tt.escopo, cargoIDPtr, cargoNome)
 			mock.ExpectQuery("SELECT COALESCE\\(m\\.tenant_id, 0\\).*").
-				WithArgs(int64(10)).
+				WithArgs(int64(10), int64(5)).
 				WillReturnRows(userRows)
 
 			if tt.cargoID != 0 {
@@ -132,7 +132,7 @@ func TestLoadUserAccess_FiltraEscopo(t *testing.T) {
 				WithArgs(int64(1), int64(1)).
 				WillReturnRows(featuresRows)
 
-			ua, err := LoadUserAccess(context.Background(), mock, 10)
+			ua, err := LoadUserAccess(context.Background(), mock, 10, 5)
 			require.NoError(t, err)
 
 			got := make([]string, 0, len(ua.Modulos))

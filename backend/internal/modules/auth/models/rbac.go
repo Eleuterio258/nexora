@@ -107,16 +107,25 @@ func buildModulos(perms []Permission) []ModuloAcesso {
 	return out
 }
 
-// LoadUserAccess carrega tipo + cargo + permissões mergeadas para um utilizador.
-func LoadUserAccess(ctx context.Context, db DBQuerier, userID int64) (*UserAccess, error) {
+// LoadUserAccess carrega tipo + cargo + permissões mergeadas para um
+// utilizador, na membership indicada. membershipID deve vir de um JWT já
+// validado (claim "mid", ver middleware.AuthUser.MembershipID) — 0 devolve
+// o mesmo resultado de um utilizador sem membership (ex.: superadmin).
+//
+// Filtrar por membership_id (em vez de só user_id) é o que torna esta
+// query determinística agora que auth.memberships permite mais de um
+// vínculo por utilizador (ver migration 20260713000002): sem este filtro,
+// um LEFT JOIN só por user_id passaria a devolver uma linha arbitrária
+// entre as várias memberships possíveis.
+func LoadUserAccess(ctx context.Context, db DBQuerier, userID, membershipID int64) (*UserAccess, error) {
 	ua := &UserAccess{UserID: userID, Modulos: []ModuloAcesso{}, Features: []string{}}
 
 	err := db.QueryRow(ctx, `
 		SELECT COALESCE(m.tenant_id, 0), u.tipo, COALESCE(NULLIF(m.escopo, ''), 'erp'), m.cargo_id, c.nome
 		  FROM users u
-		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
+		  LEFT JOIN auth.memberships m ON m.id = $2 AND m.user_id = u.id AND m.ativo = true
 		  LEFT JOIN cargos c ON c.id = m.cargo_id
-		 WHERE u.id = $1`, userID).
+		 WHERE u.id = $1`, userID, membershipID).
 		Scan(&ua.TenantID, &ua.Tipo, &ua.Escopo, &ua.CargoID, &ua.CargoNome)
 	if err != nil {
 		return nil, err

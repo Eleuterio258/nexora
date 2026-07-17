@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/internal/shared/contracts"
+	"nexora/internal/shared/pessoas"
 )
 
 // ClientAdapter implementa contracts.ClientPort.
@@ -59,16 +60,28 @@ func (a *ClientAdapter) CreateClient(ctx context.Context, c contracts.ClientData
 	}
 	codigo = fmt.Sprintf("%s-%d", codigo, c.TenantID%1000)
 
+	// pessoa_id: reutiliza a já resolvida pelo chamador (ex.: encarregado,
+	// que já está ligado a uma pessoas.pessoas — ver contracts.ClientData);
+	// só na ausência disso é que se aplica a mesma heurística "sem NUIT de
+	// empresa" usada nos outros pontos de criação de clientes.customers.
+	pessoaID := c.PessoaID
+	if pessoaID == nil && strings.TrimSpace(c.Nuit) == "" {
+		if pid, err := pessoas.EnsurePessoa(ctx, a.db, c.Nome); err == nil {
+			pessoaID = &pid
+		}
+	}
+
 	var id int64
 	err := a.db.QueryRow(ctx, `
 		INSERT INTO clientes.customers
-		(tenant_id, codigo, nome, email, telefone, nuit, estado)
-		VALUES ($1, $2, $3, $4, $5, $6, 'ativo')
+		(tenant_id, codigo, nome, email, telefone, nuit, estado, pessoa_id)
+		VALUES ($1, $2, $3, $4, $5, $6, 'ativo', $7)
 		ON CONFLICT (tenant_id, codigo) DO UPDATE
-		  SET nome  = EXCLUDED.nome,
-		      email = EXCLUDED.email
+		  SET nome      = EXCLUDED.nome,
+		      email     = EXCLUDED.email,
+		      pessoa_id = COALESCE(clientes.customers.pessoa_id, EXCLUDED.pessoa_id)
 		RETURNING id`,
-		c.TenantID, codigo, c.Nome, c.Email, c.Telefone, c.Nuit,
+		c.TenantID, codigo, c.Nome, c.Email, c.Telefone, c.Nuit, pessoaID,
 	).Scan(&id)
 	return id, err
 }

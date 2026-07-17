@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/pessoas"
 )
 
 // â”€â”€ Grupos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -152,11 +154,22 @@ func (h *Handler) CriarCliente(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "nome Ã© obrigatÃ³rio", http.StatusBadRequest)
 		return
 	}
+	// Heurística "sem NUIT de empresa": só pessoas singulares (sem NUIT
+	// indicado) ficam ligadas a pessoas.pessoas — evita criar uma "pessoa"
+	// para clientes que são empresas (ver plano da extensão do modelo Pessoa
+	// central a contactos externos).
+	var pessoaID *int64
+	if body.Nuit == nil || strings.TrimSpace(*body.Nuit) == "" {
+		if pid, err := pessoas.EnsurePessoa(r.Context(), h.db, body.Nome); err == nil {
+			pessoaID = &pid
+		}
+	}
+
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO customers (tenant_id, codigo, nome, nuit, email, telefone, customer_group_id, observacao)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-		user.TenantID, body.Codigo, body.Nome, body.Nuit, body.Email, body.Telefone, body.CustomerGroupID, body.Observacao).Scan(&id)
+		INSERT INTO customers (tenant_id, codigo, nome, nuit, email, telefone, customer_group_id, observacao, pessoa_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+		user.TenantID, body.Codigo, body.Nome, body.Nuit, body.Email, body.Telefone, body.CustomerGroupID, body.Observacao, pessoaID).Scan(&id)
 	if err != nil {
 		if isUniqueViolation(err) {
 			jsonErr(w, "CÃ³digo ou NUIT jÃ¡ existe", http.StatusConflict)

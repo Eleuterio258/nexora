@@ -15,7 +15,9 @@ data class ErpLoginResponse(
     val expires_in: Int,
     val tipo: String,
     val user: ErpUser,
-    val modulos: List<ErpModuloAcesso> = emptyList()
+    val modulos: List<ErpModuloAcesso> = emptyList(),
+    val escopo: List<String> = emptyList(),
+    val features: List<String> = emptyList()
 )
 
 data class ErpUser(

@@ -14,6 +14,7 @@ import (
 	"nexora/internal/modules/gestao-escolar/models"
 	"nexora/internal/modules/gestao-escolar/services"
 	"nexora/internal/shared/contracts"
+	"nexora/internal/shared/pessoas"
 )
 
 func (h *Handler) teacherService() *services.TeacherService {
@@ -108,6 +109,22 @@ func (h *Handler) CriarProfessor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ligar o professor a uma pessoa desde a criação (ver
+	// docs/analise-modelo-pessoa-multi-tenant.md secção 9) — cobre o caso de
+	// professor criado directamente (fora do fluxo de contratação, que já
+	// liga pessoa_id desde a Fase 3). teacherPessoaID é reutilizado abaixo
+	// para o funcionário RH criado automaticamente, para não ficar órfão.
+	var teacherPessoaID int64
+	if teacher.UserID != nil {
+		if pid, err := pessoas.EnsureUserPessoa(r.Context(), h.db, *teacher.UserID, teacher.NomeCompleto, nil); err == nil {
+			teacherPessoaID = pid
+			h.db.Exec(r.Context(), `UPDATE gestao_escolar.school_teachers SET pessoa_id = $1 WHERE id = $2`, pid, teacher.ID)
+		}
+	} else if pid, err := pessoas.EnsurePessoa(r.Context(), h.db, teacher.NomeCompleto); err == nil {
+		teacherPessoaID = pid
+		h.db.Exec(r.Context(), `UPDATE gestao_escolar.school_teachers SET pessoa_id = $1 WHERE id = $2`, pid, teacher.ID)
+	}
+
 	// Criar funcionário no módulo RH automaticamente (se port disponível)
 	if h.hr != nil && teacher.NomeCompleto != "" {
 		go func() {
@@ -121,6 +138,7 @@ func (h *Handler) CriarProfessor(w http.ResponseWriter, r *http.Request) {
 				NomeNumero:   fmt.Sprintf("PROF-%d", teacher.ID),
 				DataAdmissao: time.Now(),
 				Cargo:        teacher.Especialidade,
+				PessoaID:     teacherPessoaID,
 			})
 			if err != nil || empID == 0 {
 				return

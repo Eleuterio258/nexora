@@ -5,151 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
-	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
 	mw "nexora/internal/middleware"
 )
-
-const portalJWTExpiry = 8 * time.Hour
-
-func (h *Handler) signAlunoToken(studentID, tenantID int64) (string, error) {
-	jti, err := generateInviteToken()
-	if err != nil {
-		return "", err
-	}
-	claims := jwt.MapClaims{
-		"sub":  studentID,
-		"tid":  tenantID,
-		"tipo": "aluno",
-		"jti":  jti,
-		"exp":  time.Now().Add(portalJWTExpiry).Unix(),
-		"iat":  time.Now().Unix(),
-	}
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.cfg.JWTSecret))
-}
-
-// ── POST /api/portal/aluno/login ─────────────────────────────────────────────
-
-const (
-	loginMaxTentativas = 5
-	loginBloqueio      = 30 * time.Minute
-)
-
-func (h *Handler) PortalLogin(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Email == "" || body.Password == "" {
-		jsonErr(w, "Email e password são obrigatórios", http.StatusBadRequest)
-		return
-	}
-
-	var userID int64
-	var passwordHash string
-
-	// Autenticar na tabela unificada de utilizadores
-	err := h.db.QueryRow(r.Context(), `
-		SELECT id, password_hash
-		  FROM auth.users
-		 WHERE LOWER(email) = LOWER($1) AND tipo = 'aluno' AND estado = 'ativo'`,
-		body.Email,
-	).Scan(&userID, &passwordHash)
-	if err != nil {
-		jsonErr(w, "Credenciais inválidas", http.StatusUnauthorized)
-		return
-	}
-
-	var studentID, tenantID int64
-	var nome, codigo string
-	var portalAtivo bool
-	var tentativas int
-	var bloqueadoAte *time.Time
-
-	err = h.db.QueryRow(r.Context(), `
-		SELECT s.id, s.tenant_id, s.nome, s.codigo, s.portal_ativo,
-		       s.portal_login_tentativas, s.portal_bloqueado_ate
-		  FROM gestao_escolar.school_students s
-		 WHERE s.user_id = $1`,
-		userID,
-	).Scan(&studentID, &tenantID, &nome, &codigo, &portalAtivo, &tentativas, &bloqueadoAte)
-	if err != nil {
-		jsonErr(w, "Aluno não encontrado no portal", http.StatusUnauthorized)
-		return
-	}
-
-	// Verificar bloqueio temporário
-	if bloqueadoAte != nil && bloqueadoAte.After(time.Now()) {
-		jsonErr(w, "Conta temporariamente bloqueada por excesso de tentativas. Tente novamente mais tarde.", http.StatusTooManyRequests)
-		return
-	}
-
-	if !portalAtivo {
-		jsonErr(w, "Acesso ao portal não activado. Contacte a secretaria.", http.StatusForbidden)
-		return
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(body.Password)); err != nil {
-		// Incrementar contador de tentativas falhadas
-		tentativas++
-		if tentativas >= loginMaxTentativas {
-			_, _ = h.db.Exec(r.Context(), `
-				UPDATE gestao_escolar.school_students
-				   SET portal_login_tentativas = $1,
-				       portal_bloqueado_ate    = NOW() + $2::interval
-				 WHERE id = $3`,
-				tentativas, loginBloqueio.String(), studentID)
-		} else {
-			_, _ = h.db.Exec(r.Context(), `
-				UPDATE gestao_escolar.school_students
-				   SET portal_login_tentativas = $1
-				 WHERE id = $2`,
-				tentativas, studentID)
-		}
-		jsonErr(w, "Credenciais inválidas", http.StatusUnauthorized)
-		return
-	}
-
-	// Login bem sucedido: resetar contador e registar último acesso
-	_, _ = h.db.Exec(r.Context(), `
-		UPDATE gestao_escolar.school_students
-		   SET portal_login_tentativas = 0,
-		       portal_bloqueado_ate    = NULL,
-		       portal_ultimo_login     = NOW()
-		 WHERE id = $1`, studentID)
-
-	token, err := h.signAlunoToken(studentID, tenantID)
-	if err != nil {
-		jsonErr(w, "Erro interno", http.StatusInternalServerError)
-		return
-	}
-
-	expiresAt := time.Now().Add(portalJWTExpiry)
-	_, err = h.db.Exec(r.Context(), `
-		INSERT INTO gestao_escolar.portal_sessions
-			(student_id, tenant_id, token_hash, ip_address, user_agent, expira_em)
-		VALUES ($1, $2, $3, $4, $5, $6)`,
-		studentID, tenantID, mw.HashToken(token),
-		r.RemoteAddr, r.Header.Get("User-Agent"), expiresAt,
-	)
-	if err != nil {
-		jsonErr(w, "Erro ao criar sessão", http.StatusInternalServerError)
-		return
-	}
-
-	jsonOK(w, map[string]any{
-		"access_token": token,
-		"expires_in":   int(portalJWTExpiry.Seconds()),
-		"aluno": map[string]any{
-			"id":     studentID,
-			"nome":   nome,
-			"codigo": codigo,
-		},
-	}, http.StatusOK)
-}
 
 // ── POST /api/portal/aluno/logout ────────────────────────────────────────────
 
@@ -252,15 +112,15 @@ func (h *Handler) PortalDefinirSenha(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var studentID int64
-	var userID *int64
+	var userID, pessoaID *int64
 	var portalEmail, nome string
 	err = h.db.QueryRow(r.Context(), `
-		SELECT id, user_id, portal_email, nome
+		SELECT id, user_id, portal_email, nome, pessoa_id
 		  FROM gestao_escolar.school_students
 		 WHERE portal_invite_token = $1
 		   AND portal_invite_expires_at > NOW()`,
 		body.Token,
-	).Scan(&studentID, &userID, &portalEmail, &nome)
+	).Scan(&studentID, &userID, &portalEmail, &nome, &pessoaID)
 	if err != nil {
 		jsonErr(w, "Link inválido ou expirado", http.StatusUnprocessableEntity)
 		return
@@ -272,7 +132,7 @@ func (h *Handler) PortalDefinirSenha(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, "Email do portal não configurado", http.StatusUnprocessableEntity)
 			return
 		}
-		uid, err = h.upsertPortalUser(r.Context(), portalEmail, nome, "", string(hash), "aluno", true)
+		uid, err = h.upsertPortalUser(r.Context(), portalEmail, nome, "", string(hash), "aluno", true, pessoaID)
 		if err != nil {
 			jsonErr(w, "Erro ao criar utilizador", http.StatusInternalServerError)
 			return

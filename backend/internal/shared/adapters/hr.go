@@ -42,6 +42,11 @@ func (a *HRAdapter) CreateEmployee(ctx context.Context, e contracts.HREmployee) 
 		return 0, fmt.Errorf("nome e tenant_id obrigatórios para criar funcionário RH")
 	}
 
+	var pessoaID *int64
+	if e.PessoaID > 0 {
+		pessoaID = &e.PessoaID
+	}
+
 	// Verificar se já existe por email
 	if e.Email != "" {
 		var existingID int64
@@ -50,6 +55,12 @@ func (a *HRAdapter) CreateEmployee(ctx context.Context, e contracts.HREmployee) 
 			WHERE tenant_id = $1 AND email = $2
 			LIMIT 1`, e.TenantID, e.Email).Scan(&existingID)
 		if err == nil {
+			// Já existe — aproveita para fechar o gap se ainda não tiver
+			// pessoa_id (ver docs/analise-modelo-pessoa-multi-tenant.md
+			// secção 9), sem nunca substituir uma ligação já existente.
+			if pessoaID != nil {
+				a.db.Exec(ctx, `UPDATE rh.funcionarios SET pessoa_id = COALESCE(pessoa_id, $1) WHERE id = $2`, pessoaID, existingID)
+			}
 			return existingID, nil // já existe
 		}
 	}
@@ -57,13 +68,14 @@ func (a *HRAdapter) CreateEmployee(ctx context.Context, e contracts.HREmployee) 
 	var id int64
 	err := a.db.QueryRow(ctx, `
 		INSERT INTO rh.funcionarios
-		(tenant_id, numero_funcionario, nome_completo, email, telefone, data_admissao, cargo, estado)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 'ativo')
+		(tenant_id, numero_funcionario, nome_completo, email, telefone, data_admissao, cargo, estado, pessoa_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 'ativo', $8)
 		ON CONFLICT (tenant_id, numero_funcionario) WHERE numero_funcionario IS NOT NULL AND numero_funcionario <> '' DO UPDATE
 		  SET email      = EXCLUDED.email,
+		      pessoa_id  = COALESCE(rh.funcionarios.pessoa_id, EXCLUDED.pessoa_id),
 		      updated_at = NOW()
 		RETURNING id`,
-		e.TenantID, e.NomeNumero, e.Nome, e.Email, e.Telefone, e.DataAdmissao, e.Cargo,
+		e.TenantID, e.NomeNumero, e.Nome, e.Email, e.Telefone, e.DataAdmissao, e.Cargo, pessoaID,
 	).Scan(&id)
 	return id, err
 }

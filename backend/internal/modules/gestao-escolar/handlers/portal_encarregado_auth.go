@@ -5,137 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
 	mw "nexora/internal/middleware"
 )
-
-const encarregadoJWTExpiry = 8 * time.Hour
-
-func (h *Handler) signEncarregadoToken(email string, tenantID int64) (string, error) {
-	claims := jwt.MapClaims{
-		"email": email,
-		"tid":   tenantID,
-		"tipo":  "encarregado",
-		"exp":   time.Now().Add(encarregadoJWTExpiry).Unix(),
-		"iat":   time.Now().Unix(),
-	}
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.cfg.JWTSecret))
-}
-
-// ── POST /api/portal/encarregado/login ───────────────────────────────────────
-
-func (h *Handler) EncarregadoLogin(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Email == "" || body.Password == "" {
-		jsonErr(w, "Email e password são obrigatórios", http.StatusBadRequest)
-		return
-	}
-
-	// Autenticar na tabela unificada de utilizadores
-	var userID int64
-	var passwordHash, nome string
-	err := h.db.QueryRow(r.Context(), `
-		SELECT id, password_hash, nome
-		  FROM auth.users
-		 WHERE LOWER(email) = LOWER($1) AND tipo = 'encarregado' AND estado = 'ativo'`,
-		body.Email,
-	).Scan(&userID, &passwordHash, &nome)
-	if err != nil {
-		jsonErr(w, "Credenciais inválidas", http.StatusUnauthorized)
-		return
-	}
-
-	// Resolver tenant e registos de guardian activos para este encarregado
-	var tenantID int64
-	var portalAtivo bool
-	var tentativas int
-	var bloqueadoAte *time.Time
-	err = h.db.QueryRow(r.Context(), `
-		SELECT g.tenant_id,
-		       bool_or(g.portal_ativo) AS portal_ativo,
-		       COALESCE(MAX(g.portal_login_tentativas), 0) AS tentativas,
-		       MAX(g.portal_bloqueado_ate) AS bloqueado_ate
-		  FROM gestao_escolar.school_guardians g
-		 WHERE g.user_id = $1
-		 GROUP BY g.tenant_id
-		 ORDER BY bool_or(g.portal_ativo) DESC, g.tenant_id
-		 LIMIT 1`,
-		userID,
-	).Scan(&tenantID, &portalAtivo, &tentativas, &bloqueadoAte)
-	if err != nil {
-		jsonErr(w, "Encarregado não encontrado", http.StatusUnauthorized)
-		return
-	}
-
-	if bloqueadoAte != nil && bloqueadoAte.After(time.Now()) {
-		jsonErr(w, "Conta temporariamente bloqueada. Tente novamente mais tarde.", http.StatusTooManyRequests)
-		return
-	}
-	if !portalAtivo {
-		jsonErr(w, "Acesso ao portal não activado. Contacte a secretaria.", http.StatusForbidden)
-		return
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(body.Password)); err != nil {
-		tentativas++
-		if tentativas >= loginMaxTentativas {
-			_, _ = h.db.Exec(r.Context(), `
-				UPDATE gestao_escolar.school_guardians
-				   SET portal_login_tentativas = $1,
-				       portal_bloqueado_ate    = NOW() + $2::interval
-				 WHERE user_id = $3 AND tenant_id = $4`,
-				tentativas, loginBloqueio.String(), userID, tenantID)
-		} else {
-			_, _ = h.db.Exec(r.Context(), `
-				UPDATE gestao_escolar.school_guardians
-				   SET portal_login_tentativas = $1
-				 WHERE user_id = $2 AND tenant_id = $3`,
-				tentativas, userID, tenantID)
-		}
-		jsonErr(w, "Credenciais inválidas", http.StatusUnauthorized)
-		return
-	}
-
-	_, _ = h.db.Exec(r.Context(), `
-		UPDATE gestao_escolar.school_guardians
-		   SET portal_login_tentativas = 0, portal_bloqueado_ate = NULL, portal_ultimo_login = NOW()
-		 WHERE user_id = $1 AND tenant_id = $2`,
-		userID, tenantID)
-
-	token, err := h.signEncarregadoToken(body.Email, tenantID)
-	if err != nil {
-		jsonErr(w, "Erro interno", http.StatusInternalServerError)
-		return
-	}
-
-	expiresAt := time.Now().Add(encarregadoJWTExpiry)
-	_, err = h.db.Exec(r.Context(), `
-		INSERT INTO gestao_escolar.guardian_portal_sessions
-			(guardian_email, tenant_id, token_hash, ip_address, user_agent, expira_em)
-		VALUES ($1, $2, $3, $4, $5, $6)`,
-		body.Email, tenantID, mw.HashToken(token),
-		r.RemoteAddr, r.Header.Get("User-Agent"), expiresAt,
-	)
-	if err != nil {
-		jsonErr(w, "Erro ao criar sessão", http.StatusInternalServerError)
-		return
-	}
-
-	jsonOK(w, map[string]any{
-		"access_token": token,
-		"expires_in":   int(encarregadoJWTExpiry.Seconds()),
-		"encarregado": map[string]any{
-			"nome":      nome,
-			"email":     body.Email,
-			"tenant_id": tenantID,
-		},
-	}, http.StatusOK)
-}
 
 // ── POST /api/portal/encarregado/logout ──────────────────────────────────────
 
@@ -158,7 +31,7 @@ func (h *Handler) EncarregadoMe(w http.ResponseWriter, r *http.Request) {
 	var result any
 	err := h.db.QueryRow(r.Context(), `
 		SELECT jsonb_build_object(
-			'email',    $1,
+			'email',    $1::text,
 			'educandos', COALESCE((
 				SELECT jsonb_agg(jsonb_build_object(
 					'guardian_id',  g.id,
@@ -212,15 +85,15 @@ func (h *Handler) EncarregadoDefinirSenha(w http.ResponseWriter, r *http.Request
 	}
 
 	var guardianID int64
-	var userID *int64
+	var userID, pessoaID *int64
 	var portalEmail, nome string
 	err = h.db.QueryRow(r.Context(), `
-		SELECT id, user_id, portal_email, nome
+		SELECT id, user_id, portal_email, nome, pessoa_id
 		  FROM gestao_escolar.school_guardians
 		 WHERE portal_invite_token = $1
 		   AND portal_invite_expires_at > NOW()`,
 		body.Token,
-	).Scan(&guardianID, &userID, &portalEmail, &nome)
+	).Scan(&guardianID, &userID, &portalEmail, &nome, &pessoaID)
 	if err != nil {
 		jsonErr(w, "Link inválido ou expirado", http.StatusUnprocessableEntity)
 		return
@@ -232,7 +105,7 @@ func (h *Handler) EncarregadoDefinirSenha(w http.ResponseWriter, r *http.Request
 			jsonErr(w, "Email do portal não configurado", http.StatusUnprocessableEntity)
 			return
 		}
-		uid, err = h.upsertPortalUser(r.Context(), portalEmail, nome, "", string(hash), "encarregado", true)
+		uid, err = h.upsertPortalUser(r.Context(), portalEmail, nome, "", string(hash), "encarregado", true, pessoaID)
 		if err != nil {
 			jsonErr(w, "Erro ao criar utilizador", http.StatusInternalServerError)
 			return
@@ -261,7 +134,6 @@ func (h *Handler) EncarregadoDefinirSenha(w http.ResponseWriter, r *http.Request
 	tag, err := h.db.Exec(r.Context(), `
 		UPDATE gestao_escolar.school_guardians
 		   SET portal_ativo             = true,
-		       portal_email_verificado  = true,
 		       portal_invite_token      = NULL,
 		       portal_invite_expires_at = NULL
 		 WHERE portal_invite_token = $1
@@ -331,15 +203,16 @@ func (h *Handler) EncarregadoConvidar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var nome string
+	var pessoaID *int64
 	if err := h.db.QueryRow(r.Context(), `
-		SELECT nome FROM gestao_escolar.school_guardians WHERE id = $1 AND tenant_id = $2`,
-		body.GuardianID, u.TenantID).Scan(&nome); err != nil {
+		SELECT nome, pessoa_id FROM gestao_escolar.school_guardians WHERE id = $1 AND tenant_id = $2`,
+		body.GuardianID, u.TenantID).Scan(&nome, &pessoaID); err != nil {
 		jsonErr(w, "Encarregado não encontrado", http.StatusNotFound)
 		return
 	}
 
 	// Criar utilizador pendente (sem senha) na tabela unificada
-	userID, err := h.upsertPortalUser(r.Context(), body.Email, nome, "", "", "encarregado", false)
+	userID, err := h.upsertPortalUser(r.Context(), body.Email, nome, "", "", "encarregado", false, pessoaID)
 	if err != nil {
 		jsonErr(w, "Email já em uso ou erro ao criar utilizador", http.StatusUnprocessableEntity)
 		return

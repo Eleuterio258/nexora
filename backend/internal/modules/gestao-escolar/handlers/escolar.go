@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	mw "nexora/internal/middleware"
 	"nexora/internal/shared/contracts"
+	"nexora/internal/shared/pessoas"
 )
 
 func schoolBody(r *http.Request) ([]byte, error) {
@@ -411,18 +412,39 @@ func (h *Handler) CriarAluno(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "JSON invalido", 400)
 		return
 	}
-	h.schoolCreate(w, r, `INSERT INTO gestao_escolar.school_students
+	var id int64
+	var nome string
+	if err := h.db.QueryRow(r.Context(), `INSERT INTO gestao_escolar.school_students
 		(tenant_id,codigo,nome,data_nascimento,genero,documento_tipo,documento_numero,nuit,telefone,email,endereco,fotografia_url)
 		SELECT $1,j.codigo,j.nome,j.data_nascimento,j.genero,j.documento_tipo,j.documento_numero,j.nuit,j.telefone,j.email,j.endereco,j.fotografia_url
 		FROM jsonb_to_record($2::jsonb) AS j(codigo text,nome text,data_nascimento date,genero text,
 		documento_tipo text,documento_numero text,nuit text,telefone text,email text,endereco text,fotografia_url text)
-		WHERE j.codigo<>'' AND j.nome<>'' RETURNING id`, u.TenantID, body)
+		WHERE j.codigo<>'' AND j.nome<>'' RETURNING id, nome`, u.TenantID, body,
+	).Scan(&id, &nome); err != nil {
+		jsonErr(w, "Dados invalidos ou registo duplicado", http.StatusUnprocessableEntity)
+		return
+	}
+
+	// Ligar o aluno a uma pessoa desde a criação (ver
+	// docs/analise-modelo-pessoa-multi-tenant.md secção 9) — sem isto, um
+	// aluno criado directamente pelo admin ficava com pessoa_id NULL (só o
+	// backfill da Fase 1 preenchia isto para alunos já existentes).
+	if pessoaID, err := pessoas.EnsurePessoa(r.Context(), h.db, nome); err == nil {
+		h.db.Exec(r.Context(), `UPDATE gestao_escolar.school_students SET pessoa_id = $1 WHERE id = $2`, pessoaID, id)
+	}
+
+	jsonOK(w, map[string]any{"id": id}, http.StatusCreated)
 }
 
 func (h *Handler) ObterAluno(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetUser(r)
 	h.schoolOne(w, r, `SELECT to_jsonb(s)||jsonb_build_object(
-		'encarregados',COALESCE((SELECT jsonb_agg(to_jsonb(g) ORDER BY g.principal DESC) FROM gestao_escolar.school_guardians g WHERE g.student_id=s.id),'[]'),
+		'encarregados',COALESCE((SELECT jsonb_agg(jsonb_build_object(
+			'id',g.id,'nome',g.nome,'parentesco',g.parentesco,'telefone',g.telefone,'email',g.email,
+			'nuit',g.nuit,'endereco',g.endereco,'principal',g.principal,'autorizado_recolher',g.autorizado_recolher,
+			'user_id',g.user_id,'portal_email',g.portal_email,'portal_ativo',g.portal_ativo,
+			'created_at',g.created_at,'updated_at',g.updated_at
+		) ORDER BY g.principal DESC) FROM gestao_escolar.school_guardians g WHERE g.student_id=s.id),'[]'),
 		'matriculas',COALESCE((SELECT jsonb_agg(to_jsonb(e)||jsonb_build_object('turma',c.nome) ORDER BY e.created_at DESC)
 		FROM gestao_escolar.school_enrollments e JOIN gestao_escolar.school_classes c ON c.id=e.class_id WHERE e.student_id=s.id),'[]'))
 		FROM gestao_escolar.school_students s WHERE s.id=$1 AND s.tenant_id=$2`, chi.URLParam(r, "id"), u.TenantID)
@@ -465,6 +487,25 @@ func (h *Handler) AdicionarEncarregado(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ligar o encarregado a uma pessoa e registar a relação com o aluno (ver
+	// docs/analise-modelo-pessoa-multi-tenant.md secção 9) — sem isto, o
+	// encarregado ficava com pessoa_id NULL (só o backfill da Fase 1
+	// preenchia isto; nenhum código vivo o fazia até agora).
+	var guardianNome, guardianParentesco string
+	var guardianPrincipal bool
+	var studentPessoaID *int64
+	if err := h.db.QueryRow(r.Context(), `
+		SELECT g.nome, COALESCE(g.parentesco,''), g.principal, s.pessoa_id
+		  FROM gestao_escolar.school_guardians g
+		  JOIN gestao_escolar.school_students s ON s.id = g.student_id
+		 WHERE g.id = $1`, guardianID,
+	).Scan(&guardianNome, &guardianParentesco, &guardianPrincipal, &studentPessoaID); err == nil && studentPessoaID != nil {
+		if guardianPessoaID, err := pessoas.EnsurePessoa(r.Context(), h.db, guardianNome); err == nil {
+			h.db.Exec(r.Context(), `UPDATE gestao_escolar.school_guardians SET pessoa_id = $1 WHERE id = $2`, guardianPessoaID, guardianID)
+			_ = pessoas.LinkPessoaRelacao(r.Context(), h.db, u.TenantID, guardianPessoaID, *studentPessoaID, guardianParentesco, guardianPrincipal)
+		}
+	}
+
 	// Registar encarregado como cliente no módulo Gestão de Clientes (assíncrono)
 	if h.client != nil {
 		tenantID := u.TenantID
@@ -473,10 +514,11 @@ func (h *Handler) AdicionarEncarregado(w http.ResponseWriter, r *http.Request) {
 			defer cancel()
 
 			var nome, email, telefone, nuit string
+			var pessoaID *int64
 			_ = h.db.QueryRow(ctx, `
-				SELECT nome, COALESCE(email,''), COALESCE(telefone,''), COALESCE(nuit,'')
+				SELECT nome, COALESCE(email,''), COALESCE(telefone,''), COALESCE(nuit,''), pessoa_id
 				FROM gestao_escolar.school_guardians WHERE id=$1`, guardianID,
-			).Scan(&nome, &email, &telefone, &nuit)
+			).Scan(&nome, &email, &telefone, &nuit, &pessoaID)
 
 			if nome == "" {
 				return
@@ -488,6 +530,7 @@ func (h *Handler) AdicionarEncarregado(w http.ResponseWriter, r *http.Request) {
 				Telefone: telefone,
 				Nuit:     nuit,
 				Tipo:     "encarregado",
+				PessoaID: pessoaID,
 			})
 			if err != nil || clientID == 0 {
 				return

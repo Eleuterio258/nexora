@@ -24,13 +24,14 @@ const (
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 type userIdentity struct {
-	id       int64
-	tenantID int64
-	nome     string
-	email    string
-	estado   string
-	tipo     string
-	escopo   string
+	id           int64
+	tenantID     int64
+	membershipID int64
+	nome         string
+	email        string
+	estado       string
+	tipo         string
+	escopo       string
 }
 
 // lookupUserByEmail procura um utilizador pelo email (case-insensitive) e
@@ -38,12 +39,12 @@ type userIdentity struct {
 func (h *Handler) lookupUserByEmail(ctx context.Context, email string) (*userIdentity, error) {
 	var u userIdentity
 	err := h.db.QueryRow(ctx, `
-		SELECT u.id, COALESCE(m.tenant_id, 0), u.nome, u.email, u.estado, u.tipo, COALESCE(NULLIF(m.escopo, ''), 'erp')
+		SELECT u.id, COALESCE(m.tenant_id, 0), COALESCE(m.id, 0), u.nome, u.email, u.estado, u.tipo, COALESCE(NULLIF(m.escopo, ''), 'erp')
 		  FROM users u
 		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
 		 WHERE u.email = LOWER($1)`,
 		email,
-	).Scan(&u.id, &u.tenantID, &u.nome, &u.email, &u.estado, &u.tipo, &u.escopo)
+	).Scan(&u.id, &u.tenantID, &u.membershipID, &u.nome, &u.email, &u.estado, &u.tipo, &u.escopo)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +54,7 @@ func (h *Handler) lookupUserByEmail(ctx context.Context, email string) (*userIde
 // issueFuncionarioTokens cria access + refresh tokens, regista a sessão e
 // devolve a resposta padrão de login do ERP. É usada por Login, PIN e TOTP.
 func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request, u *userIdentity) {
-	accessToken, err := h.signAccess(u.id, u.tenantID, u.tipo, u.escopo)
+	accessToken, err := h.signAccess(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -72,7 +73,7 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 
 	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, u.id)
 
-	userAccess, _ := models.LoadUserAccess(r.Context(), h.db, u.id)
+	userAccess, _ := models.LoadUserAccess(r.Context(), h.db, u.id, u.membershipID)
 
 	userObj := map[string]interface{}{
 		"id":     u.id,

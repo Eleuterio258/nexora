@@ -14,6 +14,7 @@ object Constants {
     const val KEY_DEVICE_ID = "device_id"
     const val KEY_MIGRATED_FROM_LEGACY = "migrated_from_legacy"
     const val KEY_EMPLOYEE_CODE = "employee_code"
+    const val KEY_MODULOS_JSON = "modulos_json"
 
     const val ROLE_FUNCIONARIO = "COLABORADOR"
     const val ROLE_GESTOR = "GESTOR_RH"

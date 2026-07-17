@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/pessoas"
 	"nexora/internal/storage"
 )
 
@@ -223,12 +224,17 @@ func (h *Handler) AdicionarSignatario(w http.ResponseWriter, r *http.Request) {
 		tipo = *body.Tipo
 	}
 
+	var pessoaID *int64
+	if pid, err := pessoas.EnsurePessoa(r.Context(), h.db, body.Nome); err == nil {
+		pessoaID = &pid
+	}
+
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO assinatura_digital.signatarios (documento_id, tenant_id, nome, email, nuit, bi, telefone, ordem, tipo, campo_pagina, campo_x, campo_y, campo_largura, campo_altura)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+		INSERT INTO assinatura_digital.signatarios (documento_id, tenant_id, nome, email, nuit, bi, telefone, ordem, tipo, campo_pagina, campo_x, campo_y, campo_largura, campo_altura, pessoa_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
 		docID, user.TenantID, body.Nome, body.Email, body.Nuit, body.BI, body.Telefone, ordem, tipo,
-		body.Pagina, body.X, body.Y, body.Largura, body.Altura).Scan(&id)
+		body.Pagina, body.X, body.Y, body.Largura, body.Altura, pessoaID).Scan(&id)
 	if err != nil {
 		jsonErr(w, "Erro ao adicionar signatário", http.StatusInternalServerError)
 		return

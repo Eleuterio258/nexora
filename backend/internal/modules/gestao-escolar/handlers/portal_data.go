@@ -508,6 +508,79 @@ func (h *Handler) PortalPresencas(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusOK)
 }
 
+// ── POST /api/portal/aluno/me/turma/presencas ────────────────────────────────
+// Permite a um aluno com cargo autorizado na turma (ex.: delegado) marcar a
+// presença dos colegas. Autorização vem de school_cargo_permissoes — não é
+// RBAC de staff, é por cargo em school_student_roles, scoped à própria turma
+// onde o aluno tem esse cargo activo.
+
+// alunoTemPermissaoTurma confirma que o aluno autenticado tem, através de um
+// cargo activo em school_student_roles para esta turma, a permissão indicada
+// (registada em school_cargo_permissoes pela secretaria/admin).
+func (h *Handler) alunoTemPermissaoTurma(r *http.Request, studentID, classID, tenantID int64, permissao string) bool {
+	var ok bool
+	_ = h.db.QueryRow(r.Context(), `
+		SELECT EXISTS(
+			SELECT 1 FROM gestao_escolar.school_student_roles sr
+			JOIN gestao_escolar.school_cargo_permissoes cp
+			  ON cp.tenant_id = sr.tenant_id AND cp.class_id = sr.class_id AND cp.cargo = sr.cargo
+			 WHERE sr.student_id = $1 AND sr.class_id = $2 AND sr.tenant_id = $3
+			   AND sr.activo = true AND cp.permissao = $4
+			   AND (sr.data_fim IS NULL OR sr.data_fim >= CURRENT_DATE)
+		)`, studentID, classID, tenantID, permissao,
+	).Scan(&ok)
+	return ok
+}
+
+func (h *Handler) PortalAlunoMarcarPresencas(w http.ResponseWriter, r *http.Request) {
+	u := mw.GetAlunoUser(r)
+	var body struct {
+		ClassID   int64  `json:"class_id"`
+		Data      string `json:"data"`
+		Presencas []struct {
+			StudentID  int64  `json:"student_id"`
+			Estado     string `json:"estado"`
+			Observacao string `json:"observacao"`
+		} `json:"presencas"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.ClassID == 0 || body.Data == "" {
+		jsonErr(w, "class_id e data são obrigatórios", http.StatusBadRequest)
+		return
+	}
+	if !h.alunoTemPermissaoTurma(r, u.ID, body.ClassID, u.TenantID, "marcar_presencas") {
+		jsonErr(w, "Sem permissão para marcar presenças nesta turma", http.StatusForbidden)
+		return
+	}
+
+	payload, err := json.Marshal(body.Presencas)
+	if err != nil {
+		jsonErr(w, "JSON inválido", http.StatusBadRequest)
+		return
+	}
+
+	var count int64
+	err = h.db.QueryRow(r.Context(), `
+		WITH ins AS (
+			INSERT INTO gestao_escolar.school_attendance
+				(tenant_id, class_id, student_id, attendance_date, estado, observacoes)
+			SELECT $1, $2, (x->>'student_id')::bigint, $3::date, x->>'estado', NULLIF(x->>'observacao','')
+			  FROM jsonb_array_elements($4::jsonb) x
+			  JOIN gestao_escolar.school_students s
+			    ON s.id = (x->>'student_id')::bigint AND s.tenant_id = $1
+			 WHERE x->>'estado' IN ('presente','ausente','justificado','atrasado')
+			ON CONFLICT ON CONSTRAINT uq_school_attendance_entry DO UPDATE
+			   SET estado = EXCLUDED.estado, observacoes = EXCLUDED.observacoes, updated_at = NOW()
+			RETURNING 1
+		) SELECT COUNT(*) FROM ins`,
+		u.TenantID, body.ClassID, body.Data, payload,
+	).Scan(&count)
+	if err != nil {
+		jsonErr(w, "Erro ao guardar presenças", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]any{"registos": count}, http.StatusOK)
+}
+
 // ── GET /api/portal/aluno/me/ocorrencias ─────────────────────────────────────
 
 func (h *Handler) PortalOcorrencias(w http.ResponseWriter, r *http.Request) {

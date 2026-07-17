@@ -30,6 +30,79 @@ func (h *Handler) professorID(w http.ResponseWriter, r *http.Request) (teacherID
 	return teacherID, tenantID, true
 }
 
+// professorEDirectorTurma confirma que teacherID é o professor director
+// (school_classes.director_teacher_id) da turma classID — só o director de
+// turma pode conceder/revogar permissões por cargo (ex.: delegado marcar
+// presenças), não é RBAC de secretaria/admin.
+func (h *Handler) professorEDirectorTurma(r *http.Request, teacherID, classID, tenantID int64) bool {
+	var ok bool
+	_ = h.db.QueryRow(r.Context(), `
+		SELECT EXISTS(SELECT 1 FROM gestao_escolar.school_classes
+		 WHERE id=$1 AND tenant_id=$2 AND director_teacher_id=$3)`,
+		classID, tenantID, teacherID,
+	).Scan(&ok)
+	return ok
+}
+
+// ── GET/POST/DELETE /api/portal/professor/me/turmas/{id}/cargo-permissoes ───
+// Concede/revoga, a um cargo de aluno da turma (ex. "delegado"), permissão
+// para agir em nome da turma (hoje só "marcar_presencas", ver
+// PortalAlunoMarcarPresencas em portal_data.go). Reservado ao director da
+// turma indicada em {id}.
+
+func (h *Handler) ProfessorPortalListarCargoPermissoes(w http.ResponseWriter, r *http.Request) {
+	tid, tenID, ok := h.professorID(w, r)
+	if !ok {
+		return
+	}
+	classID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if !h.professorEDirectorTurma(r, tid, classID, tenID) {
+		jsonErr(w, "Só o professor responsável por esta turma pode gerir estas permissões", http.StatusForbidden)
+		return
+	}
+	h.schoolList(w, r, `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.cargo,x.permissao),'[]')
+		FROM gestao_escolar.school_cargo_permissoes x WHERE x.tenant_id=$1 AND x.class_id=$2`, tenID, classID)
+}
+
+func (h *Handler) ProfessorPortalCriarCargoPermissao(w http.ResponseWriter, r *http.Request) {
+	tid, tenID, ok := h.professorID(w, r)
+	if !ok {
+		return
+	}
+	classID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if !h.professorEDirectorTurma(r, tid, classID, tenID) {
+		jsonErr(w, "Só o professor responsável por esta turma pode gerir estas permissões", http.StatusForbidden)
+		return
+	}
+	u := mw.GetUser(r)
+	body, err := schoolBody(r)
+	if err != nil {
+		jsonErr(w, "JSON invalido", 400)
+		return
+	}
+	h.schoolCreate(w, r, `INSERT INTO gestao_escolar.school_cargo_permissoes
+		(tenant_id,class_id,cargo,permissao,created_by)
+		SELECT $1,$2,j.cargo,j.permissao,$4
+		FROM jsonb_to_record($3::jsonb) AS j(cargo text,permissao text)
+		WHERE j.cargo<>'' AND j.permissao<>''
+		RETURNING id`, tenID, classID, body, u.ID)
+}
+
+func (h *Handler) ProfessorPortalRemoverCargoPermissao(w http.ResponseWriter, r *http.Request) {
+	tid, tenID, ok := h.professorID(w, r)
+	if !ok {
+		return
+	}
+	classID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if !h.professorEDirectorTurma(r, tid, classID, tenID) {
+		jsonErr(w, "Só o professor responsável por esta turma pode gerir estas permissões", http.StatusForbidden)
+		return
+	}
+	h.schoolUpdate(w, r, `DELETE FROM gestao_escolar.school_cargo_permissoes
+		WHERE id=$1 AND tenant_id=$2 AND class_id=$3`,
+		chi.URLParam(r, "permId"), tenID, classID)
+}
+
 // ── GET /api/portal/professor/me ─────────────────────────────────────────────
 
 func (h *Handler) ProfessorPortalMe(w http.ResponseWriter, r *http.Request) {
