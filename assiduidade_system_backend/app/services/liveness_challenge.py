@@ -12,23 +12,68 @@ SEQUÊNCIA de frames e verifica se a acção pedida (ex.: piscar) aconteceu de
 facto ao longo do tempo — isso é o que distingue uma pessoa real de uma foto
 estática ou de um vídeo em loop que não reage ao desafio pedido.
 
-Não usa nenhum SDK de liveness comercial (nenhum está instalado — ver
-stakeholders-and-constraints.md); a detecção da acção é feita com os mesmos
-68 landmarks dlib já usados em `services/biometric.py`, sem dependências novas.
+A detecção da acção usa o MediaPipe FaceLandmarker (478 pontos), um modelo
+separado do FaceDetector usado em `services/biometric.py` — este precisa de
+geometria fina (contorno dos olhos, cantos da boca) que os 6 keypoints do
+detector não fornecem. Os índices dos pontos usados abaixo (olhos, boca,
+nariz) foram verificados empiricamente sobre o mapa canónico do Face Mesh.
 """
 
 import logging
 import math
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
-import numpy as np
-
-from app.services.biometric import FACE_RECOGNITION_AVAILABLE, _base64_to_numpy
+from app.services.biometric import _base64_to_numpy
 
 log = logging.getLogger("faceclock.liveness_challenge")
+
+_MODELS_DIR = Path(__file__).resolve().parent.parent / "ml_models"
+_FACE_LANDMARKER_MODEL_PATH = _MODELS_DIR / "face_landmarker.task"
+
+try:
+    import mediapipe as mp
+    from mediapipe.tasks.python import BaseOptions
+    from mediapipe.tasks.python.vision import FaceLandmarker, FaceLandmarkerOptions, RunningMode
+
+    MEDIAPIPE_LANDMARKER_AVAILABLE = _FACE_LANDMARKER_MODEL_PATH.is_file()
+    if not MEDIAPIPE_LANDMARKER_AVAILABLE:
+        log.warning(
+            "Modelo MediaPipe em falta (%s) — prova de vida por accao desativada",
+            _FACE_LANDMARKER_MODEL_PATH,
+        )
+except ImportError:
+    MEDIAPIPE_LANDMARKER_AVAILABLE = False
+    log.warning("mediapipe nao disponivel — prova de vida por accao desativada")
+
+# Índices do MediaPipe Face Mesh (478 pontos), verificados empiricamente.
+# Cada lista de olho segue a ordem p1..p6 do EAR clássico (Soukupová & Čech):
+# p1/p4 = cantos (eixo horizontal), p2/p3 = pálpebra superior, p5/p6 = inferior.
+_EYE_A_IDX = [33, 160, 158, 133, 153, 144]
+_EYE_B_IDX = [362, 385, 387, 263, 373, 380]
+_MOUTH_LEFT_IDX = 61
+_MOUTH_RIGHT_IDX = 291
+_NOSE_TIP_IDX = 4
+
+_landmarker: "FaceLandmarker | None" = None
+
+
+def _get_landmarker() -> "FaceLandmarker":
+    global _landmarker
+    if _landmarker is None:
+        if not MEDIAPIPE_LANDMARKER_AVAILABLE:
+            raise RuntimeError("mediapipe nao instalado ou modelo em falta")
+        options = FaceLandmarkerOptions(
+            base_options=BaseOptions(model_asset_path=str(_FACE_LANDMARKER_MODEL_PATH)),
+            running_mode=RunningMode.IMAGE,
+            num_faces=1,
+        )
+        _landmarker = FaceLandmarker.create_from_options(options)
+        log.info("MediaPipe FaceLandmarker carregado (prova de vida por accao).")
+    return _landmarker
 
 
 class ChallengeAction(str, Enum):
@@ -100,26 +145,28 @@ def _dist(p1: tuple[float, float], p2: tuple[float, float]) -> float:
     return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
 
-def _extract_landmarks(image_base64: str) -> dict | None:
-    """Devolve o dict de landmarks (face_recognition) do primeiro rosto detectado,
-    ou None se não houver rosto ou a lib não estiver disponível."""
-    if not FACE_RECOGNITION_AVAILABLE:
+def _extract_landmark_points(image_base64: str) -> "list[tuple[float, float]] | None":
+    """Devolve os 478 pontos (em pixeis) do primeiro rosto detectado pelo
+    MediaPipe FaceLandmarker, ou None se não houver rosto ou o modelo não
+    estiver disponível."""
+    if not MEDIAPIPE_LANDMARKER_AVAILABLE:
         return None
     img = _base64_to_numpy(image_base64)
     if img is None:
         return None
 
     import cv2
-    import face_recognition
 
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    face_locations = face_recognition.face_locations(img_rgb, model="hog")
-    if not face_locations:
+    height, width = img_rgb.shape[:2]
+    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
+
+    result = _get_landmarker().detect(mp_image)
+    if not result.face_landmarks:
         return None
-    landmarks_list = face_recognition.face_landmarks(img_rgb, face_locations)
-    if not landmarks_list:
-        return None
-    return landmarks_list[0]
+
+    landmarks = result.face_landmarks[0]
+    return [(pt.x * width, pt.y * height) for pt in landmarks]
 
 
 def _eye_aspect_ratio(eye_points: list[tuple[float, float]]) -> float | None:
@@ -133,42 +180,42 @@ def _eye_aspect_ratio(eye_points: list[tuple[float, float]]) -> float | None:
     return (_dist(p2, p6) + _dist(p3, p5)) / (2.0 * horizontal)
 
 
-def _frame_metrics(landmarks: dict) -> dict[str, float] | None:
-    """Extrai as métricas usadas pelos 3 desafios a partir dos landmarks de um frame."""
-    left_eye = landmarks.get("left_eye", [])
-    right_eye = landmarks.get("right_eye", [])
-    top_lip = landmarks.get("top_lip", [])
-    if not left_eye or not right_eye or not top_lip:
+def _frame_metrics(points: "list[tuple[float, float]]") -> "dict[str, float] | None":
+    """Extrai as métricas usadas pelos 3 desafios a partir dos 478 pontos MediaPipe."""
+    try:
+        eye_a = [points[i] for i in _EYE_A_IDX]
+        eye_b = [points[i] for i in _EYE_B_IDX]
+        mouth_left = points[_MOUTH_LEFT_IDX]
+        mouth_right = points[_MOUTH_RIGHT_IDX]
+        nose_tip = points[_NOSE_TIP_IDX]
+    except IndexError:
         return None
 
-    ear_left = _eye_aspect_ratio(left_eye)
-    ear_right = _eye_aspect_ratio(right_eye)
-    if ear_left is None or ear_right is None:
+    ear_a = _eye_aspect_ratio(eye_a)
+    ear_b = _eye_aspect_ratio(eye_b)
+    if ear_a is None or ear_b is None:
         return None
-    ear = (ear_left + ear_right) / 2.0
+    ear = (ear_a + ear_b) / 2.0
 
-    left_eye_center = (
-        sum(p[0] for p in left_eye) / len(left_eye),
-        sum(p[1] for p in left_eye) / len(left_eye),
+    eye_a_center = (
+        sum(p[0] for p in eye_a) / len(eye_a),
+        sum(p[1] for p in eye_a) / len(eye_a),
     )
-    right_eye_center = (
-        sum(p[0] for p in right_eye) / len(right_eye),
-        sum(p[1] for p in right_eye) / len(right_eye),
+    eye_b_center = (
+        sum(p[0] for p in eye_b) / len(eye_b),
+        sum(p[1] for p in eye_b) / len(eye_b),
     )
-    inter_ocular = _dist(left_eye_center, right_eye_center)
+    inter_ocular = _dist(eye_a_center, eye_b_center)
     if inter_ocular == 0:
         return None
 
-    mouth_width = _dist(top_lip[0], top_lip[6])  # cantos da boca (indices 0 e 6 do top_lip)
+    mouth_width = _dist(mouth_left, mouth_right)
     smile_ratio = mouth_width / inter_ocular
 
-    nose_bridge = landmarks.get("nose_bridge") or landmarks.get("nose_tip")
     turn_ratio = 0.5
-    if nose_bridge:
-        nose_x = nose_bridge[-1][0]
-        span = right_eye_center[0] - left_eye_center[0]
-        if span != 0:
-            turn_ratio = (nose_x - left_eye_center[0]) / span
+    span = eye_b_center[0] - eye_a_center[0]
+    if span != 0:
+        turn_ratio = (nose_tip[0] - eye_a_center[0]) / span
 
     return {"ear": ear, "smile_ratio": smile_ratio, "turn_ratio": turn_ratio}
 
@@ -181,18 +228,18 @@ def verify_challenge_sequence(
     Devolve (passou: bool, detalhes: dict) — detalhes inclui as métricas usadas,
     úteis para diagnóstico/auditoria em caso de rejeição.
     """
-    if not FACE_RECOGNITION_AVAILABLE:
-        return False, {"reason": "face_recognition_unavailable"}
+    if not MEDIAPIPE_LANDMARKER_AVAILABLE:
+        return False, {"reason": "mediapipe_unavailable"}
 
     if len(frames_base64) < _MIN_FRAMES:
         return False, {"reason": "frames_insuficientes", "recebidos": len(frames_base64)}
 
     metrics_per_frame: list[dict[str, float]] = []
     for frame in frames_base64[:_MAX_FRAMES]:
-        landmarks = _extract_landmarks(frame)
-        if landmarks is None:
+        points = _extract_landmark_points(frame)
+        if points is None:
             continue
-        m = _frame_metrics(landmarks)
+        m = _frame_metrics(points)
         if m is not None:
             metrics_per_frame.append(m)
 

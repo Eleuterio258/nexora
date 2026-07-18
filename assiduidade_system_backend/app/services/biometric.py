@@ -1,38 +1,56 @@
 """
-Pipeline de reconhecimento facial em 3 etapas:
+  Pipeline de reconhecimento facial em 3 etapas:
 
-  ETAPA 1 — OpenCV (Detecao)
-    Decodifica a imagem e detecta regioes de rosto via Haar Cascade
-    com equalizacao de histograma para robustez em diferentes iluminacoes.
+  ETAPA 1 — MediaPipe FaceDetector (BlazeFace short-range)
+    Deteta a regiao do rosto e os keypoints dos olhos, nariz e boca num
+    unico passe (modelo leve, ~230KB, optimizado para CPU/mobile — o mesmo
+    modelo usado na app Android para o preview em tempo real).
 
-  ETAPA 2 — Dlib / face_recognition (Alinhamento)
-    Extrai 68 landmarks faciais, calcula o angulo dos olhos e aplica
-    warp affine para normalizar rotacao, escala e posicao.
-    Resultado: crop de 160x160 px com face canonicamente alinhada.
+  ETAPA 2 — Alinhamento (keypoints dos olhos do MediaPipe)
+    Usa os dois keypoints dos olhos devolvidos pelo detector para calcular
+    o angulo de inclinacao e aplicar warp affine, normalizando rotacao,
+    escala e posicao. Resultado: crop de 160x160 px com face alinhada.
 
   ETAPA 3 — FaceNet / InceptionResnetV1 (Embedding)
-    Converte o rosto alinhado num vetor de 512 dimensoes,
-    usando o modelo InceptionResnetV1 pre-treinado no dataset VGGFace2.
-    Embeddings sao normalizados (norma L2 = 1) antes de armazenar.
+    Converte o rosto alinhado num vetor de 512 dimensoes, usando o modelo
+    InceptionResnetV1 pre-treinado no dataset VGGFace2. Embeddings sao
+    normalizados (norma L2 = 1) antes de armazenar.
+
+Nota: `services/liveness_challenge.py` usa um modelo MediaPipe separado
+(FaceLandmarker, 478 pontos) para a prova de vida activa (piscar/sorrir/
+virar o rosto), que precisa de geometria mais fina do que os 6 keypoints
+do detector usado aqui.
 """
 import base64
 import binascii
 import json
 import math
 import logging
+from pathlib import Path
 
 import cv2
 import numpy as np
 
 log = logging.getLogger(__name__)
 
-# ─── Etapa 2: Dlib via face_recognition ─────────────────────────────────────
+_MODELS_DIR = Path(__file__).resolve().parent.parent / "ml_models"
+_FACE_DETECTOR_MODEL_PATH = _MODELS_DIR / "blaze_face_short_range.tflite"
+
+# ─── Etapa 1 + 2: MediaPipe FaceDetector (deteccao + keypoints dos olhos) ────
 try:
-    import face_recognition
-    FACE_RECOGNITION_AVAILABLE = True
+    import mediapipe as mp
+    from mediapipe.tasks.python import BaseOptions
+    from mediapipe.tasks.python.vision import FaceDetector, FaceDetectorOptions, RunningMode
+
+    MEDIAPIPE_AVAILABLE = _FACE_DETECTOR_MODEL_PATH.is_file()
+    if not MEDIAPIPE_AVAILABLE:
+        log.warning(
+            "Modelo MediaPipe em falta (%s) — deteccao facial desativada",
+            _FACE_DETECTOR_MODEL_PATH,
+        )
 except ImportError:
-    FACE_RECOGNITION_AVAILABLE = False
-    log.warning("face_recognition nao disponivel — alinhamento facial desativado")
+    MEDIAPIPE_AVAILABLE = False
+    log.warning("mediapipe nao disponivel — deteccao facial desativada")
 
 # ─── Etapa 3: FaceNet via facenet-pytorch ────────────────────────────────────
 try:
@@ -49,19 +67,26 @@ EMBEDDING_DIM = 512          # InceptionResnetV1 (VGGFace2)
 MODEL_VERSION = "facenet-vggface2-v1"
 QUALITY_THRESHOLD_FALLBACK = 0.55
 _FACE_INPUT_SIZE = 160       # Dimensao esperada pelo FaceNet
-_HAAR_MIN_FACE_PX = 60       # Rosto minimo para Haar Cascade
+_MIN_DETECTION_CONFIDENCE = 0.5
 
 # ─── Singletons (lazy init) ──────────────────────────────────────────────────
-_haar_cascade: "cv2.CascadeClassifier | None" = None
+_face_detector: "FaceDetector | None" = None
 _facenet_model: "InceptionResnetV1 | None" = None
 
 
-def _get_haar_cascade() -> "cv2.CascadeClassifier":
-    global _haar_cascade
-    if _haar_cascade is None:
-        path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        _haar_cascade = cv2.CascadeClassifier(path)
-    return _haar_cascade
+def _get_face_detector() -> "FaceDetector":
+    global _face_detector
+    if _face_detector is None:
+        if not MEDIAPIPE_AVAILABLE:
+            raise RuntimeError("mediapipe nao instalado ou modelo em falta")
+        options = FaceDetectorOptions(
+            base_options=BaseOptions(model_asset_path=str(_FACE_DETECTOR_MODEL_PATH)),
+            running_mode=RunningMode.IMAGE,
+            min_detection_confidence=_MIN_DETECTION_CONFIDENCE,
+        )
+        _face_detector = FaceDetector.create_from_options(options)
+        log.info("MediaPipe FaceDetector (BlazeFace short-range) carregado.")
+    return _face_detector
 
 
 def _get_facenet() -> "InceptionResnetV1":
@@ -94,67 +119,70 @@ def _base64_to_numpy(image_base64: str) -> "np.ndarray | None":
         return None
 
 
-# ─── ETAPA 1: Detecao de rosto (OpenCV Haar Cascade) ─────────────────────────
+# ─── ETAPA 1: Deteccao de rosto (MediaPipe BlazeFace) ────────────────────────
 
-def _detect_faces_opencv(img_bgr: "np.ndarray") -> list[tuple[int, int, int, int]]:
+class _Detection:
+    """Uma deteccao facial do MediaPipe: caixa delimitadora + keypoints dos olhos."""
+
+    __slots__ = ("x", "y", "w", "h", "score", "eye_a", "eye_b")
+
+    def __init__(self, x: int, y: int, w: int, h: int, score: float,
+                 eye_a: "tuple[float, float] | None", eye_b: "tuple[float, float] | None"):
+        self.x, self.y, self.w, self.h = x, y, w, h
+        self.score = score
+        self.eye_a = eye_a
+        self.eye_b = eye_b
+
+
+def _detect_faces_mediapipe(img_rgb: "np.ndarray") -> list[_Detection]:
     """
-    Localiza rostos na imagem usando OpenCV Haar Cascade.
+    Localiza rostos na imagem usando MediaPipe FaceDetector (BlazeFace).
 
-    1. Converte para escala de cinza
-    2. Equaliza histograma (melhora contraste e iluminacao)
-    3. Detecta rostos e ordena por area (maior primeiro)
+    O BlazeFace short-range devolve, por deteccao, 6 keypoints normalizados
+    (olho A, olho B, ponta do nariz, centro da boca, tragus direito, tragus
+    esquerdo) — usamos os dois primeiros (os olhos) para o alinhamento da
+    Etapa 2, sem precisar de um segundo modelo de landmarks.
 
-    Retorna lista de (x, y, w, h).
+    Retorna lista ordenada por area (maior primeiro).
     """
-    cascade = _get_haar_cascade()
-    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-    gray = cv2.equalizeHist(gray)
+    detector = _get_face_detector()
+    height, width = img_rgb.shape[:2]
+    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
+    result = detector.detect(mp_image)
 
-    detections = cascade.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=5,
-        minSize=(_HAAR_MIN_FACE_PX, _HAAR_MIN_FACE_PX),
-        flags=cv2.CASCADE_SCALE_IMAGE,
-    )
+    detections = []
+    for d in result.detections:
+        bb = d.bounding_box
+        score = float(d.categories[0].score) if d.categories else 0.0
+        kps = d.keypoints or []
+        eye_a = (kps[0].x * width, kps[0].y * height) if len(kps) > 0 else None
+        eye_b = (kps[1].x * width, kps[1].y * height) if len(kps) > 1 else None
+        detections.append(_Detection(bb.origin_x, bb.origin_y, bb.width, bb.height, score, eye_a, eye_b))
 
-    if len(detections) == 0:
-        return []
-
-    faces = list(detections)
-    faces.sort(key=lambda f: int(f[2]) * int(f[3]), reverse=True)
-    return [(int(x), int(y), int(w), int(h)) for (x, y, w, h) in faces]
+    detections.sort(key=lambda f: f.w * f.h, reverse=True)
+    return detections
 
 
-def _opencv_box_to_dlib_location(
-    x: int, y: int, w: int, h: int
-) -> tuple[int, int, int, int]:
-    """Converte (x, y, w, h) do OpenCV para (top, right, bottom, left) do dlib."""
-    return (y, x + w, y + h, x)
+# ─── ETAPA 2: Alinhamento facial (keypoints dos olhos do MediaPipe) ──────────
 
-
-# ─── ETAPA 2: Alinhamento facial (Dlib landmarks) ────────────────────────────
-
-def _align_face(img_rgb: "np.ndarray", face_landmarks: dict) -> "np.ndarray | None":
+def _align_face(
+    img_rgb: "np.ndarray",
+    eye_a: "tuple[float, float]",
+    eye_b: "tuple[float, float]",
+) -> "np.ndarray | None":
     """
-    Normaliza o rosto usando os landmarks dos olhos (dlib 68-pontos).
+    Normaliza o rosto usando os dois keypoints dos olhos devolvidos pelo
+    MediaPipe FaceDetector.
 
-    1. Calcula centroide do olho esquerdo e direito
-    2. Calcula angulo de inclinacao entre os olhos
-    3. Aplica rotacao + escala via warpAffine
-    4. Recorta a regiao facial em _FACE_INPUT_SIZE x _FACE_INPUT_SIZE px
+    1. Calcula o angulo de inclinacao entre os dois olhos
+    2. Aplica rotacao + escala via warpAffine
+    3. Recorta a regiao facial em _FACE_INPUT_SIZE x _FACE_INPUT_SIZE px
 
-    Retorna imagem RGB alinhada ou None se landmarks insuficientes.
+    Retorna imagem RGB alinhada ou None em caso de falha.
     """
     try:
-        left_eye_pts = np.array(face_landmarks.get("left_eye", []), dtype=np.float32)
-        right_eye_pts = np.array(face_landmarks.get("right_eye", []), dtype=np.float32)
-
-        if len(left_eye_pts) == 0 or len(right_eye_pts) == 0:
-            return None
-
-        left_center = left_eye_pts.mean(axis=0)
-        right_center = right_eye_pts.mean(axis=0)
+        left_center = np.array(eye_a, dtype=np.float32)
+        right_center = np.array(eye_b, dtype=np.float32)
 
         # Angulo de inclinacao
         dy = float(right_center[1] - left_center[1])
@@ -190,38 +218,25 @@ def _align_face(img_rgb: "np.ndarray", face_landmarks: dict) -> "np.ndarray | No
 def _extract_aligned_face(img_bgr: "np.ndarray") -> "np.ndarray | None":
     """
     Executa Etapa 1 + Etapa 2:
-      OpenCV detecta o rosto → Dlib alinha via landmarks.
+      MediaPipe deteta o rosto e os keypoints dos olhos → alinha o crop.
 
     Retorna array RGB 160x160 ou None se falhar.
     """
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
-    # Etapa 1: Detetar rosto com OpenCV
-    faces = _detect_faces_opencv(img_bgr)
+    faces = _detect_faces_mediapipe(img_rgb)
     if not faces:
-        # Fallback: tenta dlib HOG se disponivel
-        if FACE_RECOGNITION_AVAILABLE:
-            dlib_locs = face_recognition.face_locations(img_rgb, model="hog")
-            if not dlib_locs:
-                return None
-            top, right, bottom, left = dlib_locs[0]
-            faces = [(left, top, right - left, bottom - top)]
-        else:
-            return None
+        return None
+    face = faces[0]
 
-    x, y, w, h = faces[0]
+    if face.eye_a is not None and face.eye_b is not None:
+        aligned = _align_face(img_rgb, face.eye_a, face.eye_b)
+        if aligned is not None:
+            return aligned
 
-    if FACE_RECOGNITION_AVAILABLE:
-        # Etapa 2: Alinhamento via landmarks dlib
-        dlib_loc = [_opencv_box_to_dlib_location(x, y, w, h)]
-        landmarks_list = face_recognition.face_landmarks(img_rgb, dlib_loc)
-        if landmarks_list:
-            aligned = _align_face(img_rgb, landmarks_list[0])
-            if aligned is not None:
-                return aligned
-
-    # Fallback sem alinhamento: recorta e redimensiona o rosto
-    face_crop = img_rgb[y:y + h, x:x + w]
+    # Fallback sem alinhamento: recorta a caixa delimitadora e redimensiona
+    x, y = max(face.x, 0), max(face.y, 0)
+    face_crop = img_rgb[y:y + face.h, x:x + face.w]
     if face_crop.size == 0:
         return None
     return cv2.resize(face_crop, (_FACE_INPUT_SIZE, _FACE_INPUT_SIZE), interpolation=cv2.INTER_CUBIC)
@@ -256,37 +271,35 @@ def _embed_with_facenet(face_rgb: "np.ndarray") -> list[float]:
 # ─── API publica do servico ───────────────────────────────────────────────────
 
 def _has_face_landmarks(img_rgb: "np.ndarray") -> tuple[bool, list[dict]]:
-    """Deteta rostos e extrai informacao de landmarks para avaliacao de qualidade."""
-    if not FACE_RECOGNITION_AVAILABLE:
+    """Deteta rostos com MediaPipe e devolve info usada na avaliacao de qualidade."""
+    if not MEDIAPIPE_AVAILABLE:
         return True, [{
-            "feature_count": 72,
+            "feature_count": 6,
             "has_nose_bridge": True,
             "has_eye_regions": True,
+            "score": 1.0,
         }]
 
-    face_locations = face_recognition.face_locations(img_rgb, model="hog")
-    if not face_locations:
+    faces = _detect_faces_mediapipe(img_rgb)
+    if not faces:
         return False, []
 
-    face_landmarks_list = face_recognition.face_landmarks(img_rgb, face_locations)
-    if not face_landmarks_list:
-        return False, []
-
-    landmarks_info = []
-    for landmarks in face_landmarks_list:
-        total_points = sum(len(pts) for pts in landmarks.values())
-        landmarks_info.append({
-            "feature_count": total_points,
-            "has_nose_bridge": "nose_bridge" in landmarks and len(landmarks["nose_bridge"]) > 2,
-            "has_eye_regions": all(k in landmarks for k in ["left_eye", "right_eye"]),
-        })
+    landmarks_info = [
+        {
+            "feature_count": 6,
+            "has_nose_bridge": True,
+            "has_eye_regions": f.eye_a is not None and f.eye_b is not None,
+            "score": f.score,
+        }
+        for f in faces
+    ]
     return True, landmarks_info
 
 
 def assess_capture_quality(image_base64: str) -> tuple[float, "str | None"]:
     """
     Avalia qualidade da captura:
-    - Detecao de face (OpenCV + Dlib)
+    - Detecao de face (MediaPipe)
     - Nitidez via Laplaciano
     - Iluminacao via histograma
     - Tamanho relativo do rosto
@@ -307,7 +320,7 @@ def assess_capture_quality(image_base64: str) -> tuple[float, "str | None"]:
 
     sharpness = _compute_sharpness(img)
     brightness, brightness_ok = _compute_brightness(img)
-    face_size_score = _compute_face_size_score(img_rgb, landmarks_info)
+    face_size_score = _compute_face_size_score(img_rgb)
 
     quality = round(
         (sharpness * 0.35)
@@ -342,25 +355,19 @@ def _compute_brightness(img_bgr: "np.ndarray") -> tuple[float, bool]:
     return normalized, 40 < mean_brightness < 200
 
 
-def _compute_face_size_score(img_rgb: "np.ndarray", landmarks_info: list[dict]) -> float:
-    """Score baseado no tamanho relativo do rosto (Etapa 1 — OpenCV)."""
-    faces = _detect_faces_opencv(cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR))
+def _compute_face_size_score(img_rgb: "np.ndarray") -> float:
+    """Score baseado no tamanho relativo do rosto (MediaPipe BlazeFace)."""
+    faces = _detect_faces_mediapipe(img_rgb)
     if not faces:
-        if FACE_RECOGNITION_AVAILABLE:
-            dlib_locs = face_recognition.face_locations(img_rgb, model="hog")
-            if not dlib_locs:
-                return 0.0 if FACE_RECOGNITION_AVAILABLE else 0.5
-            faces = [(l, t, r - l, b - t) for (t, r, b, l) in dlib_locs]
-        else:
-            return 0.5
+        return 0.0
 
     height, width = img_rgb.shape[:2]
     image_area = height * width
     ideal_ratio = 0.15
 
     scores = [
-        max(0.0, 1.0 - abs((w * h / image_area) - ideal_ratio) / ideal_ratio)
-        for (_, __, w, h) in faces
+        max(0.0, 1.0 - abs((f.w * f.h / image_area) - ideal_ratio) / ideal_ratio)
+        for f in faces
     ]
     return round(max(scores), 4)
 
@@ -424,9 +431,9 @@ def _compute_color_variance_score(img_bgr: "np.ndarray") -> float:
 def build_embedding(image_base64: str) -> list[float]:
     """
     Pipeline completo de 3 etapas:
-      1. OpenCV Haar Cascade → detetar rosto
-      2. Dlib 68 landmarks   → alinhar rosto (160x160)
-      3. FaceNet ResNetV1    → embedding 512-dim normalizado
+      1. MediaPipe BlazeFace  → detetar rosto + keypoints dos olhos
+      2. Alinhamento          → normalizar rotacao/escala (160x160)
+      3. FaceNet ResNetV1     → embedding 512-dim normalizado
     """
     if not FACENET_AVAILABLE:
         log.warning("Utilizando EMBEDDING SIMULADO (facenet-pytorch nao instalado)")
@@ -439,7 +446,7 @@ def build_embedding(image_base64: str) -> list[float]:
     if img is None:
         raise ValueError("invalid_image")
 
-    # Etapas 1 + 2: detecao + alinhamento
+    # Etapas 1 + 2: deteccao + alinhamento
     aligned_face = _extract_aligned_face(img)
     if aligned_face is None:
         raise ValueError("no_face_detected")
