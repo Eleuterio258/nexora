@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vaga - Professor de Matemática</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+        }
+
+        body{
+            font-family:'Inter',sans-serif;
+            background:#f5f7fb;
+            color:#333;
+            line-height:1.6;
+        }
+
+        .hero{
+            background:linear-gradient(135deg,#0f4c81,#1565c0);
+            color:#fff;
+            padding:70px 20px;
+        }
+
+        .container{
+            max-width:1100px;
+            margin:auto;
+            padding:0 20px;
+        }
+
+        .school{
+            display:flex;
+            align-items:center;
+            gap:20px;
+        }
+
+        .school img{
+            width:90px;
+            height:90px;
+            border-radius:50%;
+            background:#fff;
+            object-fit:cover;
+        }
+
+        h1{
+            font-size:38px;
+            margin-bottom:8px;
+        }
+
+        .badge{
+            display:inline-block;
+            background:#27ae60;
+            color:#fff;
+            padding:6px 15px;
+            border-radius:20px;
+            font-size:14px;
+            margin-top:10px;
+        }
+
+        .content{
+            display:grid;
+            grid-template-columns:2fr 1fr;
+            gap:30px;
+            margin:40px auto;
+        }
+
+        .card{
+            background:#fff;
+            border-radius:12px;
+            padding:30px;
+            box-shadow:0 10px 25px rgba(0,0,0,.08);
+            margin-bottom:25px;
+        }
+
+        h2{
+            color:#1565c0;
+            margin-bottom:15px;
+        }
+
+        ul{
+            padding-left:20px;
+        }
+
+        li{
+            margin-bottom:10px;
+        }
+
+        .info-item{
+            margin-bottom:18px;
+        }
+
+        .info-title{
+            color:#777;
+            font-size:13px;
+        }
+
+        .info-value{
+            font-weight:600;
+            margin-top:3px;
+        }
+
+        .btn{
+            display:block;
+            width:100%;
+            background:#1565c0;
+            color:#fff;
+            text-align:center;
+            text-decoration:none;
+            padding:15px;
+            border-radius:8px;
+            font-weight:bold;
+            transition:.3s;
+            margin-top:25px;
+        }
+
+        .btn:hover{
+            background:#0f4c81;
+        }
+
+        .footer{
+            text-align:center;
+            color:#666;
+            padding:30px;
+            margin-top:40px;
+        }
+
+        @media(max-width:900px){
+
+            .content{
+                grid-template-columns:1fr;
+            }
+
+            .school{
+                flex-direction:column;
+                text-align:center;
+            }
+
+            h1{
+                font-size:30px;
+            }
+
+        }
+    </style>
+
+</head>
+<body>
+
+<header class="hero">
+    <div class="container">
+
+        <div class="school">
+
+            <img src="https://via.placeholder.com/90" alt="Logo da Escola">
+
+            <div>
+
+                <h1>Professor(a) de Matemática</h1>
+
+                <p>Escola Secundária Horizonte • Maputo</p>
+
+                <span class="badge">
+                    Vaga Aberta
+                </span>
+
+            </div>
+
+        </div>
+
+    </div>
+</header>
+
+<div class="container">
+
+    <div class="content">
+
+        <main>
+
+            <div class="card">
+
+                <h2>Descrição da Vaga</h2>
+
+                <p>
+                    A Escola Secundária Horizonte pretende recrutar um(a)
+                    Professor(a) de Matemática para integrar a sua equipa
+                    pedagógica, contribuindo para o desenvolvimento académico
+                    e humano dos estudantes.
+                </p>
+
+            </div>
+
+            <div class="card">
+
+                <h2>Responsabilidades</h2>
+
+                <ul>
+                    <li>Planificar e ministrar aulas.</li>
+                    <li>Avaliar o desempenho dos alunos.</li>
+                    <li>Preparar materiais didáticos.</li>
+                    <li>Participar em reuniões pedagógicas.</li>
+                    <li>Promover um ambiente de aprendizagem saudável.</li>
+                </ul>
+
+            </div>
+
+            <div class="card">
+
+                <h2>Requisitos</h2>
+
+                <ul>
+                    <li>Licenciatura em Matemática ou Educação.</li>
+                    <li>Experiência mínima de 2 anos.</li>
+                    <li>Boa capacidade de comunicação.</li>
+                    <li>Domínio das TIC.</li>
+                    <li>Sentido de responsabilidade.</li>
+                </ul>
+
+            </div>
+
+            <div class="card">
+
+                <h2>Benefícios</h2>
+
+                <ul>
+                    <li>Salário competitivo.</li>
+                    <li>Seguro de saúde.</li>
+                    <li>Formação contínua.</li>
+                    <li>Bom ambiente de trabalho.</li>
+                </ul>
+
+            </div>
+
+        </main>
+
+        <aside>
+
+            <div class="card">
+
+                <h2>Informações</h2>
+
+                <div class="info-item">
+                    <div class="info-title">Escola</div>
+                    <div class="info-value">Escola Secundária Horizonte</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-title">Localização</div>
+                    <div class="info-value">Maputo</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-title">Tipo de Contrato</div>
+                    <div class="info-value">Tempo Inteiro</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-title">Área</div>
+                    <div class="info-value">Educação</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-title">Experiência</div>
+                    <div class="info-value">2 Anos</div>
+                </div>
+
+                <div class="info-item">
+                    <div class="info-title">Prazo de Candidatura</div>
+                    <div class="info-value">30 Setembro 2026</div>
+                </div>
+
+                <a href="#" class="btn">
+                    Candidatar-se Agora
+                </a>
+
+            </div>
+
+        </aside>
+
+    </div>
+
+</div>
+
+<footer class="footer">
+    © 2026 Escola Secundária Horizonte • Todos os direitos reservados.
+</footer>
+
+</body>
+</html>
