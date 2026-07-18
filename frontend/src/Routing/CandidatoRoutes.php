@@ -18,8 +18,11 @@ final class CandidatoRoutes
         'carreira'                    => ['path' => '/carreira',                    'view' => 'carreira.php'],
         'carreira_vagas'              => ['path' => '/vagas',                       'view' => 'carreira.php'],
         'carreira_estado'             => ['path' => '/carreira/estado',             'view' => 'carreira_estado.php'],
-        'carreira_candidato_registar' => ['path' => '/carreira/candidato/registar', 'view' => 'carreira_registar.php'],
-        'carreira_candidato_area'     => ['path' => '/carreira/candidato/area',      'view' => 'carreira_area.php', 'auth' => true],
+        'carreira_candidato_registar'     => ['path' => '/carreira/candidato/registar',     'view' => 'carreira_registar.php'],
+        'carreira_candidato_area'         => ['path' => '/carreira/candidato/area',         'view' => 'candidato/dashboard.php', 'auth' => true],
+        'carreira_candidato_candidaturas' => ['path' => '/carreira/candidato/candidaturas', 'view' => 'candidato/candidaturas.php', 'auth' => true],
+        'carreira_candidato_mensagens'    => ['path' => '/carreira/candidato/mensagens',    'view' => 'candidato/mensagens.php', 'auth' => true],
+        'carreira_candidato_perfil'       => ['path' => '/carreira/candidato/perfil',       'view' => 'candidato/perfil.php', 'auth' => true],
     ];
 
     public function resolveByPath(string $path): ?string

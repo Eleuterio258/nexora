@@ -520,6 +520,14 @@ if (str_starts_with($uri, '/admin')) {
         })(),
         default => (function () { http_response_code(404); echo 'Página não encontrada.'; })(),
     };
+} elseif (preg_match('#^/carreira/candidato/api/mensagens/(\d+)$#', $uri, $m) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $app = Application::bootstrap();
+    $app->carreira->apiEnviarMensagem((int) $m[1]);
+    exit;
+} elseif ($uri === '/carreira/candidato/api/perfil' && $_SERVER['REQUEST_METHOD'] === 'PUT') {
+    $app = Application::bootstrap();
+    $app->carreira->apiActualizarPerfil();
+    exit;
 } elseif (str_starts_with($uri, '/api/public/recrutamento/candidaturas') && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $app = Application::bootstrap();
     $app->publicApi->submitApplication();
@@ -546,10 +554,13 @@ if (str_starts_with($uri, '/admin')) {
         '/vagas'                      => $app->carreira->render(),
         '/carreira'                   => $app->carreira->render(),
         '/carreira/estado'            => $app->carreira->estado(),
-        '/carreira/candidato/login'   => $app->carreira->loginCandidato(),
-        '/carreira/candidato/registar'=> $app->carreira->registarCandidato(),
-        '/carreira/candidato/area'    => $app->carreira->areaCandidato(),
-        '/carreira/candidato/logout'  => $app->carreira->logoutCandidato(),
+        '/carreira/candidato/login'        => $app->carreira->loginCandidato(),
+        '/carreira/candidato/registar'     => $app->carreira->registarCandidato(),
+        '/carreira/candidato/area'         => $app->carreira->areaCandidato(),
+        '/carreira/candidato/candidaturas' => $app->carreira->candidaturasCandidato(),
+        '/carreira/candidato/mensagens'    => $app->carreira->mensagensCandidato(),
+        '/carreira/candidato/perfil'       => $app->carreira->perfilCandidato(),
+        '/carreira/candidato/logout'       => $app->carreira->logoutCandidato(),
         default                       => $app->home->render(),
     };
 }
