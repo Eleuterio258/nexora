@@ -92,6 +92,18 @@ func (h *Handler) revogarCargoEscolar(w http.ResponseWriter, r *http.Request, ta
 		WHERE id=$1 AND tenant_id=$2 AND activo`, chi.URLParam(r, "id"), u.TenantID)
 }
 
+// ── Permissões por cargo de aluno (ex.: delegado de turma pode marcar
+// presenças dos colegas) — só consulta aqui (visão da secretaria/admin sobre
+// todas as turmas). Quem CONCEDE é o professor director de cada turma, via
+// ProfessorPortalCriarCargoPermissao/ProfessorPortalRemoverCargoPermissao
+// (portal_professor.go) — não é RBAC de secretaria/admin.
+
+func (h *Handler) ListarCargoPermissoes(w http.ResponseWriter, r *http.Request) {
+	u := mw.GetUser(r)
+	h.schoolList(w, r, `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.cargo,x.permissao),'[]')
+		FROM gestao_escolar.school_cargo_permissoes x WHERE x.tenant_id=$1`, u.TenantID)
+}
+
 func (h *Handler) ListarFrequencias(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetUser(r)
 	where := "a.tenant_id=$1"

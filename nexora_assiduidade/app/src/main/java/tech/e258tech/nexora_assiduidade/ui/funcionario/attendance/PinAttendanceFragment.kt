@@ -118,7 +118,8 @@ class PinAttendanceFragment : Fragment() {
                             userName = payload.user.nome,
                             userEmail = payload.user.email,
                             userRole = role,
-                            employeeCode = payload.user.email
+                            employeeCode = payload.user.email,
+                            modulos = payload.modulos
                         )
                         true to null
                     } else {

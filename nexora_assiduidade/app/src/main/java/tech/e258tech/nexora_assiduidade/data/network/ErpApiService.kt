@@ -1,5 +1,6 @@
 package tech.e258tech.nexora_assiduidade.data.network
 
+import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -12,6 +13,7 @@ import tech.e258tech.nexora_assiduidade.data.model.Ausencia
 import tech.e258tech.nexora_assiduidade.data.model.ChatMessageRequest
 import tech.e258tech.nexora_assiduidade.data.model.DispositivoErp
 import tech.e258tech.nexora_assiduidade.data.model.ErpLoginRequest
+import tech.e258tech.nexora_assiduidade.data.model.ErpRefreshRequest
 import tech.e258tech.nexora_assiduidade.data.model.FuncionarioDetalhe
 import tech.e258tech.nexora_assiduidade.data.model.FuncionarioListResponse
 import tech.e258tech.nexora_assiduidade.data.model.GenericHardwareEventRequest
@@ -29,6 +31,7 @@ import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ConversationCreateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ConversationListResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ErpLoginResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.ErpRefreshResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.FuncionarioIntegracaoResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.GeofenceDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.HardwareEventResponse
@@ -52,6 +55,12 @@ interface ErpApiService {
     // Login (Fase 6 — identidade vem sempre do ERP, ver ErpLoginRequest)
     @POST("api/auth/login")
     suspend fun login(@Body request: ErpLoginRequest): Response<ErpLoginResponse>
+
+    // Renovação de sessão (auth.go:402) — versão síncrona (Call, não suspend)
+    // porque é invocada a partir de AuthAuthenticator, que corre fora de
+    // uma coroutine (callback OkHttp numa thread de background).
+    @POST("api/auth/refresh")
+    fun refreshSync(@Body request: ErpRefreshRequest): Call<ErpRefreshResponse>
 
     // Login alternativo por PIN/TOTP (authcode.go) — chamado directamente no
     // ERP desde 2026-07-12 (deixou de passar pelo proxy do FaceClock).

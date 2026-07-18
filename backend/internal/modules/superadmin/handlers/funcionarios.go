@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"nexora/internal/shared/pessoas"
 )
 
 var superadminTiposContrato = map[string]bool{
@@ -91,6 +92,12 @@ func (h *Handler) CriarFuncionarioTenant(w http.ResponseWriter, r *http.Request)
 		}
 		jsonErr(w, "Erro interno ao criar funcionário", http.StatusInternalServerError)
 		return
+	}
+
+	// Ligar o funcionário a uma pessoa (ver
+	// docs/analise-modelo-pessoa-multi-tenant.md secção 9).
+	if pessoaID, err := pessoas.EnsurePessoa(r.Context(), h.db, body.NomeCompleto); err == nil {
+		h.db.Exec(r.Context(), `UPDATE funcionarios SET pessoa_id = $1 WHERE id = $2`, pessoaID, id)
 	}
 
 	jsonOK(w, map[string]any{"ok": true, "id": id, "msg": "Funcionário criado com sucesso."}, http.StatusCreated)

@@ -31,9 +31,10 @@ func (h *Handler) PortalActivarAluno(w http.ResponseWriter, r *http.Request) {
 
 	// Obter nome do aluno para criar o utilizador
 	var nome string
+	var pessoaID *int64
 	if err := h.db.QueryRow(r.Context(), `
-		SELECT nome FROM gestao_escolar.school_students WHERE id = $1 AND tenant_id = $2`,
-		studentID, u.TenantID).Scan(&nome); err != nil {
+		SELECT nome, pessoa_id FROM gestao_escolar.school_students WHERE id = $1 AND tenant_id = $2`,
+		studentID, u.TenantID).Scan(&nome, &pessoaID); err != nil {
 		jsonErr(w, "Aluno não encontrado", http.StatusNotFound)
 		return
 	}
@@ -45,7 +46,7 @@ func (h *Handler) PortalActivarAluno(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Criar/actualizar utilizador na tabela unificada
-	userID, err := h.upsertPortalUser(r.Context(), body.Email, nome, "", string(hash), "aluno", true)
+	userID, err := h.upsertPortalUser(r.Context(), body.Email, nome, "", string(hash), "aluno", true, pessoaID)
 	if err != nil {
 		jsonErr(w, "Email já em uso ou erro ao criar utilizador", http.StatusUnprocessableEntity)
 		return
@@ -110,15 +111,16 @@ func (h *Handler) PortalConvidarAluno(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var nome string
+	var pessoaID *int64
 	if err := h.db.QueryRow(r.Context(), `
-		SELECT nome FROM gestao_escolar.school_students WHERE id = $1 AND tenant_id = $2`,
-		studentID, u.TenantID).Scan(&nome); err != nil {
+		SELECT nome, pessoa_id FROM gestao_escolar.school_students WHERE id = $1 AND tenant_id = $2`,
+		studentID, u.TenantID).Scan(&nome, &pessoaID); err != nil {
 		jsonErr(w, "Aluno não encontrado", http.StatusNotFound)
 		return
 	}
 
 	// Criar utilizador pendente (sem senha) na tabela unificada
-	userID, err := h.upsertPortalUser(r.Context(), body.Email, nome, "", "", "aluno", false)
+	userID, err := h.upsertPortalUser(r.Context(), body.Email, nome, "", "", "aluno", false, pessoaID)
 	if err != nil {
 		jsonErr(w, "Email já em uso ou erro ao criar utilizador", http.StatusUnprocessableEntity)
 		return
@@ -215,12 +217,9 @@ func (h *Handler) PortalListarAlunos(w http.ResponseWriter, r *http.Request) {
 			SELECT s.id, s.codigo, s.nome,
 			       s.portal_ativo,
 			       s.portal_email,
-			       s.portal_ultimo_login,
 			       u.password_hash IS NOT NULL AND LENGTH(u.password_hash) > 0          AS tem_senha,
 			       s.portal_invite_token IS NOT NULL AND s.portal_invite_expires_at > NOW() AS convite_pendente,
 			       s.portal_invite_expires_at,
-			       s.portal_login_tentativas,
-			       s.portal_bloqueado_ate,
 			       (SELECT COUNT(*) FROM gestao_escolar.portal_sessions ps
 			         WHERE ps.student_id = s.id AND ps.ativa = true AND ps.expira_em > NOW()) AS sessoes_activas
 			FROM gestao_escolar.school_students s
@@ -237,7 +236,7 @@ func (h *Handler) PortalRelatorioSessoes(w http.ResponseWriter, r *http.Request)
 	h.schoolList(w, r, `
 		SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.ultimo_acesso DESC NULLS LAST), '[]') FROM (
 			SELECT s.id, s.codigo, s.nome, s.portal_ativo, s.portal_email,
-			       s.portal_ultimo_login                                           AS ultimo_acesso,
+			       MAX(ps.criada_em)                                               AS ultimo_acesso,
 			       COUNT(ps.id)                                                    AS total_sessoes,
 			       COUNT(ps.id) FILTER (WHERE ps.ativa AND ps.expira_em > NOW())  AS sessoes_activas,
 			       COUNT(DISTINCT ps.ip_address)                                   AS ips_distintos
@@ -245,7 +244,7 @@ func (h *Handler) PortalRelatorioSessoes(w http.ResponseWriter, r *http.Request)
 			LEFT JOIN gestao_escolar.portal_sessions ps
 			       ON ps.student_id = s.id AND ps.criada_em >= NOW() - INTERVAL '30 days'
 			WHERE s.tenant_id = $1
-			GROUP BY s.id, s.codigo, s.nome, s.portal_ativo, s.portal_email, s.portal_ultimo_login
+			GROUP BY s.id, s.codigo, s.nome, s.portal_ativo, s.portal_email
 		) x`, u.TenantID)
 }
 
@@ -267,7 +266,7 @@ func (h *Handler) PortalInvitarTurma(w http.ResponseWriter, r *http.Request) {
 
 	// Buscar alunos activos da turma sem portal activado
 	rows, err := h.db.Query(r.Context(), `
-		SELECT s.id, LOWER(s.codigo) codigo
+		SELECT s.id, LOWER(s.codigo) codigo, s.pessoa_id
 		  FROM gestao_escolar.school_enrollments e
 		  JOIN gestao_escolar.school_students s ON s.id = e.student_id
 		 WHERE e.class_id = $1 AND e.tenant_id = $2 AND e.status = 'activa'
@@ -279,13 +278,14 @@ func (h *Handler) PortalInvitarTurma(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type student struct {
-		id     int64
-		codigo string
+		id       int64
+		codigo   string
+		pessoaID *int64
 	}
 	var students []student
 	for rows.Next() {
 		var s student
-		if err := rows.Scan(&s.id, &s.codigo); err == nil {
+		if err := rows.Scan(&s.id, &s.codigo, &s.pessoaID); err == nil {
 			students = append(students, s)
 		}
 	}
@@ -301,7 +301,7 @@ func (h *Handler) PortalInvitarTurma(w http.ResponseWriter, r *http.Request) {
 		email := fmt.Sprintf("%s@%s", s.codigo, domain)
 
 		// Criar utilizador pendente (sem senha) na tabela unificada
-		userID, err := h.upsertPortalUser(r.Context(), email, s.codigo, "", "", "aluno", false)
+		userID, err := h.upsertPortalUser(r.Context(), email, s.codigo, "", "", "aluno", false, s.pessoaID)
 		if err != nil {
 			continue
 		}
@@ -338,7 +338,6 @@ func (h *Handler) PortalStatusAluno(w http.ResponseWriter, r *http.Request) {
 		SELECT jsonb_build_object(
 			'portal_ativo',        s.portal_ativo,
 			'portal_email',        s.portal_email,
-			'portal_ultimo_login', s.portal_ultimo_login,
 			'tem_senha',           u.password_hash IS NOT NULL AND LENGTH(u.password_hash) > 0,
 			'convite_pendente',    s.portal_invite_token IS NOT NULL AND s.portal_invite_expires_at > NOW(),
 			'convite_expira_em',   s.portal_invite_expires_at

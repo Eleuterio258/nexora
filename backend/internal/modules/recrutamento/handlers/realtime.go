@@ -140,6 +140,7 @@ func (rs *RealtimeServer) authFuncionario(rawToken string) (*realtimeIdentity, b
 		return nil, false
 	}
 	userID, tenantID := int64(sub), int64(tid)
+	membershipID, _ := claims["mid"].(float64)
 
 	var ativa bool
 	rs.db.QueryRow(context.Background(), `
@@ -149,7 +150,7 @@ func (rs *RealtimeServer) authFuncionario(rawToken string) (*realtimeIdentity, b
 		return nil, false
 	}
 
-	access, err := authModels.LoadUserAccess(context.Background(), rs.db, userID)
+	access, err := authModels.LoadUserAccess(context.Background(), rs.db, userID, int64(membershipID))
 	if err != nil || !access.Can("recrutamento", "ver_candidaturas") {
 		return nil, false
 	}

@@ -13,7 +13,7 @@ import (
 // ObterAcessoUtilizador devolve tipo + cargo + permissões mergeadas.
 func (h *Handler) ObterAcessoUtilizador(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	access, err := models.LoadUserAccess(r.Context(), h.db, user.ID)
+	access, err := models.LoadUserAccess(r.Context(), h.db, user.ID, user.MembershipID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return

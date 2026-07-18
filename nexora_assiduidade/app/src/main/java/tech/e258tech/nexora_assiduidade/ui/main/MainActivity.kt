@@ -24,6 +24,7 @@ import tech.e258tech.nexora_assiduidade.ui.gestor.equipa.EquipaGestorFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ferias.PedidosFeriasFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.mais.MaisFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.relatorios.RelatoriosGestorFragment
+import tech.e258tech.nexora_assiduidade.utils.PermissionUtils
 import tech.e258tech.nexora_assiduidade.utils.RoleUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 import tech.e258tech.nexora_assiduidade.work.SyncAttendanceWorker
@@ -78,7 +79,7 @@ class MainActivity : AppCompatActivity() {
             applyEdgeInsets(gestorBottomNav, top = false, bottom = true)
             setupGestorBottomNav()
             if (savedInstanceState == null) {
-                selectGestorTab(GestorTab.DASHBOARD)
+                selectGestorTab(firstVisibleGestorTab())
             }
         } else {
             gestorBottomNav.visibility = View.GONE
@@ -186,6 +187,20 @@ class MainActivity : AppCompatActivity() {
             ),
         )
 
+        // Dashboard/Equipa/Relatorios exigem recursos-humanos.ver_funcionarios
+        // no backend (router.go:1675-1719) — distinto de aprovar_ausencias,
+        // que já define o modo gestor (RoleUtils.fromErpLogin). Sem essa
+        // permissão, escondemos a tab em vez de deixar aparecer 403 dentro
+        // dela. Ferias/Mais mantêm-se sempre (Ferias é a própria razão de
+        // estar em modo gestor; Mais tem o seu próprio filtro por cartão).
+        val temVerFuncionarios = PermissionUtils.has(sessionManager, "recursos-humanos", "ver_funcionarios")
+        val tabsQueExigemVerFuncionarios = setOf(GestorTab.DASHBOARD, GestorTab.EQUIPA, GestorTab.RELATORIOS)
+        items.forEach { item ->
+            if (item.tab in tabsQueExigemVerFuncionarios && !temVerFuncionarios) {
+                item.container.visibility = View.GONE
+            }
+        }
+
         items.forEach { item ->
             item.container.setOnClickListener {
                 selectGestorTab(item.tab)
@@ -194,6 +209,10 @@ class MainActivity : AppCompatActivity() {
 
         this.gestorNavItems = items
     }
+
+    /** Primeira tab de gestor visível — usada como destino inicial quando Dashboard está escondida por falta de permissão. */
+    private fun firstVisibleGestorTab(): GestorTab =
+        gestorNavItems.firstOrNull { it.container.visibility == View.VISIBLE }?.tab ?: GestorTab.MAIS
 
     private lateinit var gestorNavItems: List<GestorNavItem>
 

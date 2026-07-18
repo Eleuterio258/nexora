@@ -25,7 +25,7 @@ const (
 	candidatoJWTExpiry   = 30 * 24 * time.Hour
 )
 
-func (h *Handler) signAccess(userID, tenantID int64, tipo, escopo string) (string, error) {
+func (h *Handler) signAccess(userID, tenantID, membershipID int64, tipo, escopo string) (string, error) {
 	if escopo == "" {
 		escopo = "erp"
 	}
@@ -36,6 +36,7 @@ func (h *Handler) signAccess(userID, tenantID int64, tipo, escopo string) (strin
 	claims := jwt.MapClaims{
 		"sub":    userID,
 		"tid":    tenantID,
+		"mid":    membershipID,
 		"tipo":   tipo,
 		"escopo": escopo,
 		"jti":    jti,
@@ -143,6 +144,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var (
 		userID       int64
 		tenantID     int64
+		membershipID int64
 		nome         string
 		passwordHash string
 		estado       string
@@ -150,14 +152,15 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		escopo       string
 	)
 
-	// tenant_id vem da membership — superadmins não têm membership (tenant_id = 0)
+	// tenant_id/membership_id vêm da membership — superadmins não têm
+	// membership (tenant_id = 0, membership_id = 0)
 	err := h.db.QueryRow(r.Context(), `
-		SELECT u.id, COALESCE(m.tenant_id, 0), u.nome, u.password_hash, u.estado, u.tipo, COALESCE(NULLIF(m.escopo, ''), 'erp')
+		SELECT u.id, COALESCE(m.tenant_id, 0), COALESCE(m.id, 0), u.nome, u.password_hash, u.estado, u.tipo, COALESCE(NULLIF(m.escopo, ''), 'erp')
 		  FROM users u
 		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
 		 WHERE u.email = LOWER($1)`,
 		body.Email,
-	).Scan(&userID, &tenantID, &nome, &passwordHash, &estado, &tipo, &escopo)
+	).Scan(&userID, &tenantID, &membershipID, &nome, &passwordHash, &estado, &tipo, &escopo)
 
 	found := err == nil
 	var pwOk bool
@@ -194,19 +197,20 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	case "candidato":
 		h.LoginCandidato(w, r, userID, nome)
 	default:
-		h.loginFuncionario(w, r, userID, tenantID, nome, body.Email, tipo, escopo)
+		h.loginFuncionario(w, r, userID, tenantID, membershipID, nome, body.Email, tipo, escopo)
 	}
 }
 
-func (h *Handler) loginFuncionario(w http.ResponseWriter, r *http.Request, userID, tenantID int64, nome, email, tipo, escopo string) {
+func (h *Handler) loginFuncionario(w http.ResponseWriter, r *http.Request, userID, tenantID, membershipID int64, nome, email, tipo, escopo string) {
 	h.issueFuncionarioTokens(w, r, &userIdentity{
-		id:       userID,
-		tenantID: tenantID,
-		nome:     nome,
-		email:    email,
-		estado:   "ativo",
-		tipo:     tipo,
-		escopo:   escopo,
+		id:           userID,
+		tenantID:     tenantID,
+		membershipID: membershipID,
+		nome:         nome,
+		email:        email,
+		estado:       "ativo",
+		tipo:         tipo,
+		escopo:       escopo,
 	})
 }
 
@@ -415,13 +419,13 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	claims, _ := token.Claims.(jwt.MapClaims)
 	userID := int64(claims["sub"].(float64))
 
-	var tenantID int64
+	var tenantID, membershipID int64
 	var estado, tipo, escopo string
 	err = h.db.QueryRow(r.Context(), `
-		SELECT COALESCE(m.tenant_id, 0), u.estado, u.tipo, COALESCE(NULLIF(m.escopo, ''), 'erp')
+		SELECT COALESCE(m.tenant_id, 0), COALESCE(m.id, 0), u.estado, u.tipo, COALESCE(NULLIF(m.escopo, ''), 'erp')
 		  FROM users u LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
 		 WHERE u.id = $1`, userID).
-		Scan(&tenantID, &estado, &tipo, &escopo)
+		Scan(&tenantID, &membershipID, &estado, &tipo, &escopo)
 	if err == pgx.ErrNoRows || estado != "ativo" {
 		jsonErr(w, "Utilizador inactivo", http.StatusUnauthorized)
 		return
@@ -435,7 +439,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	case "candidato":
 		h.refreshCandidato(w, r, userID)
 	default:
-		accessToken, err := h.signAccess(userID, tenantID, tipo, escopo)
+		accessToken, err := h.signAccess(userID, tenantID, membershipID, tipo, escopo)
 		if err != nil {
 			jsonErr(w, "Erro interno", http.StatusInternalServerError)
 			return
@@ -800,8 +804,8 @@ func (h *Handler) GatewayValidate(w http.ResponseWriter, r *http.Request) {
 	var nome, email, escopo, tipo string
 	err := h.db.QueryRow(r.Context(), `
 		SELECT u.id, COALESCE(m.tenant_id, 0), u.nome, u.email, COALESCE(NULLIF(m.escopo, ''), 'erp'), u.tipo
-		  FROM users u LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
-		 WHERE u.id = $1`, user.ID).
+		  FROM users u LEFT JOIN auth.memberships m ON m.id = $2 AND m.user_id = u.id AND m.ativo = true
+		 WHERE u.id = $1`, user.ID, user.MembershipID).
 		Scan(&id, &tenantID, &nome, &email, &escopo, &tipo)
 	if err != nil {
 		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
@@ -809,7 +813,7 @@ func (h *Handler) GatewayValidate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	appRole := "COLABORADOR"
-	if ua, err := models.LoadUserAccess(r.Context(), h.db, id); err == nil {
+	if ua, err := models.LoadUserAccess(r.Context(), h.db, id, user.MembershipID); err == nil {
 		appRole = gatewayAppRole(ua)
 	}
 

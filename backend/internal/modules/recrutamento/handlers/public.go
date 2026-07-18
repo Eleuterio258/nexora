@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 
+	"nexora/internal/shared/pessoas"
 	"nexora/internal/storage"
 )
 
@@ -775,6 +776,11 @@ func (h *Handler) RegistarCandidato(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Já existe uma conta com este email. Inicie sessão em /api/auth/login.", http.StatusConflict)
 		return
 	}
+
+	// Ligar a conta a uma pessoa desde o auto-registo (ver
+	// docs/analise-modelo-pessoa-multi-tenant.md secção 9) — antes disto, um
+	// candidato só ficava ligado a pessoas.pessoas se/quando fosse contratado.
+	_, _ = pessoas.EnsureUserPessoa(r.Context(), h.db, userID, nome, nil)
 
 	var id int64
 	err := h.db.QueryRow(r.Context(), `

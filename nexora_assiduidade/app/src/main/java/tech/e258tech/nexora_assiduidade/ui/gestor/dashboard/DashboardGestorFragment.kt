@@ -80,10 +80,13 @@ class DashboardGestorFragment : Fragment() {
                 val response = withContext(Dispatchers.IO) {
                     RetrofitClient.erpApiService.getRelatorioRH(ApiUtils.bearerToken(token))
                 }
-                tvTotal.text = if (response.isSuccessful && response.body() != null) {
-                    response.body()!!.total_funcionarios.toString()
+                if (response.isSuccessful && response.body() != null) {
+                    tvTotal.text = response.body()!!.total_funcionarios.toString()
                 } else {
-                    "-"
+                    tvTotal.text = "-"
+                    if (isAdded && ApiUtils.isForbidden(response)) {
+                        Toast.makeText(context, ApiUtils.errorMessage(response), Toast.LENGTH_SHORT).show()
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e

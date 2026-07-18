@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/pessoas"
 )
 
 func (h *Handler) ListarUtilizadores(w http.ResponseWriter, r *http.Request) {
@@ -94,6 +95,11 @@ func (h *Handler) CriarUtilizador(w http.ResponseWriter, r *http.Request) {
 		Password string  `json:"password"`
 		Telefone *string `json:"telefone"`
 		Escopo   string  `json:"escopo"`
+		// PessoaID liga esta nova conta a uma pessoa já existente em vez de
+		// criar uma pessoa nova — usar quando a mesma pessoa já tem outra
+		// conta no sistema (ex.: segunda conta de autenticação para os
+		// mesmos dados pessoais, ou um aluno que também vai ser funcionário).
+		PessoaID *int64 `json:"pessoa_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Nome == "" || body.Email == "" || body.Password == "" {
 		jsonErr(w, "nome, email e password são obrigatórios", http.StatusBadRequest)
@@ -147,11 +153,24 @@ func (h *Handler) CriarUtilizador(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// papel vai sempre 'funcionario': este endpoint só cria funcionários
+	// (promover a superadmin é feito à parte, via AlterarTipo). Sem isto,
+	// a membership ficava com papel NULL — inconsistente com o padrão já
+	// seguido em contratar.go desde a Fase 3.
 	_, err = tx.Exec(r.Context(), `
-		INSERT INTO auth.memberships (user_id, tenant_id, escopo) VALUES ($1, $2, $3)`,
+		INSERT INTO auth.memberships (user_id, tenant_id, escopo, papel) VALUES ($1, $2, $3, 'funcionario')`,
 		created.ID, user.TenantID, body.Escopo)
 	if err != nil {
 		jsonErr(w, "Erro interno ao associar tenant", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := pessoas.EnsureUserPessoa(r.Context(), tx, created.ID, created.Nome, body.PessoaID); err != nil {
+		if isPgForeignKeyViolation(err) {
+			jsonErr(w, "pessoa_id não corresponde a nenhuma pessoa existente", http.StatusBadRequest)
+			return
+		}
+		jsonErr(w, "Erro interno ao associar pessoa", http.StatusInternalServerError)
 		return
 	}
 

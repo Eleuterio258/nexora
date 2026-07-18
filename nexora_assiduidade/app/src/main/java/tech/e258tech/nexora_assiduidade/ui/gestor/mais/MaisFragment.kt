@@ -15,6 +15,7 @@ import tech.e258tech.nexora_assiduidade.ui.gestor.ocorrencias.AlertasFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ocorrencias.OcorrenciasFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.registo.RegistoManualFragment
 import tech.e258tech.nexora_assiduidade.ui.main.MainActivity
+import tech.e258tech.nexora_assiduidade.utils.PermissionUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
@@ -38,13 +39,28 @@ class MaisFragment : Fragment() {
 
         sessionManager = SessionManager(requireContext())
 
-        view.findViewById<CardView>(R.id.cardDispositivos).setOnClickListener {
+        // Dispositivos exige hardware.ver_dispositivos (router.go:2500);
+        // Ocorrências/Alertas exigem recursos-humanos.ver_funcionarios
+        // (router.go:1675) — escondidos quando o cargo não tem a acção,
+        // em vez de deixar aparecer 403 ao abrir o ecrã.
+        val temVerDispositivos = PermissionUtils.has(sessionManager, "hardware", "ver_dispositivos")
+        val temVerFuncionarios = PermissionUtils.has(sessionManager, "recursos-humanos", "ver_funcionarios")
+
+        val cardDispositivos = view.findViewById<CardView>(R.id.cardDispositivos)
+        val cardOcorrencias = view.findViewById<CardView>(R.id.cardOcorrencias)
+        val cardAlertas = view.findViewById<CardView>(R.id.cardAlertas)
+
+        cardDispositivos.visibility = if (temVerDispositivos) View.VISIBLE else View.GONE
+        cardOcorrencias.visibility = if (temVerFuncionarios) View.VISIBLE else View.GONE
+        cardAlertas.visibility = if (temVerFuncionarios) View.VISIBLE else View.GONE
+
+        cardDispositivos.setOnClickListener {
             (activity as? MainActivity)?.pushFragment(DispositivosFragment())
         }
-        view.findViewById<CardView>(R.id.cardOcorrencias).setOnClickListener {
+        cardOcorrencias.setOnClickListener {
             (activity as? MainActivity)?.pushFragment(OcorrenciasFragment())
         }
-        view.findViewById<CardView>(R.id.cardAlertas).setOnClickListener {
+        cardAlertas.setOnClickListener {
             (activity as? MainActivity)?.pushFragment(AlertasFragment())
         }
         view.findViewById<CardView>(R.id.cardRegistoManual).setOnClickListener {

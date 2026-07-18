@@ -73,7 +73,7 @@ func (h *Handler) PodeVerSalarios(r *http.Request) bool {
 	if user.Tipo == "superadmin" {
 		return true
 	}
-	access, err := models.LoadUserAccess(r.Context(), h.db, user.ID)
+	access, err := models.LoadUserAccess(r.Context(), h.db, user.ID, user.MembershipID)
 	if err != nil {
 		return false
 	}

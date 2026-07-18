@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/pessoas"
 	"nexora/internal/storage"
 )
 
@@ -214,11 +215,28 @@ func (h *Handler) ContratarCandidato(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 4. Garantir membership ERP ativa
+	// 3.1. Ligar a conta a uma pessoa (cria uma se ainda não existir — ver
+	// docs/analise-modelo-pessoa-multi-tenant.md). Idempotente: se o
+	// candidato já tinha conta com pessoa associada, é reutilizada.
+	// pessoaID é propagado para rh.funcionarios.pessoa_id no passo 7 e usado
+	// no passo 10 para ligar os contactos de emergência (secção 9).
+	pessoaID, err := pessoas.EnsureUserPessoa(ctx, tx, userID, cand.Nome, nil)
+	if err != nil {
+		jsonErr(w, "Erro ao associar pessoa", http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Garantir membership ERP ativa como funcionário. O conflito é
+	// resolvido pela chave composta (user_id, tenant_id, escopo, papel) —
+	// "papel" tem de ir explícito no INSERT: com NULL dos dois lados o
+	// Postgres não considera NULL=NULL um conflito, e o upsert deixaria de
+	// ser idempotente (criaria uma membership nova a cada contratação
+	// repetida da mesma pessoa no mesmo tenant).
 	_, err = tx.Exec(ctx, `
-		INSERT INTO auth.memberships (user_id, tenant_id, escopo, ativo)
-		VALUES ($1, $2, 'erp', true)
-		ON CONFLICT (user_id) DO UPDATE SET tenant_id = EXCLUDED.tenant_id, escopo = 'erp', ativo = true, updated_at = NOW()`,
+		INSERT INTO auth.memberships (user_id, tenant_id, escopo, papel, ativo)
+		VALUES ($1, $2, 'erp', 'funcionario', true)
+		ON CONFLICT (user_id, tenant_id, escopo, papel)
+		DO UPDATE SET ativo = true, updated_at = NOW()`,
 		userID, u.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro ao associar utilizador ao tenant", http.StatusInternalServerError)
@@ -285,13 +303,13 @@ func (h *Handler) ContratarCandidato(w http.ResponseWriter, r *http.Request) {
 		INSERT INTO rh.funcionarios
 		(tenant_id, numero_funcionario, nome_completo, email, telefone, nuit,
 		 data_nascimento, provincia, cidade, cargo, cargo_id, unit_id, horario_id, centro_custo_id,
-		 data_admissao, tipo_contrato, salario_base, estado, user_id,
+		 data_admissao, tipo_contrato, salario_base, estado, user_id, pessoa_id,
 		 nacionalidade, tipo_documento, numero_documento)
-		VALUES ($1, $2, $3, LOWER($4), $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'ativo', $18, $19, $20, $21)
+		VALUES ($1, $2, $3, LOWER($4), $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'ativo', $18, $19, $20, $21, $22)
 		RETURNING id`,
 		u.TenantID, numero, cand.Nome, cand.Email, nullIfEmpty(telefone), body.Nuit,
 		dataNascimento, cand.Provincia, cand.Cidade, cargo, cargoID, body.UnitID, body.HorarioID, body.CentroCustoID,
-		dataAdmissao, tipoContrato, salarioBase, userID,
+		dataAdmissao, tipoContrato, salarioBase, userID, pessoaID,
 		body.Nacionalidade, body.TipoDocumento, body.NumeroDocumento,
 	).Scan(&empID)
 	if err != nil {
@@ -341,20 +359,30 @@ func (h *Handler) ContratarCandidato(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 10. Criar contactos de emergência
+	// 10. Criar contactos de emergência (ligados a pessoas.pessoas — secção 9)
 	for _, c := range body.ContactosEmergencia {
 		if c.Nome == "" || c.Telefone == "" {
 			continue
 		}
+		contactoPessoaID, err := pessoas.EnsurePessoa(ctx, tx, c.Nome)
+		if err != nil {
+			jsonErr(w, "Erro ao associar pessoa do contacto de emergência", http.StatusInternalServerError)
+			return
+		}
 		_, err = tx.Exec(ctx, `
 			INSERT INTO rh.contactos_emergencia
-			(tenant_id, funcionario_id, nome, parentesco, telefone, email)
-			VALUES ($1, $2, $3, $4, $5, $6)`,
-			u.TenantID, empID, c.Nome, c.Parentesco, c.Telefone, c.Email)
+			(tenant_id, funcionario_id, nome, parentesco, telefone, email, pessoa_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			u.TenantID, empID, c.Nome, c.Parentesco, c.Telefone, c.Email, contactoPessoaID)
 		if err != nil {
 			jsonErr(w, "Erro ao criar contacto de emergência", http.StatusInternalServerError)
 			return
 		}
+		parentesco := ""
+		if c.Parentesco != nil {
+			parentesco = *c.Parentesco
+		}
+		_ = pessoas.LinkPessoaRelacao(ctx, tx, u.TenantID, contactoPessoaID, pessoaID, parentesco, false)
 	}
 
 	// 10.1. Criar professor na Gestão Escolar (se solicitado)
@@ -365,11 +393,11 @@ func (h *Handler) ContratarCandidato(w http.ResponseWriter, r *http.Request) {
 		err = tx.QueryRow(ctx, `
 			INSERT INTO gestao_escolar.school_teachers
 			(tenant_id, user_id, codigo, nome_completo, genero, telefone, email,
-			 documento_identificacao, especialidade, carga_horaria_maxima_semanal, status, rh_employee_id)
-			VALUES ($1, $2, $3, $4, $5, $6, LOWER($7), $8, $9, $10, 'activo', $11)
+			 documento_identificacao, especialidade, carga_horaria_maxima_semanal, status, rh_employee_id, pessoa_id)
+			VALUES ($1, $2, $3, $4, $5, $6, LOWER($7), $8, $9, $10, 'activo', $11, $12)
 			RETURNING id`,
 			u.TenantID, userID, codigoProf, cand.Nome, nil, nullIfEmpty(telefone), cand.Email,
-			body.NumeroDocumento, cargo, 40, empID,
+			body.NumeroDocumento, cargo, 40, empID, pessoaID,
 		).Scan(&tid)
 		if err != nil {
 			jsonErr(w, "Erro ao criar professor", http.StatusInternalServerError)
@@ -377,10 +405,13 @@ func (h *Handler) ContratarCandidato(w http.ResponseWriter, r *http.Request) {
 		}
 		teacherID = &tid
 
-		// Ajustar escopo da membership para portal do professor
+		// Ajustar escopo da membership para portal do professor. Filtra
+		// também por escopo/papel da membership acabada de criar acima,
+		// para não mexer noutra membership da mesma pessoa no mesmo tenant
+		// (ex.: se também for aluno).
 		_, _ = tx.Exec(ctx, `
 			UPDATE auth.memberships SET escopo = 'portal_professor', updated_at = NOW()
-			WHERE user_id = $1 AND tenant_id = $2`,
+			WHERE user_id = $1 AND tenant_id = $2 AND escopo = 'erp' AND papel = 'funcionario'`,
 			userID, u.TenantID)
 	}
 

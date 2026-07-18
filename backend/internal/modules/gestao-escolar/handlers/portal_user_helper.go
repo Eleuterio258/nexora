@@ -7,14 +7,24 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"nexora/internal/shared/pessoas"
 )
 
 // upsertPortalUser cria ou actualiza um registo em auth.users para aluno/encarregado.
 // Se passwordHash for vazio, a senha existente não é sobrescrita (útil em convites).
+//
+// pessoaID é a pessoa já existente do aluno/encarregado (school_students.pessoa_id
+// ou school_guardians.pessoa_id — quem chama já a tem, porque CriarAluno/
+// AdicionarEncarregado já a preenchem desde a criação, ver
+// docs/analise-modelo-pessoa-multi-tenant.md secção 9). Resolvida aqui, num
+// único sítio, para não depender de cada um dos vários chamadores se lembrar
+// de o fazer — EnsureUserPessoa é idempotente, por isso é seguro chamar em
+// ambos os ramos (conta nova ou já existente).
 func (h *Handler) upsertPortalUser(
 	ctx context.Context,
 	email, nome, telefone, passwordHash, userTipo string,
 	ativo bool,
+	pessoaID *int64,
 ) (int64, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
@@ -52,7 +62,11 @@ func (h *Handler) upsertPortalUser(
 				 WHERE id = $2`,
 				estadoFromAtivo(ativo), userID)
 		}
-		return userID, err
+		if err != nil {
+			return 0, err
+		}
+		_, _ = pessoas.EnsureUserPessoa(ctx, h.db, userID, nome, pessoaID)
+		return userID, nil
 	}
 
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -65,7 +79,11 @@ func (h *Handler) upsertPortalUser(
 		RETURNING id`,
 		nome, email, passwordHash, telefone, estadoFromAtivo(ativo), ativo, userTipo,
 	).Scan(&userID)
-	return userID, err
+	if err != nil {
+		return 0, err
+	}
+	_, _ = pessoas.EnsureUserPessoa(ctx, h.db, userID, nome, pessoaID)
+	return userID, nil
 }
 
 // updatePortalUserPassword actualiza a senha de um utilizador existente.

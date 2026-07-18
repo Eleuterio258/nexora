@@ -46,6 +46,7 @@ import (
 	hardwareH "nexora/internal/modules/hardware/handlers"
 	mmH "nexora/internal/modules/multi-moeda/handlers"
 	notifH "nexora/internal/modules/notifications/handlers"
+	pessoasH "nexora/internal/modules/pessoas/handlers"
 	segH "nexora/internal/modules/seguranca/handlers"
 	ssH "nexora/internal/modules/self-service/handlers"
 	superH "nexora/internal/modules/superadmin/handlers"
@@ -113,6 +114,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	seg := segH.New(db, cfg)
 	ss := ssH.New(db, cfg, store)
 	aprov := aprovH.New(db, cfg)
+	pessoas := pessoasH.New(db)
 	super := superH.New(db, cfg)
 	tarefas := tarefasH.New(db, cfg)
 	hardware := hardwareH.New(db, cfg)
@@ -717,6 +719,13 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		r.Post("/requests/{id}/cancelar", aprov.CancelarRequest)
 	})
 
+	// ── Pessoas (entidade central — ver docs/analise-modelo-pessoa-multi-tenant.md) ──
+	r.Route("/api/pessoas", func(r chi.Router) {
+		r.Use(mw.RequireAuth(cfg.JWTSecret, db))
+		r.Use(mw.RequirePermission(db, "autorizacao", "gerir_utilizadores"))
+		r.Get("/{id}/relacoes", pessoas.ListarRelacoesPessoa)
+	})
+
 	r.Route("/api/tesouraria", func(r chi.Router) {
 		r.Use(mw.RequireAuth(cfg.JWTSecret, db))
 		r.Use(mw.AuditModule(db, "/api/tesouraria", "tesouraria"))
@@ -792,6 +801,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Get("/enrollments/{id}", escolar.ObterMatricula)
 			r.Get("/student-roles", escolar.ListarCargosAlunos)
 			r.Get("/teacher-roles", escolar.ListarCargosProfessores)
+			r.Get("/cargo-permissoes", escolar.ListarCargoPermissoes)
 			r.Get("/attendance", escolar.ListarFrequencias)
 			r.Get("/attendance/{id}", escolar.ObterFrequencia)
 			r.Get("/grades", escolar.ListarNotas)
@@ -1060,6 +1070,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Get("/me/mensagens", escolar.PortalMensagens)
 			r.Get("/me/eventos", escolar.PortalEventos)
 			r.Get("/me/presencas", escolar.PortalPresencas)
+			r.Post("/me/turma/presencas", escolar.PortalAlunoMarcarPresencas)
 			r.Get("/me/ocorrencias", escolar.PortalOcorrencias)
 			r.Get("/me/biblioteca", escolar.PortalBiblioteca)
 			r.Post("/me/cobrancas/{id}/pagar", escolar.PortalIniciarPagamento)
@@ -1087,6 +1098,9 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Get("/me/horario", escolar.ProfessorPortalHorario)
 			r.Get("/me/presencas", escolar.ProfessorPortalGetPresencas)
 			r.Post("/me/presencas", escolar.ProfessorPortalSalvarPresencas)
+			r.Get("/me/turmas/{id}/cargo-permissoes", escolar.ProfessorPortalListarCargoPermissoes)
+			r.Post("/me/turmas/{id}/cargo-permissoes", escolar.ProfessorPortalCriarCargoPermissao)
+			r.Delete("/me/turmas/{id}/cargo-permissoes/{permId}", escolar.ProfessorPortalRemoverCargoPermissao)
 			r.Get("/me/notas", escolar.ProfessorPortalGetNotas)
 			r.Post("/me/notas", escolar.ProfessorPortalSalvarNotas)
 			r.Get("/me/comunicacao", escolar.ProfessorPortalComunicacao)

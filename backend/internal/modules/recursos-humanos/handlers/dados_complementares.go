@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/pessoas"
 )
 
 var tiposDocumentoValidos = map[string]bool{
@@ -47,6 +48,21 @@ func (h *Handler) CriarContactoEmergencia(w http.ResponseWriter, r *http.Request
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
+
+	// Ligar o contacto a uma pessoa e registar a relação com o funcionário
+	// (ver docs/analise-modelo-pessoa-multi-tenant.md secção 9).
+	var funcionarioPessoaID *int64
+	if h.db.QueryRow(r.Context(), `SELECT pessoa_id FROM rh.funcionarios WHERE id=$1`, body.FuncionarioID).Scan(&funcionarioPessoaID) == nil && funcionarioPessoaID != nil {
+		if contactoPessoaID, err := pessoas.EnsurePessoa(r.Context(), h.db, body.Nome); err == nil {
+			h.db.Exec(r.Context(), `UPDATE rh.contactos_emergencia SET pessoa_id = $1 WHERE id = $2`, contactoPessoaID, id)
+			parentesco := ""
+			if body.Parentesco != nil {
+				parentesco = *body.Parentesco
+			}
+			_ = pessoas.LinkPessoaRelacao(r.Context(), h.db, user.TenantID, contactoPessoaID, *funcionarioPessoaID, parentesco, false)
+		}
+	}
+
 	jsonOK(w, map[string]any{"id": id}, http.StatusCreated)
 }
 

@@ -10,7 +10,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	mw "nexora/internal/middleware"
+	"nexora/internal/modules/aprovacoes"
+	"nexora/internal/shared/pessoas"
 )
 
 var tiposContratoValidos = map[string]bool{
@@ -363,6 +366,21 @@ func (h *Handler) CriarFuncionario(w http.ResponseWriter, r *http.Request) {
 		aplicarPermissoesTipo(r.Context(), h.db, *body.UserID)
 	}
 
+	// Ligar o funcionário a uma pessoa (ver
+	// docs/analise-modelo-pessoa-multi-tenant.md secção 9) — este é o
+	// endpoint directo de RH, separado do fluxo de contratação de
+	// candidatos (que já liga desde a Fase 3).
+	var pessoaID int64
+	var pessoaErr error
+	if body.UserID != nil {
+		pessoaID, pessoaErr = pessoas.EnsureUserPessoa(r.Context(), h.db, *body.UserID, body.NomeCompleto, nil)
+	} else {
+		pessoaID, pessoaErr = pessoas.EnsurePessoa(r.Context(), h.db, body.NomeCompleto)
+	}
+	if pessoaErr == nil {
+		h.db.Exec(r.Context(), `UPDATE rh.funcionarios SET pessoa_id = $1 WHERE id = $2`, pessoaID, id)
+	}
+
 	jsonOK(w, map[string]any{"id": id}, http.StatusCreated)
 }
 
@@ -693,10 +711,14 @@ func (h *Handler) DesligarFuncionario(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if email != "" {
+			// pessoa_id vem de auth.users — o funcionário desligado já devia
+			// estar ligado a uma pessoa desde a criação; copia-se aqui em
+			// vez de criar uma pessoa nova (não é uma pessoa nova, é a
+			// mesma pessoa a assumir também o papel de candidato).
 			if _, err := tx.Exec(r.Context(), `
-				INSERT INTO recrutamento.candidatos (tenant_id, user_id, email, nome, ativo)
-				VALUES ($1, $2, $3, $4, true)
-				ON CONFLICT (tenant_id, email) DO UPDATE SET user_id=EXCLUDED.user_id, ativo=true`,
+				INSERT INTO recrutamento.candidatos (tenant_id, user_id, email, nome, ativo, pessoa_id)
+				VALUES ($1, $2, $3, $4, true, (SELECT pessoa_id FROM auth.users WHERE id = $2))
+				ON CONFLICT (tenant_id, email) DO UPDATE SET user_id=EXCLUDED.user_id, ativo=true, pessoa_id=COALESCE(recrutamento.candidatos.pessoa_id, EXCLUDED.pessoa_id)`,
 				user.TenantID, *userID, email, nome); err != nil {
 				jsonErr(w, "Erro interno", http.StatusInternalServerError)
 				return
@@ -1177,7 +1199,26 @@ func (h *Handler) CriarAusencia(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
+
+	// Ver comentário equivalente em pedido_ferias.go:CriarMeuPedidoFerias.
+	if flow, ferr := aprovacoes.NeedsApproval(r.Context(), h.db, user.TenantID, "rh.ferias", float64(dias)); ferr == nil && flow != nil {
+		_ = aprovacoes.CreateRequest(r.Context(), h.db, user.TenantID, flow.ID, id, user.ID, "rh.ausencias")
+	}
+
 	jsonOK(w, map[string]any{"id": id}, http.StatusCreated)
+}
+
+// temAprovacaoPendentePelaPipeline verifica se a ausência tem um pedido de
+// aprovação pendente na pipeline genérica (internal/modules/aprovacoes) —
+// nesse caso, a decisão passa a ser feita lá, não directamente aqui, para
+// evitar dois caminhos a decidir o mesmo pedido de forma inconsistente.
+func temAprovacaoPendentePelaPipeline(ctx context.Context, db *pgxpool.Pool, ausenciaID string) bool {
+	var existe bool
+	db.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM saas.approval_requests
+		               WHERE entidade='rh.ausencias' AND entidade_id=$1::bigint AND estado='pendente')`,
+		ausenciaID).Scan(&existe)
+	return existe
 }
 
 func (h *Handler) AprovarAusencia(w http.ResponseWriter, r *http.Request) {
@@ -1192,6 +1233,11 @@ func (h *Handler) AprovarAusencia(w http.ResponseWriter, r *http.Request) {
 		SELECT funcionario_id, tipo_id, dias, data_inicio FROM rh.ausencias WHERE id=$1 AND tenant_id=$2 AND estado='pendente'`,
 		id, user.TenantID).Scan(&funcionarioID, &tipoID, &dias, &dataInicio); err != nil {
 		jsonErr(w, "Pedido não encontrado ou já processado", http.StatusConflict)
+		return
+	}
+
+	if temAprovacaoPendentePelaPipeline(r.Context(), h.db, id) {
+		jsonErr(w, "Este pedido está sujeito a um fluxo de aprovação — decida em POST /api/aprovacoes/requests/{id}/decidir", http.StatusConflict)
 		return
 	}
 
@@ -1232,6 +1278,11 @@ func (h *Handler) RejeitarAusencia(w http.ResponseWriter, r *http.Request) {
 		SELECT funcionario_id FROM rh.ausencias WHERE id=$1 AND tenant_id=$2 AND estado='pendente'`,
 		id, user.TenantID).Scan(&funcionarioID); err != nil {
 		jsonErr(w, "Pedido não encontrado ou já processado", http.StatusConflict)
+		return
+	}
+
+	if temAprovacaoPendentePelaPipeline(r.Context(), h.db, id) {
+		jsonErr(w, "Este pedido está sujeito a um fluxo de aprovação — decida em POST /api/aprovacoes/requests/{id}/decidir", http.StatusConflict)
 		return
 	}
 

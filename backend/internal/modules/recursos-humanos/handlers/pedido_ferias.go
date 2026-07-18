@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	mw "nexora/internal/middleware"
+	"nexora/internal/modules/aprovacoes"
 )
 
 // ListarMeusPedidosFerias devolve os pedidos de férias/ausências do funcionário
@@ -98,6 +99,17 @@ func (h *Handler) CriarMeuPedidoFerias(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
+
+	// Se o tenant tiver um fluxo de aprovação configurado para "rh.ferias"
+	// (ver docs/analise-modelo-pessoa-multi-tenant.md secção 9, pipeline de
+	// internal/modules/aprovacoes — reaproveitada em vez de um mecanismo
+	// novo), cria o pedido de aprovação correspondente. Sem flow configurado
+	// (o caso hoje, para todos os tenants), o comportamento fica exactamente
+	// como antes — decisão directa via AprovarAusencia/RejeitarAusencia.
+	if flow, ferr := aprovacoes.NeedsApproval(r.Context(), h.db, user.TenantID, "rh.ferias", float64(dias)); ferr == nil && flow != nil {
+		_ = aprovacoes.CreateRequest(r.Context(), h.db, user.TenantID, flow.ID, id, user.ID, "rh.ausencias")
+	}
+
 	jsonOK(w, map[string]any{"id": id}, http.StatusCreated)
 }
 

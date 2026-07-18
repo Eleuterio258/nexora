@@ -307,6 +307,39 @@ func atualizarEstadoEntidade(ctx context.Context, tx pgx.Tx, entidade string, id
 	case "compras.purchase_requests":
 		tx.Exec(ctx, `UPDATE compras.purchase_requests SET status=$1, updated_at=NOW() WHERE id=$2`, estado, id)
 
+	case "rh.ausencias":
+		// Ver docs/analise-modelo-pessoa-multi-tenant.md secção 9 — a
+		// aprovação de férias/ausências reaproveita esta pipeline em vez de
+		// um mecanismo próprio. "estado" aqui vem no vocabulário desta
+		// função ("aprovada"/"rejeitada"); rh.ausencias.estado usa o
+		// masculino ("aprovado"/"rejeitado").
+		novoEstado := "rejeitado"
+		if estado == "aprovada" {
+			novoEstado = "aprovado"
+		}
+		var tipoID *int64
+		var dias *int
+		var dataInicio time.Time
+		var funcionarioID, tenantID int64
+		if err := tx.QueryRow(ctx, `
+			SELECT funcionario_id, tenant_id, tipo_id, dias, data_inicio
+			  FROM rh.ausencias WHERE id=$1`, id,
+		).Scan(&funcionarioID, &tenantID, &tipoID, &dias, &dataInicio); err != nil {
+			return
+		}
+		tx.Exec(ctx, `UPDATE rh.ausencias SET estado=$1, aprovado_em=NOW() WHERE id=$2`, novoEstado, id)
+		if novoEstado == "aprovado" && tipoID != nil && dias != nil {
+			var afetaSaldo bool
+			if tx.QueryRow(ctx, `SELECT afeta_saldo FROM rh.tipos_ausencia WHERE id=$1`, *tipoID).Scan(&afetaSaldo) == nil && afetaSaldo {
+				tx.Exec(ctx, `
+					INSERT INTO rh.saldos_ausencia (tenant_id, funcionario_id, tipo_ausencia_id, ano, dias_usados)
+					VALUES ($1,$2,$3,$4,GREATEST($5,0))
+					ON CONFLICT (funcionario_id, tipo_ausencia_id, ano) DO UPDATE SET
+					  dias_usados=GREATEST(saldos_ausencia.dias_usados + $5, 0), updated_at=NOW()`,
+					tenantID, funcionarioID, *tipoID, dataInicio.Year(), float64(*dias))
+			}
+		}
+
 	case "gestao_escolar.school_fees":
 		if estado == "aprovado" {
 			// Aplicar o desconto pendente que foi guardado aquando da submissão

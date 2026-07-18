@@ -22,7 +22,7 @@ func expectLoadUserAccess(t *testing.T, mock pgxmock.PgxPoolIface, tipo string, 
 	userRows := pgxmock.NewRows([]string{"tenant_id", "tipo", "escopo", "cargo_id", "cargo_nome"}).
 		AddRow(int64(1), tipo, "erp", (*int64)(nil), (*string)(nil))
 	mock.ExpectQuery("SELECT COALESCE\\(m\\.tenant_id, 0\\).*").
-		WithArgs(int64(10)).
+		WithArgs(int64(10), int64(5)).
 		WillReturnRows(userRows)
 
 	if tipo == "superadmin" {
@@ -60,7 +60,7 @@ func TestGatewayAppRole_Superadmin(t *testing.T) {
 
 	expectLoadUserAccess(t, mock, "superadmin", nil)
 
-	ua, err := models.LoadUserAccess(context.Background(), mock, 10)
+	ua, err := models.LoadUserAccess(context.Background(), mock, 10, 5)
 	require.NoError(t, err)
 
 	assert.Equal(t, "ADMIN_SISTEMA", gatewayAppRole(ua))
@@ -77,7 +77,7 @@ func TestGatewayAppRole_GestorComPermissaoAprovarAusencias(t *testing.T) {
 		{"recursos-humanos", "aprovar_ausencias"},
 	})
 
-	ua, err := models.LoadUserAccess(context.Background(), mock, 10)
+	ua, err := models.LoadUserAccess(context.Background(), mock, 10, 5)
 	require.NoError(t, err)
 
 	assert.Equal(t, "GESTOR_RH", gatewayAppRole(ua))
@@ -93,7 +93,7 @@ func TestGatewayAppRole_ColaboradorSemPermissoesDeGestao(t *testing.T) {
 		{"recursos-humanos", "ver_funcionarios"},
 	})
 
-	ua, err := models.LoadUserAccess(context.Background(), mock, 10)
+	ua, err := models.LoadUserAccess(context.Background(), mock, 10, 5)
 	require.NoError(t, err)
 
 	assert.Equal(t, "COLABORADOR", gatewayAppRole(ua))

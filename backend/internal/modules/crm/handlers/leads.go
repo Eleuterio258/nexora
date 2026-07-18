@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/pessoas"
 )
 
 type Lead struct {
@@ -348,13 +349,24 @@ func (h *Handler) ConverterLead(w http.ResponseWriter, r *http.Request) {
 		if empresa != nil && strings.TrimSpace(*empresa) != "" {
 			nomeCliente = *empresa
 		}
+		// Heurística "sem indício de empresa": só liga a pessoas.pessoas
+		// quando o cliente resultante representa a própria pessoa de
+		// contacto do lead (empresa vazia) — quando o lead tem empresa
+		// preenchida, nomeCliente já é o nome da empresa, não de uma pessoa.
+		var pessoaID *int64
+		if empresa == nil || strings.TrimSpace(*empresa) == "" {
+			if pid, err := pessoas.EnsurePessoa(ctx, tx, nomeCliente); err == nil {
+				pessoaID = &pid
+			}
+		}
+
 		var novoClienteID int64
 		if err := tx.QueryRow(ctx, `
-			INSERT INTO clientes.customers (tenant_id, nome, email, telefone, estado, observacao)
-			VALUES ($1,$2,$3,$4,'ativo',$5)
+			INSERT INTO clientes.customers (tenant_id, nome, email, telefone, estado, observacao, pessoa_id)
+			VALUES ($1,$2,$3,$4,'ativo',$5,$6)
 			RETURNING id`,
 			user.TenantID, nomeCliente, email, telefone,
-			fmt.Sprintf("Criado a partir do lead CRM #%s", id),
+			fmt.Sprintf("Criado a partir do lead CRM #%s", id), pessoaID,
 		).Scan(&novoClienteID); err != nil {
 			jsonErr(w, "Erro ao criar cliente.", http.StatusInternalServerError)
 			return

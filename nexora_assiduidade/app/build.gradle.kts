@@ -48,7 +48,7 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
-            buildConfigField("String", "ERP_BASE_URL", "\"http://192.168.168.171:8080/\"")
+            buildConfigField("String", "ERP_BASE_URL", "\"http://10.0.2.2:8080/\"")
             buildConfigField("String", "ASSIDUIDADE_BASE_URL", "\"http://10.0.2.2:8001/api/v1/\"")
             buildConfigField("String", "DEVICE_API_KEY", deviceApiKey())
         }

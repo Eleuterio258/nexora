@@ -131,13 +131,18 @@ type HRPort interface {
 
 // HREmployee dados mínimos para criar um funcionário no módulo RH.
 type HREmployee struct {
-	TenantID    int64
-	Nome        string
-	Email       string
-	Telefone    string
-	NomeNumero  string // numero de funcionário, ex: "PROF-2026-001"
+	TenantID     int64
+	Nome         string
+	Email        string
+	Telefone     string
+	NomeNumero   string // numero de funcionário, ex: "PROF-2026-001"
 	DataAdmissao time.Time
-	Cargo       string
+	Cargo        string
+	// PessoaID liga o funcionário criado a pessoas.pessoas (ver
+	// docs/analise-modelo-pessoa-multi-tenant.md secção 9). 0 quando o
+	// chamador não resolveu uma pessoa (não deve acontecer nos usos actuais,
+	// mas o adaptador trata isso como "não ligar").
+	PessoaID int64
 }
 
 // ── Clientes ────────────────────────────────────────────────────────────────
@@ -159,6 +164,12 @@ type ClientData struct {
 	Telefone string
 	Nuit     string
 	Tipo     string // "encarregado", "aluno", etc. (customer_group_id será resolvido pelo adapter)
+	// PessoaID, quando indicado pelo chamador, é a pessoas.pessoas já
+	// associada a esta pessoa noutro papel (ex.: encarregado — ver
+	// pessoas.EnsurePessoa/pessoa_id em school_guardians). Evita criar uma
+	// segunda pessoa para o mesmo ser humano; quando nil, o adapter decide
+	// por si (heurística de NUIT).
+	PessoaID *int64
 }
 
 // ── Aprovações ──────────────────────────────────────────────────────────────

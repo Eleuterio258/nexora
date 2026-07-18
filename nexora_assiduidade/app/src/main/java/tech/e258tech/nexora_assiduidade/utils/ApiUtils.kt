@@ -10,7 +10,14 @@ object ApiUtils {
 
     fun bearerToken(token: String): String = "Bearer $token"
 
+    /** true se o backend recusou o pedido por falta de permissão RBAC (auth.permissoes_cargo). */
+    fun isForbidden(response: Response<*>): Boolean = response.code() == 403
+
     fun errorMessage(response: Response<*>): String {
+        if (isForbidden(response)) {
+            return "Sem permissão para este ecrã."
+        }
+
         val body = response.errorBody()?.string().orEmpty()
         if (body.isBlank()) {
             return "Falha na comunicacao com o servidor."
