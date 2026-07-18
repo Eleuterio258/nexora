@@ -27,36 +27,81 @@ import (
 
 var emailRe = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 
+// requestHost devolve o host do pedido normalizado: minúsculas, sem porta, sem
+// ponto final e sem "www.".
+//
+// Atenção: só é de confiança porque o container da API não tem porta publicada
+// — o único caminho até cá é o Traefik, que apenas encaminha hosts que casem
+// com uma regra configurada. Se a API alguma vez ficar directamente acessível,
+// um "Host:" forjado passa a valer o mesmo que o antigo ?tenant_id e esta
+// resolução deixa de ser uma fronteira.
+func requestHost(r *http.Request) string {
+	host := r.Header.Get("X-Forwarded-Host")
+	if i := strings.IndexByte(host, ','); i >= 0 {
+		host = host[:i] // o proxy encadeia valores; o primeiro é o original
+	}
+	if strings.TrimSpace(host) == "" {
+		host = r.Host
+	}
+	host = strings.ToLower(strings.TrimSpace(host))
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.TrimSuffix(host, ".")
+	return strings.TrimPrefix(host, "www.")
+}
+
+// subdominioTenant extrai o código do tenant de <codigo>.<base>. Devolve ""
+// se o host não for um subdomínio directo da base — só um nível conta, para
+// que "a.b.base" nunca seja lido como tenant "a".
+func subdominioTenant(host, base string) string {
+	if base == "" || host == base {
+		return ""
+	}
+	sufixo := "." + base
+	if !strings.HasSuffix(host, sufixo) {
+		return ""
+	}
+	label := strings.TrimSuffix(host, sufixo)
+	if label == "" || strings.Contains(label, ".") {
+		return ""
+	}
+	return label
+}
+
 // resolveTenantID devolve o tenant a usar para endpoints públicos.
-// Prioridade:
-//  1. ?tenant_id=id  (usado pelas apps móveis — o candidato autenticado já conhece o seu próprio tenant_id)
-//  2. ?tenant=codigo  (útil em localhost/dev para testar vários tenants)
-//  3. settings.recrutamento_tenant_id  (configurado pelo admin)
+//
+// O tenant é derivado do domínio do pedido, nunca escolhido por quem chama:
+//  1. match exacto num domínio registado em saas.tenant_dominios
+//  2. subdomínio da plataforma — <codigo>.<PLATFORM_BASE_DOMAIN>
+//  3. settings.recrutamento_tenant_id  (portal partilhado / instalação single-tenant)
 //  4. RECRUITMENT_TENANT_ID da config  (fallback env/.env)
+//
+// Não existe query param: aceitar ?tenant_id deixaria qualquer visitante
+// dirigir escritas (contactos, registos) a qualquer tenant.
 func (h *Handler) resolveTenantID(r *http.Request) int64 {
 	ctx := r.Context()
+	host := requestHost(r)
+	var id int64
 
-	if tid := strings.TrimSpace(r.URL.Query().Get("tenant_id")); tid != "" {
-		if parsed, err := strconv.ParseInt(tid, 10, 64); err == nil && parsed > 0 {
-			var exists bool
+	if host != "" {
+		if err := h.db.QueryRow(ctx, `
+			SELECT t.id FROM saas.tenant_dominios d
+			  JOIN saas.tenants t ON t.id = d.tenant_id
+			 WHERE d.dominio = $1 AND t.status = 'ativo'`, host,
+		).Scan(&id); err == nil && id > 0 {
+			return id
+		}
+
+		if codigo := subdominioTenant(host, h.cfg.PlatformBaseDomain); codigo != "" {
 			if err := h.db.QueryRow(ctx,
-				`SELECT EXISTS(SELECT 1 FROM saas.tenants WHERE id=$1 AND status='ativo')`, parsed,
-			).Scan(&exists); err == nil && exists {
-				return parsed
+				`SELECT id FROM saas.tenants WHERE codigo=$1 AND status='ativo'`, codigo,
+			).Scan(&id); err == nil && id > 0 {
+				return id
 			}
 		}
 	}
 
-	if codigo := strings.TrimSpace(r.URL.Query().Get("tenant")); codigo != "" {
-		var id int64
-		if err := h.db.QueryRow(ctx,
-			`SELECT id FROM saas.tenants WHERE codigo=$1 AND status='ativo'`, codigo,
-		).Scan(&id); err == nil && id > 0 {
-			return id
-		}
-	}
-
-	var id int64
 	if err := h.db.QueryRow(ctx,
 		`SELECT valor::bigint FROM settings WHERE chave='recrutamento_tenant_id' AND escopo='global' LIMIT 1`,
 	).Scan(&id); err == nil && id > 0 {
@@ -319,8 +364,6 @@ func (h *Handler) SubmeterCandidatura(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantID := h.resolveTenantID(r)
-
 	nome := clean(r.FormValue("nome"), 150)
 	telefone := clean(r.FormValue("telefone"), 30)
 	vagaTitulo := clean(r.FormValue("vaga_titulo"), 200)
@@ -362,13 +405,15 @@ func (h *Handler) SubmeterCandidatura(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validar tipo de candidatura permitido para esta vaga
+	// O tenant vem da própria vaga — é ela a fonte autoritativa. Só a
+	// candidatura espontânea (sem vaga_id) depende do domínio do pedido.
+	tenantID := h.resolveTenantID(r)
 	if vagaID != nil {
 		var permitePublica, permiteConta bool
 		err := h.db.QueryRow(r.Context(),
-			`SELECT permite_publica, permite_conta FROM vagas WHERE id=$1 AND tenant_id=$2 AND ativa=TRUE`,
-			*vagaID, tenantID,
-		).Scan(&permitePublica, &permiteConta)
+			`SELECT tenant_id, permite_publica, permite_conta FROM vagas WHERE id=$1 AND ativa=TRUE`,
+			*vagaID,
+		).Scan(&tenantID, &permitePublica, &permiteConta)
 		if err != nil {
 			jsonErr(w, "Vaga não encontrada ou inactiva.", http.StatusUnprocessableEntity)
 			return
@@ -601,6 +646,12 @@ func (h *Handler) SubmeterCandidatura(w http.ResponseWriter, r *http.Request) {
 }
 
 // ConsultarCandidaturaPorCodigo permite ao candidato consultar o estado público da candidatura.
+//
+// Sem filtro por tenant de propósito: codigo_acompanhamento é único global
+// (uq_candidaturas_codigo_acompanhamento) e imprevisível (10 chars num alfabeto
+// de 32 ≈ 50 bits), portanto é o próprio código que autoriza o acesso. Filtrar
+// por tenant não acrescentaria segurança e partiria a consulta a partir de
+// qualquer domínio que não fosse o do empregador.
 func (h *Handler) ConsultarCandidaturaPorCodigo(w http.ResponseWriter, r *http.Request) {
 	codigo := strings.ToUpper(strings.TrimSpace(chi.URLParam(r, "codigo")))
 	if codigo == "" {
@@ -624,8 +675,8 @@ func (h *Handler) ConsultarCandidaturaPorCodigo(w http.ResponseWriter, r *http.R
 	err := h.db.QueryRow(r.Context(), `
 		SELECT id, vaga_titulo, nome, estado, score, entrevista_data, entrevista_local, entrevista_link, created_at, codigo_acompanhamento
 		  FROM candidaturas
-		 WHERE tenant_id=$1 AND codigo_acompanhamento=$2`,
-		h.cfg.RecruitmentTenantID, codigo).Scan(
+		 WHERE codigo_acompanhamento=$1`,
+		codigo).Scan(
 		&c.ID, &c.VagaTitulo, &c.Nome, &c.Estado, &c.Score, &c.EntrevistaData,
 		&c.EntrevistaLocal, &c.EntrevistaLink, &c.CreatedAt, &c.CodigoAcompanhamento)
 	if err != nil {
@@ -729,10 +780,10 @@ func (h *Handler) RegistarCandidato(w http.ResponseWriter, r *http.Request) {
 	err := h.db.QueryRow(r.Context(), `
 		INSERT INTO candidatos (tenant_id, email, nome, telefone, user_id)
 		VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-		h.cfg.RecruitmentTenantID, email, nome, nullIfEmpty(telefone), userID).Scan(&id)
+		h.resolveTenantID(r), email, nome, nullIfEmpty(telefone), userID).Scan(&id)
 	if err != nil {
 		if isUniqueViolation(err) {
-			jsonErr(w, "Já existe uma conta com este email.", http.StatusConflict)
+			jsonErr(w, "Já tem uma conta neste empregador. Inicie sessão em /api/auth/login.", http.StatusConflict)
 			return
 		}
 		jsonErr(w, "Erro ao criar conta.", http.StatusInternalServerError)
@@ -806,7 +857,7 @@ func (h *Handler) SubmeterContacto(w http.ResponseWriter, r *http.Request) {
 
 	_, err := h.db.Exec(r.Context(),
 		`INSERT INTO contactos (tenant_id, nome, email, assunto, mensagem, ip) VALUES ($1,$2,$3,$4,$5,$6)`,
-		h.cfg.RecruitmentTenantID, nome, email, assunto, mensagem, clientIP(r))
+		h.resolveTenantID(r), nome, email, assunto, mensagem, clientIP(r))
 	if err != nil {
 		jsonErr(w, "Erro ao guardar. Tente novamente.", http.StatusInternalServerError)
 		return

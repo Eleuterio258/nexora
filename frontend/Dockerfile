@@ -6,8 +6,10 @@ RUN a2enmod rewrite headers expires
 RUN sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
 
 # Dompdf requires mbstring; zip is needed by Composer to extract packages.
-RUN docker-php-ext-install mbstring \
-    && apt-get update && apt-get install -y --no-install-recommends unzip \
+# mbstring compila contra oniguruma — sem libonig-dev o configure falha.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libonig-dev unzip \
+    && docker-php-ext-install mbstring \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
@@ -19,10 +21,5 @@ RUN cd /var/www/html && composer install --no-dev --optimize-autoloader --no-int
 RUN mkdir -p /var/www/html/uploads/cv \
     && chown -R www-data:www-data /var/www/html/uploads \
     && chmod -R 750 /var/www/html/uploads
-
-RUN chown -R www-data:www-data /var/www/html/config \
-    && chmod 750 /var/www/html/config \
-    && chmod 640 /var/www/html/config/*.php \
-    && chmod 750 /var/www/html/sql
 
 EXPOSE 80

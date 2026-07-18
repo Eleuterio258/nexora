@@ -83,6 +83,9 @@ final class NexoraClient implements NexoraGateway
         if ($ip = $this->clientIp()) {
             $headers[] = 'X-Forwarded-For: ' . $ip;
         }
+        if ($host = $this->clientHost()) {
+            $headers[] = 'X-Forwarded-Host: ' . $host;
+        }
         if ($auth = $this->incomingAuthorization()) {
             $headers[] = 'Authorization: ' . $auth;
         }
@@ -209,6 +212,9 @@ final class NexoraClient implements NexoraGateway
         $headers = ['Accept: application/json'];
         if ($ip = $this->clientIp()) {
             $headers[] = 'X-Forwarded-For: ' . $ip;
+        }
+        if ($host = $this->clientHost()) {
+            $headers[] = 'X-Forwarded-Host: ' . $host;
         }
 
         $response = $this->raw($this->baseUrl . $path, [
@@ -366,5 +372,19 @@ final class NexoraClient implements NexoraGateway
             return trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
         }
         return $_SERVER['REMOTE_ADDR'] ?? null;
+    }
+
+    /**
+     * Host que o visitante abriu no browser. As chamadas públicas ao backend
+     * são feitas servidor-a-servidor, por isso o Host do pedido cURL é o da
+     * API e não o do visitante — sem o reencaminhar, o backend não consegue
+     * saber de que tenant é a página e cai sempre no tenant por omissão.
+     */
+    private function clientHost(): ?string
+    {
+        if (!empty($_SERVER['HTTP_X_FORWARDED_HOST'])) {
+            return trim(explode(',', $_SERVER['HTTP_X_FORWARDED_HOST'])[0]);
+        }
+        return $_SERVER['HTTP_HOST'] ?? null;
     }
 }

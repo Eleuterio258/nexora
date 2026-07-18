@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -28,6 +29,10 @@ type Config struct {
 	RecruitmentTenantID int64
 	UploadsDir          string
 	UploadMaxMB         int64
+
+	// Multi-tenant — domínio base da plataforma. Um pedido a
+	// <codigo>.<PlatformBaseDomain> resolve para o tenant com esse código.
+	PlatformBaseDomain string
 
 	// ID obfuscation — same salt must be set in PHP frontend (JWT_SECRET is reused)
 	IDHashSalt string
@@ -95,6 +100,7 @@ func Load() *Config {
 		RecruitmentTenantID:  envInt("RECRUITMENT_TENANT_ID", 1),
 		UploadsDir:           env("UPLOADS_DIR", "./uploads"),
 		UploadMaxMB:          envInt("UPLOAD_MAX_MB", 3),
+		PlatformBaseDomain:   strings.ToLower(strings.TrimSpace(env("PLATFORM_BASE_DOMAIN", ""))),
 		IDHashSalt:              env("JWT_SECRET", "change-me-secret"),
 		GatewayWebhookSecret:    env("GATEWAY_WEBHOOK_SECRET", ""),
 		FirebaseCredentialsFile: env("FIREBASE_CREDENTIALS_FILE", "./config/e258tech-d439e.json"),

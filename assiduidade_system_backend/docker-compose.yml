@@ -3,14 +3,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: assiduidade-api
     restart: unless-stopped
-    ports:
-      - "8000:8000"
     env_file:
       - path: .env
         required: false
     environment:
-      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:admin@pg:5432/faceclock}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-}
@@ -27,8 +26,22 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - e258techmozambique
+      - backend
+    labels:
+      - "traefik.enable=true"
+      # HTTPS — asseduidade.e258tech.tech
+      - "traefik.http.routers.asseduidade.rule=Host(`asseduidade.e258tech.tech`)"
+      - "traefik.http.routers.asseduidade.entrypoints=websecure"
+      - "traefik.http.routers.asseduidade.tls=true"
+      - "traefik.http.routers.asseduidade.tls.certresolver=le"
+      - "traefik.http.services.asseduidade.loadbalancer.server.port=8000"
+      # Redirect HTTP → HTTPS
+      - "traefik.http.routers.asseduidade-http.rule=Host(`asseduidade.e258tech.tech`)"
+      - "traefik.http.routers.asseduidade-http.entrypoints=web"
+      - "traefik.http.routers.asseduidade-http.middlewares=asseduidade-https"
+      - "traefik.http.middlewares.asseduidade-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.asseduidade-https.redirectscheme.permanent=true"
 
 networks:
-  e258techmozambique:
+  backend:
     external: true

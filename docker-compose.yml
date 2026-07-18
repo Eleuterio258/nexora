@@ -6,7 +6,9 @@ services:
     container_name: nexora-api
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD}@nexora-db:5432/nexora_erp?sslmode=disable
+      # Vem inteiro do .env: o host é `postgres` (não `nexora-db`) e traz o
+      # search_path com os 25 schemas — sem ele as queries não resolvem.
+      DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
@@ -20,19 +22,34 @@ services:
       NEXORA_PAY_BASE_URL: ${NEXORA_PAY_BASE_URL:-https://pay.e258tech.tech}
       NEXORA_PAY_API_KEY: ${NEXORA_PAY_API_KEY}
       NEXORA_PAY_SERVICE_ACCOUNT: ${NEXORA_PAY_SERVICE_ACCOUNT:-gestao-escolar}
+      # Object storage — o MinIO já existe na rede `backend`.
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-minio}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-nexoraerp}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      # Multi-tenant do recrutamento — sem RECRUITMENT_TENANT_ID o código usa
+      # o default 1, um tenant que não existe nesta instalação.
+      RECRUITMENT_TENANT_ID: ${RECRUITMENT_TENANT_ID:-7}
+      PLATFORM_BASE_DOMAIN: ${PLATFORM_BASE_DOMAIN:-nexora.e258tech.tech}
     volumes:
       - api_uploads:/app/uploads
       - api_avatars:/app/avatars
     networks:
-      - e258techmozambique
+      - backend
     labels:
       - "traefik.enable=true"
       # HTTPS — api.nexora.e258tech.tech
       - "traefik.http.routers.nexora-api.rule=Host(`api.nexora.e258tech.tech`)"
       - "traefik.http.routers.nexora-api.entrypoints=websecure"
       - "traefik.http.routers.nexora-api.tls=true"
-      - "traefik.http.routers.nexora-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nexora-api.tls.certresolver=le"
       - "traefik.http.services.nexora-api.loadbalancer.server.port=8080"
+      # api.nexora.e258tech.tech também casa com o HostRegexp dos portais de
+      # tenant (no serviço web). Prioridade explícita para este router ganhar.
+      - "traefik.http.routers.nexora-api.priority=100"
       # Redirect HTTP → HTTPS
       - "traefik.http.routers.nexora-api-http.rule=Host(`api.nexora.e258tech.tech`)"
       - "traefik.http.routers.nexora-api-http.entrypoints=web"
@@ -57,16 +74,36 @@ services:
     volumes:
       - web_uploads:/var/www/html/uploads
     networks:
-      - e258techmozambique
+      - backend
     labels:
       - "traefik.enable=true"
       # HTTPS — e258tech.tech
       - "traefik.http.routers.e258tech.rule=Host(`e258tech.tech`)"
       - "traefik.http.routers.e258tech.entrypoints=websecure"
       - "traefik.http.routers.e258tech.tls=true"
-      - "traefik.http.routers.e258tech.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.e258tech.tls.certresolver=le"
       - "traefik.http.routers.e258tech.middlewares=e258tech-sec"
       - "traefik.http.services.e258tech.loadbalancer.server.port=80"
+      # ── Portais de carreira por tenant — <codigo>.nexora.e258tech.tech ──
+      # Serve o MESMO frontend PHP: ele já encaminha /api/public/* para o
+      # backend Go (index.php) e reenvia o X-Forwarded-Host, que é como o
+      # backend descobre de que tenant é a página. Por isso o wildcard aponta
+      # para o web e não para a API — mandar /api directo à API saltaria o
+      # proxy e deixaria a própria página de carreiras sem rota.
+      # Wildcard exige DNS-01: o resolver `le` (tlschallenge) não emite
+      # wildcards — daí `le-dns` (Cloudflare), já configurado neste Traefik.
+      - 'traefik.http.routers.tenants.rule=HostRegexp(`^[a-z0-9][a-z0-9-]*\.nexora\.e258tech\.tech$`)'
+      - "traefik.http.routers.tenants.entrypoints=websecure"
+      - "traefik.http.routers.tenants.tls=true"
+      - "traefik.http.routers.tenants.tls.certresolver=le-dns"
+      - "traefik.http.routers.tenants.tls.domains[0].main=nexora.e258tech.tech"
+      - "traefik.http.routers.tenants.tls.domains[0].sans=*.nexora.e258tech.tech"
+      - "traefik.http.routers.tenants.service=e258tech"
+      - "traefik.http.routers.tenants.middlewares=e258tech-sec"
+      # Prioridade baixa: api.nexora.e258tech.tech e nexora.e258tech.tech têm
+      # routers próprios e a regra deles é mais curta, logo perderiam para este
+      # HostRegexp (a prioridade default é o comprimento da regra).
+      - "traefik.http.routers.tenants.priority=10"
       # ── Cabeçalhos de segurança ──────────────────────────────
       - "traefik.http.middlewares.e258tech-sec.headers.stsSeconds=31536000"
       - "traefik.http.middlewares.e258tech-sec.headers.stsIncludeSubdomains=true"
@@ -85,8 +122,9 @@ services:
       - "traefik.http.routers.nexora.rule=Host(`nexora.e258tech.tech`)"
       - "traefik.http.routers.nexora.entrypoints=websecure"
       - "traefik.http.routers.nexora.tls=true"
-      - "traefik.http.routers.nexora.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.nexora.tls.certresolver=le"
       - "traefik.http.routers.nexora.service=e258tech"
+      - "traefik.http.routers.nexora.priority=1000"
       - "traefik.http.routers.nexora.middlewares=nexora-rootredir,e258tech-sec"
       - "traefik.http.middlewares.nexora-rootredir.redirectregex.regex=^https://nexora\\.e258tech\\.tech/?$$"
       - "traefik.http.middlewares.nexora-rootredir.redirectregex.replacement=https://nexora.e258tech.tech/nexora/"
@@ -106,6 +144,7 @@ volumes:
     driver: local
 
 # ── Redes ─────────────────────────────────────────────────────
+# `backend` é a rede partilhada com traefik/postgres/minio neste servidor.
 networks:
-  e258techmozambique:
+  backend:
     external: true
