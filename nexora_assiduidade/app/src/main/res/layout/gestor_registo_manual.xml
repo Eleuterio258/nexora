@@ -39,42 +39,27 @@
                 android:inputType="number" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <RadioGroup
-            android:id="@+id/rgEventType"
+        <TextView
+            android:id="@+id/tvAutoDetectHint"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:orientation="horizontal"
+            android:layout_marginTop="12dp"
+            android:text="Entrada ou saída são detectadas automaticamente pelo ERP, consoante o que já estiver registado hoje para este funcionário — não é preciso escolher."
+            android:textColor="@color/text_muted"
+            android:textSize="13sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tilEmployeeId">
-
-            <RadioButton
-                android:id="@+id/rbEntrada"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:checked="true"
-                android:text="Entrada" />
-
-            <RadioButton
-                android:id="@+id/rbSaida"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Saída" />
-
-        </RadioGroup>
+            app:layout_constraintTop_toBottomOf="@id/tilEmployeeId" />
 
         <Button
             android:id="@+id/btnRegister"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="Registrar"
+            android:text="Registrar Ponto"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/rgEventType" />
+            app:layout_constraintTop_toBottomOf="@id/tvAutoDetectHint" />
 
         <TextView
             android:id="@+id/tvRegistoStatus"

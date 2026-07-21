@@ -2,12 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
-	"math"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/pkg/geo"
+	"nexora/internal/pkg/tenantid"
 )
 
 // ── Endpoints consumidos por serviços externos de assiduidade (ex.: FaceClock) ──
@@ -17,24 +18,13 @@ import (
 // seu tenant_id vem do próprio registo em hardware.devices. Ver secção 3 e 4
 // de assiduidade_system_backend/CONTRATO-INTEGRACAO-ERP.md.
 
-// resolveSaasTenantID traduz o tenant_id injectado por RequireDeviceAuth (que
-// é na verdade empresas.companies.id, por causa da FK devices_tenant_id_fkey
-// -> companies) para o saas.tenants.id real usado por rh.funcionarios e
-// sistema_configuracao.tenant_feature_flags.
-//
-// Descoberto por teste manual em 2026-07-11: companies.id e saas.tenants.id
-// são espaços de identificadores DIFERENTES que por acaso partilham o nome de
-// coluna "tenant_id" em várias tabelas (ex.: Enigma School tem companies.id=7
-// mas saas.tenants.id=5). O módulo hardware pré-existente (processor.go,
-// registarPresenca) NÃO faz esta tradução e grava rh.presencas.tenant_id com
-// o companies.id errado — bug pré-existente, fora do âmbito desta integração,
-// reportado separadamente e não corrigido aqui.
+// resolveSaasTenantID adapta a assinatura (h, r, companyID) usada em todo
+// este pacote a tenantid.ResolveSaas — a implementação real (e o porquê da
+// tradução ser necessária) está documentada em internal/pkg/tenantid, único
+// sítio onde esta lógica existe agora (estava duplicada aqui e em
+// hardware/service/processor.go).
 func resolveSaasTenantID(h *Handler, r *http.Request, companyID int64) (int64, error) {
-	var saasTenantID int64
-	err := h.db.QueryRow(r.Context(),
-		`SELECT tenant_id FROM empresas.companies WHERE id = $1`, companyID,
-	).Scan(&saasTenantID)
-	return saasTenantID, err
+	return tenantid.ResolveSaas(r.Context(), h.db, companyID)
 }
 
 // GET /api/hardware/assiduidade/config
@@ -201,25 +191,11 @@ func (h *Handler) ValidarGeofenceDevice(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	distance := haversineMeters(*refLat, *refLon, lat, lon)
+	distance := geo.HaversineMeters(*refLat, *refLon, lat, lon)
 	jsonOK(w, map[string]any{
 		"valid":           distance <= *raio,
 		"unit_name":       nome,
 		"distance_meters": distance,
 		"radius_meters":   *raio,
 	}, http.StatusOK)
-}
-
-// haversineMeters calcula a distância em metros entre duas coordenadas
-// geográficas (fórmula de Haversine, raio da Terra = 6371 km).
-func haversineMeters(lat1, lon1, lat2, lon2 float64) float64 {
-	const earthRadiusMeters = 6371000.0
-	toRad := func(deg float64) float64 { return deg * math.Pi / 180 }
-
-	dLat := toRad(lat2 - lat1)
-	dLon := toRad(lon2 - lon1)
-	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
-		math.Cos(toRad(lat1))*math.Cos(toRad(lat2))*math.Sin(dLon/2)*math.Sin(dLon/2)
-	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
-	return earthRadiusMeters * c
 }

@@ -6,7 +6,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
-import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
@@ -22,6 +21,7 @@ import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
+import tech.e258tech.nexora_assiduidade.utils.Constants
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
 import tech.e258tech.nexora_assiduidade.utils.HardwareEventMapper
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
@@ -35,6 +35,16 @@ import java.util.UUID
  * proxy do FaceClock. O `funcionarioId` introduzido é o ID numérico tal como
  * devolvido por GET /api/rh/funcionarios (ecrã Equipa) — `rh.funcionarios.id`,
  * resolvido para `employee_no` via `HardwareEventMapper.resolveEmployeeCodeById`.
+ *
+ * Não pede para escolher Entrada/Saída — o ERP decide sozinho (ver
+ * `registarEventoAssiduidade`/`inferirTipoEventoCodigo` em
+ * backend/internal/modules/hardware/service/processor.go): grava em
+ * rh.eventos_assiduidade, usando event.Direction quando o adapter o souber
+ * indicar ou, na ausência disso, alternando entrada/saída pela paridade dos
+ * eventos já registados nesse dia — já não perde marcações a partir da 3ª
+ * como a lógica antiga baseada em rh.presencas perdia. O `event_type`
+ * enviado aqui não influencia esse cálculo, é só metadado do log bruto
+ * (hardware.device_events).
  */
 class RegistoManualFragment : Fragment() {
 
@@ -57,7 +67,6 @@ class RegistoManualFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         val etEmployeeId = view.findViewById<EditText>(R.id.etEmployeeId)
-        val rgEventType = view.findViewById<RadioGroup>(R.id.rgEventType)
         val btnRegister = view.findViewById<Button>(R.id.btnRegister)
         val tvStatus = view.findViewById<TextView>(R.id.tvRegistoStatus)
 
@@ -68,12 +77,11 @@ class RegistoManualFragment : Fragment() {
                 return@setOnClickListener
             }
 
-            val eventType = if (rgEventType.checkedRadioButtonId == R.id.rbSaida) "EXIT" else "ENTRY"
-            registar(funcionarioId, eventType, tvStatus, btnRegister)
+            registar(funcionarioId, tvStatus, btnRegister)
         }
     }
 
-    private fun registar(funcionarioId: String, eventType: String, tvStatus: TextView, btnRegister: Button) {
+    private fun registar(funcionarioId: String, tvStatus: TextView, btnRegister: Button) {
         val token = SessionManager(requireContext()).getToken()
         if (token.isNullOrBlank()) {
             tvStatus.text = "Sessão inválida. Faça login novamente."
@@ -103,7 +111,7 @@ class RegistoManualFragment : Fragment() {
                     idempotency_key = UUID.randomUUID().toString(),
                     user_id = funcionarioId,
                     device_id = "00000000-0000-0000-0000-000000000000",
-                    event_type = eventType,
+                    event_type = Constants.EVENT_AUTO,
                     recorded_at = DateTimeUtils.nowForApi(),
                     source = "MANUAL",
                 )

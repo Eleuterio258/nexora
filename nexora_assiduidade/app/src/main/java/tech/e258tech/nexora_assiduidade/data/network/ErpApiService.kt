@@ -18,6 +18,7 @@ import tech.e258tech.nexora_assiduidade.data.model.FuncionarioDetalhe
 import tech.e258tech.nexora_assiduidade.data.model.FuncionarioListResponse
 import tech.e258tech.nexora_assiduidade.data.model.GenericHardwareEventRequest
 import tech.e258tech.nexora_assiduidade.data.model.JustificacaoRequest
+import tech.e258tech.nexora_assiduidade.data.model.Notification
 import tech.e258tech.nexora_assiduidade.data.model.PinValidateRequest
 import tech.e258tech.nexora_assiduidade.data.model.PresencaOcorrencia
 import tech.e258tech.nexora_assiduidade.data.model.QRGenerateDeviceRequest
@@ -30,8 +31,10 @@ import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageListRespo
 import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ConversationCreateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ConversationListResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.ErpAcessoResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ErpLoginResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ErpRefreshResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.EventoAssiduidadeResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.FuncionarioIntegracaoResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.GeofenceDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.HardwareEventResponse
@@ -41,6 +44,7 @@ import tech.e258tech.nexora_assiduidade.data.model.response.NFCDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.PresencaResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.QRGenerateDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.QRValidateDeviceResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.ResultadoDiarioResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.TotpSetupResponse
 
 /**
@@ -55,6 +59,13 @@ interface ErpApiService {
     // Login (Fase 6 — identidade vem sempre do ERP, ver ErpLoginRequest)
     @POST("api/auth/login")
     suspend fun login(@Body request: ErpLoginRequest): Response<ErpLoginResponse>
+
+    // Permissões RBAC em tempo real do utilizador autenticado (permissoes.go:14,
+    // ObterAcessoUtilizador → models.LoadUserAccess) — chamado logo após o
+    // login para obter `modulos` correcto mesmo que o login em produção
+    // devolva esse campo desactualizado/vazio, ver ErpAcessoResponse.
+    @GET("api/auth/me/acesso")
+    suspend fun getMeuAcesso(@Header("Authorization") token: String): Response<ErpAcessoResponse>
 
     // Renovação de sessão (auth.go:402) — versão síncrona (Call, não suspend)
     // porque é invocada a partir de AuthAuthenticator, que corre fora de
@@ -153,6 +164,29 @@ interface ErpApiService {
         @Query("longitude") longitude: Double
     ): Response<GeofenceDeviceResponse>
 
+    // Notificações do próprio utilizador (utilizadores/handlers/notificacoes.go)
+    @GET("api/utilizadores/{userId}/notifications")
+    suspend fun getNotifications(
+        @Header("Authorization") token: String,
+        @Path("userId") userId: String,
+        @Query("lida") lida: Boolean? = null,
+        @Query("limit") limit: Int = 50,
+        @Query("offset") offset: Int = 0
+    ): Response<List<Notification>>
+
+    @POST("api/utilizadores/{userId}/notifications/{notificationId}/read")
+    suspend fun markNotificationRead(
+        @Header("Authorization") token: String,
+        @Path("userId") userId: String,
+        @Path("notificationId") notificationId: Long
+    ): Response<Unit>
+
+    @POST("api/utilizadores/{userId}/notifications/read-all")
+    suspend fun markAllNotificationsRead(
+        @Header("Authorization") token: String,
+        @Path("userId") userId: String
+    ): Response<Unit>
+
     // Equipa — lista de funcionários (rh.go:157, ListarFuncionarios)
     @GET("api/rh/funcionarios")
     suspend fun getFuncionarios(
@@ -170,6 +204,25 @@ interface ErpApiService {
         @Header("Authorization") token: String,
         @Path("id") funcionarioId: Long
     ): Response<FuncionarioDetalhe>
+
+    // Assiduidade (modelo novo) de um funcionário — eventos_assiduidade.go:
+    // ListarEventosFuncionario / resultados_assiduidade.go:ListarResultadosFuncionario.
+    // Sem data_inicio/data_fim, o ERP defaulta aos últimos 30 dias.
+    @GET("api/rh/funcionarios/{id}/eventos")
+    suspend fun getEventosFuncionario(
+        @Header("Authorization") token: String,
+        @Path("id") funcionarioId: Long,
+        @Query("data_inicio") dataInicio: String? = null,
+        @Query("data_fim") dataFim: String? = null
+    ): Response<List<EventoAssiduidadeResponse>>
+
+    @GET("api/rh/funcionarios/{id}/resultados")
+    suspend fun getResultadosFuncionario(
+        @Header("Authorization") token: String,
+        @Path("id") funcionarioId: Long,
+        @Query("data_inicio") dataInicio: String? = null,
+        @Query("data_fim") dataFim: String? = null
+    ): Response<List<ResultadoDiarioResponse>>
 
     // Pedidos de férias/ausências (rh.go:1090, ListarAusencias)
     @GET("api/rh/ausencias")

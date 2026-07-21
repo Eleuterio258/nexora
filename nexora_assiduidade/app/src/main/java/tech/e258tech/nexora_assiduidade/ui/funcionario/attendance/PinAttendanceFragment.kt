@@ -110,7 +110,7 @@ class PinAttendanceFragment : Fragment() {
                     )
                     if (response.isSuccessful && response.body() != null) {
                         val payload = response.body()!!
-                        val role = RoleUtils.fromErpLogin(payload.tipo, payload.modulos)
+                        val role = RoleUtils.fromErpLogin(payload.modulos)
                         sessionManager.saveSession(
                             token = payload.access_token,
                             refreshToken = payload.refresh_token,

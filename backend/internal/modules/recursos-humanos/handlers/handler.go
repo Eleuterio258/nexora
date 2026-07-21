@@ -7,17 +7,19 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
+	"nexora/internal/modules/recursos-humanos/service/assiduidade"
 	"nexora/internal/storage"
 )
 
 type Handler struct {
-	db      *pgxpool.Pool
-	cfg     *config.Config
-	storage storage.Provider
+	db          *pgxpool.Pool
+	cfg         *config.Config
+	storage     storage.Provider
+	assiduidade *assiduidade.Service
 }
 
 func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider) *Handler {
-	return &Handler{db: db, cfg: cfg, storage: st}
+	return &Handler{db: db, cfg: cfg, storage: st, assiduidade: assiduidade.NewService(db)}
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {

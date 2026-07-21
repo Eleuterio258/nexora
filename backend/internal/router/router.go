@@ -1774,12 +1774,15 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Use(mw.RequirePermission(db, "recursos-humanos", "ver_funcionarios"))
 				r.Get("/{id}/presencas", rh.ListarPresencas)
 				r.Get("/{id}/saldos-ausencia", rh.ListarSaldosAusenciaFuncionario)
+				r.Get("/{id}/eventos", rh.ListarEventosFuncionario)
+				r.Get("/{id}/resultados", rh.ListarResultadosFuncionario)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "recursos-humanos", "gerir_funcionarios"))
 				r.Post("/{id}/presencas", rh.CriarPresenca)
 				r.Delete("/{id}/presencas/{presencaId}", rh.RemoverPresenca)
 				r.Post("/{id}/saldos-ausencia", rh.DefinirSaldoAusencia)
+				r.Post("/{id}/recalcular", rh.RecalcularResultadoFuncionario)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "recursos-humanos", "ver_processos_disciplinares"))
@@ -1845,6 +1848,69 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Get("/", rh.ListarPedidosCorrecaoPendentes)
 				r.Post("/{id}/aprovar", rh.AprovarPedidoCorrecao)
 				r.Post("/{id}/rejeitar", rh.RejeitarPedidoCorrecao)
+			})
+		})
+
+		// Sistema flexível de assiduidade: catálogos configuráveis (tipos de
+		// evento, métodos de marcação), regras por âmbito e eventos manuais.
+		r.Route("/tipos-evento", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequirePermission(db, "recursos-humanos", "ver_funcionarios"))
+				r.Get("/", rh.ListarTiposEvento)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequirePermission(db, "assiduidade", "gerir_configuracao"))
+				r.Post("/", rh.CriarTipoEvento)
+				r.Put("/{id}", rh.ActualizarTipoEvento)
+				r.Delete("/{id}", rh.RemoverTipoEvento)
+			})
+		})
+		r.Route("/metodos-marcacao", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequirePermission(db, "recursos-humanos", "ver_funcionarios"))
+				r.Get("/", rh.ListarMetodosMarcacao)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequirePermission(db, "assiduidade", "gerir_configuracao"))
+				r.Post("/", rh.CriarMetodoMarcacao)
+				r.Put("/{id}", rh.ActualizarMetodoMarcacao)
+				r.Delete("/{id}", rh.RemoverMetodoMarcacao)
+			})
+		})
+		r.Route("/tipos-regra", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequirePermission(db, "recursos-humanos", "ver_funcionarios"))
+				r.Get("/", rh.ListarTiposRegra)
+			})
+		})
+		r.Route("/regras", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequirePermission(db, "assiduidade", "ver_configuracao"))
+				r.Get("/", rh.ListarRegras)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequirePermission(db, "assiduidade", "gerir_configuracao"))
+				r.Post("/", rh.CriarRegra)
+				r.Put("/{id}", rh.ActualizarRegra)
+				r.Delete("/{id}", rh.RemoverRegra)
+			})
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequirePermission(db, "recursos-humanos", "gerir_funcionarios"))
+			r.Post("/eventos", rh.CriarEvento)
+		})
+		// Correcções sobre o novo modelo de eventos — sucessor de
+		// /correcoes-ponto (que fica congelado, só leitura de histórico).
+		r.Route("/correcoes", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequirePermission(db, "recursos-humanos", "gerir_funcionarios"))
+				r.Post("/", rh.CriarCorrecaoEvento)
+			})
+			r.Group(func(r chi.Router) {
+				r.Use(mw.RequirePermission(db, "assiduidade", "aprovar_correcao"))
+				r.Get("/", rh.ListarCorrecoesEventoPendentes)
+				r.Post("/{id}/aprovar", rh.AprovarCorrecaoEvento)
+				r.Post("/{id}/rejeitar", rh.RejeitarCorrecaoEvento)
 			})
 		})
 

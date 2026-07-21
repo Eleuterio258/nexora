@@ -2,12 +2,16 @@ package tech.e258tech.nexora_assiduidade.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import tech.e258tech.nexora_assiduidade.data.model.response.ErpModuloAcesso
+import java.security.GeneralSecurityException
 import java.util.UUID
+
+private const val TAG = "SessionManager"
 
 /**
  * Gestor de sessao com EncryptedSharedPreferences.
@@ -19,21 +23,52 @@ import java.util.UUID
  */
 class SessionManager(context: Context) {
 
+    private val appContext: Context = context.applicationContext
+
     private val masterKey: MasterKey by lazy {
         MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
     }
 
-    private val encryptedPrefs: SharedPreferences by lazy {
+    private val encryptedPrefs: SharedPreferences by lazy { buildEncryptedPrefs() }
+
+    /**
+     * Cria o EncryptedSharedPreferences com recuperacao automatica.
+     *
+     * A chave do Android Keystore pode ficar dessincronizada dos dados ja
+     * gravados (reinstalacao sobre dados antigos, troca de assinatura
+     * debug/release mantendo o mesmo applicationId, reset do Keystore do
+     * sistema, etc.) — nesse caso a desencriptacao falha com
+     * AEADBadTagException/KeyStoreException, e por correr dentro de
+     * Application.onCreate (via RetrofitClient.init) isso e um crash fatal
+     * logo no arranque, do qual nem desinstalar/reinstalar recupera enquanto
+     * o ficheiro corrompido persistir. Em caso de falha, apaga o ficheiro e
+     * recria vazio — perde-se a sessao guardada (o utilizador tem de voltar
+     * a fazer login), mas a app deixa de ficar presa em crash loop.
+     */
+    private fun buildEncryptedPrefs(): SharedPreferences {
+        return try {
+            createEncryptedPrefs()
+        } catch (e: Exception) {
+            if (e is GeneralSecurityException || e is java.io.IOException || e.cause is GeneralSecurityException) {
+                Log.w(TAG, "EncryptedSharedPreferences corrompidas — a apagar e recriar.", e)
+                appContext.deleteSharedPreferences(Constants.PREFS_NAME_ENCRYPTED)
+                createEncryptedPrefs()
+            } else {
+                throw e
+            }
+        }
+    }
+
+    private fun createEncryptedPrefs(): SharedPreferences =
         EncryptedSharedPreferences.create(
-            context,
+            appContext,
             Constants.PREFS_NAME_ENCRYPTED,
             masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
-    }
 
     private val legacyPrefs: SharedPreferences by lazy {
         context.getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE)

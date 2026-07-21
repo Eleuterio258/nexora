@@ -14,7 +14,6 @@ import tech.e258tech.nexora_assiduidade.ui.gestor.dispositivos.DispositivosFragm
 import tech.e258tech.nexora_assiduidade.ui.gestor.ocorrencias.AlertasFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ocorrencias.OcorrenciasFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.registo.RegistoManualFragment
-import tech.e258tech.nexora_assiduidade.ui.main.MainActivity
 import tech.e258tech.nexora_assiduidade.utils.PermissionUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
@@ -55,16 +54,16 @@ class MaisFragment : Fragment() {
         cardAlertas.visibility = if (temVerFuncionarios) View.VISIBLE else View.GONE
 
         cardDispositivos.setOnClickListener {
-            (activity as? MainActivity)?.pushFragment(DispositivosFragment())
+            (activity as? LoginActivity)?.pushFragment(DispositivosFragment())
         }
         cardOcorrencias.setOnClickListener {
-            (activity as? MainActivity)?.pushFragment(OcorrenciasFragment())
+            (activity as? LoginActivity)?.pushFragment(OcorrenciasFragment())
         }
         cardAlertas.setOnClickListener {
-            (activity as? MainActivity)?.pushFragment(AlertasFragment())
+            (activity as? LoginActivity)?.pushFragment(AlertasFragment())
         }
         view.findViewById<CardView>(R.id.cardRegistoManual).setOnClickListener {
-            (activity as? MainActivity)?.pushFragment(RegistoManualFragment())
+            (activity as? LoginActivity)?.pushFragment(RegistoManualFragment())
         }
         view.findViewById<CardView>(R.id.cardConfig).setOnClickListener {
             Toast.makeText(context, "Configurações em breve.", Toast.LENGTH_SHORT).show()

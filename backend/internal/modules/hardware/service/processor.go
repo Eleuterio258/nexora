@@ -9,16 +9,19 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/internal/modules/hardware/models"
+	"nexora/internal/modules/recursos-humanos/service/assiduidade"
+	"nexora/internal/pkg/tenantid"
 )
 
 // Processor contém a lógica de processamento de eventos normalizados.
 type Processor struct {
-	db *pgxpool.Pool
+	db          *pgxpool.Pool
+	assiduidade *assiduidade.Service
 }
 
 // NewProcessor cria um novo processor.
 func NewProcessor(db *pgxpool.Pool) *Processor {
-	return &Processor{db: db}
+	return &Processor{db: db, assiduidade: assiduidade.NewService(db)}
 }
 
 // ProcessResult representa o resultado do processamento de um evento.
@@ -80,28 +83,6 @@ func (p *Processor) Process(ctx context.Context, deviceID, tenantID int64, event
 	return eventID, result, nil
 }
 
-// resolveSaasTenantID traduz o tenant_id de hardware.devices (que é na
-// verdade empresas.companies.id, por causa da FK devices_tenant_id_fkey ->
-// companies) para o saas.tenants.id real usado por rh.presencas e
-// gestao_escolar.school_attendance.
-//
-// Bug corrigido em 2026-07-11: antes desta função, processEntity gravava
-// rh.presencas.tenant_id/gestao_escolar.school_attendance.tenant_id
-// directamente com o tenantID recebido de Process() (= companies.id), que é
-// um espaço de identificadores DIFERENTE de saas.tenants.id — confirmado com
-// dados reais (Enigma School: companies.id=7, saas.tenants.id=5). Isto podia
-// gravar presenças/frequências com o tenant_id errado sempre que essas duas
-// IDs divergissem para a empresa do dispositivo. hardware.device_events
-// continua a usar o tenantID original (companies.id), que é consistente
-// dentro do próprio schema hardware.
-func (p *Processor) resolveSaasTenantID(ctx context.Context, companyID int64) (int64, error) {
-	var saasTenantID int64
-	err := p.db.QueryRow(ctx,
-		`SELECT tenant_id FROM empresas.companies WHERE id = $1`, companyID,
-	).Scan(&saasTenantID)
-	return saasTenantID, err
-}
-
 func (p *Processor) processEntity(ctx context.Context, tenantID, deviceID int64, event *models.NormalizedEvent, eventID int64) ProcessResult {
 	var mapping struct {
 		EntityType string
@@ -117,18 +98,22 @@ func (p *Processor) processEntity(ctx context.Context, tenantID, deviceID int64,
 		return ProcessResult{ErrorMessage: "employee_no não mapeado"}
 	}
 
-	saasTenantID, err := p.resolveSaasTenantID(ctx, tenantID)
+	saasTenantID, err := tenantid.ResolveSaas(ctx, p.db, tenantID)
 	if err != nil {
 		return ProcessResult{ErrorMessage: "dispositivo sem empresa/tenant associado correctamente"}
 	}
 
 	switch mapping.EntityType {
 	case "funcionario", "professor":
-		pid, err := p.registarPresenca(ctx, saasTenantID, mapping.EntityID, event.EventTime, eventID)
+		eventoID, err := p.registarEventoAssiduidade(ctx, saasTenantID, mapping.EntityID, event, eventID)
 		if err != nil {
-			return ProcessResult{ErrorMessage: "erro ao registar presença: " + err.Error()}
+			return ProcessResult{ErrorMessage: "erro ao registar evento de assiduidade: " + err.Error()}
 		}
-		return ProcessResult{Processed: true, PresencaID: &pid}
+		// Repurposed: PresencaID/hardware.device_events.presenca_id passam a
+		// referenciar rh.eventos_assiduidade.id (sem FK na BD, coluna livre),
+		// não rh.presencas.id — mantém o contrato JSON externo (FaceClock)
+		// inalterado, só muda o que o ID identifica internamente.
+		return ProcessResult{Processed: true, PresencaID: &eventoID}
 
 	case "aluno":
 		aid, err := p.registarFrequencia(ctx, saasTenantID, mapping.EntityID, event.EventTime, eventID)
@@ -142,71 +127,68 @@ func (p *Processor) processEntity(ctx context.Context, tenantID, deviceID int64,
 	}
 }
 
-// atrasoToleranciaMinutos é a margem antes de um evento de entrada ser
-// considerado atraso, face à hora_entrada configurada em rh.horarios_trabalho.
-const atrasoToleranciaMinutos = 10
-
-// calcularTipoPresenca decide 'presente' ou 'atraso' comparando a hora do
-// evento com rh.horarios_trabalho.hora_entrada do funcionário (via
-// rh.funcionarios.horario_id). Sem horário configurado (ou fora do formato
-// HH:MM), não há baseline para detectar atraso — assume-se 'presente'.
+// registarEventoAssiduidade grava o evento numa das duas famílias
+// entrada/saída de rh.eventos_assiduidade, substituindo o antigo
+// registarPresenca (que escrevia directamente em rh.presencas, um par
+// entrada/saída por dia). A tolerância de atraso e o cálculo de
+// presente/atraso/falta deixam de ser resolvidos aqui — passam a ser
+// responsabilidade de assiduidade.RecalcularDia, aplicados a partir das
+// regras configuráveis do tenant em vez de uma tolerância fixa de 10 min.
 //
-// Nota (Fase 4, 2026-07-11): não determina 'falta' — ausência só pode ser
-// detectada pela FALTA de qualquer evento num dia útil esperado, o que exige
-// uma rotina diária a comparar dias-de-trabalho vs rh.presencas, não algo que
-// se calcule a partir de um único evento recebido. Fica como trabalho futuro.
-func (p *Processor) calcularTipoPresenca(ctx context.Context, tenantID, funcionarioID int64, horaEvento string) string {
-	var horaEntradaEsperada *string
-	err := p.db.QueryRow(ctx, `
-		SELECT h.hora_entrada
-		  FROM rh.funcionarios f
-		  JOIN rh.horarios_trabalho h ON h.id = f.horario_id
-		 WHERE f.id = $1 AND f.tenant_id = $2 AND h.ativo = TRUE`,
-		funcionarioID, tenantID,
-	).Scan(&horaEntradaEsperada)
-	if err != nil || horaEntradaEsperada == nil {
-		return "presente"
+// event.Direction ("entry"/"exit"/"unknown", devolvido pelo adapter do
+// dispositivo) decide o tipo de evento quando conhecido; no caso "unknown"
+// (adapters mais simples que não distinguem direcção), infere-se pela
+// paridade de eventos entrada/saída já registados nesse dia — a mesma marca
+// alterna entrada/saída indefinidamente, já não se perde ao 3º evento como
+// no modelo antigo (1ª marcação=entrada, 2ª=saída, 3ª+=perdida).
+func (p *Processor) registarEventoAssiduidade(ctx context.Context, tenantID, funcionarioID int64, event *models.NormalizedEvent, eventID int64) (int64, error) {
+	tipoEventoCodigo, err := p.inferirTipoEventoCodigo(ctx, tenantID, funcionarioID, event)
+	if err != nil {
+		return 0, err
 	}
 
-	esperado, err1 := time.Parse("15:04", *horaEntradaEsperada)
-	real, err2 := time.Parse("15:04", horaEvento)
-	if err1 != nil || err2 != nil {
-		return "presente"
+	metodo := "biometria"
+	eventIDStr := fmt.Sprintf("%d", eventID)
+	observacoes := "Registo via hardware | evento_id=" + eventIDStr
+
+	ev, err := p.assiduidade.RegistarEvento(ctx, tenantID, assiduidade.RegistarEventoInput{
+		FuncionarioID:    funcionarioID,
+		TipoEventoCodigo: tipoEventoCodigo,
+		MetodoCodigo:     &metodo,
+		OcorridoEm:       event.EventTime,
+		Origem:           "biometria",
+		Observacoes:      &observacoes,
+	})
+	if err != nil {
+		return 0, err
 	}
-	if real.Sub(esperado) > atrasoToleranciaMinutos*time.Minute {
-		return "atraso"
-	}
-	return "presente"
+	return ev.ID, nil
 }
 
-func (p *Processor) registarPresenca(ctx context.Context, tenantID, funcionarioID int64, eventTime time.Time, eventID int64) (int64, error) {
-	data := eventTime.Format("2006-01-02")
-	hora := eventTime.Format("15:04")
-	tipo := p.calcularTipoPresenca(ctx, tenantID, funcionarioID, hora)
-	// eventID pré-formatado como string: um placeholder usado só dentro de uma
-	// concatenação "|| $N::text" não dá ao pgx contexto suficiente para
-	// inferir o tipo do parâmetro a partir de um int64 Go — falha em runtime
-	// com "cannot find encode plan" (bug encontrado e corrigido em 2026-07-11,
-	// nunca antes exercido: 0 eventos hardware tinham sido processados até então).
-	eventIDStr := fmt.Sprintf("%d", eventID)
+func (p *Processor) inferirTipoEventoCodigo(ctx context.Context, tenantID, funcionarioID int64, event *models.NormalizedEvent) (string, error) {
+	switch event.Direction {
+	case "entry":
+		return "entrada", nil
+	case "exit":
+		return "saida", nil
+	}
 
-	var id int64
+	var count int
 	err := p.db.QueryRow(ctx, `
-		INSERT INTO rh.presencas (tenant_id, funcionario_id, data, hora_entrada, observacoes, tipo)
-		VALUES ($1, $2, $3::date, $4, $5, $6)
-		ON CONFLICT (funcionario_id, data)
-		DO UPDATE SET
-		  hora_saida = CASE
-		    WHEN rh.presencas.hora_entrada IS NOT NULL AND rh.presencas.hora_entrada <> ''
-		      AND (rh.presencas.hora_saida IS NULL OR rh.presencas.hora_saida = '')
-		    THEN $4
-		    ELSE rh.presencas.hora_saida
-		  END,
-		  observacoes = COALESCE(rh.presencas.observacoes, '') || ' | evento_id=' || $7
-		RETURNING id`,
-		tenantID, funcionarioID, data, hora, "Registo via hardware", tipo, eventIDStr,
-	).Scan(&id)
-	return id, err
+		SELECT COUNT(*)
+		  FROM rh.eventos_assiduidade e
+		  JOIN rh.tipos_evento te ON te.id = e.tipo_evento_id
+		 WHERE e.tenant_id = $1 AND e.funcionario_id = $2
+		   AND e.data_referencia = $3::date AND te.codigo IN ('entrada', 'saida')`,
+		tenantID, funcionarioID, event.EventTime.Format("2006-01-02"),
+	).Scan(&count)
+	if err != nil {
+		return "entrada", nil
+	}
+	if count%2 == 0 {
+		return "entrada", nil
+	}
+	return "saida", nil
 }
 
 func (p *Processor) registarFrequencia(ctx context.Context, tenantID, studentID int64, eventTime time.Time, eventID int64) (int64, error) {

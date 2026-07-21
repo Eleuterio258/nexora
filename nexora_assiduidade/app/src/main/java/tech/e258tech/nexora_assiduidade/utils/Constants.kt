@@ -18,10 +18,14 @@ object Constants {
 
     const val ROLE_FUNCIONARIO = "COLABORADOR"
     const val ROLE_GESTOR = "GESTOR_RH"
-    const val ROLE_ADMIN = "ADMIN_SISTEMA"
 
     const val EVENT_ENTRY = "ENTRY"
     const val EVENT_EXIT = "EXIT"
+    /** O ERP decide entrada/saída sozinho, comparando com o que já existe em
+     * rh.presencas para o dia (ver processor.go, registarPresenca — INSERT
+     * define hora_entrada, ON CONFLICT preenche hora_saida). Usado quando não
+     * faz sentido a app escolher, ex.: registo manual do gestor. */
+    const val EVENT_AUTO = "AUTO"
     const val SOURCE_MANUAL = "MANUAL"
     const val SOURCE_PIN = "PIN"
     const val SOURCE_FINGERPRINT = "FINGERPRINT"
@@ -41,12 +45,11 @@ object Constants {
     const val LOCATION_TIMEOUT = 10000L
     const val LOCATION_MIN_DISTANCE = 10f
 
-    const val DEMO_FUNCIONARIO_EMAIL = "olimpia.chitlhango@e258tech.mz"
+    const val DEMO_FUNCIONARIO_EMAIL = "olimpia.chitlhango@e258tech.tech"
     const val DEMO_FUNCIONARIO_PASSWORD = "1234567890"
-    const val DEMO_GESTOR_EMAIL = "GESTOR_RH"
-    const val DEMO_GESTOR_PASSWORD = "RH@2026"
-    const val DEMO_ADMIN_EMAIL = "ADMIN_SISTEMA"
-    const val DEMO_ADMIN_PASSWORD = "Admin@2026"
+    const val DEMO_GESTOR_EMAIL = "penina.tembe@e258tech.tech"
+    const val DEMO_GESTOR_PASSWORD = "1234567890"
+
 
     // WebSocket chat events (backend ERP /ws/chat)
     const val WS_CHAT_PATH = "/ws/chat"

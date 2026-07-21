@@ -92,7 +92,8 @@
       "Bash(powershell -Command \"Stop-Process -Id 10196 -Force\")",
       "Bash(grep -rn \"#[0-9A-Fa-f]\\\\{6,8\\\\}\" \"/d/projecto/e-258tech/2026/factPro/nexora_assiduidade/app/src/main/res/drawable/\")",
       "Bash(py -3.14 -m pip list)",
-      "Bash(py -3.11 -m pip list)"
+      "Bash(py -3.11 -m pip list)",
+      "Bash(psql --version)"
     ]
   }
 }

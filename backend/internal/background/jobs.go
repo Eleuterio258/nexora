@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
+	"nexora/internal/modules/recursos-humanos/service/assiduidade"
 	"nexora/internal/shared/contracts"
 )
 
@@ -46,9 +47,20 @@ func StartJobs(ctx context.Context, db *pgxpool.Pool, notif contracts.Notificati
 		processSubscriptionRenewals(db)
 	})
 
-	// Marcação de faltas (ausência de evento num dia útil) — diário
+	// Marcação de faltas (ausência de evento num dia útil) — diário.
+	// Mantido em paralelo com o job novo abaixo: opera sobre o modelo antigo
+	// (rh.presencas), que o self-service e outros leitores ainda consultam
+	// enquanto a Fase F (migração de dados) não os move para o novo modelo.
 	go runDaily(ctx, "process-daily-absences", func() {
 		processDailyAbsences(db)
+	})
+
+	// Recálculo diário de resultados de assiduidade (modelo de eventos) —
+	// diário. Complementa o job acima: escreve em rh.resultados_diarios via
+	// assiduidade.RecalcularDia, incluindo a detecção de falta por ausência
+	// de eventos num dia com horário configurado.
+	go runDaily(ctx, "recalcular-resultados-assiduidade", func() {
+		recalcularResultadosAssiduidade(db)
 	})
 }
 
@@ -525,6 +537,91 @@ func processAbsencesForDate(ctx context.Context, db *pgxpool.Pool, data string) 
 	}
 
 	return marcadas, nil
+}
+
+// ── recálculo diário de resultados de assiduidade (modelo de eventos) ───────
+
+// recalcularResultadosAssiduidade chama assiduidade.RecalcularDia para todos
+// os funcionários com horário vigente ou eventos registados no dia ANTERIOR
+// (mesma razão do process-daily-absences: o dia corrente ainda pode receber
+// eventos mais tarde). RecalcularDia já trata a detecção de falta por
+// ausência de eventos num dia com horário configurado (ver calculo.go).
+func recalcularResultadosAssiduidade(db *pgxpool.Pool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	data := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	recalculados, err := recalcularResultadosParaData(ctx, db, data)
+	if err != nil {
+		log.Printf("[background] recalcular-resultados-assiduidade: %v", err)
+		return
+	}
+	if recalculados > 0 {
+		log.Printf("[background] recalcular-resultados-assiduidade: %d funcionários recalculados (%s)", recalculados, data)
+	}
+}
+
+// recalcularResultadosParaData aplica a lógica de
+// recalcularResultadosAssiduidade a uma data específica (formato
+// "2006-01-02"), devolvendo quantos funcionários foram recalculados.
+// Extraído para ser exercitável em testes sem depender de time.Now(), mesmo
+// padrão de processAbsencesForDate.
+func recalcularResultadosParaData(ctx context.Context, db *pgxpool.Pool, data string) (int, error) {
+	dataRef, err := time.Parse("2006-01-02", data)
+	if err != nil {
+		return 0, fmt.Errorf("data inválida: %w", err)
+	}
+
+	rows, err := db.Query(ctx, `
+		SELECT DISTINCT f.id, f.tenant_id
+		  FROM rh.funcionarios f
+		 WHERE f.estado = 'ativo'
+		   AND f.data_admissao <= $1::date
+		   AND (f.data_saida IS NULL OR f.data_saida >= $1::date)
+		   AND (
+		       EXISTS (
+		           SELECT 1 FROM rh.funcionario_horarios fh
+			         JOIN rh.horarios_trabalho h ON h.id = fh.horario_id
+			        WHERE fh.funcionario_id = f.id
+			          AND fh.data_inicio <= $1::date
+			          AND (fh.data_fim IS NULL OR fh.data_fim >= $1::date)
+			          AND h.ativo = TRUE
+		       )
+		       OR EXISTS (
+		           SELECT 1 FROM rh.eventos_assiduidade e
+			        WHERE e.funcionario_id = f.id AND e.data_referencia = $1::date
+		       )
+		   )`,
+		data)
+	if err != nil {
+		return 0, fmt.Errorf("query: %w", err)
+	}
+
+	type funcTenant struct {
+		funcionarioID int64
+		tenantID      int64
+	}
+	var alvos []funcTenant
+	for rows.Next() {
+		var ft funcTenant
+		if err := rows.Scan(&ft.funcionarioID, &ft.tenantID); err != nil {
+			continue
+		}
+		alvos = append(alvos, ft)
+	}
+	rows.Close()
+
+	svc := assiduidade.NewService(db)
+	var recalculados int
+	for _, ft := range alvos {
+		if _, err := svc.RecalcularDia(ctx, ft.tenantID, ft.funcionarioID, dataRef); err != nil {
+			log.Printf("[background] recalcular-resultados-assiduidade: funcionario_id=%d: %v", ft.funcionarioID, err)
+			continue
+		}
+		recalculados++
+	}
+
+	return recalculados, nil
 }
 
 // ── alertas de stock mínimo ───────────────────────────────────────────────────

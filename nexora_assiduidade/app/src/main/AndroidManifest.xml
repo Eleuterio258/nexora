@@ -32,11 +32,6 @@
             </intent-filter>
         </activity>
 
-        <!-- MainActivity - Tela principal pós-login -->
-        <activity
-            android:name=".ui.main.MainActivity"
-            android:exported="false" />
-
         <!-- CaptureActivityPortrait - Leitor de QR Code (ZXing) em modo retrato -->
         <activity
             android:name=".ui.common.CaptureActivityPortrait"

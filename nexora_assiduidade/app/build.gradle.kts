@@ -34,8 +34,8 @@ android {
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "ERP_BASE_URL", "\"http://10.0.2.2:8080/\"")
-        buildConfigField("String", "ASSIDUIDADE_BASE_URL", "\"http://10.0.2.2:8001/api/v1/\"")
+        buildConfigField("String", "ERP_BASE_URL", "\"https://api.nexora.e258tech.tech/\"")
+        buildConfigField("String", "ASSIDUIDADE_BASE_URL", "\"https://asseduidade.e258tech.tech/api/v1/\"")
         buildConfigField("String", "DEVICE_API_KEY", deviceApiKey())
     }
 
@@ -48,8 +48,14 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
-            buildConfigField("String", "ERP_BASE_URL", "\"http://10.0.2.2:8080/\"")
-            buildConfigField("String", "ASSIDUIDADE_BASE_URL", "\"http://10.0.2.2:8001/api/v1/\"")
+            // 10.0.2.2 so resolve dentro do emulador Android (alias para o
+            // localhost da maquina host) — num telemovel fisico aponta para
+            // lado nenhum e todas as chamadas de rede falham (incl. login).
+            // Debug usa os dominios reais para poder testar em dispositivo
+            // fisico; para apontar a um backend local a correr na tua
+            // maquina, substitui pelo IP da tua rede local (ex.: 192.168.x.x).
+            buildConfigField("String", "ERP_BASE_URL", "\"https://api.nexora.e258tech.tech/\"")
+            buildConfigField("String", "ASSIDUIDADE_BASE_URL", "\"https://asseduidade.e258tech.tech/api/v1/\"")
             buildConfigField("String", "DEVICE_API_KEY", deviceApiKey())
         }
     }

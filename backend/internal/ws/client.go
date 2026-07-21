@@ -290,7 +290,7 @@ func (c *Client) persistMessage(conversaID int64, conteudo string, clientID stri
 		err := c.db.QueryRow(context.Background(), `
 			INSERT INTO chat_mensagens (conversa_id, autor_id, conteudo, tipo, client_id)
 			VALUES ($1,$2,$3,'texto',$4)
-			ON CONFLICT (conversa_id, client_id) DO UPDATE SET conteudo = EXCLUDE.conteudo
+			ON CONFLICT (conversa_id, client_id) DO UPDATE SET conteudo = EXCLUDED.conteudo
 			RETURNING id`,
 			conversaID, c.UserID, conteudo, clientID).Scan(&id)
 		if err != nil {

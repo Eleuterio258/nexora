@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
-import tech.e258tech.nexora_assiduidade.ui.main.MainActivity
+import tech.e258tech.nexora_assiduidade.ui.auth.LoginActivity
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
@@ -83,7 +83,7 @@ class EquipaGestorFragment : Fragment() {
                 tvEmpty.visibility = View.GONE
                 recyclerView.visibility = View.VISIBLE
                 recyclerView.adapter = EquipaAdapter(items) { funcionario ->
-                    (activity as? MainActivity)?.pushFragment(
+                    (activity as? LoginActivity)?.pushFragment(
                         DetalheFuncionarioFragment.newInstance(funcionario.id)
                     )
                 }
