@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
+	"golang.org/x/crypto/bcrypt"
 	mw "nexora/internal/middleware"
+	"nexora/internal/ws"
 )
 
 // proximoNumeroSerie obtem (com lock) a serie ativa do tipo indicado,
@@ -36,6 +39,13 @@ func proximoNumeroSerie(ctx context.Context, tx pgx.Tx, tenantID int64, tipo str
 		return "", 0, err
 	}
 	return fmt.Sprintf("%s%04d", prefixo, sequencia), serieID, nil
+}
+
+func nullString(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 var metodosPagamentoValidos = map[string]bool{
@@ -68,28 +78,119 @@ func (h *Handler) ListarTerminais(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, data, http.StatusOK)
 }
 
+// cargoTerminalPOSNome é o cargo automático atribuído às contas de terminal
+// (ver ensureCargoTerminalPOS) — só tem a permissão pos:operar_pos, para que
+// o terminal fique restrito ao módulo POS pelo mesmo motor de permissões já
+// usado para funcionários, sem precisar de escopo ou middleware novos.
+const cargoTerminalPOSNome = "Terminal POS"
+
+// ensureCargoTerminalPOS devolve o id do cargo "Terminal POS" do tenant,
+// criando-o (com a permissão pos:operar_pos) se ainda não existir.
+func ensureCargoTerminalPOS(ctx context.Context, tx pgx.Tx, tenantID int64) (int64, error) {
+	var cargoID int64
+	err := tx.QueryRow(ctx, `
+		SELECT id FROM auth.cargos WHERE tenant_id=$1 AND nome=$2`,
+		tenantID, cargoTerminalPOSNome).Scan(&cargoID)
+	if err == nil {
+		return cargoID, nil
+	}
+	if err != pgx.ErrNoRows {
+		return 0, err
+	}
+
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO auth.cargos (tenant_id, nome, descricao)
+		VALUES ($1, $2, 'Cargo automático para contas de terminal POS (acesso restrito à operação de caixa)')
+		RETURNING id`,
+		tenantID, cargoTerminalPOSNome).Scan(&cargoID); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO auth.permissoes_cargo (cargo_id, modulo, acao) VALUES ($1, 'pos', 'operar_pos')
+		ON CONFLICT DO NOTHING`, cargoID); err != nil {
+		return 0, err
+	}
+	return cargoID, nil
+}
+
+// CriarTerminal regista o terminal e, para o poder autenticar sozinho (ver
+// PosLogin em auth/handlers), provisiona também uma conta de funcionário
+// dedicada: email sintético (codigo@terminal.internal), password = código de
+// ativação, cargo "Terminal POS". Não reaproveita CriarUtilizador porque essa
+// validação de negócio (password >= 8 caracteres) não se aplica a um código
+// de ativação de 6 dígitos.
 func (h *Handler) CriarTerminal(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	var body struct {
-		Codigo      string `json:"codigo"`
-		Nome        string `json:"nome"`
-		WarehouseID *int64 `json:"warehouse_id"`
-		CaixaID     *int64 `json:"caixa_id"`
+		Codigo         string `json:"codigo"`
+		Nome           string `json:"nome"`
+		WarehouseID    *int64 `json:"warehouse_id"`
+		CaixaID        *int64 `json:"caixa_id"`
+		ActivationCode string `json:"activation_code"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Codigo == "" || body.Nome == "" {
-		jsonErr(w, "codigo e nome são obrigatórios", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Codigo == "" || body.Nome == "" || body.ActivationCode == "" {
+		jsonErr(w, "codigo, nome e activation_code são obrigatórios", http.StatusBadRequest)
 		return
 	}
+
+	ctx := r.Context()
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	cargoID, err := ensureCargoTerminalPOS(ctx, tx, user.TenantID)
+	if err != nil {
+		jsonErr(w, "Erro interno ao preparar cargo do terminal", http.StatusInternalServerError)
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(body.ActivationCode), 12)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	syntheticEmail := strings.ToLower(body.Codigo) + "@terminal.internal"
+
+	var userID int64
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO auth.users (nome, email, password_hash, estado, tipo)
+		VALUES ($1, LOWER($2), $3, 'ativo', 'funcionario')
+		RETURNING id`,
+		body.Nome, syntheticEmail, string(hash)).Scan(&userID); err != nil {
+		if isUniqueViolation(err) {
+			jsonErr(w, "Já existe uma conta de terminal com esse código", http.StatusConflict)
+			return
+		}
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO auth.memberships (user_id, tenant_id, cargo_id, escopo, papel)
+		VALUES ($1, $2, $3, 'erp', 'funcionario')`,
+		userID, user.TenantID, cargoID); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
 	var id int64
-	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO pos_terminals (tenant_id, codigo, nome, warehouse_id, caixa_id)
-		VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-		user.TenantID, body.Codigo, body.Nome, body.WarehouseID, body.CaixaID).Scan(&id)
+	err = tx.QueryRow(ctx, `
+		INSERT INTO pos_terminals (tenant_id, codigo, nome, warehouse_id, caixa_id, user_id)
+		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+		user.TenantID, body.Codigo, body.Nome, body.WarehouseID, body.CaixaID, userID).Scan(&id)
 	if err != nil {
 		if isUniqueViolation(err) {
 			jsonErr(w, "Já existe um terminal com esse código", http.StatusConflict)
 			return
 		}
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
@@ -548,6 +649,12 @@ func (h *Handler) CriarVenda(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
+
+	if h.wsHub != nil {
+		h.wsHub.SendEvent(user.ID, ws.EvtVendaCriada, map[string]any{"id": id, "numero": numero, "total": totalGeral})
+		h.wsHub.SendEvent(user.ID, ws.EvtPagamentoRecebido, map[string]any{"venda_id": id, "valor": valorRecebido})
+	}
+
 	jsonOK(w, map[string]any{"id": id, "numero": numero, "total": totalGeral, "troco": troco}, http.StatusCreated)
 }
 
@@ -624,6 +731,13 @@ func (h *Handler) ObterVenda(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CancelarVenda(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
+
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	// corpo é opcional — nem todos os clientes enviam motivo
+	json.NewDecoder(r.Body).Decode(&body)
+
 	ctx := r.Context()
 	tx, err := h.db.Begin(ctx)
 	if err != nil {
@@ -684,7 +798,8 @@ func (h *Handler) CancelarVenda(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if _, err := tx.Exec(ctx, `UPDATE pos_sales SET status='cancelada' WHERE id=$1`, id); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE pos_sales SET status='cancelada', motivo_cancelamento=$1 WHERE id=$2`,
+		nullString(body.Reason), id); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}

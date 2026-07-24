@@ -57,21 +57,51 @@ type Config struct {
 	SMTPFromName string
 
 	// Object Storage (local ou minio)
-	StorageProvider   string
-	StorageLocalDir   string
-	StoragePublicURL  string
-	MinioEndpoint     string
-	MinioAccessKey    string
-	MinioSecretKey    string
-	MinioBucket       string
-	MinioUseSSL       bool
-	MinioRegion       string
+	StorageProvider  string
+	StorageLocalDir  string
+	StoragePublicURL string
+	MinioEndpoint    string
+	MinioAccessKey   string
+	MinioSecretKey   string
+	MinioBucket      string
+	MinioUseSSL      bool
+	MinioRegion      string
 
 	// Hardware — worker MQTT (opcional; desligado se MQTTBrokerURL vazio)
 	MQTTBrokerURL string
 	MQTTClientID  string
 	MQTTUsername  string
 	MQTTPassword  string
+
+	// Assinatura digital — convite de assinatura (opcional; sem link clicável se vazio)
+	SignatureInviteBaseURL string
+
+	// Assinatura digital — provider PKI/PAdES. "dev" gera um certificado
+	// auto-assinado local; NUNCA é juridicamente válido. Um provider real
+	// (ex. INTIC) substituiria este valor quando existirem credenciais.
+	SignatureProvider   string
+	SignatureDevKeyPath string
+	SignatureTSAURL     string
+
+	// Assinatura digital — segredo HMAC do webhook (esqueleto, sem lógica de
+	// negócio ainda; vazio desliga o endpoint com 501).
+	SignatureWebhookSecret string
+
+	// SMS — envio de notificações por SMS (opcional; "noop" ou vazio desativa).
+	SMSProvider   string
+	SMSTwilioSID  string
+	SMSTwilioToken string
+	SMSTwilioFrom string
+
+	// Antivírus — verificação de ficheiros no upload (opcional).
+	AntivirusProvider      string
+	AntivirusClamAVNetwork string
+	AntivirusClamAVAddress string
+
+	// Provider de assinatura real (INTIC stub).
+	SignatureINTICKeyPath       string
+	SignatureCARootsPEM         string
+	SignatureCAIntermediatesPEM string
 }
 
 func Load() *Config {
@@ -97,10 +127,10 @@ func Load() *Config {
 		AvatarMaxMB:         envInt("AVATAR_MAX_MB", 2),
 		AvatarDir:           env("AVATAR_DIR", "./avatars"),
 
-		RecruitmentTenantID:  envInt("RECRUITMENT_TENANT_ID", 1),
-		UploadsDir:           env("UPLOADS_DIR", "./uploads"),
-		UploadMaxMB:          envInt("UPLOAD_MAX_MB", 3),
-		PlatformBaseDomain:   strings.ToLower(strings.TrimSpace(env("PLATFORM_BASE_DOMAIN", ""))),
+		RecruitmentTenantID:     envInt("RECRUITMENT_TENANT_ID", 1),
+		UploadsDir:              env("UPLOADS_DIR", "./uploads"),
+		UploadMaxMB:             envInt("UPLOAD_MAX_MB", 3),
+		PlatformBaseDomain:      strings.ToLower(strings.TrimSpace(env("PLATFORM_BASE_DOMAIN", ""))),
 		IDHashSalt:              env("JWT_SECRET", "change-me-secret"),
 		GatewayWebhookSecret:    env("GATEWAY_WEBHOOK_SECRET", ""),
 		FirebaseCredentialsFile: env("FIREBASE_CREDENTIALS_FILE", "./config/e258tech-d439e.json"),
@@ -129,6 +159,27 @@ func Load() *Config {
 		MQTTClientID:  env("MQTT_CLIENT_ID", "nexora-hardware-worker"),
 		MQTTUsername:  env("MQTT_USERNAME", ""),
 		MQTTPassword:  env("MQTT_PASSWORD", ""),
+
+		SignatureInviteBaseURL: env("SIGNATURE_INVITE_BASE_URL", ""),
+
+		SignatureProvider:   env("SIGNATURE_PROVIDER", "dev"),
+		SignatureDevKeyPath: env("SIGNATURE_DEV_KEY_PATH", "./data/assinatura-dev.pem"),
+		SignatureTSAURL:     env("SIGNATURE_TSA_URL", ""),
+
+		SignatureWebhookSecret: env("SIGNATURE_WEBHOOK_SECRET", ""),
+
+		SMSProvider:    env("SMS_PROVIDER", "noop"),
+		SMSTwilioSID:   env("SMS_TWILIO_SID", ""),
+		SMSTwilioToken: env("SMS_TWILIO_TOKEN", ""),
+		SMSTwilioFrom:  env("SMS_TWILIO_FROM", ""),
+
+		AntivirusProvider:      env("ANTIVIRUS_PROVIDER", "noop"),
+		AntivirusClamAVNetwork: env("ANTIVIRUS_CLAMAV_NETWORK", "tcp"),
+		AntivirusClamAVAddress: env("ANTIVIRUS_CLAMAV_ADDRESS", "localhost:3310"),
+
+		SignatureINTICKeyPath:       env("SIGNATURE_INTIC_KEY_PATH", ""),
+		SignatureCARootsPEM:         env("SIGNATURE_CA_ROOTS_PEM", ""),
+		SignatureCAIntermediatesPEM: env("SIGNATURE_CA_INTERMEDIATES_PEM", ""),
 	}
 }
 

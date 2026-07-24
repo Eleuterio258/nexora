@@ -33,7 +33,7 @@ func main() {
 		if e.IsDir() {
 			continue
 		}
-		if strings.HasPrefix(e.Name(), "20260701000114_") || strings.HasPrefix(e.Name(), "20260701000115_") {
+		if strings.HasPrefix(e.Name(), "20260701000114_") || strings.HasPrefix(e.Name(), "20260701000115_") || strings.HasPrefix(e.Name(), "20260701000116_") || strings.HasPrefix(e.Name(), "20260701000117_") || strings.HasPrefix(e.Name(), "20260701000118_") {
 			if strings.HasSuffix(e.Name(), ".up.sql") {
 				files = append(files, e.Name())
 			}

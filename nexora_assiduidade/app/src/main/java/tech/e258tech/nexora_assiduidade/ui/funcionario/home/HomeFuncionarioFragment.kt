@@ -17,6 +17,8 @@ import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.local.AppDatabase
 import tech.e258tech.nexora_assiduidade.data.local.PendingEventEntity
 import tech.e258tech.nexora_assiduidade.ui.auth.LoginActivity
+import tech.e258tech.nexora_assiduidade.ui.funcionario.agenda.AgendaFragment
+import tech.e258tech.nexora_assiduidade.ui.funcionario.agenda.AgendaItemDetailFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.FacialAttendanceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.FingerprintAttendanceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.ManualAttendanceFragment
@@ -86,6 +88,31 @@ class HomeFuncionarioFragment : Fragment() {
 
         view.findViewById<CardView>(R.id.cardFingerprint).setOnClickListener {
             openFragment(FingerprintAttendanceFragment())
+        }
+
+        // Eventos
+        view.findViewById<TextView>(R.id.tvVerTodosEventos).setOnClickListener {
+            openFragment(AgendaFragment())
+        }
+
+        view.findViewById<CardView>(R.id.itemEventoReuniao).setOnClickListener {
+            openFragment(
+                AgendaItemDetailFragment.newInstance(
+                    title = "Reunião de Equipa",
+                    description = "Alinhamento de objetivos e atualização de projetos.",
+                    duration = "Hoje, 10:00 - 11:30"
+                )
+            )
+        }
+
+        view.findViewById<CardView>(R.id.itemEventoWorkshop).setOnClickListener {
+            openFragment(
+                AgendaItemDetailFragment.newInstance(
+                    title = "Workshop de Formação",
+                    description = "Formação sobre novas ferramentas e processos.",
+                    duration = "Hoje, 14:00 - 16:00"
+                )
+            )
         }
 
         loadPendingEventsCount()

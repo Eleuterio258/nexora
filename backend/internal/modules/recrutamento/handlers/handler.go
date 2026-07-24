@@ -11,20 +11,22 @@ import (
 	"nexora/config"
 	"nexora/internal/idhash"
 	"nexora/internal/push"
+	"nexora/internal/shared/contracts"
 	"nexora/internal/storage"
 )
 
 type Handler struct {
-	db       *pgxpool.Pool
-	cfg      *config.Config
-	storage  storage.Provider
-	push     *push.Service
-	realtime *RealtimeServer
-	idh      *idhash.Hasher
+	db        *pgxpool.Pool
+	cfg       *config.Config
+	storage   storage.Provider
+	push      *push.Service
+	realtime  *RealtimeServer
+	idh       *idhash.Hasher
+	signature contracts.SignaturePort
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider, pushSvc *push.Service, realtime *RealtimeServer, idh *idhash.Hasher) *Handler {
-	return &Handler{db: db, cfg: cfg, storage: st, push: pushSvc, realtime: realtime, idh: idh}
+func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider, pushSvc *push.Service, realtime *RealtimeServer, idh *idhash.Hasher, signature contracts.SignaturePort) *Handler {
+	return &Handler{db: db, cfg: cfg, storage: st, push: pushSvc, realtime: realtime, idh: idh, signature: signature}
 }
 
 // decodeID resolve o parâmetro "{id}" de uma rota aninhada (ex.: /candidaturas/{id})

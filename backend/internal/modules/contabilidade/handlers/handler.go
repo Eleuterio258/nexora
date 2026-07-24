@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 	"encoding/json"
@@ -8,15 +8,19 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
+	"nexora/internal/shared/contracts"
+	"nexora/internal/storage"
 )
 
 type Handler struct {
-	db  *pgxpool.Pool
-	cfg *config.Config
+	db        *pgxpool.Pool
+	cfg       *config.Config
+	storage   storage.Provider
+	signature contracts.SignaturePort
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config) *Handler {
-	return &Handler{db: db, cfg: cfg}
+func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider, signature contracts.SignaturePort) *Handler {
+	return &Handler{db: db, cfg: cfg, storage: st, signature: signature}
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {

@@ -81,6 +81,13 @@ class LoginActivity : AppCompatActivity() {
     private var activeGestorTab: GestorTab? = null
     private lateinit var navItems: List<NavItem>
     private lateinit var gestorNavItems: List<GestorNavItem>
+    private lateinit var bottomNav: View
+    private lateinit var gestorBottomNav: View
+
+    /** Barra visível quando estamos numa tab raiz (Home/Histórico/Chat/Pedidos/Perfil
+     *  ou o equivalente de Gestor) — escondida em ecrãs secundários empilhados
+     *  no back stack (ex.: Agenda, Criar Reunião, check-in, detalhe de item). */
+    private lateinit var activeNavContainer: View
 
     private data class NavItem(
         val container: LinearLayout,
@@ -277,14 +284,28 @@ class LoginActivity : AppCompatActivity() {
         // a barra/ecrãs de Gestor deixaram de ser o destino automático pós-
         // login, por pedido explícito. O código de Gestor mantém-se (ainda
         // acessível por quem entrar directamente nesses fragments).
-        val bottomNav = findViewById<View>(R.id.bottomNavContainer)
-        val gestorBottomNav = findViewById<View>(R.id.gestorBottomNavContainer)
+        bottomNav = findViewById(R.id.bottomNavContainer)
+        gestorBottomNav = findViewById(R.id.gestorBottomNavContainer)
         val fragmentContainer = findViewById<View>(R.id.fragment_container)
 
         gestorBottomNav.visibility = View.GONE
+        activeNavContainer = bottomNav
         applyEdgeInsets(fragmentContainer, top = true, bottom = false)
         applyEdgeInsets(bottomNav, top = false, bottom = true)
         setupBottomNav()
+
+        // Ecrãs secundários (push com addToBackStack) escondem a barra —
+        // só as 5 tabs raiz (Home/Histórico/Chat/Pedidos/Perfil, ou o
+        // equivalente de Gestor) a mostram, ver docs/design_prompts.md
+        // ("Persistent chrome"). selectTab/selectGestorTab limpam o back
+        // stack antes de trocar de tab, por isso count == 0 identifica
+        // sempre uma tab raiz, independentemente de o ecrã secundário ter
+        // sido empilhado via pushFragment ou directamente por um fragment.
+        supportFragmentManager.addOnBackStackChangedListener {
+            activeNavContainer.visibility =
+                if (supportFragmentManager.backStackEntryCount == 0) View.VISIBLE else View.GONE
+        }
+
         if (savedInstanceState == null) {
             selectTab(BottomTab.HOME)
         }
@@ -354,6 +375,10 @@ class LoginActivity : AppCompatActivity() {
             item.label.setTextColor(color)
         }
 
+        activeNavContainer = bottomNav
+        gestorBottomNav.visibility = View.GONE
+        bottomNav.visibility = View.VISIBLE
+
         val target = navItems.first { it.tab == tab }
         supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
         loadFragment(target.fragment())
@@ -419,6 +444,10 @@ class LoginActivity : AppCompatActivity() {
             item.icon.setColorFilter(color)
             item.label.setTextColor(color)
         }
+
+        activeNavContainer = gestorBottomNav
+        bottomNav.visibility = View.GONE
+        gestorBottomNav.visibility = View.VISIBLE
 
         val target = gestorNavItems.first { it.tab == tab }
         supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)

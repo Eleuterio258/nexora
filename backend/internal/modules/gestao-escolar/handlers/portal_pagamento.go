@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -13,52 +11,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/pkg/nexorapay"
 )
-
-// nexoraPayClient faz chamadas HTTP ao nexora-pay com X-API-Key.
-type nexoraPayClient struct {
-	baseURL string
-	apiKey  string
-}
-
-func (c *nexoraPayClient) post(ctx context.Context, path string, idempotencyKey string, body any) (map[string]any, int, error) {
-	data, _ := json.Marshal(body)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(data))
-	if err != nil {
-		return nil, 0, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-API-Key", c.apiKey)
-	if idempotencyKey != "" {
-		req.Header.Set("Idempotency-Key", idempotencyKey)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
-	var result map[string]any
-	json.Unmarshal(raw, &result)
-	return result, resp.StatusCode, nil
-}
-
-func (c *nexoraPayClient) get(ctx context.Context, path string) (map[string]any, int, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
-	if err != nil {
-		return nil, 0, err
-	}
-	req.Header.Set("X-API-Key", c.apiKey)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
-	var result map[string]any
-	json.Unmarshal(raw, &result)
-	return result, resp.StatusCode, nil
-}
 
 // ── POST /api/portal/aluno/me/cobrancas/{id}/pagar ───────────────────────────
 // Inicia pagamento via nexora-pay (M-Pesa, eMola, mKesh).
@@ -107,15 +61,12 @@ func (h *Handler) PortalIniciarPagamento(w http.ResponseWriter, r *http.Request)
 	thirdPartyRef := fmt.Sprintf("ESC-%s-%d", feeID, u.TenantID)
 	txRef := fmt.Sprintf("FEE-%s", feeID)[:20] // max 20 chars
 
-	pay := &nexoraPayClient{
-		baseURL: h.cfg.NexoraPayBaseURL,
-		apiKey:  h.cfg.NexoraPayAPIKey,
-	}
+	pay := nexorapay.NewClient(h.cfg.NexoraPayBaseURL, h.cfg.NexoraPayAPIKey)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 130*time.Second) // ligeiramente > timeout M-Pesa
 	defer cancel()
 
-	resp, status, err := pay.post(ctx, "/v1/payments", idempotencyKey, map[string]any{
+	resp, status, err := pay.Post(ctx, "/v1/payments", idempotencyKey, map[string]any{
 		"provider":             body.Provider,
 		"serviceAccount":       h.cfg.NexoraPayServiceAccount,
 		"transactionReference": txRef,
@@ -181,15 +132,12 @@ func (h *Handler) PortalStatusPagamento(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	pay := &nexoraPayClient{
-		baseURL: h.cfg.NexoraPayBaseURL,
-		apiKey:  h.cfg.NexoraPayAPIKey,
-	}
+	pay := nexorapay.NewClient(h.cfg.NexoraPayBaseURL, h.cfg.NexoraPayAPIKey)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 
-	resp, _, err := pay.get(ctx, "/v1/transactions/"+gatewayTxnID)
+	resp, _, err := pay.Get(ctx, "/v1/transactions/"+gatewayTxnID)
 	if err != nil {
 		jsonErr(w, "Erro ao consultar gateway", http.StatusBadGateway)
 		return

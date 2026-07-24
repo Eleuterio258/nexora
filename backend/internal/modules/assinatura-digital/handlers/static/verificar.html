@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="pt-MZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verificar assinatura de documento — Nexora ERP</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --texto: #1a1a1a;
+    --texto-suave: #55606b;
+    --borda: #d9dee3;
+    --azul: #2563eb;
+    --verde: #15803d;
+    --verde-bg: #ecfdf3;
+    --vermelho: #b91c1c;
+    --vermelho-bg: #fef2f2;
+    --amarelo: #92400e;
+    --amarelo-bg: #fffbeb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --card: #181b21;
+      --texto: #e8eaed;
+      --texto-suave: #9aa4af;
+      --borda: #2a2f37;
+      --verde-bg: #0f2417;
+      --vermelho-bg: #2a1414;
+      --amarelo-bg: #2a2110;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2rem 1rem;
+    background: var(--bg);
+    color: var(--texto);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .container { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  p.sub { color: var(--texto-suave); margin-top: 0; margin-bottom: 1.5rem; font-size: 0.95rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--borda);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  form { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  input[type=text] {
+    flex: 1 1 320px;
+    padding: 0.65rem 0.8rem;
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--texto);
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+  }
+  button {
+    padding: 0.65rem 1.1rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--azul);
+    color: #fff;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: default; }
+  .aviso {
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  .aviso.legal-invalido { background: var(--vermelho-bg); color: var(--vermelho); border: 1px solid var(--vermelho); }
+  .aviso.legal-valido { background: var(--verde-bg); color: var(--verde); border: 1px solid var(--verde); }
+  .aviso.info { background: var(--amarelo-bg); color: var(--amarelo); border: 1px solid var(--amarelo); }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; margin: 0; font-size: 0.9rem; }
+  dt { color: var(--texto-suave); }
+  dd { margin: 0; word-break: break-word; }
+  table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--borda); }
+  th { color: var(--texto-suave); font-weight: 600; }
+  .status-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+  }
+  .status-assinado { background: var(--verde-bg); color: var(--verde); }
+  .status-recusado { background: var(--vermelho-bg); color: var(--vermelho); }
+  .status-outro { background: var(--amarelo-bg); color: var(--amarelo); }
+  footer { color: var(--texto-suave); font-size: 0.8rem; margin-top: 2rem; text-align: center; }
+  #resultado:empty { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Verificar assinatura de documento</h1>
+  <p class="sub">Cole o hash SHA-256 do ficheiro PDF para confirmar se corresponde a um documento conhecido do Nexora ERP.</p>
+
+  <div class="card">
+    <form id="form-verificar">
+      <input type="text" id="input-hash" placeholder="hash SHA-256 (64 caracteres hexadecimais)" autocomplete="off" spellcheck="false">
+      <button type="submit" id="btn-verificar">Verificar</button>
+    </form>
+  </div>
+
+  <div id="resultado"></div>
+
+  <footer>Nexora ERP — módulo de assinatura digital. Esta página não substitui homologação jurídica.</footer>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById('form-verificar');
+  var input = document.getElementById('input-hash');
+  var botao = document.getElementById('btn-verificar');
+  var resultado = document.getElementById('resultado');
+
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('hash')) {
+    input.value = params.get('hash').trim();
+    verificar(input.value);
+  }
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var hash = input.value.trim();
+    if (hash) verificar(hash);
+  });
+
+  function escaparHTML(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  function formatarData(iso) {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleString('pt-PT'); } catch (e) { return iso; }
+  }
+
+  function statusClasse(status) {
+    if (status === 'assinado') return 'status-assinado';
+    if (status === 'recusado') return 'status-recusado';
+    return 'status-outro';
+  }
+
+  function verificar(hash) {
+    botao.disabled = true;
+    botao.textContent = 'A verificar…';
+    resultado.innerHTML = '';
+
+    var url = '/api/public/assinatura-digital/verificar/' + encodeURIComponent(hash);
+    fetch(url).then(function (resp) {
+      return resp.json().then(function (body) { return { status: resp.status, body: body }; });
+    }).then(function (r) {
+      renderizar(r.status, r.body);
+    }).catch(function () {
+      resultado.innerHTML = '<div class="aviso legal-invalido">Erro de rede ao consultar a verificação. Tente novamente.</div>';
+    }).finally(function () {
+      botao.disabled = false;
+      botao.textContent = 'Verificar';
+    });
+  }
+
+  function renderizar(status, body) {
+    if (status === 400) {
+      resultado.innerHTML = '<div class="aviso legal-invalido">' + escaparHTML(body.error || 'Hash inválido.') + '</div>';
+      return;
+    }
+    if (status === 404) {
+      resultado.innerHTML = '<div class="aviso info">Este hash não corresponde a nenhum documento conhecido. Isto não significa necessariamente que o ficheiro seja inválido — pode simplesmente não ter sido processado por este sistema.</div>';
+      return;
+    }
+    if (status !== 200) {
+      resultado.innerHTML = '<div class="aviso legal-invalido">Erro inesperado ao verificar (HTTP ' + status + ').</div>';
+      return;
+    }
+
+    var html = '';
+
+    if (body.assinado) {
+      if (body.legal_valido) {
+        html += '<div class="aviso legal-valido">Assinatura encontrada, com um provider de certificação assinalado como juridicamente válido.</div>';
+      } else {
+        html += '<div class="aviso legal-invalido">Assinatura encontrada, mas gerada por um provider de desenvolvimento — <strong>NÃO tem valor jurídico</strong>.</div>';
+      }
+    } else {
+      html += '<div class="aviso info">Este hash corresponde ao documento original — ainda sem nenhuma assinatura.</div>';
+    }
+
+    html += '<div class="card"><dl>';
+    html += '<dt>Documento</dt><dd>' + escaparHTML(body.documento_titulo) + '</dd>';
+    if (body.assinado) {
+      html += '<dt>Assinado por</dt><dd>' + escaparHTML(body.assinado_por) + '</dd>';
+      html += '<dt>Assinado em</dt><dd>' + formatarData(body.assinado_em) + '</dd>';
+      html += '<dt>Provider</dt><dd>' + escaparHTML(body.provider) + '</dd>';
+      html += '<dt>Certificado</dt><dd>' + escaparHTML(body.certificado_subject) + '</dd>';
+      html += '<dt>Algoritmo</dt><dd>' + escaparHTML(body.algoritmo_assinatura) + ' / ' + escaparHTML(body.algoritmo_digest) + '</dd>';
+      html += '<dt>Carimbo temporal</dt><dd>' + (body.timestamp_autoridade ? escaparHTML(body.timestamp_autoridade) : 'sem carimbo temporal') + '</dd>';
+    } else {
+      html += '<dt>Estado</dt><dd>' + escaparHTML(body.documento_status) + '</dd>';
+      html += '<dt>Criado em</dt><dd>' + formatarData(body.documento_criado_em) + '</dd>';
+    }
+    html += '</dl></div>';
+
+    if (body.signatarios && body.signatarios.length) {
+      html += '<div class="card"><strong>Signatários</strong><table><thead><tr><th>Nome</th><th>Tipo</th><th>Estado</th><th>Assinado em</th></tr></thead><tbody>';
+      body.signatarios.forEach(function (s) {
+        html += '<tr><td>' + escaparHTML(s.nome) + '</td><td>' + escaparHTML(s.tipo) + '</td>' +
+          '<td><span class="status-badge ' + statusClasse(s.status) + '">' + escaparHTML(s.status) + '</span></td>' +
+          '<td>' + formatarData(s.assinado_em) + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+
+    resultado.innerHTML = html;
+  }
+})();
+</script>
+</body>
+</html>

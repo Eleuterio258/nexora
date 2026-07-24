@@ -16,10 +16,11 @@ import (
 // StartJobs lança os jobs em background e retorna quando ctx é cancelado.
 func StartJobs(ctx context.Context, db *pgxpool.Pool, notif contracts.NotificationPort, cfg *config.Config) {
 	mailer := newMailer(cfg)
+	sms := newSMSSender(cfg)
 
 	// Despacho de notificações pendentes — a cada 30s
 	go runInterval(ctx, "dispatch-notifications", 30*time.Second, func() {
-		dispatchNotifications(db, mailer)
+		dispatchNotifications(db, mailer, sms)
 	})
 
 	// Reminders de cobranças escolares — diário
@@ -106,10 +107,10 @@ func runInterval(ctx context.Context, name string, interval time.Duration, fn fu
 
 // ── dispatch de notificações ─────────────────────────────────────────────────
 
-// dispatchNotifications lê mensagens pendentes e envia por email.
+// dispatchNotifications lê mensagens pendentes e envia por email ou SMS.
 // Até 3 tentativas por mensagem; após isso marca como 'falhou'.
-func dispatchNotifications(db *pgxpool.Pool, mailer *smtpMailer) {
-	if !mailer.enabled() {
+func dispatchNotifications(db *pgxpool.Pool, mailer *smtpMailer, sms smsSender) {
+	if !mailer.enabled() && sms == nil {
 		return
 	}
 
@@ -150,10 +151,15 @@ func dispatchNotifications(db *pgxpool.Pool, mailer *smtpMailer) {
 	var sent, failed int
 	for _, m := range msgs {
 		var sendErr error
-		if m.canalTipo == "email" {
+		switch m.canalTipo {
+		case "email":
 			sendErr = mailer.send(m.destinatario, m.assunto, m.corpo)
+		case "sms":
+			sendErr = sms.send(m.destinatario, m.corpo)
+		default:
+			// Canais não suportados (push, whatsapp) são marcados como falha.
+			sendErr = fmt.Errorf("canal %s não suportado", m.canalTipo)
 		}
-		// outros canais (sms, push) podem ser adicionados aqui
 
 		if sendErr != nil {
 			failed++

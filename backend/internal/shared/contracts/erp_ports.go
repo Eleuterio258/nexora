@@ -199,3 +199,35 @@ type SystemConfigPort interface {
 	// Set grava ou actualiza uma configuração por tenant.
 	Set(ctx context.Context, tenantID int64, chave, valor string) error
 }
+
+// ── Assinatura Digital ──────────────────────────────────────────────────────
+
+// SignaturePort cria documentos de assinatura a partir de ficheiros já
+// existentes noutros módulos.
+type SignaturePort interface {
+	// CreateForSigning cria um documento em assinatura_digital.documentos
+	// (estado 'rascunho', reaproveitando o ficheiro já existente no storage
+	// — não faz novo upload) e associa um único signatário. Devolve o id do
+	// documento criado. Um humano do módulo de origem despacha-o depois pelo
+	// fluxo normal do assinatura-digital (POST /documentos/{id}/enviar).
+	CreateForSigning(ctx context.Context, r SignatureDocumentRequest) (int64, error)
+}
+
+// SignatureDocumentRequest dados para criar um documento de assinatura a
+// partir de um ficheiro já existente.
+type SignatureDocumentRequest struct {
+	TenantID    int64
+	Titulo      string
+	Descricao   string
+	StorageKey  string // chave já existente no storage.Provider
+	FicheiroURL string
+	HashSHA256  string
+	CreatedBy   int64
+
+	SignatarioNome   string
+	SignatarioEmail  string
+	SignatarioUserID *int64 // auth.users.id, quando o signatário tem conta ERP
+
+	OrigemModulo string // ex.: "recursos-humanos"
+	OrigemID     int64  // id da entidade de origem nesse módulo
+}

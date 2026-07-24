@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="pt-MZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assinar documento — Nexora ERP</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --texto: #1a1a1a;
+    --texto-suave: #55606b;
+    --borda: #d9dee3;
+    --azul: #2563eb;
+    --azul-escuro: #1d4ed8;
+    --verde: #15803d;
+    --verde-bg: #ecfdf3;
+    --vermelho: #b91c1c;
+    --vermelho-bg: #fef2f2;
+    --amarelo: #92400e;
+    --amarelo-bg: #fffbeb;
+    --cinza: #6b7280;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --card: #181b21;
+      --texto: #e8eaed;
+      --texto-suave: #9aa4af;
+      --borda: #2a2f37;
+      --verde-bg: #0f2417;
+      --vermelho-bg: #2a1414;
+      --amarelo-bg: #2a2110;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 1.5rem 1rem;
+    background: var(--bg);
+    color: var(--texto);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .container { max-width: 800px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 1.5rem; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  p.sub { color: var(--texto-suave); margin: 0; font-size: 0.95rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--borda);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .card h2 {
+    font-size: 1rem;
+    margin: 0 0 0.75rem 0;
+    color: var(--texto-suave);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; margin: 0; font-size: 0.95rem; }
+  dt { color: var(--texto-suave); }
+  dd { margin: 0; word-break: break-word; }
+  .aviso {
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+    border: 1px solid transparent;
+  }
+  .aviso.legal-invalido { background: var(--vermelho-bg); color: var(--vermelho); border-color: var(--vermelho); }
+  .aviso.info { background: var(--amarelo-bg); color: var(--amarelo); border-color: var(--amarelo); }
+  .aviso.sucesso { background: var(--verde-bg); color: var(--verde); border-color: var(--verde); }
+  .aviso.erro { background: var(--vermelho-bg); color: var(--vermelho); border-color: var(--vermelho); }
+  .form-group { margin-bottom: 1rem; }
+  label { display: block; font-size: 0.9rem; color: var(--texto-suave); margin-bottom: 0.35rem; }
+  input[type=text], textarea {
+    width: 100%;
+    padding: 0.65rem 0.8rem;
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--texto);
+    font-size: 1rem;
+    font-family: inherit;
+  }
+  input[type=text]:disabled, textarea:disabled, button:disabled { opacity: 0.6; cursor: not-allowed; }
+  textarea { min-height: 80px; resize: vertical; }
+  .botoes { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+  button {
+    padding: 0.7rem 1.2rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--azul);
+    color: #fff;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: var(--azul-escuro); }
+  button.secundario { background: transparent; color: var(--azul); border: 1px solid var(--azul); }
+  button.danger { background: var(--vermelho); }
+  button.danger:hover:not(:disabled) { background: #991b1b; }
+  .pdf-preview {
+    width: 100%;
+    height: 480px;
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    background: var(--bg);
+  }
+  .estado-badge {
+    display: inline-block;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .estado-pendente { background: var(--amarelo-bg); color: var(--amarelo); }
+  .estado-assinado { background: var(--verde-bg); color: var(--verde); }
+  .estado-recusado { background: var(--vermelho-bg); color: var(--vermelho); }
+  .hidden { display: none; }
+  footer { color: var(--texto-suave); font-size: 0.8rem; margin-top: 2rem; text-align: center; }
+  .spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 0.4rem;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 600px) {
+    .botoes { flex-direction: column; }
+    button { width: 100%; }
+    .pdf-preview { height: 320px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Assinatura de documento</h1>
+    <p class="sub">Portal seguro de assinatura digital — Nexora ERP</p>
+  </header>
+
+  <div id="mensagens"></div>
+
+  <div id="aviso-juridico" class="aviso legal-invalido">
+    <strong>Aviso importante:</strong> este ambiente está em modo de desenvolvimento. A assinatura produzida
+    <strong>não tem valor jurídico</strong> enquanto não estiver ligada a um provider de certificação reconhecido
+    (ex.: INTIC). Use apenas para testes internos.
+  </div>
+
+  <div id="loading" class="card">
+    <p>A carregar dados do convite...</p>
+  </div>
+
+  <div id="conteudo" class="hidden">
+    <div class="card">
+      <h2>Documento</h2>
+      <dl>
+        <dt>Estado:</dt>
+        <dd><span id="doc-status" class="estado-badge estado-pendente">—</span></dd>
+        <dt>Signatário:</dt>
+        <dd id="sig-nome">—</dd>
+        <dt>Papel:</dt>
+        <dd id="sig-tipo">—</dd>
+        <dt>Convite válido até:</dt>
+        <dd id="convite-expira">—</dd>
+      </dl>
+    </div>
+
+    <div id="secao-otp" class="card">
+      <h2>Confirmação de identidade</h2>
+      <p id="otp-instrucao" style="color: var(--texto-suave); font-size: 0.95rem; margin-top: 0;">
+        Para prosseguir, solicite um código de acesso.
+      </p>
+      <div id="otp-canais" class="botoes hidden">
+        <button id="btn-solicitar-email" onclick="solicitarOTP('email')">Receber por email</button>
+        <button id="btn-solicitar-sms" onclick="solicitarOTP('sms')">Receber por SMS</button>
+      </div>
+      <div class="botoes">
+        <button id="btn-solicitar-otp" class="hidden" onclick="solicitarOTP()">Solicitar código</button>
+      </div>
+      <div id="form-otp" class="hidden" style="margin-top: 1rem;">
+        <div class="form-group">
+          <label for="input-otp">Código de 6 dígitos</label>
+          <input type="text" id="input-otp" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
+        </div>
+        <div class="botoes">
+          <button id="btn-validar-otp" onclick="validarOTP()">Confirmar código</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="secao-preview" class="card hidden">
+      <h2>Pré-visualização do documento</h2>
+      <p style="color: var(--texto-suave); font-size: 0.9rem; margin-top: 0;">
+        Verifique atentamente o conteúdo antes de assinar.
+      </p>
+      <iframe id="pdf-preview" class="pdf-preview" title="Pré-visualização do documento"></iframe>
+      <div class="botoes" style="margin-top: 1rem;">
+        <button id="btn-assinar" onclick="assinarDocumento()">Assinar documento</button>
+        <button class="secundario danger" id="btn-mostrar-recusa" onclick="mostrarRecusa()">Recusar assinatura</button>
+      </div>
+    </div>
+
+    <div id="secao-recusa" class="card hidden">
+      <h2>Recusar assinatura</h2>
+      <div class="form-group">
+        <label for="input-motivo">Motivo da recusa</label>
+        <textarea id="input-motivo" placeholder="Indique o motivo da recusa..."></textarea>
+      </div>
+      <div class="botoes">
+        <button class="danger" id="btn-recusar" onclick="recusarDocumento()">Confirmar recusa</button>
+        <button class="secundario" onclick="cancelarRecusa()">Voltar</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Nexora ERP — módulo de assinatura digital.<br>
+    Esta página não substitui homologação jurídica.
+  </footer>
+</div>
+
+<script>
+  const TOKEN = '{{TOKEN}}';
+  const API_BASE = '{{API_BASE}}';
+
+  const el = (id) => document.getElementById(id);
+  const msgs = el('mensagens');
+
+  function mostrarAviso(tipo, texto) {
+    msgs.innerHTML = '<div class="aviso ' + tipo + '">' + escapeHtml(texto) + '</div>';
+  }
+  function limparAvisos() { msgs.innerHTML = ''; }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function setLoading(id, loading) {
+    const btn = el(id);
+    if (!btn) return;
+    btn.disabled = loading;
+  }
+
+  async function api(path, opts) {
+    const url = API_BASE + path;
+    const res = await fetch(url, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
+    let body = null;
+    const text = await res.text();
+    if (text) {
+      try { body = JSON.parse(text); } catch (e) { body = { error: text }; }
+    }
+    if (!res.ok) {
+      throw new Error((body && body.error) || ('Erro ' + res.status));
+    }
+    return body;
+  }
+
+  function formatarData(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleString('pt-MZ', { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  function tipoLabel(t) {
+    const map = { assinatura: 'Assinatura', rubrica: 'Rúbrica', testemunha: 'Testemunha' };
+    return map[t] || t;
+  }
+
+  let dadosConvite = null;
+  let otpConfirmado = false;
+
+  async function carregarConvite() {
+    try {
+      dadosConvite = await api('/assinatura-digital/convites/' + encodeURIComponent(TOKEN));
+      el('loading').classList.add('hidden');
+      el('conteudo').classList.remove('hidden');
+
+      const statusEl = el('doc-status');
+      statusEl.textContent = dadosConvite.documento_status;
+      statusEl.className = 'estado-badge estado-' + (dadosConvite.documento_status === 'assinado' ? 'assinado' : dadosConvite.documento_status === 'recusado' ? 'recusado' : 'pendente');
+
+      el('sig-nome').textContent = dadosConvite.signatario_nome || '—';
+      el('sig-tipo').textContent = tipoLabel(dadosConvite.signatario_tipo);
+      el('convite-expira').textContent = formatarData(dadosConvite.expira_em);
+
+      // Se signatário já assinou/recusou, esconde ações
+      if (dadosConvite.signatario_status === 'assinado' || dadosConvite.signatario_status === 'recusado') {
+        el('secao-otp').classList.add('hidden');
+        el('secao-preview').classList.add('hidden');
+        el('secao-recusa').classList.add('hidden');
+        mostrarAviso('info', 'Este processo já foi concluído com estado: ' + dadosConvite.signatario_status + '.');
+        return;
+      }
+
+      if (!dadosConvite.tem_email && !dadosConvite.tem_telefone) {
+        el('secao-otp').innerHTML = '<p style="color: var(--vermelho);">Não foi possível enviar o código de acesso porque este signatário não tem email nem telefone registados. Contacte quem lhe enviou o documento.</p>';
+      } else if (dadosConvite.tem_email && dadosConvite.tem_telefone) {
+        el('otp-canais').classList.remove('hidden');
+      } else {
+        el('btn-solicitar-otp').classList.remove('hidden');
+        if (dadosConvite.tem_email) {
+          el('btn-solicitar-otp').textContent = 'Receber código por email';
+        } else {
+          el('btn-solicitar-otp').textContent = 'Receber código por SMS';
+        }
+      }
+    } catch (err) {
+      el('loading').innerHTML = '<p style="color: var(--vermelho);">Não foi possível carregar o convite. Verifique o link ou contacte o remetente.</p>';
+      mostrarAviso('erro', err.message);
+    }
+  }
+
+  async function solicitarOTP(canal) {
+    limparAvisos();
+    const body = canal ? JSON.stringify({ canal }) : undefined;
+    const btnId = canal ? (canal === 'email' ? 'btn-solicitar-email' : 'btn-solicitar-sms') : 'btn-solicitar-otp';
+    setLoading(btnId, true);
+    try {
+      const res = await api('/assinatura-digital/convites/' + encodeURIComponent(TOKEN) + '/otp/enviar', {
+        method: 'POST',
+        body: body
+      });
+      el('form-otp').classList.remove('hidden');
+      el('otp-canais').classList.add('hidden');
+      el('btn-solicitar-otp').classList.add('hidden');
+      const msg = res.canal === 'sms' ? 'Código enviado por SMS. Verifique o seu telemóvel.' : 'Código enviado. Verifique o seu email.';
+      mostrarAviso('info', msg);
+    } catch (err) {
+      mostrarAviso('erro', err.message);
+    } finally {
+      setLoading(btnId, false);
+    }
+  }
+
+  async function validarOTP() {
+    limparAvisos();
+    const codigo = el('input-otp').value.trim();
+    if (!/^\d{6}$/.test(codigo)) {
+      mostrarAviso('erro', 'Introduza o código de 6 dígitos.');
+      return;
+    }
+    setLoading('btn-validar-otp', true);
+    try {
+      await api('/assinatura-digital/convites/' + encodeURIComponent(TOKEN) + '/otp/validar', {
+        method: 'POST',
+        body: JSON.stringify({ codigo })
+      });
+      otpConfirmado = true;
+      el('form-otp').classList.add('hidden');
+      el('btn-solicitar-otp').disabled = true;
+      el('btn-solicitar-otp').textContent = 'Código confirmado';
+      mostrarAviso('sucesso', 'Código confirmado. Pode agora pré-visualizar e assinar o documento.');
+      ativarPreview();
+    } catch (err) {
+      mostrarAviso('erro', err.message);
+    } finally {
+      setLoading('btn-validar-otp', false);
+    }
+  }
+
+  function ativarPreview() {
+    el('secao-preview').classList.remove('hidden');
+    el('pdf-preview').src = API_BASE + '/assinatura-digital/convites/' + encodeURIComponent(TOKEN) + '/preview';
+  }
+
+  async function assinarDocumento() {
+    if (!otpConfirmado) {
+      mostrarAviso('erro', 'Confirme o código de acesso antes de assinar.');
+      return;
+    }
+    if (!confirm('Tem a certeza de que deseja assinar este documento?')) return;
+    limparAvisos();
+    setLoading('btn-assinar', true);
+    try {
+      const res = await api('/assinatura-digital/convites/' + encodeURIComponent(TOKEN) + '/assinar', { method: 'POST' });
+      el('secao-otp').classList.add('hidden');
+      el('secao-preview').classList.add('hidden');
+      el('secao-recusa').classList.add('hidden');
+      mostrarAviso('sucesso', 'Documento assinado com sucesso. Estado: ' + (res.concluido ? 'assinado por todos os signatários.' : 'aguarda outros signatários.'));
+    } catch (err) {
+      mostrarAviso('erro', err.message);
+    } finally {
+      setLoading('btn-assinar', false);
+    }
+  }
+
+  function mostrarRecusa() {
+    el('secao-recusa').classList.remove('hidden');
+    el('secao-preview').classList.add('hidden');
+  }
+
+  function cancelarRecusa() {
+    el('secao-recusa').classList.add('hidden');
+    el('secao-preview').classList.remove('hidden');
+  }
+
+  async function recusarDocumento() {
+    const motivo = el('input-motivo').value.trim();
+    if (!motivo) {
+      mostrarAviso('erro', 'Indique o motivo da recusa.');
+      return;
+    }
+    limparAvisos();
+    setLoading('btn-recusar', true);
+    try {
+      await api('/assinatura-digital/convites/' + encodeURIComponent(TOKEN) + '/recusar', {
+        method: 'POST',
+        body: JSON.stringify({ motivo })
+      });
+      el('secao-otp').classList.add('hidden');
+      el('secao-preview').classList.add('hidden');
+      el('secao-recusa').classList.add('hidden');
+      mostrarAviso('sucesso', 'Recusa registada com sucesso.');
+    } catch (err) {
+      mostrarAviso('erro', err.message);
+    } finally {
+      setLoading('btn-recusar', false);
+    }
+  }
+
+  carregarConvite();
+</script>
+</body>
+</html>

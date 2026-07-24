@@ -26,6 +26,13 @@ const (
 )
 
 func (h *Handler) signAccess(userID, tenantID, membershipID int64, tipo, escopo string) (string, error) {
+	return h.signAccessWithExpiry(userID, tenantID, membershipID, tipo, escopo, h.cfg.JWTExpiresIn)
+}
+
+// signAccessWithExpiry existe para contas com validade diferente da humana
+// habitual (ex.: terminais POS, 30 dias — ver issueTerminalTokens em
+// pos_login.go), mantendo a mesma estrutura de claims.
+func (h *Handler) signAccessWithExpiry(userID, tenantID, membershipID int64, tipo, escopo string, expiry time.Duration) (string, error) {
 	if escopo == "" {
 		escopo = "erp"
 	}
@@ -40,13 +47,17 @@ func (h *Handler) signAccess(userID, tenantID, membershipID int64, tipo, escopo 
 		"tipo":   tipo,
 		"escopo": escopo,
 		"jti":    jti,
-		"exp":    time.Now().Add(h.cfg.JWTExpiresIn).Unix(),
+		"exp":    time.Now().Add(expiry).Unix(),
 		"iat":    time.Now().Unix(),
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.cfg.JWTSecret))
 }
 
 func (h *Handler) signRefresh(userID int64) (string, error) {
+	return h.signRefreshWithExpiry(userID, h.cfg.JWTRefreshExpiresIn)
+}
+
+func (h *Handler) signRefreshWithExpiry(userID int64, expiry time.Duration) (string, error) {
 	jti, err := randomJTI()
 	if err != nil {
 		return "", err
@@ -54,7 +65,7 @@ func (h *Handler) signRefresh(userID int64) (string, error) {
 	claims := jwt.MapClaims{
 		"sub": userID,
 		"jti": jti,
-		"exp": time.Now().Add(h.cfg.JWTRefreshExpiresIn).Unix(),
+		"exp": time.Now().Add(expiry).Unix(),
 		"iat": time.Now().Unix(),
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.cfg.JWTRefreshSecret))
@@ -140,7 +151,13 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "email e password são obrigatórios", http.StatusBadRequest)
 		return
 	}
+	h.loginWithCredentials(w, r, body.Email, body.Password)
+}
 
+// loginWithCredentials contém a lógica de Login a partir de email/password já
+// extraídos do body — reaproveitada por PosLogin (tipo=utilizador, ver
+// pos_login.go) para não duplicar a validação/dispatch por tipo de conta.
+func (h *Handler) loginWithCredentials(w http.ResponseWriter, r *http.Request, email, password string) {
 	var (
 		userID       int64
 		tenantID     int64
@@ -159,13 +176,13 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		  FROM users u
 		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
 		 WHERE u.email = LOWER($1)`,
-		body.Email,
+		email,
 	).Scan(&userID, &tenantID, &membershipID, &nome, &passwordHash, &estado, &tipo, &escopo)
 
 	found := err == nil
 	var pwOk bool
 	if found {
-		pwOk = bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(body.Password)) == nil
+		pwOk = bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)) == nil
 	}
 
 	// fire-and-forget audit log
@@ -174,7 +191,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		VALUES ($1, $2, LOWER($3), $4, $5, $6, $7)`,
 		nullInt(userID, found && pwOk),
 		nullInt(tenantID, tenantID > 0),
-		body.Email,
+		email,
 		found && pwOk,
 		r.RemoteAddr,
 		r.Header.Get("User-Agent"),
@@ -197,7 +214,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	case "candidato":
 		h.LoginCandidato(w, r, userID, nome)
 	default:
-		h.loginFuncionario(w, r, userID, tenantID, membershipID, nome, body.Email, tipo, escopo)
+		h.loginFuncionario(w, r, userID, tenantID, membershipID, nome, email, tipo, escopo)
 	}
 }
 
@@ -407,8 +424,13 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "refresh_token é obrigatório", http.StatusBadRequest)
 		return
 	}
+	h.refreshWithToken(w, r, body.RefreshToken)
+}
 
-	token, err := jwt.Parse(body.RefreshToken, func(t *jwt.Token) (interface{}, error) {
+// refreshWithToken contém a lógica de Refresh a partir do refresh_token já
+// extraído do body — reaproveitada por PosRefresh (ver pos_login.go).
+func (h *Handler) refreshWithToken(w http.ResponseWriter, r *http.Request, refreshToken string) {
+	token, err := jwt.Parse(refreshToken, func(t *jwt.Token) (interface{}, error) {
 		return []byte(h.cfg.JWTRefreshSecret), nil
 	})
 	if err != nil || !token.Valid {

@@ -17,6 +17,10 @@ const (
 	EvtError             = "error"
 	EvtNotification      = "notification"
 	EvtNotificationCount = "notification_count"
+
+	// Eventos de negócio POS (item 7 do plano-mudancas-backend-paycore-mobile.md)
+	EvtVendaCriada       = "venda_criada"
+	EvtPagamentoRecebido = "pagamento_recebido"
 )
 
 // Envelope é o envelope JSON de todos os eventos WebSocket.
@@ -110,6 +114,13 @@ func (h *Hub) SendToUser(userID int64, msg []byte) {
 			}
 		}
 	}
+}
+
+// SendEvent codifica e envia um evento de negócio a um utilizador — usado por
+// handlers fora do package ws (ex. pos.CriarVenda) para notificar em tempo
+// real sem precisar de conhecer o formato interno do envelope.
+func (h *Hub) SendEvent(userID int64, evtType string, data any) {
+	h.SendToUser(userID, encode(evtType, data))
 }
 
 // BroadcastAll envia para todos os clientes ligados.

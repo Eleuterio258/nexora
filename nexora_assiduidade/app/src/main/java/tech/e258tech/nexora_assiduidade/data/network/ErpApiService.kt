@@ -9,6 +9,8 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 import tech.e258tech.nexora_assiduidade.data.model.AdminSetPinRequest
+import tech.e258tech.nexora_assiduidade.data.model.AgendaItem
+import tech.e258tech.nexora_assiduidade.data.model.AgendaItemRequest
 import tech.e258tech.nexora_assiduidade.data.model.Ausencia
 import tech.e258tech.nexora_assiduidade.data.model.ChatMessageRequest
 import tech.e258tech.nexora_assiduidade.data.model.DispositivoErp
@@ -186,6 +188,22 @@ interface ErpApiService {
         @Header("Authorization") token: String,
         @Path("userId") userId: String
     ): Response<Unit>
+
+    // Agenda pessoal do próprio utilizador (utilizadores/handlers/agenda.go)
+    @GET("api/utilizadores/{userId}/agenda")
+    suspend fun getAgenda(
+        @Header("Authorization") token: String,
+        @Path("userId") userId: String,
+        @Query("desde") desde: String? = null,
+        @Query("ate") ate: String? = null
+    ): Response<List<AgendaItem>>
+
+    @POST("api/utilizadores/{userId}/agenda")
+    suspend fun criarItemAgenda(
+        @Header("Authorization") token: String,
+        @Path("userId") userId: String,
+        @Body request: AgendaItemRequest
+    ): Response<Map<String, Long>>
 
     // Equipa — lista de funcionários (rh.go:157, ListarFuncionarios)
     @GET("api/rh/funcionarios")
