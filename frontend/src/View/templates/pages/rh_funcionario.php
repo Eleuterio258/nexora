@@ -1,8 +1,16 @@
-﻿<?php
+<?php
 
     $idHash = $app->request->queryString('id');
+    // O middleware de idhash do Go só decodifica parâmetros de query-string; em
+    // parâmetros de path (/{id}) não decodifica (corre antes do chi resolver a
+    // rota). Por isso decodificamos aqui e enviamos o id numérico à API.
+    $id = $app->id->decode((string) $idHash);
+    if ($id <= 0) {
+        header('Location: /nexora/rh/funcionarios');
+        exit;
+    }
 
-    $resp = $app->nexora->call('GET', "/api/rh/funcionarios/$idHash");
+    $resp = $app->nexora->call('GET', "/api/rh/funcionarios/$id");
     if ($resp['status'] !== 200) {
         header('Location: /nexora/rh/funcionarios');
         exit;

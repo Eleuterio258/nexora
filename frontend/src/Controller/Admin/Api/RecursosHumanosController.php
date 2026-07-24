@@ -249,7 +249,10 @@ final class RecursosHumanosController
             return new ApiResult(['erro' => 'Sem permissao.'], 403);
         }
 
-        $id = (int) ($_GET['id'] ?? 0);
+        // O link é gerado com o id ofuscado ($app->id->encode); aqui corre no
+        // PHP (não passa pelo middleware idhash do Go), por isso descodificamos.
+        $rawId = (string) ($_GET['id'] ?? '');
+        $id = ctype_digit($rawId) ? (int) $rawId : $d->id->decode($rawId);
         if ($id <= 0) {
             return new ApiResult(['erro' => 'Contrato invalido.'], 400);
         }

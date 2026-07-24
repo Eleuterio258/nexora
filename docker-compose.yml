@@ -34,6 +34,9 @@ services:
       # o default 1, um tenant que não existe nesta instalação.
       RECRUITMENT_TENANT_ID: ${RECRUITMENT_TENANT_ID:-7}
       PLATFORM_BASE_DOMAIN: ${PLATFORM_BASE_DOMAIN:-nexora.e258tech.tech}
+      # Provider de assinatura em modo 'dev' (chave autoassinada, NÃO juridicamente
+      # válida). O código recusa arrancar com ele sem este opt-in explícito.
+      SIGNATURE_ALLOW_INSECURE_PROVIDER: ${SIGNATURE_ALLOW_INSECURE_PROVIDER:-true}
     volumes:
       - api_uploads:/app/uploads
       - api_avatars:/app/avatars
@@ -50,6 +53,17 @@ services:
       # api.nexora.e258tech.tech também casa com o HostRegexp dos portais de
       # tenant (no serviço web). Prioridade explícita para este router ganhar.
       - "traefik.http.routers.nexora-api.priority=100"
+      # ── WebSocket do ERP (/ws/chat) ──────────────────────────────
+      # O frontend liga-se a wss://<host>/ws/chat (location.host), mas todo o
+      # host e258tech.tech / nexora.e258tech.tech vai para o PHP, que não faz
+      # WebSocket. Este router intercepta /ws e manda directo à API Go. O
+      # proxy PHP só cobre REST (/api/public/*); o handshake WS tem de ser
+      # encaminhado no Traefik. Prioridade acima do router `nexora` (1000).
+      - "traefik.http.routers.nexora-ws.rule=(Host(`e258tech.tech`) || Host(`nexora.e258tech.tech`)) && PathPrefix(`/ws`)"
+      - "traefik.http.routers.nexora-ws.entrypoints=websecure"
+      - "traefik.http.routers.nexora-ws.tls=true"
+      - "traefik.http.routers.nexora-ws.service=nexora-api"
+      - "traefik.http.routers.nexora-ws.priority=2000"
       # Redirect HTTP → HTTPS
       - "traefik.http.routers.nexora-api-http.rule=Host(`api.nexora.e258tech.tech`)"
       - "traefik.http.routers.nexora-api-http.entrypoints=web"
@@ -71,6 +85,11 @@ services:
       # directamente ao Go, sem passar pelo proxy PHP) — diferente do
       # NEXORA_API_URL acima, que é só para as chamadas server-to-server.
       NEXORA_PUBLIC_API_URL: ${NEXORA_PUBLIC_API_URL:-https://api.nexora.e258tech.tech}
+      # O IdHasher (obfuscação de IDs em URLs) deriva a salt do JWT_SECRET e
+      # TEM de bater certo com o backend Go (config.IDHashSalt = JWT_SECRET).
+      # Sem isto o PHP cai no fallback 'change-me-secret', os hashes deixam de
+      # coincidir e cada link com ?id=<hash> decodifica para outro id → 404.
+      JWT_SECRET: ${JWT_SECRET}
     volumes:
       - web_uploads:/var/www/html/uploads
     networks:
@@ -111,7 +130,7 @@ services:
       - "traefik.http.middlewares.e258tech-sec.headers.browserXssFilter=true"
       - "traefik.http.middlewares.e258tech-sec.headers.customFrameOptionsValue=SAMEORIGIN"
       - "traefik.http.middlewares.e258tech-sec.headers.referrerPolicy=strict-origin-when-cross-origin"
-      - "traefik.http.middlewares.e258tech-sec.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.nexora.e258tech.tech;"
+      - "traefik.http.middlewares.e258tech-sec.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self' https://api.nexora.e258tech.tech wss://e258tech.tech wss://nexora.e258tech.tech;"
       - "traefik.http.middlewares.e258tech-sec.headers.customResponseHeaders.X-Powered-By="
       - "traefik.http.middlewares.e258tech-sec.headers.customResponseHeaders.Server="
       # Redirect HTTP → HTTPS (domínio principal)

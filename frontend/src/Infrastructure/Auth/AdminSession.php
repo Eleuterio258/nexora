@@ -54,8 +54,9 @@ final class AdminSession
             $_SESSION['prof_token']      = $body['access_token'] ?? '';
             $_SESSION['prof_expires_at'] = time() + (int) ($body['expires_in'] ?? 28800);
         }
-        // Se features não vieram no login, forçar sync na primeira request
-        $_SESSION['nexora_modulos_at']      = empty($_SESSION['nexora_features']) && ($_SESSION['nexora_tipo'] !== 'superadmin')
+        // Módulos deixaram de vir no login (só features): forçar sync de
+        // /api/auth/me/acesso na primeira request para popular nexora_modulos.
+        $_SESSION['nexora_modulos_at']      = (empty($_SESSION['nexora_modulos']) || empty($_SESSION['nexora_features'])) && ($_SESSION['nexora_tipo'] !== 'superadmin')
                                                 ? 0
                                                 : time();
     }

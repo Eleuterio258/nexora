@@ -81,7 +81,6 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 		"email":  u.email,
 		"escopo": escoposPorTipoEscopo(u.tipo, u.escopo),
 	}
-	modulos := []models.ModuloAcesso{}
 	features := []string{}
 	if userAccess != nil {
 		userObj["tenant_id"] = userAccess.TenantID
@@ -89,7 +88,6 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 		if userAccess.CargoNome != nil {
 			userObj["cargo"] = *userAccess.CargoNome
 		}
-		modulos = userAccess.Modulos
 		features = userAccess.Features
 	} else {
 		userObj["tenant_id"] = u.tenantID
@@ -103,7 +101,6 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 		"tipo":          u.tipo,
 		"escopo":        escoposPorTipoEscopo(u.tipo, u.escopo),
 		"user":          userObj,
-		"modulos":       modulos,
 		"features":      features,
 	}, http.StatusOK)
 }

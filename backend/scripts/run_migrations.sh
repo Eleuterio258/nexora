@@ -14,15 +14,20 @@ set -euo pipefail
 #   - As migrações estão em backend/migrations/ no formato YYYYMMDDHHMMSS_nome.{up,down}.sql.
 #   - O script tenta usar o CLI nativo migrate; se não existir, usa a imagem Docker migrate/migrate.
 
-DB_HOST="${DB_HOST:-localhost}"
-DB_PORT="${DB_PORT:-5432}"
-DB_USER="${DB_USER:-postgres}"
-DB_PASSWORD="${DB_PASSWORD:-admin}"
-DB_NAME="${DB_NAME:-nexora_erp}"
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIGRATIONS_DIR="$(cd "${SCRIPT_DIR}/../migrations" && pwd)"
-DB_URL="postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
+
+# Preferir DATABASE_URL (inclui search_path necessario ao golang-migrate).
+if [[ -n "${DATABASE_URL:-}" ]]; then
+    DB_URL="${DATABASE_URL}"
+else
+    DB_HOST="${DB_HOST:-localhost}"
+    DB_PORT="${DB_PORT:-5432}"
+    DB_USER="${DB_USER:-postgres}"
+    DB_PASSWORD="${DB_PASSWORD:-admin}"
+    DB_NAME="${DB_NAME:-nexora_erp}"
+    DB_URL="postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable"
+fi
 
 ACTION="${1:-up}"
 
@@ -31,10 +36,11 @@ run_migrate() {
     if command -v migrate >/dev/null 2>&1; then
         migrate -path "$MIGRATIONS_DIR" -database "$DB_URL" "${cmd[@]}"
     elif command -v docker >/dev/null 2>&1; then
-        # O container migrate/migrate precisa de aceder ao host e ao volume de migrações.
-        # MSYS_NO_PATHCONV=1 evita que o Git Bash converta /migrations para path Windows.
+        # Rede Docker a usar (default: backend, para ligar ao servico postgres).
+        # Em ambiente local sem compose, usar DOCKER_NETWORK=host.
+        DOCKER_NETWORK="${DOCKER_NETWORK:-backend}"
         MSYS_NO_PATHCONV=1 docker run --rm \
-            --network host \
+            --network "${DOCKER_NETWORK}" \
             -v "${MIGRATIONS_DIR}:/migrations" \
             migrate/migrate \
             -path /migrations -database "$DB_URL" "${cmd[@]}"

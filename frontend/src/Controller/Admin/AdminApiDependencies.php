@@ -35,6 +35,7 @@ use E258Tech\Model\Service\Tarefas\TarefasService;
 use E258Tech\Model\Service\AssinaturaDigital\AssinaturaDigitalService;
 use E258Tech\Model\Contract\NexoraGateway;
 use E258Tech\Model\Exception\OperationException;
+use E258Tech\Infrastructure\Security\IdHasher;
 use E258Tech\Http\ApiResult;
 
 final readonly class AdminApiDependencies
@@ -72,6 +73,7 @@ final readonly class AdminApiDependencies
         public AprovacaoService $aprovacao,
         public TarefasService $tarefas,
         public AssinaturaDigitalService $assinaturaDigital,
+        public IdHasher $id,
     ) {
     }
 

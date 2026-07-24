@@ -82,6 +82,7 @@ final readonly class AdminApiRuntime
             new AprovacaoService($gateway),
             new TarefasService($gateway),
             new AssinaturaDigitalService($gateway),
+            $app->id,
         );
     }
 

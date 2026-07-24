@@ -91,10 +91,6 @@
 <div class="vagas-cards" role="tablist" aria-label="Vagas disponíveis">
 <?php foreach ($vagas as $i => $v):
     $slug = $view->vacancySlug($v['area']);
-    $prazoFmt = $view->vacancyDeadline($v['prazo'] ?? null);
-    $dias = isset($v['dias_restantes']) ? (int) $v['dias_restantes'] : null;
-    $deadlineClass = $view->vacancyDeadlineClass($dias);
-    $deadlineLabel = $view->vacancyDeadlineLabel($prazoFmt, $dias);
 ?>
 <button class="vaga-card <?php echo $i === 0 ? 'active' : '' ?>"
         id="card-<?php echo $slug ?>"
@@ -102,18 +98,7 @@
         aria-selected="<?php echo $i === 0 ? 'true' : 'false' ?>"
         aria-controls="vaga-<?php echo $slug ?>"
         onclick="showVaga('<?php echo $slug ?>', this)">
-    <div class="vaga-card-top">
-        <span class="vaga-card-area" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-        </span>
-        <span class="vaga-card-prazo <?php echo $deadlineClass ?>"><?php echo $deadlineLabel ?></span>
-    </div>
     <h3 class="vaga-card-title"><?php echo htmlspecialchars($v['titulo']) ?></h3>
-    <p class="vaga-card-area-tag"><?php echo htmlspecialchars($v['area']) ?></p>
-    <div class="vaga-card-meta">
-        <span class="vaga-card-meta-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><?php echo htmlspecialchars($v['local']) ?></span>
-        <span class="vaga-card-meta-item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><?php echo htmlspecialchars($v['tipo']) ?></span>
-    </div>
     <span class="vaga-card-arrow" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
 </button>
 <?php endforeach; ?>

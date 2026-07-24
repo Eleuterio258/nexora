@@ -20,6 +20,7 @@ final class ComercialApiRoutes
             'fatura_save'               => ['module' => 'faturacao', 'action' => 'emitir_faturas'],
             'fatura_item_save'          => ['module' => 'faturacao', 'action' => 'emitir_faturas'],
             'fatura_estado'             => ['module' => 'faturacao', 'action' => 'emitir_faturas'],
+            'fatura_pdf'                => ['module' => 'faturacao', 'action' => 'ver_documentos', 'method' => 'GET'],
             'recibo_save'               => ['module' => 'faturacao', 'action' => 'emitir_faturas'],
             'nota_credito_save'         => ['module' => 'faturacao', 'action' => 'emitir_notas_credito'],
 

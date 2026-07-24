@@ -40,6 +40,112 @@ final class FaturacaoController
         );
     }
 
+    /**
+     * Gera e serve o PDF de uma fatura (normal ou pró-forma).
+     * GET /nexora/api/fatura_pdf?id=<hash>
+     *
+     * Corre no PHP (não passa pelo middleware idhash do Go), por isso
+     * descodificamos o id aqui. Junta os mesmos dados da pró-forma HTML
+     * (empresa, cliente, itens) e produz um PDF com o FaturaPdfBuilder.
+     */
+    public function faturaPdf(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        $authorization = new \E258Tech\Infrastructure\Auth\PhpSessionAuthorization();
+        if (!$authorization->isAuthenticated() || !$authorization->can('faturacao', 'ver_documentos')) {
+            return new ApiResult(['erro' => 'Sem permissao.'], 403);
+        }
+
+        $rawId = (string) ($_GET['id'] ?? '');
+        $id = ctype_digit($rawId) ? (int) $rawId : $d->id->decode($rawId);
+        if ($id <= 0) {
+            return new ApiResult(['erro' => 'Fatura invalida.'], 400);
+        }
+
+        $faturaResp = $d->gateway->request('GET', "/api/faturacao/invoices/$id");
+        if (!$faturaResp->successful()) {
+            return new ApiResult(['erro' => 'Fatura nao encontrada.'], $faturaResp->status);
+        }
+        $fatura = $faturaResp->body['fatura'] ?? [];
+        $itens  = $faturaResp->body['itens'] ?? [];
+
+        // Cliente + endereço principal
+        $customerId = (int) ($fatura['customer_id'] ?? 0);
+        $cliente = $d->gateway->request('GET', "/api/clientes/$customerId")->body ?? [];
+        $clienteEnderecos = $d->gateway->request('GET', "/api/clientes/$customerId/enderecos")->body ?? [];
+        $clienteEndereco = $this->principal($clienteEnderecos, 'principal');
+
+        // Empresa emitente (primeira empresa do tenant) + fiscal/endereço/contacto
+        $companies = $d->gateway->request('GET', '/api/companies')->body ?? [];
+        $company   = $companies[0] ?? null;
+        $tax = $companyEndereco = $companyContacto = null;
+        if ($company) {
+            $cid = (int) $company['id'];
+            $tax = $d->gateway->request('GET', "/api/companies/$cid/tax-info")->body ?? null;
+            $addrs = $d->gateway->request('GET', "/api/companies/$cid/addresses")->body ?? [];
+            $companyEndereco = $this->principalTipo($addrs, 'principal');
+            $contacts = $d->gateway->request('GET', "/api/companies/$cid/contacts")->body ?? [];
+            $companyContacto = $this->principal($contacts, 'principal');
+        }
+        $companyNome = !empty($company['nome_comercial']) ? $company['nome_comercial'] : ($company['nome'] ?? 'Empresa');
+
+        // Totais derivados (subtotal / desconto), como na pró-forma
+        $subtotal = $descontoTotal = 0.0;
+        foreach ($itens as $item) {
+            $base = (float) ($item['quantidade'] ?? 0) * (float) ($item['preco_unitario'] ?? 0);
+            $subtotal      += $base;
+            $descontoTotal += $base * (float) ($item['desconto_percent'] ?? 0) / 100;
+        }
+
+        $pdf = (new \E258Tech\Infrastructure\Pdf\FaturaPdfBuilder())->build([
+            'fatura'          => $fatura,
+            'itens'           => $itens,
+            'company'         => $company,
+            'companyNome'     => $companyNome,
+            'tax'             => $tax,
+            'companyEndereco' => $companyEndereco,
+            'companyContacto' => $companyContacto,
+            'cliente'         => is_array($cliente) ? $cliente : [],
+            'clienteEndereco' => $clienteEndereco,
+            'subtotal'        => $subtotal,
+            'descontoTotal'   => $descontoTotal,
+        ]);
+
+        $nome = 'fatura-' . preg_replace('/[^A-Za-z0-9._-]/', '_', (string) ($fatura['numero'] ?? $id)) . '.pdf';
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . $nome . '"');
+        header('Content-Length: ' . (string) strlen($pdf));
+        echo $pdf;
+        exit;
+    }
+
+    /** Devolve o primeiro item marcado como principal (flag booleana), senão o primeiro. */
+    private function principal(mixed $items, string $flag): ?array
+    {
+        if (!is_array($items) || !$items) {
+            return null;
+        }
+        foreach ($items as $it) {
+            if (!empty($it[$flag])) {
+                return $it;
+            }
+        }
+        return $items[0] ?? null;
+    }
+
+    /** Como principal(), mas o "principal" é um valor de campo tipo (ex.: tipo='principal'). */
+    private function principalTipo(mixed $items, string $valor): ?array
+    {
+        if (!is_array($items) || !$items) {
+            return null;
+        }
+        foreach ($items as $it) {
+            if (($it['tipo'] ?? '') === $valor) {
+                return $it;
+            }
+        }
+        return $items[0] ?? null;
+    }
+
     public function faturaItemSave(Request $request, AdminApiDependencies $d): ApiResult
     {
         $payload = [

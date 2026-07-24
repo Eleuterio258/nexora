@@ -1734,6 +1734,8 @@ compras := comprasH.New(db, cfg, store, signaturePort)
 			r.Route("/terminais", func(r chi.Router) {
 				r.Get("/", pos.ListarTerminais)
 				r.Post("/", pos.CriarTerminal)
+				r.Post("/{id}/activar", pos.ActivarTerminal)
+				r.Post("/{id}/desactivar", pos.DesactivarTerminal)
 			})
 		})
 

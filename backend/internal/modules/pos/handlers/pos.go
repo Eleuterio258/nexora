@@ -197,6 +197,49 @@ func (h *Handler) CriarTerminal(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{"id": id}, http.StatusCreated)
 }
 
+// alterarEstadoTerminal liga/desliga um terminal (coluna activo). Desativar é o
+// equivalente "soft-delete" usado pelo cliente PayCore Mobile — o ERP não tem
+// DELETE de terminal. Devolve o terminal actualizado no mesmo shape de
+// ListarTerminais para o cliente poder actualizar o estado localmente.
+func (h *Handler) alterarEstadoTerminal(w http.ResponseWriter, r *http.Request, activo bool) {
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+
+	type Row struct {
+		ID          int64  `json:"id"`
+		Codigo      string `json:"codigo"`
+		Nome        string `json:"nome"`
+		WarehouseID *int64 `json:"warehouse_id"`
+		CaixaID     *int64 `json:"caixa_id"`
+		Activo      bool   `json:"activo"`
+	}
+	var t Row
+	err := h.db.QueryRow(r.Context(), `
+		UPDATE pos_terminals SET activo=$1, updated_at=NOW()
+		 WHERE id=$2 AND tenant_id=$3
+		 RETURNING id, codigo, nome, warehouse_id, caixa_id, activo`,
+		activo, id, user.TenantID).Scan(&t.ID, &t.Codigo, &t.Nome, &t.WarehouseID, &t.CaixaID, &t.Activo)
+	if err == pgx.ErrNoRows {
+		jsonErr(w, "Terminal não encontrado", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, t, http.StatusOK)
+}
+
+// ActivarTerminal marca o terminal como activo.
+func (h *Handler) ActivarTerminal(w http.ResponseWriter, r *http.Request) {
+	h.alterarEstadoTerminal(w, r, true)
+}
+
+// DesactivarTerminal marca o terminal como inactivo (soft-delete do cliente).
+func (h *Handler) DesactivarTerminal(w http.ResponseWriter, r *http.Request) {
+	h.alterarEstadoTerminal(w, r, false)
+}
+
 // ── Catálogo POS ────────────────────────────────────────────────────────────
 
 func (h *Handler) ListarCatalogo(w http.ResponseWriter, r *http.Request) {
