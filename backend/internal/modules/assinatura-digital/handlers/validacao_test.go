@@ -6,15 +6,19 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/digitorus/pdfsign/sign"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
 
 	mw "nexora/internal/middleware"
+	pkimod "nexora/internal/modules/assinatura-digital/pki"
 )
 
 func newAuthedRequest(method, path string, tenantID int64) *http.Request {
@@ -148,6 +152,79 @@ func TestValidacao_HashNaoBate(t *testing.T) {
 	body := rr.Body.String()
 	if !strings.Contains(body, `"resultado":"invalido"`) {
 		t.Errorf("esperava resultado invalido, body=%s", body)
+	}
+}
+
+// TestValidacao_AssinaturaRealNaoConfiavel assina um PDF real com o provider
+// dev e confirma que /validacao devolve "nao_confiavel" — nunca "valido" —
+// porque a assinatura é criptograficamente íntegra mas o certificado é
+// autoassinado (sem CA real). Este é o critério central da Fase 4: "valido"
+// só pode ser devolvido após validação criptográfica completa E cadeia de
+// confiança reconhecida.
+func TestValidacao_AssinaturaRealNaoConfiavel(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	store := newMockProviderInMemory()
+	h := &Handler{db: mock, storage: store}
+
+	original, err := os.ReadFile(filepath.Join("..", "pki", "testdata", "sample.pdf"))
+	if err != nil {
+		t.Fatalf("ler PDF de teste: %v", err)
+	}
+
+	prov, err := pkimod.NewDevProvider(filepath.Join(t.TempDir(), "dev.pem"))
+	if err != nil {
+		t.Fatalf("NewDevProvider: %v", err)
+	}
+	pdfSigner := pkimod.NewPDFSigner(pkimod.NewBasicValidator(), "")
+	signed, _, err := pdfSigner.Sign(context.Background(), original, sign.SignDataSignatureInfo{
+		Name:   "Ana Mussa",
+		Reason: "teste",
+	}, prov)
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	originalHash := sha256.Sum256(original)
+	originalHashHex := hex.EncodeToString(originalHash[:])
+	signedHash := sha256.Sum256(signed)
+	signedHashHex := hex.EncodeToString(signedHash[:])
+
+	originalKey := "assinatura-digital/tenant-1/" + originalHashHex + ".pdf"
+	signedKey := "assinatura-digital/tenant-1/" + signedHashHex + ".pdf"
+	store.Put(context.Background(), originalKey, original, "application/pdf")
+	store.Put(context.Background(), signedKey, signed, "application/pdf")
+
+	mock.ExpectQuery("SELECT status, storage_key, hash_sha256").
+		WithArgs(int64(10), int64(1)).
+		WillReturnRows(pgxmock.NewRows([]string{"status", "storage_key", "hash_sha256"}).
+			AddRow("assinado", originalKey, originalHashHex))
+
+	mock.ExpectQuery("SELECT storage_key, hash_sha256").
+		WithArgs(int64(10), int64(1)).
+		WillReturnRows(pgxmock.NewRows([]string{"storage_key", "hash_sha256"}).
+			AddRow(&signedKey, &signedHashHex))
+
+	router := chi.NewRouter()
+	router.Get("/{id}/validacao", h.Validacao)
+
+	req := newAuthedRequest(http.MethodGet, "/10/validacao", int64(1))
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body=%s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `"resultado":"nao_confiavel"`) {
+		t.Errorf("esperava resultado nao_confiavel, body=%s", body)
+	}
+	if strings.Contains(body, `"resultado":"valido"`) {
+		t.Errorf("um certificado autoassinado NUNCA deve produzir resultado=valido, body=%s", body)
 	}
 }
 

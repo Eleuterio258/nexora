@@ -33,10 +33,12 @@ func main() {
 		if e.IsDir() {
 			continue
 		}
-		if strings.HasPrefix(e.Name(), "20260701000114_") || strings.HasPrefix(e.Name(), "20260701000115_") || strings.HasPrefix(e.Name(), "20260701000116_") || strings.HasPrefix(e.Name(), "20260701000117_") || strings.HasPrefix(e.Name(), "20260701000118_") {
-			if strings.HasSuffix(e.Name(), ".up.sql") {
-				files = append(files, e.Name())
-			}
+		// O runner específico acompanha apenas as migrations do núcleo do
+		// módulo. Usar o nome, em vez de uma lista fixa de versões, evita que
+		// novas fases fiquem silenciosamente por aplicar.
+		if strings.Contains(e.Name(), "assinatura_digital") &&
+			strings.HasSuffix(e.Name(), ".up.sql") {
+			files = append(files, e.Name())
 		}
 	}
 	sort.Strings(files)

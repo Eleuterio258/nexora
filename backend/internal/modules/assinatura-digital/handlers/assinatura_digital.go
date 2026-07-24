@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -15,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/digitorus/pdfsign/sign"
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
 	"nexora/internal/shared/contracts"
@@ -91,7 +91,7 @@ func (h *Handler) CriarDocumento(w http.ResponseWriter, r *http.Request) {
 	hashStr := hex.EncodeToString(hash[:])
 
 	key := contentKey(user.TenantID, hashStr, ".pdf")
-	url, err := h.storage.Put(r.Context(), key, data, "application/pdf")
+	url, err := h.storage.PutImmutable(r.Context(), key, data, "application/pdf")
 	if err != nil {
 		jsonErr(w, "Erro ao guardar documento", http.StatusInternalServerError)
 		return
@@ -120,7 +120,7 @@ func (h *Handler) ListarDocumentos(w http.ResponseWriter, r *http.Request) {
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT d.id, d.titulo, d.descricao, d.status, d.created_at, d.data_envio, d.data_conclusao,
 		       (SELECT COUNT(*) FROM assinatura_digital.signatarios s WHERE s.documento_id = d.id) as total_signatarios,
-		       (SELECT COUNT(*) FROM assinatura_digital.signatarios s WHERE s.documento_id = d.id AND s.status='assinado') as assinados
+		       (SELECT COUNT(*) FROM assinatura_digital.signatarios s WHERE s.documento_id = d.id AND s.status IN ('assinado','aceite_eletronicamente')) as assinados
 		FROM assinatura_digital.documentos d
 		WHERE d.tenant_id=$1
 		ORDER BY d.created_at DESC`, user.TenantID)
@@ -436,7 +436,7 @@ func (h *Handler) AssinarDocumento(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Documento não encontrado", http.StatusNotFound)
 		return
 	}
-	if docStatus != "pendente" && docStatus != "assinado" {
+	if docStatus != "pendente" && docStatus != "parcialmente_assinado" {
 		jsonErr(w, "Documento não está disponível para assinatura", http.StatusConflict)
 		return
 	}
@@ -471,13 +471,18 @@ func (h *Handler) AssinarDocumento(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hashStr, concluido, padesGerado, err := h.marcarAssinado(r.Context(), r, user.TenantID, docID, body.SignatarioID, nome, email)
+	detalhes := map[string]any{"nome": nome, "email": email}
+	hashStr, concluido, padesGerado, err := h.marcarAssinado(
+		r.Context(), r, user.TenantID, docID, body.SignatarioID, nome, email,
+		&user.ID, nil, &user.ID, detalhes,
+	)
 	if err != nil {
-		jsonErr(w, "Erro ao registar assinatura", http.StatusInternalServerError)
+		if errors.Is(err, errGeracaoPAdES) {
+			h.logPadesFalhou(r.Context(), r, user.TenantID, docID, body.SignatarioID, err.Error())
+		}
+		h.responderErroAssinatura(w, err)
 		return
 	}
-
-	h.log(r.Context(), docID, &body.SignatarioID, "assinado", map[string]any{"nome": nome, "email": email}, user.TenantID, &user.ID, r)
 
 	jsonOK(w, map[string]any{"ok": true, "assinatura_hash": hashStr, "concluido": concluido, "pades_gerado": padesGerado}, http.StatusOK)
 }
@@ -508,11 +513,20 @@ func (h *Handler) RecusarSignatario(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.db.Exec(r.Context(), `
+	// O status volta a ser verificado no próprio UPDATE (não só na SELECT
+	// acima) para impedir que uma recusa concorrente sobreponha um "assinado"
+	// já persistido por um pedido de assinatura em curso no mesmo instante.
+	tag, err := h.db.Exec(r.Context(), `
 		UPDATE assinatura_digital.signatarios
 		SET status='recusado', recusado_em=NOW(), motivo_recusa=$1
-		WHERE id=$2 AND documento_id=$3`, body.Motivo, sigID, docID); err != nil {
+		WHERE id=$2 AND documento_id=$3 AND status IN ('pendente','convidado')`,
+		body.Motivo, sigID, docID)
+	if err != nil {
 		jsonErr(w, "Erro ao registar recusa", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		jsonErr(w, "Signatário não encontrado ou já concluído", http.StatusConflict)
 		return
 	}
 
@@ -528,122 +542,12 @@ func (h *Handler) verificarOrdem(ctx context.Context, docID int64, ordem int) (b
 	var pendentesAntes int
 	err := h.db.QueryRow(ctx, `
 		SELECT COUNT(*) FROM assinatura_digital.signatarios
-		WHERE documento_id=$1 AND tipo='assinatura' AND ordem < $2 AND status != 'assinado'`,
+		WHERE documento_id=$1 AND tipo='assinatura' AND ordem < $2 AND status NOT IN ('assinado','aceite_eletronicamente')`,
 		docID, ordem).Scan(&pendentesAntes)
 	if err != nil {
 		return false, err
 	}
 	return pendentesAntes == 0, nil
-}
-
-// marcarAssinado regista o hash de evidência, IP e conclusão do documento, e
-// tenta (best-effort) incorporar uma assinatura PAdES real no PDF — uma
-// falha na geração do PAdES não impede a aceitação eletrónica de ficar
-// registada (padesGerado indica se a versão assinada foi mesmo produzida).
-// Partilhado pelo fluxo interno autenticado e pelo fluxo de convite.
-func (h *Handler) marcarAssinado(ctx context.Context, r *http.Request, tenantID, docID, sigID int64, nome, email string) (hashStr string, concluido bool, padesGerado bool, err error) {
-	hashInput := fmt.Sprintf("%s|%s|%d|%d|%d", nome, email, sigID, docID, time.Now().Unix())
-	hash := sha256.Sum256([]byte(hashInput))
-	hashStr = hex.EncodeToString(hash[:])
-
-	ip := r.RemoteAddr
-	if host, _, e := net.SplitHostPort(ip); e == nil {
-		ip = host
-	}
-
-	if _, err = h.db.Exec(ctx, `
-		UPDATE assinatura_digital.signatarios
-		SET status='assinado', assinado_em=NOW(), assinatura_hash=$1, assinatura_ip=$2
-		WHERE id=$3 AND documento_id=$4`,
-		hashStr, ip, sigID, docID); err != nil {
-		return "", false, false, err
-	}
-
-	var pendentes int
-	h.db.QueryRow(ctx, `SELECT COUNT(*) FROM assinatura_digital.signatarios WHERE documento_id=$1 AND status!='assinado'`, docID).Scan(&pendentes)
-	concluido = pendentes == 0
-	if concluido {
-		h.db.Exec(ctx, `UPDATE assinatura_digital.documentos SET status='assinado', data_conclusao=NOW(), updated_at=NOW() WHERE id=$1`, docID)
-	}
-
-	padesGerado = h.gerarVersaoPAdES(ctx, r, tenantID, docID, sigID, nome, email)
-
-	return hashStr, concluido, padesGerado, nil
-}
-
-// gerarVersaoPAdES tenta incorporar uma assinatura PAdES real no PDF mais
-// recente do documento (a última versão assinada, ou o original se ainda não
-// houver nenhuma) e guarda o resultado como nova versão em
-// versoes_assinadas. Falhas ficam registadas em log ("pades_falhou") mas não
-// são propagadas — ver marcarAssinado.
-func (h *Handler) gerarVersaoPAdES(ctx context.Context, r *http.Request, tenantID, docID, sigID int64, nome, email string) bool {
-	if h.pdfSigner == nil || h.sigProvider == nil {
-		return false
-	}
-
-	var storageKey string
-	if err := h.db.QueryRow(ctx, `
-		SELECT storage_key FROM assinatura_digital.versoes_assinadas
-		WHERE documento_id=$1 ORDER BY created_at DESC LIMIT 1`, docID).Scan(&storageKey); err != nil {
-		if err := h.db.QueryRow(ctx, `SELECT storage_key FROM assinatura_digital.documentos WHERE id=$1`, docID).Scan(&storageKey); err != nil {
-			h.logPadesFalhou(ctx, r, tenantID, docID, sigID, "obter PDF actual: "+err.Error())
-			return false
-		}
-	}
-
-	reader, _, err := h.storage.Get(ctx, storageKey)
-	if err != nil {
-		h.logPadesFalhou(ctx, r, tenantID, docID, sigID, "ler PDF do storage: "+err.Error())
-		return false
-	}
-	pdfBytes, err := io.ReadAll(reader)
-	reader.Close()
-	if err != nil {
-		h.logPadesFalhou(ctx, r, tenantID, docID, sigID, "ler PDF do storage: "+err.Error())
-		return false
-	}
-
-	reason := "Documento assinado eletronicamente."
-	if !h.sigProvider.LegalmenteValido() {
-		reason = "ASSINATURA DE DESENVOLVIMENTO - NAO valida juridicamente."
-	}
-
-	signedBytes, ev, err := h.pdfSigner.Sign(ctx, pdfBytes, sign.SignDataSignatureInfo{
-		Name:        nome,
-		Location:    "Nexora ERP",
-		Reason:      reason,
-		ContactInfo: email,
-	}, h.sigProvider)
-	if err != nil {
-		h.logPadesFalhou(ctx, r, tenantID, docID, sigID, "assinar PDF: "+err.Error())
-		return false
-	}
-
-	hash := sha256.Sum256(signedBytes)
-	hashStr := hex.EncodeToString(hash[:])
-	key := contentKey(tenantID, hashStr, ".pdf")
-	url, err := h.storage.Put(ctx, key, signedBytes, "application/pdf")
-	if err != nil {
-		h.logPadesFalhou(ctx, r, tenantID, docID, sigID, "gravar PDF assinado: "+err.Error())
-		return false
-	}
-
-	if _, err := h.db.Exec(ctx, `
-		INSERT INTO assinatura_digital.versoes_assinadas (
-			documento_id, tenant_id, storage_key, ficheiro_url, hash_sha256, signatario_id,
-			provider, legal_valido, nivel_assinatura, certificado_subject, certificado_emissor, certificado_serie,
-			certificado_fingerprint, certificado_validade_inicio, certificado_validade_fim,
-			algoritmo_digest, algoritmo_assinatura, timestamp_autoridade, motivo, localizacao)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
-		docID, tenantID, key, url, hashStr, sigID,
-		ev.Provider, ev.LegalValido, ev.Nivel, ev.CertificadoSubject, ev.CertificadoEmissor, ev.CertificadoSerie,
-		ev.CertificadoFingerprint, ev.CertificadoValidadeInicio, ev.CertificadoValidadeFim,
-		ev.AlgoritmoDigest, ev.AlgoritmoAssinatura, ev.TimestampAutoridade, ev.Motivo, ev.Localizacao); err != nil {
-		h.logPadesFalhou(ctx, r, tenantID, docID, sigID, "gravar versão assinada: "+err.Error())
-		return false
-	}
-
-	return true
 }
 
 func (h *Handler) logPadesFalhou(ctx context.Context, r *http.Request, tenantID, docID, sigID int64, motivo string) {

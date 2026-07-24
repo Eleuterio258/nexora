@@ -79,6 +79,39 @@ func (p *MinioProvider) Put(ctx context.Context, key string, data []byte, conten
 	return p.GetURL(ctx, key)
 }
 
+// PutImmutable usa If-None-Match:* para impedir atomicamente a substituição
+// de um objeto existente. Uma repetição com bytes idênticos é idempotente.
+func (p *MinioProvider) PutImmutable(ctx context.Context, key string, data []byte, contentType string) (string, error) {
+	key = NormalizeKey(key)
+	if key == "" {
+		return "", fmt.Errorf("minio: key vazia")
+	}
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	opts := minio.PutObjectOptions{ContentType: contentType}
+	opts.SetMatchETagExcept("*")
+	_, err := p.client.PutObject(ctx, p.bucket, key, bytes.NewReader(data), int64(len(data)), opts)
+	if err == nil {
+		return p.GetURL(ctx, key)
+	}
+
+	errResp := minio.ToErrorResponse(err)
+	if errResp.StatusCode != 412 && errResp.Code != "PreconditionFailed" {
+		return "", fmt.Errorf("minio put immutable: %w", err)
+	}
+
+	matches, matchErr := immutableObjectMatches(ctx, p, key, data)
+	if matchErr != nil {
+		return "", fmt.Errorf("minio: verificar objeto imutável existente: %w", matchErr)
+	}
+	if !matches {
+		return "", ErrImmutableObjectExists
+	}
+	return p.GetURL(ctx, key)
+}
+
 // Get devolve um reader para o objecto MinIO.
 func (p *MinioProvider) Get(ctx context.Context, key string) (io.ReadCloser, int64, error) {
 	key = NormalizeKey(key)
@@ -100,8 +133,12 @@ func (p *MinioProvider) GetURL(ctx context.Context, key string) (string, error) 
 	return p.publicBaseURL + "/" + key, nil
 }
 
-// Delete remove o objecto.
+// Delete remove o objecto. Recusa-se a remover evidências de assinatura
+// digital (ver ErrEvidenceDeleteForbidden).
 func (p *MinioProvider) Delete(ctx context.Context, key string) error {
+	if isEvidenceKey(key) {
+		return ErrEvidenceDeleteForbidden
+	}
 	key = NormalizeKey(key)
 	return p.client.RemoveObject(ctx, p.bucket, key, minio.RemoveObjectOptions{})
 }

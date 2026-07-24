@@ -36,6 +36,7 @@ type Handler struct {
 	client       contracts.ClientPort
 	approval     contracts.ApprovalPort
 	sysConfig    contracts.SystemConfigPort
+	signature    contracts.SignaturePort
 }
 
 // Ports agrupa todos os ports de integração para injecção no Handler.
@@ -50,6 +51,7 @@ type Ports struct {
 	Client       contracts.ClientPort
 	Approval     contracts.ApprovalPort
 	SysConfig    contracts.SystemConfigPort
+	Signature    contracts.SignaturePort
 }
 
 // New cria um novo handler do módulo escolar com os ports injectados.
@@ -76,6 +78,7 @@ func New(db *pgxpool.Pool, cfg *config.Config, ports Ports) *Handler {
 		client:         ports.Client,
 		approval:       ports.Approval,
 		sysConfig:      ports.SysConfig,
+		signature:      ports.Signature,
 	}
 }
 

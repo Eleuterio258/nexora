@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/pashagolub/pgxmock/v4"
 
 	mw "nexora/internal/middleware"
@@ -131,6 +132,48 @@ func TestAdicionarSignatario_RejeitaUserIDDeOutroTenant(t *testing.T) {
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want %d, body=%s", rr.Code, http.StatusBadRequest, rr.Body.String())
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Error(err)
+	}
+}
+
+// TestObterDocumento_IsolamentoEntreTenants confirma que um utilizador do
+// tenant B não consegue obter um documento do tenant A só por adivinhar o
+// id (IDOR) — a query usa sempre o tenant_id do utilizador autenticado, não
+// um valor vindo do pedido, e um documento de outro tenant deve resultar em
+// 404 (não em 403 nem em dados parciais, para não confirmar a existência do
+// recurso a um tenant que não devia sequer saber que ele existe).
+func TestObterDocumento_IsolamentoEntreTenants(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+	h := &Handler{db: mock}
+
+	// O documento 10 pertence ao tenant 1; o pedido vem autenticado no
+	// tenant 2 — a query filtra por (id=10 AND tenant_id=2), que nenhuma
+	// linha real satisfaria, tal como pgx.ErrNoRows simula aqui.
+	atacante := &mw.AuthUser{ID: 1, TenantID: 2}
+
+	mock.ExpectQuery("SELECT id, titulo, descricao, status, ficheiro_url, hash_sha256").
+		WithArgs(int64(10), int64(2)).
+		WillReturnError(pgx.ErrNoRows)
+
+	req := httptest.NewRequest(http.MethodGet, "/documentos/10", nil)
+	req = comUser(req, atacante)
+
+	router := chi.NewRouter()
+	router.Get("/documentos/{id}", h.ObterDocumento)
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d, body=%s", rr.Code, http.StatusNotFound, rr.Body.String())
+	}
+	if strings.Contains(rr.Body.String(), "titulo") {
+		t.Errorf("resposta não deveria expor nenhum dado do documento de outro tenant: %s", rr.Body.String())
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Error(err)

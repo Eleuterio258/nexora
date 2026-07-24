@@ -83,9 +83,21 @@ type Config struct {
 	SignatureDevKeyPath string
 	SignatureTSAURL     string
 
-	// Assinatura digital — segredo HMAC do webhook (esqueleto, sem lógica de
-	// negócio ainda; vazio desliga o endpoint com 501).
-	SignatureWebhookSecret string
+	// Assinatura digital — os providers "dev" e "intic" (stub) usam uma
+	// chave partilhada e autoassinada, nunca a chave pessoal do titular.
+	// Por omissão o servidor RECUSA arrancar com qualquer um destes dois
+	// providers — é preciso reconhecer explicitamente que não há ainda um
+	// provider real ligado (ver Fase 6 do plano de robustecimento).
+	SignatureAllowInsecureProvider bool
+
+	// Assinatura digital — webhook de providers. Fica sempre desligado (503)
+	// enquanto SignatureWebhookEnabled não for true. Cada provider tem de
+	// estar na lista de permitidos (SIGNATURE_WEBHOOK_PROVIDERS, separados
+	// por vírgula) e tem o seu próprio segredo HMAC — nunca partilhado entre
+	// providers — em SIGNATURE_WEBHOOK_SECRET_<PROVIDER-EM-MAIÚSCULAS>.
+	SignatureWebhookEnabled   bool
+	SignatureWebhookProviders []string
+	SignatureWebhookSecrets   map[string]string
 
 	// SMS — envio de notificações por SMS (opcional; "noop" ou vazio desativa).
 	SMSProvider   string
@@ -105,6 +117,7 @@ type Config struct {
 }
 
 func Load() *Config {
+	webhookProviders, webhookSecrets := loadSignatureWebhookProviders()
 	return &Config{
 		DatabaseURL: env("DATABASE_URL",
 			"postgres://postgres:admin@localhost:5432/nexora_erp?sslmode=disable"+
@@ -166,7 +179,11 @@ func Load() *Config {
 		SignatureDevKeyPath: env("SIGNATURE_DEV_KEY_PATH", "./data/assinatura-dev.pem"),
 		SignatureTSAURL:     env("SIGNATURE_TSA_URL", ""),
 
-		SignatureWebhookSecret: env("SIGNATURE_WEBHOOK_SECRET", ""),
+		SignatureAllowInsecureProvider: envBool("SIGNATURE_ALLOW_INSECURE_PROVIDER", false),
+
+		SignatureWebhookEnabled:   envBool("SIGNATURE_WEBHOOK_ENABLED", false),
+		SignatureWebhookProviders: webhookProviders,
+		SignatureWebhookSecrets:   webhookSecrets,
 
 		SMSProvider:    env("SMS_PROVIDER", "noop"),
 		SMSTwilioSID:   env("SMS_TWILIO_SID", ""),
@@ -181,6 +198,25 @@ func Load() *Config {
 		SignatureCARootsPEM:         env("SIGNATURE_CA_ROOTS_PEM", ""),
 		SignatureCAIntermediatesPEM: env("SIGNATURE_CA_INTERMEDIATES_PEM", ""),
 	}
+}
+
+// loadSignatureWebhookProviders lê a lista de providers de webhook permitidos
+// (SIGNATURE_WEBHOOK_PROVIDERS, separados por vírgula) e o segredo HMAC de
+// cada um (SIGNATURE_WEBHOOK_SECRET_<PROVIDER>). Um provider sem segredo
+// configurado fica na lista de permitidos mas o webhook responde 501 para
+// ele (ver ReceberWebhook) — nunca cai para um segredo partilhado.
+func loadSignatureWebhookProviders() ([]string, map[string]string) {
+	var providers []string
+	secrets := map[string]string{}
+	for _, p := range strings.Split(env("SIGNATURE_WEBHOOK_PROVIDERS", ""), ",") {
+		p = strings.ToLower(strings.TrimSpace(p))
+		if p == "" {
+			continue
+		}
+		providers = append(providers, p)
+		secrets[p] = env("SIGNATURE_WEBHOOK_SECRET_"+strings.ToUpper(p), "")
+	}
+	return providers, secrets
 }
 
 func envBool(key string, fallback bool) bool {

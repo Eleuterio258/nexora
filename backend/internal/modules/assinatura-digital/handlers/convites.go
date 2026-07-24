@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -109,7 +110,7 @@ func (h *Handler) EnviarOTP(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Convite inválido ou expirado", http.StatusNotFound)
 		return
 	}
-	if c.DocStatus != "pendente" {
+	if c.DocStatus != "pendente" && c.DocStatus != "parcialmente_assinado" {
 		jsonErr(w, "Documento não está disponível para assinatura", http.StatusConflict)
 		return
 	}
@@ -194,7 +195,12 @@ func (h *Handler) EnviarOTP(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{"ok": true, "msg": "Código enviado", "canal": canal}, http.StatusOK)
 }
 
-// ValidarOTP confirma o código enviado, com limite de tentativas.
+// ValidarOTP confirma o código enviado, com limite de tentativas. A leitura
+// do estado do OTP, a verificação do limite e a escrita (incremento de
+// tentativas ou confirmação) acontecem na mesma transação com a linha
+// bloqueada (SELECT ... FOR UPDATE) — sem isto, pedidos concorrentes
+// poderiam ler o mesmo número de tentativas antes de qualquer incremento
+// ficar visível e assim contornar o limite (TOCTOU).
 // POST /api/assinatura-digital/convites/{token}/otp/validar
 func (h *Handler) ValidarOTP(w http.ResponseWriter, r *http.Request) {
 	token := chi.URLParam(r, "token")
@@ -212,22 +218,55 @@ func (h *Handler) ValidarOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if c.OTPHash == nil || c.OTPExpiraEm == nil || time.Now().After(*c.OTPExpiraEm) {
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		jsonErr(w, "Erro ao validar código", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	var otpHash *string
+	var otpExpiraEm *time.Time
+	var tentativas int
+	if err := tx.QueryRow(r.Context(), `
+		SELECT otp_hash, otp_expira_em, otp_tentativas
+		FROM assinatura_digital.convites
+		WHERE id=$1
+		FOR UPDATE`, c.ID).Scan(&otpHash, &otpExpiraEm, &tentativas); err != nil {
+		jsonErr(w, "Erro ao validar código", http.StatusInternalServerError)
+		return
+	}
+
+	if otpHash == nil || otpExpiraEm == nil || time.Now().After(*otpExpiraEm) {
 		jsonErr(w, "Código expirado ou não solicitado. Peça um novo código.", http.StatusBadRequest)
 		return
 	}
-	if c.OTPTentativas >= otpMaxTentativas {
+	if tentativas >= otpMaxTentativas {
 		jsonErr(w, "Demasiadas tentativas. Peça um novo código.", http.StatusTooManyRequests)
 		return
 	}
 
-	if bcrypt.CompareHashAndPassword([]byte(*c.OTPHash), []byte(body.Codigo)) != nil {
-		h.db.Exec(r.Context(), `UPDATE assinatura_digital.convites SET otp_tentativas = otp_tentativas + 1 WHERE id=$1`, c.ID)
+	if bcrypt.CompareHashAndPassword([]byte(*otpHash), []byte(body.Codigo)) != nil {
+		if _, err := tx.Exec(r.Context(), `UPDATE assinatura_digital.convites SET otp_tentativas = otp_tentativas + 1 WHERE id=$1`, c.ID); err != nil {
+			jsonErr(w, "Erro ao validar código", http.StatusInternalServerError)
+			return
+		}
+		if err := tx.Commit(r.Context()); err != nil {
+			jsonErr(w, "Erro ao validar código", http.StatusInternalServerError)
+			return
+		}
 		jsonErr(w, "Código inválido", http.StatusUnauthorized)
 		return
 	}
 
-	h.db.Exec(r.Context(), `UPDATE assinatura_digital.convites SET otp_confirmado_em=NOW() WHERE id=$1`, c.ID)
+	if _, err := tx.Exec(r.Context(), `UPDATE assinatura_digital.convites SET otp_confirmado_em=NOW() WHERE id=$1`, c.ID); err != nil {
+		jsonErr(w, "Erro ao validar código", http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		jsonErr(w, "Erro ao validar código", http.StatusInternalServerError)
+		return
+	}
 
 	jsonOK(w, map[string]any{"ok": true, "confirmado": true}, http.StatusOK)
 }
@@ -242,7 +281,7 @@ func (h *Handler) AssinarViaConvite(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Convite inválido ou expirado", http.StatusNotFound)
 		return
 	}
-	if c.DocStatus != "pendente" {
+	if c.DocStatus != "pendente" && c.DocStatus != "parcialmente_assinado" {
 		jsonErr(w, "Documento não está disponível para assinatura", http.StatusConflict)
 		return
 	}
@@ -269,14 +308,18 @@ func (h *Handler) AssinarViaConvite(w http.ResponseWriter, r *http.Request) {
 	if c.SigEmail != nil {
 		email = *c.SigEmail
 	}
-	hashStr, concluido, padesGerado, err := h.marcarAssinado(r.Context(), r, c.TenantID, c.DocumentoID, c.SignatarioID, c.SigNome, email)
+	detalhes := map[string]any{"nome": c.SigNome, "email": email, "via": "convite"}
+	hashStr, concluido, padesGerado, err := h.marcarAssinado(
+		r.Context(), r, c.TenantID, c.DocumentoID, c.SignatarioID, c.SigNome, email,
+		nil, &c.ID, nil, detalhes,
+	)
 	if err != nil {
-		jsonErr(w, "Erro ao registar assinatura", http.StatusInternalServerError)
+		if errors.Is(err, errGeracaoPAdES) {
+			h.logPadesFalhou(r.Context(), r, c.TenantID, c.DocumentoID, c.SignatarioID, err.Error())
+		}
+		h.responderErroAssinatura(w, err)
 		return
 	}
-	h.db.Exec(r.Context(), `UPDATE assinatura_digital.convites SET usado_em=NOW() WHERE id=$1`, c.ID)
-
-	h.log(r.Context(), c.DocumentoID, &c.SignatarioID, "assinado", map[string]any{"nome": c.SigNome, "email": email, "via": "convite"}, c.TenantID, nil, r)
 
 	jsonOK(w, map[string]any{"ok": true, "assinatura_hash": hashStr, "concluido": concluido, "pades_gerado": padesGerado}, http.StatusOK)
 }
@@ -300,11 +343,20 @@ func (h *Handler) RecusarViaConvite(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewDecoder(r.Body).Decode(&body)
 
-	if _, err := h.db.Exec(r.Context(), `
+	// Reafirma o estado no próprio UPDATE (não só na leitura de obterConviteValido,
+	// que pode estar desatualizada) para impedir que uma recusa concorrente
+	// sobreponha um "assinado" já persistido por um pedido de assinatura em
+	// curso no mesmo instante.
+	tag, err := h.db.Exec(r.Context(), `
 		UPDATE assinatura_digital.signatarios
 		SET status='recusado', recusado_em=NOW(), motivo_recusa=$1
-		WHERE id=$2`, body.Motivo, c.SignatarioID); err != nil {
+		WHERE id=$2 AND status IN ('pendente','convidado')`, body.Motivo, c.SignatarioID)
+	if err != nil {
 		jsonErr(w, "Erro ao registar recusa", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		jsonErr(w, "Signatário já concluiu este processo", http.StatusConflict)
 		return
 	}
 	h.db.Exec(r.Context(), `UPDATE assinatura_digital.convites SET usado_em=NOW() WHERE id=$1`, c.ID)
@@ -326,7 +378,7 @@ func (h *Handler) PreviewDocumentoConvite(w http.ResponseWriter, r *http.Request
 		jsonErr(w, "Convite inválido ou expirado", http.StatusNotFound)
 		return
 	}
-	if c.DocStatus != "pendente" {
+	if c.DocStatus != "pendente" && c.DocStatus != "parcialmente_assinado" {
 		jsonErr(w, "Documento não está disponível para assinatura", http.StatusConflict)
 		return
 	}

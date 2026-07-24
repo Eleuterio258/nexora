@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -11,10 +10,8 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/digitorus/pdf"
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
 	pkimod "nexora/internal/modules/assinatura-digital/pki"
@@ -226,15 +223,16 @@ func (h *Handler) listarValidacoesEvidencia(ctx context.Context, docID, tenantID
 
 // ValidacaoResponse representa o resultado de uma validação de documento.
 type ValidacaoResponse struct {
-	DocumentoID       int64      `json:"documento_id"`
-	Status            string     `json:"status"`
-	HashVerificado    string     `json:"hash_verificado"`
-	Assinaturas       int        `json:"assinaturas"`
-	CertificadoValido bool       `json:"certificado_valido"`
-	CertificadoMotivo string     `json:"certificado_motivo,omitempty"`
-	Resultado         string     `json:"resultado"`
-	Aviso             string     `json:"aviso,omitempty"`
-	ValidadoEm        time.Time  `json:"validado_em"`
+	DocumentoID       int64                 `json:"documento_id"`
+	Status            string                `json:"status"`
+	HashVerificado    string                `json:"hash_verificado"`
+	Assinaturas       int                   `json:"assinaturas"`
+	CertificadoValido bool                  `json:"certificado_valido"`
+	CertificadoMotivo string                `json:"certificado_motivo,omitempty"`
+	Resultado         string                `json:"resultado"`
+	Aviso             string                `json:"aviso,omitempty"`
+	Detalhes          *pkimod.ResumoPAdES   `json:"detalhes,omitempty"`
+	ValidadoEm        time.Time             `json:"validado_em"`
 }
 
 // Validacao valida o documento e a(s) assinatura(s) da versão mais recente.
@@ -267,6 +265,9 @@ func (h *Handler) Revalidar(w http.ResponseWriter, r *http.Request) {
 	detalhes := map[string]any{
 		"status_documento": result.Status,
 		"assinaturas":      result.Assinaturas,
+	}
+	if result.Detalhes != nil {
+		detalhes["verificacao"] = result.Detalhes
 	}
 	detalhesJSON, _ := json.Marshal(detalhes)
 
@@ -323,14 +324,12 @@ func (h *Handler) validarDocumento(ctx context.Context, docID, tenantID int64, u
 	if hashHex != doc.HashOriginal {
 		h.log(ctx, docID, nil, "validacao_integridade_falhou", map[string]any{"hash_esperado": doc.HashOriginal, "hash_obtido": hashHex}, tenantID, userID, r)
 		return &ValidacaoResponse{
-			DocumentoID:       docID,
-			Status:            doc.Status,
-			HashVerificado:    hashHex,
-			Assinaturas:       0,
-			CertificadoValido: false,
-			Resultado:         "invalido",
-			Aviso:             "Hash do documento original não corresponde ao registado.",
-			ValidadoEm:        time.Now(),
+			DocumentoID:    docID,
+			Status:         doc.Status,
+			HashVerificado: hashHex,
+			Resultado:      "invalido",
+			Aviso:          "Hash do documento original não corresponde ao registado.",
+			ValidadoEm:     time.Now(),
 		}, nil
 	}
 
@@ -346,14 +345,12 @@ func (h *Handler) validarDocumento(ctx context.Context, docID, tenantID int64, u
 		ORDER BY created_at DESC LIMIT 1`, docID, tenantID).Scan(&versao.StorageKey, &versao.Hash); err != nil {
 		// Nenhuma versão assinada ainda.
 		return &ValidacaoResponse{
-			DocumentoID:       docID,
-			Status:            doc.Status,
-			HashVerificado:    hashHex,
-			Assinaturas:       0,
-			CertificadoValido: false,
-			Resultado:         "parcial",
-			Aviso:             "Documento ainda não possui versão assinada.",
-			ValidadoEm:        time.Now(),
+			DocumentoID:    docID,
+			Status:         doc.Status,
+			HashVerificado: hashHex,
+			Resultado:      "parcial",
+			Aviso:          "Documento ainda não possui versão assinada.",
+			ValidadoEm:     time.Now(),
 		}, nil
 	}
 
@@ -371,14 +368,12 @@ func (h *Handler) validarDocumento(ctx context.Context, docID, tenantID int64, u
 		if versao.Hash != nil && sha256.Sum256(versaoData) != mustParseHash(*versao.Hash) {
 			h.log(ctx, docID, nil, "validacao_integridade_versao_falhou", map[string]any{"hash_esperado": *versao.Hash}, tenantID, userID, r)
 			return &ValidacaoResponse{
-				DocumentoID:       docID,
-				Status:            doc.Status,
-				HashVerificado:    hashHex,
-				Assinaturas:       0,
-				CertificadoValido: false,
-				Resultado:         "invalido",
-				Aviso:             "Hash da versão assinada não corresponde ao registado.",
-				ValidadoEm:        time.Now(),
+				DocumentoID:    docID,
+				Status:         doc.Status,
+				HashVerificado: hashHex,
+				Resultado:      "invalido",
+				Aviso:          "Hash da versão assinada não corresponde ao registado.",
+				ValidadoEm:     time.Now(),
 			}, nil
 		}
 	}
@@ -387,41 +382,59 @@ func (h *Handler) validarDocumento(ctx context.Context, docID, tenantID int64, u
 		versaoData = data
 	}
 
-	assinaturas := contarAssinaturasPDF(versaoData)
-
-	// Validação temporal do certificado (limitada ao provider dev por omissão).
-	certOK, certMotivo := true, ""
-	if h.sigProvider != nil {
-		cert, _, _, err := h.sigProvider.Signer(ctx)
-		if err == nil && cert != nil {
-			validator := pkimod.NewBasicValidator()
-			var vok bool
-			vok, certMotivo, err = validator.Validar(cert)
-			if err != nil || !vok {
-				certOK = false
-			}
-		}
+	resumo, err := pkimod.VerificarPAdES(versaoData, h.chainValidator)
+	if err != nil {
+		h.log(ctx, docID, nil, "validacao_criptografica_falhou", map[string]any{"erro": err.Error()}, tenantID, userID, r)
+		return &ValidacaoResponse{
+			DocumentoID:    docID,
+			Status:         doc.Status,
+			HashVerificado: hashHex,
+			Resultado:      "invalido",
+			Aviso:          fmt.Sprintf("Falha ao interpretar a estrutura PAdES do PDF: %v", err),
+			ValidadoEm:     time.Now(),
+		}, nil
 	}
 
-	resultado := "valido"
-	if assinaturas == 0 {
-		resultado = "parcial"
-		certMotivo = "Não foi detetada assinatura PAdES no PDF."
-	} else if !certOK {
-		resultado = "invalido"
-	}
+	resultado, aviso, certMotivo := classificarResumoPAdES(resumo)
 
 	return &ValidacaoResponse{
 		DocumentoID:       docID,
 		Status:            doc.Status,
 		HashVerificado:    hashHex,
-		Assinaturas:       assinaturas,
-		CertificadoValido: certOK && assinaturas > 0,
+		Assinaturas:       resumo.NumAssinaturas,
+		CertificadoValido: resultado == "valido",
 		CertificadoMotivo: certMotivo,
 		Resultado:         resultado,
-		Aviso:             "Validação estrutural PAdES requer verificação criptográfica completa quando houver provider real.",
+		Aviso:             aviso,
+		Detalhes:          resumo,
 		ValidadoEm:        time.Now(),
 	}, nil
+}
+
+// classificarResumoPAdES traduz o resumo técnico da verificação criptográfica
+// (ver pki.VerificarPAdES) num resultado de negócio. "valido" só é devolvido
+// quando TODAS as assinaturas passaram, com sucesso, por validação
+// criptográfica completa — ByteRange, CMS, digest, assinatura, revogação
+// (OCSP/CRL) e cadeia de confiança — nunca como atalho a partir de uma
+// verificação parcial ou heurística.
+func classificarResumoPAdES(resumo *pkimod.ResumoPAdES) (resultado, aviso, certMotivo string) {
+	if resumo.NumAssinaturas == 0 {
+		return "parcial", "Não foi detetada nenhuma assinatura PAdES no PDF.", ""
+	}
+	if !resumo.TodasValidas {
+		return "invalido",
+			"Pelo menos uma assinatura falhou na verificação criptográfica (o digest/CMS não corresponde ao conteúdo do PDF).",
+			"assinatura criptográfica inválida"
+	}
+	if resumo.AlgumaRevogada {
+		return "invalido", "Pelo menos um certificado usado para assinar foi revogado.", "certificado revogado"
+	}
+	if !resumo.TodosEmissoresConfiaveis {
+		return "nao_confiavel",
+			"A(s) assinatura(s) são criptograficamente válidas, mas o(s) certificado(s) usados não têm uma cadeia de confiança reconhecida (nem pelo sistema operativo, nem pelas raízes configuradas em SIGNATURE_CA_ROOTS_PEM). Isto é esperado com o provider 'dev'/'intic-stub' — não constitui assinatura avançada/qualificada.",
+			"emissor não confiável"
+	}
+	return "valido", "", "cadeia de confiança e revogação verificadas"
 }
 
 func mustParseHash(s string) [32]byte {
@@ -429,23 +442,6 @@ func mustParseHash(s string) [32]byte {
 	var h [32]byte
 	copy(h[:], b)
 	return h
-}
-
-// contarAssinaturasPDF faz uma contagem heurística de assinaturas PAdES no PDF
-// procurando objetos de assinatura (/Type /Sig). Não substitui uma validação
-// criptográfica completa, mas é suficiente para este estágio do módulo.
-func contarAssinaturasPDF(data []byte) int {
-	if !bytes.HasPrefix(data, []byte("%PDF-")) {
-		return 0
-	}
-	// A biblioteca digitorus/pdf permite ler a estrutura mas não expõe
-	// contagem directa de assinaturas. Usamos uma heurística robusta no texto.
-	_ = pdf.NewReader
-	n := strings.Count(string(data), "/Type /Sig")
-	if n == 0 {
-		n = strings.Count(string(data), "/Type/Sig")
-	}
-	return n
 }
 
 func ipString(r *http.Request) *string {

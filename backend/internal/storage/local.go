@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -66,6 +67,64 @@ func (p *LocalProvider) Put(ctx context.Context, key string, data []byte, conten
 	return p.GetURL(ctx, key)
 }
 
+// PutImmutable escreve primeiro num ficheiro temporário e publica-o com um
+// hard link atómico. Uma repetição com o mesmo conteúdo é aceite; conteúdo
+// diferente nunca substitui o objeto, e leitores nunca observam bytes parciais.
+func (p *LocalProvider) PutImmutable(ctx context.Context, key string, data []byte, contentType string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	abs, err := p.resolvePath(key)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(filepath.Dir(abs), 0750); err != nil {
+		return "", err
+	}
+
+	file, err := os.CreateTemp(filepath.Dir(abs), ".immutable-*")
+	if err != nil {
+		return "", err
+	}
+	tempPath := file.Name()
+	defer os.Remove(tempPath)
+
+	if err := file.Chmod(0640); err != nil {
+		_ = file.Close()
+		return "", err
+	}
+	if _, err := file.Write(data); err != nil {
+		_ = file.Close()
+		return "", err
+	}
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
+		return "", err
+	}
+	if err := file.Close(); err != nil {
+		return "", err
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+
+	err = os.Link(tempPath, abs)
+	if errors.Is(err, os.ErrExist) {
+		matches, matchErr := immutableObjectMatches(ctx, p, key, data)
+		if matchErr != nil {
+			return "", fmt.Errorf("local storage: verificar objeto imutável existente: %w", matchErr)
+		}
+		if !matches {
+			return "", ErrImmutableObjectExists
+		}
+		return p.GetURL(ctx, key)
+	}
+	if err != nil {
+		return "", err
+	}
+	return p.GetURL(ctx, key)
+}
+
 // Get devolve um reader para o ficheiro local.
 func (p *LocalProvider) Get(ctx context.Context, key string) (io.ReadCloser, int64, error) {
 	abs, err := p.resolvePath(key)
@@ -93,8 +152,12 @@ func (p *LocalProvider) GetURL(ctx context.Context, key string) (string, error) 
 	return "/" + key, nil
 }
 
-// Delete remove o ficheiro.
+// Delete remove o ficheiro. Recusa-se a remover evidências de assinatura
+// digital (ver ErrEvidenceDeleteForbidden).
 func (p *LocalProvider) Delete(ctx context.Context, key string) error {
+	if isEvidenceKey(key) {
+		return ErrEvidenceDeleteForbidden
+	}
 	abs, err := p.resolvePath(key)
 	if err != nil {
 		return err

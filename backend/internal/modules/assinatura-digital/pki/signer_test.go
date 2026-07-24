@@ -51,6 +51,15 @@ func TestPDFSigner_Sign(t *testing.T) {
 	if !hasPAdESMarkers(signed) {
 		t.Error("PDF assinado não contém os marcadores PAdES esperados (/Type /Sig, /SubFilter, /ByteRange)")
 	}
+	// A norma PAdES (ETSI EN 319 142) exige SubFilter ETSI.CAdES.detached —
+	// ver third_party/digitorus-pdfsign/NEXORA_PATCH.md. O upstream, sem
+	// patch, gravaria o valor Adobe pré-PAdES (adbe.pkcs7.detached).
+	if !bytes.Contains(signed, []byte("/SubFilter /ETSI.CAdES.detached")) {
+		t.Error("PDF assinado não usa SubFilter ETSI.CAdES.detached (patch de PAdES não está activo)")
+	}
+	if bytes.Contains(signed, []byte("/SubFilter /adbe.pkcs7.detached")) {
+		t.Error("PDF assinado ainda usa o SubFilter Adobe pré-PAdES")
+	}
 	if ev.LegalValido {
 		t.Error("evidência do provider dev nunca deve ser legalmente válida")
 	}

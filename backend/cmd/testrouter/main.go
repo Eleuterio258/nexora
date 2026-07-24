@@ -13,6 +13,8 @@ func main() {
 		JWTSecret:        "test-secret-32-characters-long!!",
 		JWTRefreshSecret: "refresh-secret-32-characters-long!!",
 		CORSOrigin:       "*",
+		// Só um smoke test local de construção do router — não é produção.
+		SignatureAllowInsecureProvider: true,
 	}
 
 	defer func() {

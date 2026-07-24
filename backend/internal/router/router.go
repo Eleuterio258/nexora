@@ -78,7 +78,6 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 
 	auth := authH.New(db, cfg, pushSvc)
 	util := utilH.New(db, cfg, store, wsHub)
-	empresa := empresaH.New(db, cfg)
 	cli := cliH.New(db, cfg)
 	escolar := escolarH.New(db, cfg, escolarH.Ports{
 		Storage:      store,
@@ -91,26 +90,26 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		Invoicing:    adapters.NewInvoicingAdapter(db),
 		Approval:     adapters.NewApprovalAdapter(db),
 		SysConfig:    adapters.NewSystemConfigAdapter(db),
+		Signature:    adapters.NewSignatureAdapter(db),
 	})
 	prod := prodH.New(db, cfg)
 	stock := stockH.New(db, cfg)
 	impostos := impH.New(db, cfg, store)
-	audit := audH.New(db, cfg)
 	sys := sysH.New(db, cfg)
 	recrutRealtime := recrutH.NewRealtimeServer(db, cfg.JWTSecret)
 	idh := idhash.New(cfg.IDHashSalt)
-	recrut := recrutH.New(db, cfg, store, pushSvc, recrutRealtime, idh)
 	crm := crmH.New(db, cfg)
 	pos := posH.New(db, cfg, wsHub)
 	rh := rhH.New(db, cfg, store, adapters.NewSignatureAdapter(db))
-	contab := contabH.New(db, cfg)
 	centros := centrosH.New(db, cfg)
 	logistica := logH.New(db, cfg)
-	tesouraria := tesH.New(db, cfg)
 	ass := assH.New(db, cfg)
 	var sigProvider assDPki.SignatureProvider
 	switch cfg.SignatureProvider {
 	case "dev", "":
+		if !cfg.SignatureAllowInsecureProvider {
+			panic("assinatura-digital: provider 'dev' usa uma chave partilhada e autoassinada, NUNCA juridicamente válida — o servidor recusa-se a arrancar com ele a menos que SIGNATURE_ALLOW_INSECURE_PROVIDER=true seja definido explicitamente (ver Fase 6 do plano de robustecimento em internal/modules/assinatura-digital/README.md)")
+		}
 		dp, err := assDPki.NewDevProvider(cfg.SignatureDevKeyPath)
 		if err != nil {
 			panic(fmt.Sprintf("assinatura-digital: provider dev: %v", err))
@@ -118,6 +117,9 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		sigProvider = dp
 		log.Println("[assinatura-digital] AVISO: provider de assinatura em modo 'dev' — as assinaturas geradas NÃO são juridicamente válidas.")
 	case "intic":
+		if !cfg.SignatureAllowInsecureProvider {
+			panic("assinatura-digital: provider 'intic' (stub) usa uma chave local, NUNCA juridicamente válida até a integração real estar completa — o servidor recusa-se a arrancar com ele a menos que SIGNATURE_ALLOW_INSECURE_PROVIDER=true seja definido explicitamente (ver Fase 6 do plano de robustecimento em internal/modules/assinatura-digital/README.md)")
+		}
 		ip, err := assDPki.NewInticProvider(cfg.SignatureINTICKeyPath)
 		if err != nil {
 			panic(fmt.Sprintf("assinatura-digital: provider intic: %v", err))
@@ -128,12 +130,14 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		panic(fmt.Sprintf("assinatura-digital: provider de assinatura '%s' não suportado (dev, intic estão implementados)", cfg.SignatureProvider))
 	}
 	var certValidator assDPki.CertificateValidator
+	var chainValidator *assDPki.ChainValidator
 	if cfg.SignatureCARootsPEM != "" || cfg.SignatureCAIntermediatesPEM != "" {
 		v, err := assDPki.NewChainValidator([]byte(cfg.SignatureCARootsPEM), []byte(cfg.SignatureCAIntermediatesPEM))
 		if err != nil {
 			panic(fmt.Sprintf("assinatura-digital: validator de cadeia: %v", err))
 		}
 		certValidator = v
+		chainValidator = v
 		log.Println("[assinatura-digital] validator de cadeia de confiança activado.")
 	} else {
 		certValidator = assDPki.NewBasicValidator()
@@ -141,20 +145,25 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	pdfSigner := assDPki.NewPDFSigner(certValidator, cfg.SignatureTSAURL)
 	notifAdapter := adapters.NewNotificationAdapter(db)
 	signaturePort := adapters.NewSignatureAdapter(db)
-	compras := comprasH.New(db, cfg, store, signaturePort)
+compras := comprasH.New(db, cfg, store, signaturePort)
+	recrut := recrutH.New(db, cfg, store, pushSvc, recrutRealtime, idh, signaturePort)
+	contab := contabH.New(db, cfg, store, signaturePort)
+	tesouraria := tesH.New(db, cfg, store, signaturePort)
+	seg := segH.New(db, cfg, store, signaturePort)
+	aprov := aprovH.New(db, cfg, store, signaturePort)
+	audit := audH.New(db, cfg, store, signaturePort)
+	empresa := empresaH.New(db, cfg, store, signaturePort)
 	av := antivirus.New(antivirus.Config{
 		Provider:      cfg.AntivirusProvider,
 		ClamAVNetwork: cfg.AntivirusClamAVNetwork,
 		ClamAVAddress: cfg.AntivirusClamAVAddress,
 	})
-	assD := assDH.New(db, cfg, store, notifAdapter, pdfSigner, sigProvider, av)
+	assD := assDH.New(db, cfg, store, notifAdapter, pdfSigner, sigProvider, av, chainValidator)
 	fat := fatH.New(db, cfg, store, signaturePort)
 	fin := finH.New(db, cfg)
 	mm := mmH.New(db, cfg)
 	notif := notifH.New(db, cfg)
-	seg := segH.New(db, cfg)
 	ss := ssH.New(db, cfg, store)
-	aprov := aprovH.New(db, cfg)
 	pessoas := pessoasH.New(db)
 	super := superH.New(db, cfg)
 	tarefas := tarefasH.New(db, cfg)
@@ -413,6 +422,12 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Use(mw.RequirePermission(db, "empresa", "editar_empresa"))
 			r.Post("/{id}/users", empresa.AdicionarCompanyUser)
 			r.Delete("/{id}/users/{userId}", empresa.RemoverCompanyUser)
+		})
+
+		// Documentos assináveis da empresa
+		r.Route("/documents", func(r chi.Router) {
+			r.Use(mw.RequirePermission(db, "empresa", "editar_empresa"))
+			r.Post("/{id}/enviar-para-assinatura", empresa.EnviarDocumentoEmpresaParaAssinatura)
 		})
 	})
 
@@ -799,6 +814,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Use(mw.RequirePermission(db, "tesouraria", "gerir_reconciliacao"))
 			r.Post("/reconciliacoes", tesouraria.CriarReconciliacao)
 			r.Post("/reconciliacoes/{id}/fechar", tesouraria.FecharReconciliacao)
+			r.Post("/reconciliacoes/{id}/enviar-para-assinatura", tesouraria.EnviarReconciliacaoParaAssinatura)
 		})
 	})
 
@@ -959,6 +975,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Post("/enrollments", escolar.CriarMatriculaV2)
 			r.Post("/enrollments/{id}/transfer", escolar.TransferirMatriculaV2)
 			r.Post("/enrollments/{id}/cancel", escolar.CancelarMatriculaV2)
+			r.Post("/enrollments/{id}/enviar-para-assinatura", escolar.EnviarMatriculaParaAssinatura)
 		})
 
 		// Presenças e assiduidade
@@ -1401,6 +1418,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "contabilidade", "ver_relatorios"))
 				r.Post("/generate", contab.GerarRelatorio)
+				r.Post("/{id}/enviar-para-assinatura", contab.EnviarRelatorioParaAssinatura)
 			})
 		})
 	})
@@ -1565,6 +1583,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 					{Modulo: "recrutamento", Acao: "gerir_candidaturas"},
 				}))
 				r.Post("/{id}/contratar", recrut.ContratarCandidato)
+				r.Post("/{id}/enviar-para-assinatura", recrut.EnviarCandidaturaParaAssinatura)
 			})
 		})
 

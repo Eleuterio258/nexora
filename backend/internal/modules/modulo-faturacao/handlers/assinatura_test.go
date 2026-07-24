@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -39,6 +40,13 @@ func newMockStorageProvider() *mockStorageProvider {
 func (m *mockStorageProvider) Put(ctx context.Context, key string, data []byte, contentType string) (string, error) {
 	m.data[key] = data
 	return "mock://" + key, nil
+}
+
+func (m *mockStorageProvider) PutImmutable(ctx context.Context, key string, data []byte, contentType string) (string, error) {
+	if current, ok := m.data[key]; ok && !bytes.Equal(current, data) {
+		return "", fmt.Errorf("objeto imutável já existe")
+	}
+	return m.Put(ctx, key, data, contentType)
 }
 
 func (m *mockStorageProvider) Get(ctx context.Context, key string) (io.ReadCloser, int64, error) {

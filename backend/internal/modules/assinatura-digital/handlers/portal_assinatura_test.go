@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -31,6 +32,13 @@ func newMockProviderInMemory() *mockProviderInMemory {
 func (m *mockProviderInMemory) Put(ctx context.Context, key string, data []byte, contentType string) (string, error) {
 	m.data[key] = data
 	return "mock://" + key, nil
+}
+
+func (m *mockProviderInMemory) PutImmutable(ctx context.Context, key string, data []byte, contentType string) (string, error) {
+	if current, ok := m.data[key]; ok && !bytes.Equal(current, data) {
+		return "", fmt.Errorf("objeto imutável já existe")
+	}
+	return m.Put(ctx, key, data, contentType)
 }
 
 func (m *mockProviderInMemory) Get(ctx context.Context, key string) (io.ReadCloser, int64, error) {
@@ -255,7 +263,6 @@ func TestPreviewDocumentoConvite_HashNaoBate(t *testing.T) {
 		t.Errorf("status = %d, want %d, body=%s", rr.Code, http.StatusConflict, rr.Body.String())
 	}
 }
-
 
 func TestEnviarOTP_CanalEmail(t *testing.T) {
 	mock, err := pgxmock.NewPool()

@@ -2,8 +2,14 @@ module nexora
 
 go 1.25.0
 
+// Patch mínimo (1 linha) para corrigir o SubFilter de assinatura PAdES —
+// ver third_party/digitorus-pdfsign/NEXORA_PATCH.md.
+replace github.com/digitorus/pdfsign => ./third_party/digitorus-pdfsign
+
 require (
 	firebase.google.com/go/v4 v4.20.0
+	github.com/digitorus/pdf v0.1.2
+	github.com/digitorus/pdfsign v0.0.0-20260407063256-85ede6424a74
 	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/cors v1.2.1
@@ -39,8 +45,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/digitorus/pdf v0.1.2 // indirect
-	github.com/digitorus/pdfsign v0.0.0-20260407063256-85ede6424a74 // indirect
 	github.com/digitorus/pkcs7 v0.0.0-20230818184609-3a137a874352 // indirect
 	github.com/digitorus/timestamp v0.0.0-20231217203849-220c5c2851b7 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
