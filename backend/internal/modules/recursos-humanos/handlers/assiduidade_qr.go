@@ -44,14 +44,27 @@ type qrGenerateBody struct {
 	FuncionarioID   *int64  `json:"funcionario_id,omitempty"`
 }
 
+// tenantIDQR devolve o tenant a usar nas tabelas de QR.
+//
+// É o tenant_id da EMPRESA (mw.GetUser().TenantID), não o tenant SaaS de
+// resolveSaasTenantID: ValidarQRDevice lê rh.qr_tokens com
+// `JOIN rh.funcionarios f ON f.tenant_id = t.tenant_id`, e
+// rh.funcionarios.tenant_id é o id da empresa. Enquanto estes handlers
+// gravavam o tenant SaaS, o JOIN comparava valores de espaços diferentes
+// (ex.: empresa 7 -> tenant SaaS 5), nunca encontrava o funcionário, e o QR
+// pessoal do colaborador ficava inutilizável.
+//
+// Vale tanto para os handlers autenticados por sessão (user.TenantID vem da
+// membership) como para os de device (vem de hardware.devices.tenant_id) —
+// ambos guardam o id da empresa.
+func tenantIDQR(user *mw.AuthUser) int64 {
+	return user.TenantID
+}
+
 // POST /api/rh/assiduidade/qr/gerar
 func (h *Handler) GerarQRDevice(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	tenantID, err := resolveSaasTenantID(h, r, user.TenantID)
-	if err != nil {
-		jsonErr(w, "Utilizador sem empresa/tenant associado correctamente", http.StatusUnprocessableEntity)
-		return
-	}
+	tenantID := tenantIDQR(user)
 
 	var body qrGenerateBody
 	json.NewDecoder(r.Body).Decode(&body)
@@ -89,16 +102,15 @@ func (h *Handler) GerarQRDevice(w http.ResponseWriter, r *http.Request) {
 // funcionário para mostrar o seu QR pessoal ao gestor.
 func (h *Handler) GerarQRMe(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	tenantID, err := resolveSaasTenantID(h, r, user.TenantID)
-	if err != nil {
-		jsonErr(w, "Dispositivo sem empresa/tenant associado correctamente", http.StatusUnprocessableEntity)
-		return
-	}
+	tenantID := tenantIDQR(user)
 
 	var funcionarioID int64
-	err = h.db.QueryRow(r.Context(), `
+	// user_id, não utilizador_id: rh.funcionarios não tem nenhuma coluna com
+	// esse nome, por isso a query falhava sempre e este endpoint respondia
+	// 404 a toda a gente.
+	err := h.db.QueryRow(r.Context(), `
 		SELECT id FROM rh.funcionarios
-		 WHERE tenant_id=$1 AND utilizador_id=$2
+		 WHERE tenant_id=$1 AND user_id=$2
 		 LIMIT 1`,
 		tenantID, user.ID).Scan(&funcionarioID)
 	if err != nil {
@@ -133,11 +145,7 @@ func (h *Handler) GerarQRMe(w http.ResponseWriter, r *http.Request) {
 // POST /api/hardware/assiduidade/qr/validar
 func (h *Handler) ValidarQRDevice(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	tenantID, err := resolveSaasTenantID(h, r, user.TenantID)
-	if err != nil {
-		jsonErr(w, "Dispositivo sem empresa/tenant associado correctamente", http.StatusUnprocessableEntity)
-		return
-	}
+	tenantID := tenantIDQR(user)
 
 	var body struct {
 		QRCode string `json:"qr_code"`
@@ -157,7 +165,7 @@ func (h *Handler) ValidarQRDevice(w http.ResponseWriter, r *http.Request) {
 	// ainda estava por usar e dentro do prazo — RowsAffected()==0 cobre os
 	// dois casos de invalidade (já usado, ou não encontrado) e o expirado é
 	// verificado à parte para dar uma mensagem mais específica.
-	err = h.db.QueryRow(r.Context(), `
+	err := h.db.QueryRow(r.Context(), `
 		SELECT t.id, t.location_id, t.funcionario_id, f.numero_funcionario, t.expires_at
 		  FROM rh.qr_tokens t
 		  LEFT JOIN rh.funcionarios f ON f.id = t.funcionario_id AND f.tenant_id = t.tenant_id
