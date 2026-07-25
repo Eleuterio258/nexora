@@ -36,12 +36,19 @@
 
     <!-- Só um dos dois nav bars está visível de cada vez (role do utilizador);
          a barrier segue o topo do que estiver realmente visível, para o
-         fragment_container nunca ficar por baixo da barra activa. -->
+         fragment_container nunca ficar por baixo da barra activa.
+         barrierAllowsGoneWidgets tem de ser true (o default): em ecrãs
+         secundários (addToBackStack) o LoginActivity põe as DUAS barras em
+         GONE para dar o ecrã inteiro ao fragment_container — com "false" a
+         barrier ficava sem nenhum widget válido para se basear e colapsava
+         para 0, o que zerava a altura do fragment_container (ecrã em
+         branco) sempre que se navegava para um ecrã empilhado, incluindo
+         os métodos de registo de presença a partir da Home. -->
     <androidx.constraintlayout.widget.Barrier
         android:id="@+id/bottomNavBarrier"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        app:barrierAllowsGoneWidgets="false"
+        app:barrierAllowsGoneWidgets="true"
         app:barrierDirection="top"
         app:constraint_referenced_ids="bottomNavContainer,gestorBottomNavContainer" />
 

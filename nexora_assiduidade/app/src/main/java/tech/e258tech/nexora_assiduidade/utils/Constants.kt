@@ -19,12 +19,13 @@ object Constants {
     const val ROLE_FUNCIONARIO = "COLABORADOR"
     const val ROLE_GESTOR = "GESTOR_RH"
 
-    const val EVENT_ENTRY = "ENTRY"
-    const val EVENT_EXIT = "EXIT"
-    /** O ERP decide entrada/saída sozinho, comparando com o que já existe em
-     * rh.presencas para o dia (ver processor.go, registarPresenca — INSERT
-     * define hora_entrada, ON CONFLICT preenche hora_saida). Usado quando não
-     * faz sentido a app escolher, ex.: registo manual do gestor. */
+    /** O ERP decide entrada/saída sozinho: usa event.Direction quando o
+     * adapter o souber indicar ou, na ausência disso, alterna entrada/saída
+     * pela paridade dos eventos já registados no dia (ver
+     * registarEventoAssiduidade/inferirTipoEventoCodigo em
+     * backend/internal/modules/hardware/service/processor.go). Todos os
+     * métodos de registo do funcionário usam isto — deixaram de pedir para
+     * escolher Entrada/Saída. */
     const val EVENT_AUTO = "AUTO"
     const val SOURCE_MANUAL = "MANUAL"
     const val SOURCE_PIN = "PIN"

@@ -21,32 +21,6 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <RadioGroup
-        android:id="@+id/radioGroupType"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginEnd="16dp"
-        android:orientation="horizontal"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvFacialTitle">
-
-        <RadioButton
-            android:id="@+id/radioEntrada"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Entrada" />
-
-        <RadioButton
-            android:id="@+id/radioSaida"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="24dp"
-            android:text="Saida" />
-    </RadioGroup>
-
     <!-- Area da camara: preview + overlay de deteccao + orientacao -->
     <FrameLayout
         android:id="@+id/cameraContainer"
@@ -60,7 +34,7 @@
         app:layout_constraintBottom_toTopOf="@id/progressBar"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/radioGroupType">
+        app:layout_constraintTop_toBottomOf="@id/tvFacialTitle">
 
         <androidx.camera.view.PreviewView
             android:id="@+id/previewView"

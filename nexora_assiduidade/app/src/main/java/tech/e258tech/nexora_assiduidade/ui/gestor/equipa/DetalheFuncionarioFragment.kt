@@ -100,7 +100,7 @@ class DetalheFuncionarioFragment : Fragment() {
                 tvUnidade.text = "Unidade: ${f.unidade_nome ?: "Sem unidade"}"
                 tvNumero.text = "Número: ${f.numero_funcionario ?: "-"}"
                 tvTelefone.text = "Telefone: ${f.telefone ?: "-"}"
-                tvAdmissao.text = "Admissão: ${f.data_admissao ?: "-"}"
+                tvAdmissao.text = "Admissão: ${f.data_admissao?.let { DateTimeUtils.formatDate(it) } ?: "-"}"
                 tvEstado.text = "Estado: ${
                     when (f.estado) {
                         "ativo" -> "Activo"

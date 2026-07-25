@@ -11,6 +11,7 @@
         android:layout_height="wrap_content"
         android:padding="16dp">
 
+        <!-- 1. Cabeçalho -->
         <TextView
             android:id="@+id/tvGreeting"
             android:layout_width="0dp"
@@ -70,15 +71,307 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/tvSubtitle" />
 
+        <!-- 2. Acção principal: registar presença -->
+        <TextView
+            android:id="@+id/tvRegistarPresencaTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Registar Presença"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvPendingSync" />
+
+        <TextView
+            android:id="@+id/tvRegistarPresencaSubtitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Escolha o método de registro"
+            android:textColor="@color/text_muted"
+            android:textSize="13sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvRegistarPresencaTitle" />
+
+        <HorizontalScrollView
+            android:id="@+id/scrollMethods"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clipToPadding="false"
+            android:paddingEnd="8dp"
+            android:scrollbars="none"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvRegistarPresencaSubtitle">
+
+            <LinearLayout
+                android:id="@+id/gridMethods"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardManual"
+                    android:layout_width="100dp"
+                    android:layout_height="140dp"
+                    android:layout_marginEnd="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardElevation="0dp"
+                    app:cardCornerRadius="0dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    app:cardBackgroundColor="@android:color/transparent">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:src="@drawable/ic_method_manual"
+                            app:tint="@color/brand_accent" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center"
+                            android:text="Manual"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardQrCode"
+                    android:layout_width="100dp"
+                    android:layout_height="140dp"
+                    android:layout_marginEnd="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardElevation="0dp"
+                    app:cardCornerRadius="0dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    app:cardBackgroundColor="@android:color/transparent">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:src="@drawable/ic_method_qrcode"
+                            app:tint="@color/brand_accent" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center"
+                            android:text="QR Code"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardFacial"
+                    android:layout_width="100dp"
+                    android:layout_height="140dp"
+                    android:layout_marginEnd="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardElevation="0dp"
+                    app:cardCornerRadius="0dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    app:cardBackgroundColor="@android:color/transparent">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:src="@drawable/ic_method_facial"
+                            app:tint="@color/brand_accent" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center"
+                            android:text="Facial"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardSelfieGps"
+                    android:layout_width="100dp"
+                    android:layout_height="140dp"
+                    android:layout_marginEnd="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardElevation="0dp"
+                    app:cardCornerRadius="0dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    app:cardBackgroundColor="@android:color/transparent">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:src="@drawable/ic_method_selfie_gps"
+                            app:tint="@color/brand_accent" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center"
+                            android:text="Selfie + GPS"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardPin"
+                    android:layout_width="100dp"
+                    android:layout_height="140dp"
+                    android:layout_marginEnd="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardElevation="0dp"
+                    app:cardCornerRadius="0dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    app:cardBackgroundColor="@android:color/transparent">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:src="@drawable/ic_method_pin"
+                            app:tint="@color/brand_accent" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center"
+                            android:text="PIN"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardNfc"
+                    android:layout_width="100dp"
+                    android:layout_height="140dp"
+                    android:layout_marginEnd="10dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardElevation="0dp"
+                    app:cardCornerRadius="0dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    app:cardBackgroundColor="@android:color/transparent">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:src="@drawable/ic_method_nfc"
+                            app:tint="@color/brand_accent" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center"
+                            android:text="NFC"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardFingerprint"
+                    android:layout_width="100dp"
+                    android:layout_height="140dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:cardElevation="0dp"
+                    app:cardCornerRadius="0dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    app:cardBackgroundColor="@android:color/transparent">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:src="@drawable/ic_method_fingerprint"
+                            app:tint="@color/brand_accent" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:gravity="center"
+                            android:text="Impressão Digital"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- 3. Resumo pessoal: saldo de férias e assiduidade -->
         <LinearLayout
             android:id="@+id/rowSaldoAssiduidade"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="20dp"
             android:orientation="horizontal"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvPendingSync">
+            app:layout_constraintTop_toBottomOf="@id/scrollMethods">
 
             <LinearLayout
                 android:id="@+id/cardSaldoFerias"
@@ -213,6 +506,7 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- 4. Itens que exigem acção -->
         <LinearLayout
             android:id="@+id/cardPedidosPendentes"
             android:layout_width="0dp"
@@ -266,8 +560,9 @@
                 app:tint="@color/text_muted" />
         </LinearLayout>
 
+        <!-- 5. Divisor entre "o meu dia" e o feed informativo -->
         <View
-            android:id="@+id/dividerNotificacoes"
+            android:id="@+id/dividerRegistarPresenca"
             android:layout_width="0dp"
             android:layout_height="1dp"
             android:layout_marginTop="16dp"
@@ -276,262 +571,19 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/cardPedidosPendentes" />
 
-        <TextView
-            android:id="@+id/tvNotificacoesTitle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Notificações"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:layout_constraintEnd_toStartOf="@id/tvVerTodasNotificacoes"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/dividerNotificacoes" />
-
-        <TextView
-            android:id="@+id/tvVerTodasNotificacoes"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:clickable="true"
-            android:focusable="true"
-            android:text="Ver todas"
-            android:textColor="@color/brand_accent"
-            android:textSize="13sp"
-            app:layout_constraintBottom_toBottomOf="@id/tvNotificacoesTitle"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="@id/tvNotificacoesTitle" />
-
-        <LinearLayout
-            android:id="@+id/itemNotificacaoRecente"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingVertical="4dp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvNotificacoesTitle">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_dashboard_check_circle"
-                app:tint="@color/green" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Pedido aprovado"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="O teu pedido de férias foi aprovado"
-                    android:textColor="@color/text_muted"
-                    android:textSize="13sp" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="22 Jul"
-                android:textColor="@color/text_muted"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvComunicadosTitle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="Comunicados Recentes"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:layout_constraintEnd_toStartOf="@id/tvVerTodosComunicados"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/itemNotificacaoRecente" />
-
-        <TextView
-            android:id="@+id/tvVerTodosComunicados"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:clickable="true"
-            android:focusable="true"
-            android:text="Ver todas"
-            android:textColor="@color/brand_accent"
-            android:textSize="13sp"
-            app:layout_constraintBottom_toBottomOf="@id/tvComunicadosTitle"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="@id/tvComunicadosTitle" />
-
-        <LinearLayout
-            android:id="@+id/itemComunicadoRecente"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingVertical="4dp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvComunicadosTitle">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_dashboard_megaphone"
-                app:tint="@color/blue" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Feriado municipal na sexta-feira"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:text="Nova"
-                        android:textColor="@color/blue"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="Informamos que na próxima sexta-feira, 25 de Junho, é feriado."
-                    android:textColor="@color/text_muted"
-                    android:textSize="13sp" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvAniversariosTitle"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="Aniversários"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:layout_constraintEnd_toStartOf="@id/tvVerTodosAniversarios"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/itemComunicadoRecente" />
-
-        <TextView
-            android:id="@+id/tvVerTodosAniversarios"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:clickable="true"
-            android:focusable="true"
-            android:text="Ver todas"
-            android:textColor="@color/brand_accent"
-            android:textSize="13sp"
-            app:layout_constraintBottom_toBottomOf="@id/tvAniversariosTitle"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="@id/tvAniversariosTitle" />
-
-        <LinearLayout
-            android:id="@+id/itemAniversarioRecente"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingVertical="4dp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvAniversariosTitle">
-
-            <FrameLayout
-                android:layout_width="40dp"
-                android:layout_height="40dp">
-
-                <ImageView
-                    android:id="@+id/ivAniversarioFoto"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:background="@drawable/avatar_circle_bg" />
-
-                <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:layout_gravity="bottom|end"
-                    android:src="@drawable/ic_dashboard_gift"
-                    app:tint="@color/amber" />
-            </FrameLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Maria Costa (25/07)"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="Parabéns!"
-                    android:textColor="@color/text_muted"
-                    android:textSize="13sp" />
-            </LinearLayout>
-        </LinearLayout>
-
+        <!-- 6. Agenda: eventos e dias da semana -->
         <TextView
             android:id="@+id/tvEventosTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="16dp"
             android:text="Eventos"
             android:textColor="@color/text_primary"
             android:textSize="16sp"
             android:textStyle="bold"
             app:layout_constraintEnd_toStartOf="@id/tvVerTodosEventos"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/itemAniversarioRecente" />
+            app:layout_constraintTop_toBottomOf="@id/dividerRegistarPresenca" />
 
         <TextView
             android:id="@+id/tvVerTodosEventos"
@@ -963,8 +1015,9 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
+        <!-- 7. Divisor antes do feed social/informativo -->
         <View
-            android:id="@+id/dividerRegistarPresenca"
+            android:id="@+id/dividerNotificacoes"
             android:layout_width="0dp"
             android:layout_height="1dp"
             android:layout_marginTop="16dp"
@@ -973,295 +1026,254 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/itemEventoWorkshop" />
 
+        <!-- 8. Notificações -->
         <TextView
-            android:id="@+id/tvRegistarPresencaTitle"
+            android:id="@+id/tvNotificacoesTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Registar Presença"
+            android:layout_marginTop="16dp"
+            android:text="Notificações"
             android:textColor="@color/text_primary"
             android:textSize="16sp"
             android:textStyle="bold"
-            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/tvVerTodasNotificacoes"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/dividerRegistarPresenca" />
+            app:layout_constraintTop_toBottomOf="@id/dividerNotificacoes" />
 
         <TextView
-            android:id="@+id/tvRegistarPresencaSubtitle"
-            android:layout_width="0dp"
+            android:id="@+id/tvVerTodasNotificacoes"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:text="Escolha o método de registro"
-            android:textColor="@color/text_muted"
+            android:clickable="true"
+            android:focusable="true"
+            android:text="Ver todas"
+            android:textColor="@color/brand_accent"
             android:textSize="13sp"
+            app:layout_constraintBottom_toBottomOf="@id/tvNotificacoesTitle"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvRegistarPresencaTitle" />
+            app:layout_constraintTop_toTopOf="@id/tvNotificacoesTitle" />
 
-        <HorizontalScrollView
-            android:id="@+id/scrollMethods"
+        <LinearLayout
+            android:id="@+id/itemNotificacaoRecente"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:clipToPadding="false"
-            android:paddingEnd="8dp"
-            android:scrollbars="none"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingVertical="4dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvRegistarPresencaSubtitle">
+            app:layout_constraintTop_toBottomOf="@id/tvNotificacoesTitle">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_dashboard_check_circle"
+                app:tint="@color/green" />
 
             <LinearLayout
-                android:id="@+id/gridMethods"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Pedido aprovado"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="O teu pedido de férias foi aprovado"
+                    android:textColor="@color/text_muted"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:layout_marginStart="8dp"
+                android:text="22 Jul"
+                android:textColor="@color/text_muted"
+                android:textSize="11sp" />
+        </LinearLayout>
 
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardManual"
-                    android:layout_width="100dp"
-                    android:layout_height="140dp"
-                    android:layout_marginEnd="10dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:cardElevation="0dp"
-                    app:cardCornerRadius="0dp"
-                    android:foreground="?attr/selectableItemBackground"
-                    app:cardBackgroundColor="@android:color/transparent">
+        <!-- 9. Comunicados -->
+        <TextView
+            android:id="@+id/tvComunicadosTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="Comunicados Recentes"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toStartOf="@id/tvVerTodosComunicados"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/itemNotificacaoRecente" />
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:orientation="vertical">
+        <TextView
+            android:id="@+id/tvVerTodosComunicados"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:text="Ver todas"
+            android:textColor="@color/brand_accent"
+            android:textSize="13sp"
+            app:layout_constraintBottom_toBottomOf="@id/tvComunicadosTitle"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/tvComunicadosTitle" />
 
-                        <ImageView
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:src="@drawable/ic_method_manual"
-                            app:tint="@color/brand_accent" />
+        <LinearLayout
+            android:id="@+id/itemComunicadoRecente"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingVertical="4dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvComunicadosTitle">
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:gravity="center"
-                            android:text="Manual"
-                            android:textColor="@color/text_primary"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:src="@drawable/ic_dashboard_megaphone"
+                app:tint="@color/blue" />
 
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardQrCode"
-                    android:layout_width="100dp"
-                    android:layout_height="140dp"
-                    android:layout_marginEnd="10dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:cardElevation="0dp"
-                    app:cardCornerRadius="0dp"
-                    android:foreground="?attr/selectableItemBackground"
-                    app:cardBackgroundColor="@android:color/transparent">
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:orientation="vertical">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                        <ImageView
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:src="@drawable/ic_method_qrcode"
-                            app:tint="@color/brand_accent" />
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Feriado municipal na sexta-feira"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:gravity="center"
-                            android:text="QR Code"
-                            android:textColor="@color/text_primary"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="Nova"
+                        android:textColor="@color/blue"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardFacial"
-                    android:layout_width="100dp"
-                    android:layout_height="140dp"
-                    android:layout_marginEnd="10dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:cardElevation="0dp"
-                    app:cardCornerRadius="0dp"
-                    android:foreground="?attr/selectableItemBackground"
-                    app:cardBackgroundColor="@android:color/transparent">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:orientation="vertical">
-
-                        <ImageView
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:src="@drawable/ic_method_facial"
-                            app:tint="@color/brand_accent" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:gravity="center"
-                            android:text="Facial"
-                            android:textColor="@color/text_primary"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardSelfieGps"
-                    android:layout_width="100dp"
-                    android:layout_height="140dp"
-                    android:layout_marginEnd="10dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:cardElevation="0dp"
-                    app:cardCornerRadius="0dp"
-                    android:foreground="?attr/selectableItemBackground"
-                    app:cardBackgroundColor="@android:color/transparent">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:orientation="vertical">
-
-                        <ImageView
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:src="@drawable/ic_method_selfie_gps"
-                            app:tint="@color/brand_accent" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:gravity="center"
-                            android:text="Selfie + GPS"
-                            android:textColor="@color/text_primary"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardPin"
-                    android:layout_width="100dp"
-                    android:layout_height="140dp"
-                    android:layout_marginEnd="10dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:cardElevation="0dp"
-                    app:cardCornerRadius="0dp"
-                    android:foreground="?attr/selectableItemBackground"
-                    app:cardBackgroundColor="@android:color/transparent">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:orientation="vertical">
-
-                        <ImageView
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:src="@drawable/ic_method_pin"
-                            app:tint="@color/brand_accent" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:gravity="center"
-                            android:text="PIN"
-                            android:textColor="@color/text_primary"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardNfc"
-                    android:layout_width="100dp"
-                    android:layout_height="140dp"
-                    android:layout_marginEnd="10dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:cardElevation="0dp"
-                    app:cardCornerRadius="0dp"
-                    android:foreground="?attr/selectableItemBackground"
-                    app:cardBackgroundColor="@android:color/transparent">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:orientation="vertical">
-
-                        <ImageView
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:src="@drawable/ic_method_nfc"
-                            app:tint="@color/brand_accent" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:gravity="center"
-                            android:text="NFC"
-                            android:textColor="@color/text_primary"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardFingerprint"
-                    android:layout_width="100dp"
-                    android:layout_height="140dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    app:cardElevation="0dp"
-                    app:cardCornerRadius="0dp"
-                    android:foreground="?attr/selectableItemBackground"
-                    app:cardBackgroundColor="@android:color/transparent">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:orientation="vertical">
-
-                        <ImageView
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:src="@drawable/ic_method_fingerprint"
-                            app:tint="@color/brand_accent" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:gravity="center"
-                            android:text="Impressão Digital"
-                            android:textColor="@color/text_primary"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Informamos que na próxima sexta-feira, 25 de Junho, é feriado."
+                    android:textColor="@color/text_muted"
+                    android:textSize="13sp" />
             </LinearLayout>
-        </HorizontalScrollView>
+        </LinearLayout>
+
+        <!-- 10. Aniversários (menor prioridade, informação social) -->
+        <TextView
+            android:id="@+id/tvAniversariosTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="Aniversários"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toStartOf="@id/tvVerTodosAniversarios"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/itemComunicadoRecente" />
+
+        <TextView
+            android:id="@+id/tvVerTodosAniversarios"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:text="Ver todas"
+            android:textColor="@color/brand_accent"
+            android:textSize="13sp"
+            app:layout_constraintBottom_toBottomOf="@id/tvAniversariosTitle"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/tvAniversariosTitle" />
+
+        <LinearLayout
+            android:id="@+id/itemAniversarioRecente"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="16dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingVertical="4dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvAniversariosTitle">
+
+            <FrameLayout
+                android:layout_width="40dp"
+                android:layout_height="40dp">
+
+                <ImageView
+                    android:id="@+id/ivAniversarioFoto"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/avatar_circle_bg" />
+
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_gravity="bottom|end"
+                    android:src="@drawable/ic_dashboard_gift"
+                    app:tint="@color/amber" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Maria Costa (25/07)"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Parabéns!"
+                    android:textColor="@color/text_muted"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>

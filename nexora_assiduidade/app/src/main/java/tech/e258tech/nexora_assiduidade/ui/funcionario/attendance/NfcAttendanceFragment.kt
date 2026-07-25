@@ -10,7 +10,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
@@ -46,7 +45,6 @@ class NfcAttendanceFragment : Fragment() {
     private lateinit var sessionManager: SessionManager
     private lateinit var attendanceRepository: AttendanceRepository
 
-    private lateinit var radioGroupType: RadioGroup
     private lateinit var tvNfcInfo: TextView
 
     private var nfcAdapter: NfcAdapter? = null
@@ -77,7 +75,6 @@ class NfcAttendanceFragment : Fragment() {
         sessionManager = SessionManager(requireContext())
         attendanceRepository = AttendanceRepository(requireContext())
 
-        radioGroupType = view.findViewById(R.id.radioGroupType)
         tvNfcInfo = view.findViewById(R.id.tvNfcInfo)
 
         if (nfcAdapter == null) {
@@ -126,17 +123,7 @@ class NfcAttendanceFragment : Fragment() {
             if (tag != null) {
                 val nfcId = tag.id?.joinToString("") { "%02X".format(it) } ?: return
                 val ndefPayload = readNdefPayload(tag)
-                val selectedId = radioGroupType.checkedRadioButtonId
-                if (selectedId == -1) {
-                    Toast.makeText(context, "Selecione Entrada ou Saida", Toast.LENGTH_SHORT).show()
-                    return
-                }
-                val eventType = if (selectedId == R.id.radioEntrada) {
-                    Constants.EVENT_ENTRY
-                } else {
-                    Constants.EVENT_EXIT
-                }
-                validateNfcAndRegister(nfcId, ndefPayload, eventType)
+                validateNfcAndRegister(nfcId, ndefPayload)
             }
         }
     }
@@ -156,7 +143,7 @@ class NfcAttendanceFragment : Fragment() {
         }
     }
 
-    private fun validateNfcAndRegister(nfcId: String, payload: String?, eventType: String) {
+    private fun validateNfcAndRegister(nfcId: String, payload: String?) {
         val userId = sessionManager.getUserId()
         val token = sessionManager.getToken()
         if (userId.isNullOrBlank() || token.isNullOrBlank()) {
@@ -199,7 +186,7 @@ class NfcAttendanceFragment : Fragment() {
                 idempotency_key = UUID.randomUUID().toString(),
                 user_id = userId,
                 device_id = sessionManager.getOrCreateDeviceId(),
-                event_type = eventType,
+                event_type = Constants.EVENT_AUTO,
                 recorded_at = DateTimeUtils.nowForApi(),
                 source = Constants.SOURCE_NFC
             )
@@ -209,17 +196,16 @@ class NfcAttendanceFragment : Fragment() {
             }
 
             setLoading(false)
-            val action = if (eventType == Constants.EVENT_ENTRY) "entrada" else "saida"
 
             when (registerResult) {
                 is AttendanceRepository.RegisterResult.Success -> {
-                    tvNfcInfo.text = "Registo de $action realizado com sucesso."
-                    Toast.makeText(context, "Registo de $action realizado com sucesso.", Toast.LENGTH_SHORT).show()
+                    tvNfcInfo.text = "Registo de presença realizado com sucesso."
+                    Toast.makeText(context, "Registo de presença realizado com sucesso.", Toast.LENGTH_SHORT).show()
                     parentFragmentManager.popBackStack()
                 }
                 is AttendanceRepository.RegisterResult.SavedOffline -> {
                     tvNfcInfo.text = "Sem internet. Registo guardado."
-                    Toast.makeText(context, "Sem internet. Registo de $action guardado e sera sincronizado automaticamente.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Sem internet. Registo guardado e sera sincronizado automaticamente.", Toast.LENGTH_LONG).show()
                     parentFragmentManager.popBackStack()
                 }
                 is AttendanceRepository.RegisterResult.Error -> {

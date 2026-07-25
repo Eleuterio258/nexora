@@ -16,7 +16,6 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.ProgressBar
-import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -58,7 +57,6 @@ class SelfieGpsAttendanceFragment : Fragment() {
     private lateinit var attendanceRepository: AttendanceRepository
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
-    private lateinit var radioGroupType: RadioGroup
     private lateinit var btnCaptureSelfie: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var ivSelfie: ImageView
@@ -117,7 +115,6 @@ class SelfieGpsAttendanceFragment : Fragment() {
         attendanceRepository = AttendanceRepository(requireContext())
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
 
-        radioGroupType = view.findViewById(R.id.radioGroupType)
         btnCaptureSelfie = view.findViewById(R.id.btnCaptureSelfie)
         progressBar = view.findViewById(R.id.progressBar)
         ivSelfie = view.findViewById(R.id.ivSelfie)
@@ -126,11 +123,6 @@ class SelfieGpsAttendanceFragment : Fragment() {
         fetchLocation()
 
         btnCaptureSelfie.setOnClickListener {
-            val selectedId = radioGroupType.checkedRadioButtonId
-            if (selectedId == -1) {
-                Toast.makeText(context, "Selecione Entrada ou Saida", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
             openCamera()
         }
     }
@@ -199,13 +191,6 @@ class SelfieGpsAttendanceFragment : Fragment() {
             return
         }
 
-        val selectedId = radioGroupType.checkedRadioButtonId
-        val eventType = if (selectedId == R.id.radioEntrada) {
-            Constants.EVENT_ENTRY
-        } else {
-            Constants.EVENT_EXIT
-        }
-
         uiScope.launch {
             // Sem unidade seleccionada nao ha geofencing real a validar (ver
             // nota na classe) — mantem-se permissivo, tal como o proxy do
@@ -214,7 +199,7 @@ class SelfieGpsAttendanceFragment : Fragment() {
                 idempotency_key = UUID.randomUUID().toString(),
                 user_id = userId,
                 device_id = sessionManager.getOrCreateDeviceId(),
-                event_type = eventType,
+                event_type = Constants.EVENT_AUTO,
                 recorded_at = DateTimeUtils.nowForApi(),
                 source = Constants.SOURCE_GEOLOCATION,
                 geo_lat = location.latitude,
@@ -227,13 +212,12 @@ class SelfieGpsAttendanceFragment : Fragment() {
             }
 
             setLoading(false)
-            val action = if (eventType == Constants.EVENT_ENTRY) "entrada" else "saida"
 
             when (registerResult) {
                 is AttendanceRepository.RegisterResult.Success -> {
                     Toast.makeText(
                         context,
-                        "Registo de $action realizado com sucesso.",
+                        "Registo de presença realizado com sucesso.",
                         Toast.LENGTH_SHORT
                     ).show()
                     parentFragmentManager.popBackStack()
@@ -241,7 +225,7 @@ class SelfieGpsAttendanceFragment : Fragment() {
                 is AttendanceRepository.RegisterResult.SavedOffline -> {
                     Toast.makeText(
                         context,
-                        "Sem internet. Registo de $action guardado e sera sincronizado automaticamente.",
+                        "Sem internet. Registo guardado e sera sincronizado automaticamente.",
                         Toast.LENGTH_LONG
                     ).show()
                     parentFragmentManager.popBackStack()

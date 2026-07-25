@@ -15,7 +15,6 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ProgressBar
-import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -66,7 +65,6 @@ class FacialAttendanceFragment : Fragment() {
     private lateinit var sessionManager: SessionManager
     private lateinit var attendanceRepository: AttendanceRepository
 
-    private lateinit var radioGroupType: RadioGroup
     private lateinit var btnCapture: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var ivCapturedFace: ImageView
@@ -120,7 +118,6 @@ class FacialAttendanceFragment : Fragment() {
         attendanceRepository = AttendanceRepository(requireContext())
         cameraExecutor = Executors.newSingleThreadExecutor()
 
-        radioGroupType = view.findViewById(R.id.radioGroupType)
         btnCapture = view.findViewById(R.id.btnCapture)
         progressBar = view.findViewById(R.id.progressBar)
         ivCapturedFace = view.findViewById(R.id.ivCapturedFace)
@@ -131,11 +128,6 @@ class FacialAttendanceFragment : Fragment() {
         cameraContainer = view.findViewById(R.id.cameraContainer)
 
         btnCapture.setOnClickListener {
-            val selectedId = radioGroupType.checkedRadioButtonId
-            if (selectedId == -1) {
-                Toast.makeText(context, "Selecione Entrada ou Saida", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
             beginCapture()
         }
     }
@@ -294,10 +286,7 @@ class FacialAttendanceFragment : Fragment() {
         lastCapturedBase64 = bitmapToBase64(bitmap)
 
         stopCamera()
-
-        val selectedId = radioGroupType.checkedRadioButtonId
-        val eventType = if (selectedId == R.id.radioEntrada) Constants.EVENT_ENTRY else Constants.EVENT_EXIT
-        verifyAndRegister(eventType)
+        verifyAndRegister(Constants.EVENT_AUTO)
     }
 
     private fun stopCamera() {
@@ -376,13 +365,12 @@ class FacialAttendanceFragment : Fragment() {
             }
 
             setLoading(false)
-            val action = if (eventType == Constants.EVENT_ENTRY) "entrada" else "saida"
 
             when (registerResult) {
                 is AttendanceRepository.RegisterResult.Success -> {
                     Toast.makeText(
                         context,
-                        "Registo de $action realizado com sucesso.",
+                        "Registo de presença realizado com sucesso.",
                         Toast.LENGTH_SHORT
                     ).show()
                     parentFragmentManager.popBackStack()
@@ -390,7 +378,7 @@ class FacialAttendanceFragment : Fragment() {
                 is AttendanceRepository.RegisterResult.SavedOffline -> {
                     Toast.makeText(
                         context,
-                        "Sem internet. Registo de $action guardado e sera sincronizado automaticamente.",
+                        "Sem internet. Registo guardado e sera sincronizado automaticamente.",
                         Toast.LENGTH_LONG
                     ).show()
                     parentFragmentManager.popBackStack()

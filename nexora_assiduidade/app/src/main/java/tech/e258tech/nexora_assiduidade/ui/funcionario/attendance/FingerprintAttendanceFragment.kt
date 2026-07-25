@@ -6,7 +6,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ProgressBar
-import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
@@ -41,7 +40,6 @@ class FingerprintAttendanceFragment : Fragment() {
     private lateinit var sessionManager: SessionManager
     private lateinit var attendanceRepository: AttendanceRepository
 
-    private lateinit var radioGroupType: RadioGroup
     private lateinit var btnAuthenticate: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var tvStatus: TextView
@@ -65,29 +63,16 @@ class FingerprintAttendanceFragment : Fragment() {
         sessionManager = SessionManager(requireContext())
         attendanceRepository = AttendanceRepository(requireContext())
 
-        radioGroupType = view.findViewById(R.id.radioGroupType)
         btnAuthenticate = view.findViewById(R.id.btnAuthenticate)
         progressBar = view.findViewById(R.id.progressBar)
         tvStatus = view.findViewById(R.id.tvStatus)
 
         btnAuthenticate.setOnClickListener {
-            val selectedId = radioGroupType.checkedRadioButtonId
-            if (selectedId == -1) {
-                Toast.makeText(context, "Selecione Entrada ou Saida", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            val eventType = if (selectedId == R.id.radioEntrada) {
-                Constants.EVENT_ENTRY
-            } else {
-                Constants.EVENT_EXIT
-            }
-
-            startBiometricAuthentication(eventType)
+            startBiometricAuthentication()
         }
     }
 
-    private fun startBiometricAuthentication(eventType: String) {
+    private fun startBiometricAuthentication() {
         val activity = requireActivity()
 
         when (val status = BiometricHelper.checkStatus(activity)) {
@@ -95,12 +80,12 @@ class FingerprintAttendanceFragment : Fragment() {
                 setLoading(true, "Toque no sensor biometrico...")
                 BiometricHelper.authenticate(
                     activity = activity,
-                    title = "Registar ${if (eventType == Constants.EVENT_ENTRY) "entrada" else "saida"}",
+                    title = "Registar presença",
                     subtitle = "Confirme a sua identidade",
                     description = "Utilize a impressao digital registada no dispositivo.",
                     callback = object : BiometricHelper.AuthenticationCallback {
                         override fun onSuccess() {
-                            registerClock(eventType)
+                            registerClock()
                         }
 
                         override fun onError(errorCode: Int, errorMessage: String) {
@@ -127,7 +112,7 @@ class FingerprintAttendanceFragment : Fragment() {
         }
     }
 
-    private fun registerClock(eventType: String) {
+    private fun registerClock() {
         val userId = sessionManager.getUserId()
 
         if (userId.isNullOrBlank()) {
@@ -143,7 +128,7 @@ class FingerprintAttendanceFragment : Fragment() {
             idempotency_key = UUID.randomUUID().toString(),
             user_id = userId,
             device_id = sessionManager.getOrCreateDeviceId(),
-            event_type = eventType,
+            event_type = Constants.EVENT_AUTO,
             recorded_at = DateTimeUtils.nowForApi(),
             source = Constants.SOURCE_FINGERPRINT,
             confidence_score = 1.0
@@ -156,22 +141,21 @@ class FingerprintAttendanceFragment : Fragment() {
 
             setLoading(false)
 
-            val action = if (eventType == Constants.EVENT_ENTRY) "entrada" else "saida"
             when (result) {
                 is AttendanceRepository.RegisterResult.Success -> {
-                    tvStatus.text = "Registo de $action realizado com sucesso."
+                    tvStatus.text = "Registo de presença realizado com sucesso."
                     Toast.makeText(
                         context,
-                        "Registo de $action realizado com sucesso.",
+                        "Registo de presença realizado com sucesso.",
                         Toast.LENGTH_SHORT
                     ).show()
                     parentFragmentManager.popBackStack()
                 }
                 is AttendanceRepository.RegisterResult.SavedOffline -> {
-                    tvStatus.text = "Sem internet. Registo de $action guardado localmente."
+                    tvStatus.text = "Sem internet. Registo guardado localmente."
                     Toast.makeText(
                         context,
-                        "Sem internet. Registo de $action guardado e sera sincronizado automaticamente.",
+                        "Sem internet. Registo guardado e sera sincronizado automaticamente.",
                         Toast.LENGTH_LONG
                     ).show()
                     parentFragmentManager.popBackStack()

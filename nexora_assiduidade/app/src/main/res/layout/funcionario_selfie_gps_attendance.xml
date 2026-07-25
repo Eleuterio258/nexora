@@ -47,28 +47,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/tvLocation" />
 
-        <RadioGroup
-            android:id="@+id/radioGroupType"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/ivSelfie">
-
-            <RadioButton
-                android:id="@+id/radioEntrada"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Entrada" />
-
-            <RadioButton
-                android:id="@+id/radioSaida"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Saida" />
-        </RadioGroup>
-
         <Button
             android:id="@+id/btnCaptureSelfie"
             android:layout_width="0dp"
@@ -77,7 +55,7 @@
             android:text="Capturar Selfie e Registar"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/radioGroupType" />
+            app:layout_constraintTop_toBottomOf="@id/ivSelfie" />
 
         <ProgressBar
             android:id="@+id/progressBar"

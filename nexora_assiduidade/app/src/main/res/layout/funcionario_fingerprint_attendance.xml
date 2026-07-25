@@ -46,28 +46,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/tvFingerprintInfo" />
 
-        <RadioGroup
-            android:id="@+id/radioGroupType"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/ivFingerprint">
-
-            <RadioButton
-                android:id="@+id/radioEntrada"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Entrada" />
-
-            <RadioButton
-                android:id="@+id/radioSaida"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Saida" />
-        </RadioGroup>
-
         <Button
             android:id="@+id/btnAuthenticate"
             android:layout_width="0dp"
@@ -76,7 +54,7 @@
             android:text="Autenticar com Impressao Digital"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/radioGroupType" />
+            app:layout_constraintTop_toBottomOf="@id/ivFingerprint" />
 
         <ProgressBar
             android:id="@+id/progressBar"

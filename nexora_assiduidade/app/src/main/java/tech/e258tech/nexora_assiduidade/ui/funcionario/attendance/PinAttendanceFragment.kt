@@ -6,7 +6,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
-import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import java.util.UUID
@@ -43,7 +42,6 @@ class PinAttendanceFragment : Fragment() {
     private lateinit var sessionManager: SessionManager
     private lateinit var attendanceRepository: AttendanceRepository
 
-    private lateinit var radioGroupType: RadioGroup
     private lateinit var etPin: EditText
     private lateinit var btnValidatePin: Button
 
@@ -66,34 +64,21 @@ class PinAttendanceFragment : Fragment() {
         sessionManager = SessionManager(requireContext())
         attendanceRepository = AttendanceRepository(requireContext())
 
-        radioGroupType = view.findViewById(R.id.radioGroupType)
         etPin = view.findViewById(R.id.etPin)
         btnValidatePin = view.findViewById(R.id.btnValidatePin)
 
         btnValidatePin.setOnClickListener {
-            val selectedId = radioGroupType.checkedRadioButtonId
-            if (selectedId == -1) {
-                Toast.makeText(context, "Selecione Entrada ou Saida", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
             val pin = etPin.text.toString().trim()
             if (pin.length < 4) {
                 Toast.makeText(context, "PIN deve ter pelo menos 4 digitos", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            val eventType = if (selectedId == R.id.radioEntrada) {
-                Constants.EVENT_ENTRY
-            } else {
-                Constants.EVENT_EXIT
-            }
-
-            validatePinAndRegister(pin, eventType)
+            validatePinAndRegister(pin)
         }
     }
 
-    private fun validatePinAndRegister(pin: String, eventType: String) {
+    private fun validatePinAndRegister(pin: String) {
         val email = sessionManager.getUserEmail()
         if (email.isNullOrBlank()) {
             Toast.makeText(context, "Sessao invalida. Faca login novamente.", Toast.LENGTH_LONG).show()
@@ -149,7 +134,7 @@ class PinAttendanceFragment : Fragment() {
                 idempotency_key = UUID.randomUUID().toString(),
                 user_id = userId,
                 device_id = sessionManager.getOrCreateDeviceId(),
-                event_type = eventType,
+                event_type = Constants.EVENT_AUTO,
                 recorded_at = DateTimeUtils.nowForApi(),
                 source = Constants.SOURCE_PIN
             )
@@ -159,15 +144,14 @@ class PinAttendanceFragment : Fragment() {
             }
 
             btnValidatePin.isEnabled = true
-            val action = if (eventType == Constants.EVENT_ENTRY) "entrada" else "saida"
 
             when (registerResult) {
                 is AttendanceRepository.RegisterResult.Success -> {
-                    Toast.makeText(context, "Registo de $action realizado com sucesso.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Registo de presença realizado com sucesso.", Toast.LENGTH_SHORT).show()
                     parentFragmentManager.popBackStack()
                 }
                 is AttendanceRepository.RegisterResult.SavedOffline -> {
-                    Toast.makeText(context, "Sem internet. Registo de $action guardado e sera sincronizado automaticamente.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Sem internet. Registo guardado e sera sincronizado automaticamente.", Toast.LENGTH_LONG).show()
                     parentFragmentManager.popBackStack()
                 }
                 is AttendanceRepository.RegisterResult.Error -> {
