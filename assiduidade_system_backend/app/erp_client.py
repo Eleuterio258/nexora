@@ -98,7 +98,19 @@ class ERPClient:
         except httpx.RequestError as exc:
             raise ERPUnavailableError(f"ERP indisponivel: {exc}") from exc
 
-        response.raise_for_status()
+        # Um status de erro aqui é indistinguível de "ERP indisponível" para
+        # quem chama: esta config é uma política opcional, não uma autorização.
+        # Sem esta conversão, o httpx.HTTPStatusError escapava ao fail-open de
+        # validar_metodo_assiduidade e /biometric/verify e /liveness/verify
+        # respondiam 500 — foi o que aconteceu ao configurar ERP_BASE_URL sem
+        # uma ERP_API_KEY registada em hardware.devices (o ERP devolve 401).
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise ERPUnavailableError(
+                f"ERP respondeu {response.status_code} a /api/hardware/assiduidade/config"
+            ) from exc
+
         return response.json()
 
     async def validate_bearer_token(self, token: str) -> dict[str, Any]:
