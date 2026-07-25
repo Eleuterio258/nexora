@@ -8,11 +8,19 @@ type NormalizedEvent struct {
 	DeviceSerial   string
 	DeviceModel    string
 	EmployeeNo     string
-	EventType      string    // access_granted, access_denied, unknown
+	EventType      string // access_granted, access_denied, unknown
 	EventTime      time.Time
-	Direction      string    // entry, exit, unknown
-	CredentialType string    // face, card, fingerprint, pin
+	Direction      string // entry, exit, unknown
+	CredentialType string // face, card, fingerprint, pin, qr, nfc, manual, geolocation
 	RawPayload     []byte
+
+	// Metadados opcionais partilhados por vários métodos de assiduidade.
+	QRTokenID    *int64
+	Latitude     *float64
+	Longitude    *float64
+	LocalidadeID *int64
+	RegisteredBy *int64 // utilizador que efectuou a leitura (ex.: gestor que leu QR do funcionário)
+	FotoURL      *string
 }
 
 // EventTypeValid verifica se o tipo de evento é conhecido.

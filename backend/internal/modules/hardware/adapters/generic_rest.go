@@ -24,12 +24,18 @@ func (a *GenericRESTAdapter) Name() string {
 
 // GenericPayload representa o contrato REST genérico.
 type GenericPayload struct {
-	DeviceSerial   string `json:"device_serial"`
-	EmployeeNo     string `json:"employee_no"`
-	EventTime      string `json:"event_time"`
-	EventType      string `json:"event_type"`
-	Direction      string `json:"direction"`
-	CredentialType string `json:"credential_type"`
+	DeviceSerial   string   `json:"device_serial"`
+	EmployeeNo     string   `json:"employee_no"`
+	EventTime      string   `json:"event_time"`
+	EventType      string   `json:"event_type"`
+	Direction      string   `json:"direction"`
+	CredentialType string   `json:"credential_type"`
+	QRTokenID      *int64   `json:"qr_token_id,omitempty"`
+	Latitude       *float64 `json:"latitude,omitempty"`
+	Longitude      *float64 `json:"longitude,omitempty"`
+	LocalidadeID   *int64   `json:"localidade_id,omitempty"`
+	RegisteredBy   *int64   `json:"registered_by,omitempty"`
+	FotoURL        *string  `json:"foto_url,omitempty"`
 }
 
 func (a *GenericRESTAdapter) ParseEvent(r *http.Request) (*models.NormalizedEvent, error) {
@@ -70,6 +76,12 @@ func (a *GenericRESTAdapter) ParseEvent(r *http.Request) (*models.NormalizedEven
 		Direction:      direction,
 		CredentialType: credentialType,
 		RawPayload:     raw,
+		QRTokenID:      payload.QRTokenID,
+		Latitude:       payload.Latitude,
+		Longitude:      payload.Longitude,
+		LocalidadeID:   payload.LocalidadeID,
+		RegisteredBy:   payload.RegisteredBy,
+		FotoURL:        payload.FotoURL,
 	}, nil
 }
 

@@ -76,7 +76,7 @@
             android:id="@+id/cardRegistoManual"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
+            android:layout_marginBottom="8dp"
             android:clickable="true"
             android:focusable="true">
 
@@ -85,6 +85,23 @@
                 android:layout_height="wrap_content"
                 android:padding="16dp"
                 android:text="Registo Manual"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardQrCode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp"
+                android:text="QR Code de Assiduidade"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp" />
         </com.google.android.material.card.MaterialCardView>

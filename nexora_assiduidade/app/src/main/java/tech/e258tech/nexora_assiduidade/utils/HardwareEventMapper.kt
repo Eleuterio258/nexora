@@ -69,7 +69,13 @@ object HardwareEventMapper {
             event_time = request.recorded_at,
             event_type = request.event_type,
             direction = directionByEventType[request.event_type] ?: "unknown",
-            credential_type = credentialTypeBySource[request.source] ?: "unknown"
+            credential_type = credentialTypeBySource[request.source] ?: "unknown",
+            qr_token_id = request.qr_token_id,
+            latitude = request.geo_lat,
+            longitude = request.geo_lng,
+            localidade_id = request.localidade_id,
+            registered_by = request.registered_by,
+            foto_url = null // Base64 não é URL; upload de imagem fica para melhoria futura
         )
     }
 }

@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.JustifyAbsenceFragment
+import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.MeuQrCodeFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.notifications.NotificationsFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.dashboard.DashboardGestorFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.dispositivos.DispositivosFragment
@@ -17,6 +18,7 @@ import tech.e258tech.nexora_assiduidade.ui.gestor.equipa.EquipaGestorFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ferias.PedidosFeriasFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ocorrencias.AlertasFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ocorrencias.OcorrenciasFragment
+import tech.e258tech.nexora_assiduidade.ui.gestor.qrcode.GestorQrMenuFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.registo.RegistoManualFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.relatorios.RelatoriosGestorFragment
 import tech.e258tech.nexora_assiduidade.utils.PermissionUtils
@@ -90,6 +92,12 @@ class ModulesFragment : Fragment() {
             ) { openFragment(JustifyAbsenceFragment()) }
         }
 
+        // Qualquer funcionário pode mostrar o seu QR Code pessoal.
+        items += ModuleMenuItem(
+            "O Meu QR Code",
+            R.drawable.ic_method_qrcode
+        ) { openFragment(MeuQrCodeFragment()) }
+
         // Ecrãs de Gestor — "recursos-humanos:ver_funcionarios" (router.go:1675-1719)
         // é a mesma permissão que já gerija Dashboard/Equipa/Relatórios na antiga
         // barra de navegação de Gestor.
@@ -114,6 +122,10 @@ class ModulesFragment : Fragment() {
                 "Alertas",
                 android.R.drawable.ic_dialog_alert
             ) { openFragment(AlertasFragment()) }
+            items += ModuleMenuItem(
+                "QR Code de Assiduidade",
+                R.drawable.ic_method_qrcode
+            ) { openFragment(GestorQrMenuFragment()) }
         }
 
         // "recursos-humanos:aprovar_ausencias" — a mesma acção que antes

@@ -13,7 +13,6 @@ import (
 
 	"nexora/config"
 	mw "nexora/internal/middleware"
-	"nexora/internal/pkg/antivirus"
 	audH "nexora/internal/modules/auditoria/handlers"
 	authH "nexora/internal/modules/auth/handlers"
 	authModels "nexora/internal/modules/auth/models"
@@ -35,6 +34,7 @@ import (
 	sysH "nexora/internal/modules/sistema-configuracao/handlers"
 	tesH "nexora/internal/modules/tesouraria/handlers"
 	utilH "nexora/internal/modules/utilizadores/handlers"
+	"nexora/internal/pkg/antivirus"
 	"nexora/internal/push"
 	"nexora/internal/storage"
 
@@ -145,7 +145,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	pdfSigner := assDPki.NewPDFSigner(certValidator, cfg.SignatureTSAURL)
 	notifAdapter := adapters.NewNotificationAdapter(db)
 	signaturePort := adapters.NewSignatureAdapter(db)
-compras := comprasH.New(db, cfg, store, signaturePort)
+	compras := comprasH.New(db, cfg, store, signaturePort)
 	recrut := recrutH.New(db, cfg, store, pushSvc, recrutRealtime, idh, signaturePort)
 	contab := contabH.New(db, cfg, store, signaturePort)
 	tesouraria := tesH.New(db, cfg, store, signaturePort)
@@ -1991,6 +1991,17 @@ compras := comprasH.New(db, cfg, store, signaturePort)
 			r.Use(mw.RequirePermission(db, "recursos-humanos", "gerir_funcionarios"))
 			r.Post("/eventos", rh.CriarEvento)
 		})
+		// QR Code fixo do gestor — gera o token que os funcionários leem para se
+		// marcarem sozinhos. Precisa de saber QUEM está
+		// a gerar (para aplicar a mesma permissão que já esconde este botão no
+		// menu da app, "recursos-humanos:ver_funcionarios"), por isso corre
+		// autenticado por utilizador (JWT), nunca pela API Key de device
+		// partilhada por todas as instalações — essa só chega para validar/ler
+		// QRs, nunca para os gerar.
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequirePermission(db, "recursos-humanos", "ver_funcionarios"))
+			r.Post("/assiduidade/qr/gerar", rh.GerarQRDevice)
+		})
 		// Correcções sobre o novo modelo de eventos — sucessor de
 		// /correcoes-ponto (que fica congelado, só leitura de histórico).
 		r.Route("/correcoes", func(r chi.Router) {
@@ -2486,6 +2497,11 @@ compras := comprasH.New(db, cfg, store, signaturePort)
 				r.Get("/", ss.MinhaAssiduidade)
 				r.Get("/resumo", ss.ResumoAssiduidade)
 				r.Get("/justificacoes", ss.ListarJustificacoes)
+				// QR Code pessoal do próprio colaborador (rh.GerarQRMe) — precisa de
+				// saber QUEM está a pedir, por isso corre autenticado por utilizador
+				// (JWT), nunca pela API Key de device partilhada por todas as
+				// instalações da app.
+				r.Get("/qr/me", rh.GerarQRMe)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "assiduidade", "justificar"))
@@ -2684,7 +2700,6 @@ compras := comprasH.New(db, cfg, store, signaturePort)
 			r.Get("/assiduidade/consentimentos", rh.ListarConsentimentosDevice)
 			r.Get("/assiduidade/consentimentos/activo", rh.ObterConsentimentoActivoDevice)
 			r.Post("/assiduidade/consentimentos/revogar", rh.RevogarConsentimentoDevice)
-			r.Post("/assiduidade/qr/gerar", rh.GerarQRDevice)
 			r.Post("/assiduidade/qr/validar", rh.ValidarQRDevice)
 			r.Get("/assiduidade/nfc/validar", rh.ValidarNFCDevice)
 		})

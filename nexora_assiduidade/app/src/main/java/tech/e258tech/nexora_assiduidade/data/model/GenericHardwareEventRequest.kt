@@ -12,5 +12,11 @@ data class GenericHardwareEventRequest(
     val event_time: String,
     val event_type: String,
     val direction: String,
-    val credential_type: String
+    val credential_type: String,
+    val qr_token_id: Long? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val localidade_id: Long? = null,
+    val registered_by: Long? = null,
+    val foto_url: String? = null
 )

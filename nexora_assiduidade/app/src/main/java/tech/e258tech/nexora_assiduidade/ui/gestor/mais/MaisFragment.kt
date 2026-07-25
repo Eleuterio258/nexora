@@ -14,6 +14,7 @@ import tech.e258tech.nexora_assiduidade.ui.gestor.configuracao.ConfigAssiduidade
 import tech.e258tech.nexora_assiduidade.ui.gestor.dispositivos.DispositivosFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ocorrencias.AlertasFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ocorrencias.OcorrenciasFragment
+import tech.e258tech.nexora_assiduidade.ui.gestor.qrcode.GestorQrMenuFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.registo.RegistoManualFragment
 import tech.e258tech.nexora_assiduidade.utils.PermissionUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
@@ -68,6 +69,9 @@ class MaisFragment : Fragment() {
         }
         view.findViewById<CardView>(R.id.cardRegistoManual).setOnClickListener {
             (activity as? LoginActivity)?.pushFragment(RegistoManualFragment())
+        }
+        view.findViewById<CardView>(R.id.cardQrCode).setOnClickListener {
+            (activity as? LoginActivity)?.pushFragment(GestorQrMenuFragment())
         }
         cardConfig.setOnClickListener {
             (activity as? LoginActivity)?.pushFragment(ConfigAssiduidadeFragment())

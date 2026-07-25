@@ -109,7 +109,7 @@ func (p *Processor) processEntity(ctx context.Context, tenantID, deviceID int64,
 
 	switch mapping.EntityType {
 	case "funcionario", "professor":
-		eventoID, err := p.registarEventoAssiduidade(ctx, saasTenantID, mapping.EntityID, event, eventID)
+		eventoID, err := p.registarEventoAssiduidade(ctx, saasTenantID, deviceID, mapping.EntityID, event, eventID)
 		if err != nil {
 			return ProcessResult{ErrorMessage: "erro ao registar evento de assiduidade: " + err.Error()}
 		}
@@ -209,13 +209,32 @@ func (p *Processor) metodoAssiduidadeActivo(ctx context.Context, tenantID int64,
 // paridade de eventos entrada/saída já registados nesse dia — a mesma marca
 // alterna entrada/saída indefinidamente, já não se perde ao 3º evento como
 // no modelo antigo (1ª marcação=entrada, 2ª=saída, 3ª+=perdida).
-func (p *Processor) registarEventoAssiduidade(ctx context.Context, tenantID, funcionarioID int64, event *models.NormalizedEvent, eventID int64) (int64, error) {
+func (p *Processor) registarEventoAssiduidade(ctx context.Context, tenantID, deviceID, funcionarioID int64, event *models.NormalizedEvent, eventID int64) (int64, error) {
 	tipoEventoCodigo, err := p.inferirTipoEventoCodigo(ctx, tenantID, funcionarioID, event)
 	if err != nil {
 		return 0, err
 	}
 
 	metodo := "biometria"
+	origem := "biometria"
+	switch event.CredentialType {
+	case "qr":
+		metodo = "qr"
+		origem = "qr"
+	case "nfc":
+		metodo = "nfc"
+		origem = "nfc"
+	case "pin":
+		metodo = "pin"
+		origem = "app"
+	case "geolocation":
+		metodo = "geolocalizacao"
+		origem = "gps"
+	case "manual":
+		metodo = "manual"
+		origem = "manual"
+	}
+
 	eventIDStr := fmt.Sprintf("%d", eventID)
 	observacoes := "Registo via hardware | evento_id=" + eventIDStr
 
@@ -224,7 +243,14 @@ func (p *Processor) registarEventoAssiduidade(ctx context.Context, tenantID, fun
 		TipoEventoCodigo: tipoEventoCodigo,
 		MetodoCodigo:     &metodo,
 		OcorridoEm:       event.EventTime,
-		Origem:           "biometria",
+		Origem:           origem,
+		DispositivoID:    &deviceID,
+		QRTokenID:        event.QRTokenID,
+		Latitude:         event.Latitude,
+		Longitude:        event.Longitude,
+		LocalidadeID:     event.LocalidadeID,
+		FotoURL:          event.FotoURL,
+		RegistadoPor:     event.RegisteredBy,
 		Observacoes:      &observacoes,
 	})
 	if err != nil {

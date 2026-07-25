@@ -2,6 +2,7 @@ package tech.e258tech.nexora_assiduidade.ui.funcionario.attendance
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.location.Location
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -12,6 +13,8 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import java.util.UUID
@@ -20,13 +23,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.BuildConfig
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
 import tech.e258tech.nexora_assiduidade.data.model.QRValidateDeviceRequest
+import tech.e258tech.nexora_assiduidade.data.model.response.QRValidateDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.data.repository.AttendanceRepository
+import tech.e258tech.nexora_assiduidade.ui.common.CaptureActivityPortrait
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.Constants
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
@@ -46,9 +52,12 @@ class QrCodeAttendanceFragment : Fragment() {
 
     private lateinit var sessionManager: SessionManager
     private lateinit var attendanceRepository: AttendanceRepository
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     private lateinit var btnScan: Button
     private lateinit var tvQrInfo: TextView
+
+    private var currentLocation: Location? = null
 
     private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
         if (result.contents != null) {
@@ -63,6 +72,14 @@ class QrCodeAttendanceFragment : Fragment() {
             startScan()
         } else {
             Toast.makeText(context, "Permissao da camara necessaria para ler QR Code.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private val locationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions.entries.any { it.value }) {
+            fetchLocation()
         }
     }
 
@@ -84,13 +101,16 @@ class QrCodeAttendanceFragment : Fragment() {
 
         sessionManager = SessionManager(requireContext())
         attendanceRepository = AttendanceRepository(requireContext())
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
 
         btnScan = view.findViewById(R.id.btnScan)
         tvQrInfo = view.findViewById(R.id.tvQrInfo)
 
+        requestLocationPermission()
+
         btnScan.setOnClickListener {
-            when (PackageManager.PERMISSION_GRANTED) {
-                ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) -> startScan()
+            when {
+                ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> startScan()
                 else -> cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             }
         }
@@ -100,12 +120,44 @@ class QrCodeAttendanceFragment : Fragment() {
         }
     }
 
+    private fun requestLocationPermission() {
+        val hasFine = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!hasFine && !hasCoarse) {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        } else {
+            fetchLocation()
+        }
+    }
+
+    private fun fetchLocation() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
+        uiScope.launch {
+            try {
+                currentLocation = withContext(Dispatchers.IO) {
+                    fusedLocationClient.lastLocation.await()
+                }
+            } catch (_: Exception) {
+                // Localização é opcional.
+            }
+        }
+    }
+
     private fun startScan() {
         val options = ScanOptions()
             .setPrompt("Aproxime o QR Code do leitor")
             .setBeepEnabled(true)
             .setOrientationLocked(false)
-            .setCaptureActivity(tech.e258tech.nexora_assiduidade.ui.common.CaptureActivityPortrait::class.java)
+            .setCaptureActivity(CaptureActivityPortrait::class.java)
         scanLauncher.launch(options)
     }
 
@@ -121,27 +173,26 @@ class QrCodeAttendanceFragment : Fragment() {
         tvQrInfo.text = "A validar QR Code..."
 
         uiScope.launch {
-            val validateResult: Pair<Boolean, String?> = withContext(Dispatchers.IO) {
+            val validateResult: Pair<QRValidateDeviceResponse?, String?> = withContext(Dispatchers.IO) {
                 try {
                     val response = RetrofitClient.erpApiService.validateQrDevice(
                         BuildConfig.DEVICE_API_KEY,
                         QRValidateDeviceRequest(qr_code = qrCode)
                     )
                     if (response.isSuccessful && response.body() != null) {
-                        val body = response.body()!!
-                        body.valid to null
+                        response.body()!! to null
                     } else {
-                        false to ApiUtils.errorMessage(response)
+                        null to ApiUtils.errorMessage(response)
                     }
                 } catch (e: Exception) {
-                    false to (e.message ?: "Erro na validacao do QR Code")
+                    null to (e.message ?: "Erro na validacao do QR Code")
                 }
             }
 
-            val valid = validateResult.first
+            val response = validateResult.first
             val message = validateResult.second
 
-            if (!valid) {
+            if (response == null || !response.valid) {
                 setLoading(false)
                 tvQrInfo.text = "QR Code invalido."
                 Toast.makeText(context, message ?: "QR Code invalido.", Toast.LENGTH_LONG).show()
@@ -154,7 +205,11 @@ class QrCodeAttendanceFragment : Fragment() {
                 device_id = sessionManager.getOrCreateDeviceId(),
                 event_type = Constants.EVENT_AUTO,
                 recorded_at = DateTimeUtils.nowForApi(),
-                source = Constants.SOURCE_QR_CODE
+                source = Constants.SOURCE_QR_CODE,
+                geo_lat = currentLocation?.latitude,
+                geo_lng = currentLocation?.longitude,
+                qr_token_id = response.token_id,
+                localidade_id = response.location_id?.toLongOrNull()
             )
 
             val registerResult = withContext(Dispatchers.IO) {

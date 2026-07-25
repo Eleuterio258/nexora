@@ -40,13 +40,18 @@ class AttendanceRepository(context: Context) {
         data class Error(val message: String) : RegisterResult()
     }
 
-    suspend fun registerClock(request: ClockRegisterRequest): RegisterResult {
+    suspend fun registerClock(request: ClockRegisterRequest, employeeCodeOverride: String? = null): RegisterResult {
         val token = sessionManager.getToken()
         if (token.isNullOrBlank()) {
             return RegisterResult.Error("Sessao invalida. Faca login novamente.")
         }
 
-        val employeeCode = HardwareEventMapper.resolveEmployeeCode(sessionManager)
+        // employeeCodeOverride e usado quando quem regista nao e quem esta a
+        // fazer o pedido (ex.: gestor le o QR pessoal do funcionario) — sem
+        // isto, resolveEmployeeCode() identificaria sempre a sessao actual
+        // (o gestor), nunca o funcionario que o QR representa.
+        val employeeCode = employeeCodeOverride
+            ?: HardwareEventMapper.resolveEmployeeCode(sessionManager)
             ?: return RegisterResult.Error("Nao foi possivel identificar o funcionario no ERP.")
 
         return try {

@@ -11,5 +11,8 @@ data class ClockRegisterRequest(
     val liveness_score: Double? = null,
     val geo_lat: Double? = null,
     val geo_lng: Double? = null,
-    val image_base64: String? = null
+    val image_base64: String? = null,
+    val qr_token_id: Long? = null,
+    val registered_by: Long? = null,
+    val localidade_id: Long? = null
 )

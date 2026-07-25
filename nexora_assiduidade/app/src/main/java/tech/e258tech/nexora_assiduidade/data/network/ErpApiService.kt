@@ -121,6 +121,25 @@ interface ErpApiService {
         @Header("Authorization") token: String
     ): Response<List<JustificacaoResponse>>
 
+    // QR Code pessoal do próprio colaborador (assiduidade_qr.go:GerarQRMe) —
+    // autenticado por sessão (Authorization), nunca pela API Key de device,
+    // porque o ERP precisa de saber QUEM está a pedir para vincular o token
+    // ao funcionário certo.
+    @GET("api/self-service/assiduidade/qr/me")
+    suspend fun getMyQr(
+        @Header("Authorization") token: String
+    ): Response<QRGenerateDeviceResponse>
+
+    // QR Code fixo do gestor (assiduidade_qr.go:GerarQRDevice) — exige a
+    // permissão "recursos-humanos:ver_funcionarios" (a mesma que já esconde
+    // este botão no menu da app de quem não é gestor), por isso corre
+    // autenticado por sessão, nunca pela API Key de device partilhada.
+    @POST("api/rh/assiduidade/qr/gerar")
+    suspend fun generateQr(
+        @Header("Authorization") token: String,
+        @Body request: QRGenerateDeviceRequest
+    ): Response<QRGenerateDeviceResponse>
+
     // ── Endpoints de device (X-API-Key, nao Authorization) ──────────────────
     // Chamados directamente pela app desde 2026-07-13 com a API Key de device
     // do FaceClock embutida no APK (BuildConfig.DEVICE_API_KEY) — risco de
@@ -142,12 +161,6 @@ interface ErpApiService {
         @Header("X-API-Key") apiKey: String,
         @Body request: GenericHardwareEventRequest
     ): Response<HardwareEventResponse>
-
-    @POST("api/hardware/assiduidade/qr/gerar")
-    suspend fun generateQrDevice(
-        @Header("X-API-Key") apiKey: String,
-        @Body request: QRGenerateDeviceRequest
-    ): Response<QRGenerateDeviceResponse>
 
     @POST("api/hardware/assiduidade/qr/validar")
     suspend fun validateQrDevice(

@@ -15,27 +15,45 @@ import (
 // Substitui o armazenamento em memória do processo que o FaceClock usava
 // (_qr_store em methods.py): não sobrevivia a reinícios nem funcionava com
 // múltiplos workers/instâncias, porque cada processo tinha o seu próprio
-// dict. Autenticado por API Key de device, tal como os restantes endpoints
-// de assiduidade/{config,funcionarios,geofence,consentimentos}.
+// dict.
+//
+// Suporta dois modos:
+//   1. QR Fixo do gestor — token sem funcionario_id; qualquer funcionário pode
+//      lê-lo para registar o seu ponto. Gerado por GerarQRDevice, autenticado
+//      por JWT + permissão "recursos-humanos:ver_funcionarios" (só gestores),
+//      ao contrário dos restantes endpoints de
+//      assiduidade/{config,funcionarios,geofence,consentimentos}, que usam a
+//      API Key de device partilhada por todas as instalações da app.
+//   2. QR do funcionário — token vinculado a um funcionario_id; o gestor lê o
+//      QR e o sistema identifica automaticamente o funcionário. Gerado por
+//      GerarQRMe, também autenticado por JWT (o pedido tem de saber QUEM é o
+//      funcionário, o que a API Key de device não distingue).
+//
+// A validação (ValidarQRDevice) continua na API Key de device: tem de ficar
+// acessível a qualquer funcionário que leia o QR fixo (modo 1) ou a qualquer
+// gestor que leia o QR de um funcionário (modo 2).
 
 const (
 	qrDuracaoPadraoSegundos = 60
 	qrDuracaoMaximaSegundos = 300
 )
 
-// POST /api/hardware/assiduidade/qr/gerar
+type qrGenerateBody struct {
+	LocationID      *string `json:"location_id"`
+	DuracaoSegundos int     `json:"duracao_segundos"`
+	FuncionarioID   *int64  `json:"funcionario_id,omitempty"`
+}
+
+// POST /api/rh/assiduidade/qr/gerar
 func (h *Handler) GerarQRDevice(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	tenantID, err := resolveSaasTenantID(h, r, user.TenantID)
 	if err != nil {
-		jsonErr(w, "Dispositivo sem empresa/tenant associado correctamente", http.StatusUnprocessableEntity)
+		jsonErr(w, "Utilizador sem empresa/tenant associado correctamente", http.StatusUnprocessableEntity)
 		return
 	}
 
-	var body struct {
-		LocationID      *string `json:"location_id"`
-		DuracaoSegundos int     `json:"duracao_segundos"`
-	}
+	var body qrGenerateBody
 	json.NewDecoder(r.Body).Decode(&body)
 	if body.DuracaoSegundos <= 0 {
 		body.DuracaoSegundos = qrDuracaoPadraoSegundos
@@ -53,9 +71,9 @@ func (h *Handler) GerarQRDevice(w http.ResponseWriter, r *http.Request) {
 	expiresAt := time.Now().Add(time.Duration(body.DuracaoSegundos) * time.Second)
 
 	if _, err := h.db.Exec(r.Context(), `
-		INSERT INTO rh.qr_tokens (tenant_id, token, location_id, expires_at)
-		VALUES ($1,$2,$3,$4)`,
-		tenantID, token, body.LocationID, expiresAt); err != nil {
+		INSERT INTO rh.qr_tokens (tenant_id, token, location_id, funcionario_id, expires_at)
+		VALUES ($1,$2,$3,$4,$5)`,
+		tenantID, token, body.LocationID, body.FuncionarioID, expiresAt); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
@@ -63,6 +81,52 @@ func (h *Handler) GerarQRDevice(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{
 		"qr_code":    token,
 		"expires_at": expiresAt,
+	}, http.StatusCreated)
+}
+
+// GET /api/self-service/assiduidade/qr/me
+// Gera um token QR vinculado ao funcionário autenticado. Usado pelo
+// funcionário para mostrar o seu QR pessoal ao gestor.
+func (h *Handler) GerarQRMe(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	tenantID, err := resolveSaasTenantID(h, r, user.TenantID)
+	if err != nil {
+		jsonErr(w, "Dispositivo sem empresa/tenant associado correctamente", http.StatusUnprocessableEntity)
+		return
+	}
+
+	var funcionarioID int64
+	err = h.db.QueryRow(r.Context(), `
+		SELECT id FROM rh.funcionarios
+		 WHERE tenant_id=$1 AND utilizador_id=$2
+		 LIMIT 1`,
+		tenantID, user.ID).Scan(&funcionarioID)
+	if err != nil {
+		jsonErr(w, "Funcionário não encontrado para este utilizador", http.StatusNotFound)
+		return
+	}
+
+	duracao := qrDuracaoPadraoSegundos
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	token := "qr_" + hex.EncodeToString(b)
+	expiresAt := time.Now().Add(time.Duration(duracao) * time.Second)
+
+	if _, err := h.db.Exec(r.Context(), `
+		INSERT INTO rh.qr_tokens (tenant_id, token, funcionario_id, expires_at)
+		VALUES ($1,$2,$3,$4)`,
+		tenantID, token, funcionarioID, expiresAt); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w, map[string]any{
+		"qr_code":        token,
+		"expires_at":     expiresAt,
+		"funcionario_id": funcionarioID,
 	}, http.StatusCreated)
 }
 
@@ -83,16 +147,22 @@ func (h *Handler) ValidarQRDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var tokenID int64
+	var locationID *string
+	var funcionarioID *int64
+	var employeeNo *string
+	var expiresAt time.Time
 	// Marca como usado atomicamente (evita corrida entre dois pedidos
 	// concorrentes a validar o mesmo QR): só actualiza, e só é "válido", se
 	// ainda estava por usar e dentro do prazo — RowsAffected()==0 cobre os
 	// dois casos de invalidade (já usado, ou não encontrado) e o expirado é
 	// verificado à parte para dar uma mensagem mais específica.
-	var locationID *string
-	var expiresAt time.Time
-	err = h.db.QueryRow(r.Context(),
-		`SELECT location_id, expires_at FROM rh.qr_tokens WHERE token=$1 AND tenant_id=$2`,
-		body.QRCode, tenantID).Scan(&locationID, &expiresAt)
+	err = h.db.QueryRow(r.Context(), `
+		SELECT t.id, t.location_id, t.funcionario_id, f.numero_funcionario, t.expires_at
+		  FROM rh.qr_tokens t
+		  LEFT JOIN rh.funcionarios f ON f.id = t.funcionario_id AND f.tenant_id = t.tenant_id
+		 WHERE t.token=$1 AND t.tenant_id=$2`,
+		body.QRCode, tenantID).Scan(&tokenID, &locationID, &funcionarioID, &employeeNo, &expiresAt)
 	if err != nil {
 		jsonErr(w, "QR Code inválido", http.StatusBadRequest)
 		return
@@ -102,8 +172,8 @@ func (h *Handler) ValidarQRDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tag, err := h.db.Exec(r.Context(),
-		`UPDATE rh.qr_tokens SET used_at = NOW() WHERE token=$1 AND tenant_id=$2 AND used_at IS NULL`,
+	tag, err := h.db.Exec(r.Context(), `
+		UPDATE rh.qr_tokens SET used_at = NOW() WHERE token=$1 AND tenant_id=$2 AND used_at IS NULL`,
 		body.QRCode, tenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
@@ -115,7 +185,10 @@ func (h *Handler) ValidarQRDevice(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, map[string]any{
-		"valid":       true,
-		"location_id": locationID,
+		"valid":          true,
+		"token_id":       tokenID,
+		"location_id":    locationID,
+		"funcionario_id": funcionarioID,
+		"employee_no":    employeeNo,
 	}, http.StatusOK)
 }
