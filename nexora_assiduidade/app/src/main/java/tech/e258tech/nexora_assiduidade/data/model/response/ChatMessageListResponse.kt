@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName
 import tech.e258tech.nexora_assiduidade.data.model.ChatMessage
 
 /**
- * Resposta do endpoint GET /chat/conversas/{id}/mensagens.
+ * Resposta do endpoint GET /api/self-service/chat/conversas/{id}/mensagens.
  * O backend retorna a lista diretamente (jsonOK).
  */
 typealias ChatMessageListResponse = List<BackendChatMessage>

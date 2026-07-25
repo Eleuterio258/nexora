@@ -1,7 +1,7 @@
 package tech.e258tech.nexora_assiduidade.data.model.chat
 
 /**
- * Representa uma conversa retornada pelo endpoint /chat/conversas.
+ * Representa uma conversa retornada pelo endpoint /api/self-service/chat/conversas.
  */
 data class Conversation(
     val id: Long,
