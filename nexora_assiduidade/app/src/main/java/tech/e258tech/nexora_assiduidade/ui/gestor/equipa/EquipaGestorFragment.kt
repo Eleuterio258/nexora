@@ -19,7 +19,9 @@ import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.ui.auth.LoginActivity
+import tech.e258tech.nexora_assiduidade.ui.gestor.configuracao.ConfigAssiduidadeFragment
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
+import tech.e258tech.nexora_assiduidade.utils.PermissionUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
@@ -47,9 +49,20 @@ class EquipaGestorFragment : Fragment() {
 
         val recyclerView = view.findViewById<RecyclerView>(R.id.recyclerViewEquipa)
         val tvEmpty = view.findViewById<TextView>(R.id.tvEquipaEmpty)
+        val tvConfigurarMetodos = view.findViewById<TextView>(R.id.tvConfigurarMetodos)
         recyclerView.layoutManager = LinearLayoutManager(context)
 
-        val token = SessionManager(requireContext()).getToken()
+        // Só quem pode ver a config de sistema (sistema-configuracao.ver_configuracoes)
+        // vê a entrada — evita levar a um ecrã que só vai devolver 403.
+        val sessionManager = SessionManager(requireContext())
+        if (PermissionUtils.has(sessionManager, "sistema-configuracao", "ver_configuracoes")) {
+            tvConfigurarMetodos.visibility = View.VISIBLE
+            tvConfigurarMetodos.setOnClickListener {
+                (activity as? LoginActivity)?.pushFragment(ConfigAssiduidadeFragment())
+            }
+        }
+
+        val token = sessionManager.getToken()
         if (token.isNullOrBlank()) {
             tvEmpty.visibility = View.VISIBLE
             tvEmpty.text = "Sessão inválida. Faça login novamente."

@@ -94,6 +94,10 @@ class QrCodeAttendanceFragment : Fragment() {
                 else -> cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             }
         }
+
+        view.findViewById<View>(R.id.ivBack).setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
     }
 
     private fun startScan() {

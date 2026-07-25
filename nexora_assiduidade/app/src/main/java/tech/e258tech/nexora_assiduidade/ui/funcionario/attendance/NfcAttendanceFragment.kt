@@ -77,6 +77,10 @@ class NfcAttendanceFragment : Fragment() {
 
         tvNfcInfo = view.findViewById(R.id.tvNfcInfo)
 
+        view.findViewById<View>(R.id.ivBack).setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
+
         if (nfcAdapter == null) {
             tvNfcInfo.text = "NFC nao disponivel neste dispositivo"
             return

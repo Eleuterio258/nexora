@@ -6,9 +6,11 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 import tech.e258tech.nexora_assiduidade.data.model.AdminSetPinRequest
+import tech.e258tech.nexora_assiduidade.data.model.AssiduidadeConfigRequest
 import tech.e258tech.nexora_assiduidade.data.model.AgendaItem
 import tech.e258tech.nexora_assiduidade.data.model.AgendaItemRequest
 import tech.e258tech.nexora_assiduidade.data.model.Ausencia
@@ -29,6 +31,7 @@ import tech.e258tech.nexora_assiduidade.data.model.RelatorioRH
 import tech.e258tech.nexora_assiduidade.data.model.TotpSetupRequest
 import tech.e258tech.nexora_assiduidade.data.model.TotpValidateRequest
 import tech.e258tech.nexora_assiduidade.data.model.chat.Conversation
+import tech.e258tech.nexora_assiduidade.data.model.response.AssiduidadeConfigResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageListResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ConversationCreateResponse
@@ -241,6 +244,20 @@ interface ErpApiService {
         @Query("data_inicio") dataInicio: String? = null,
         @Query("data_fim") dataFim: String? = null
     ): Response<List<ResultadoDiarioResponse>>
+
+    // Configuração dos métodos de assiduidade activos para o tenant
+    // (sistema-configuracao/handlers/assiduidade.go). GET exige
+    // sistema-configuracao.ver_configuracoes, PUT exige editar_configuracoes.
+    @GET("api/system/configuracao/tenant/feature/rh.assiduidade")
+    suspend fun getConfigAssiduidade(
+        @Header("Authorization") token: String
+    ): Response<AssiduidadeConfigResponse>
+
+    @PUT("api/system/configuracao/tenant/feature/rh.assiduidade")
+    suspend fun guardarConfigAssiduidade(
+        @Header("Authorization") token: String,
+        @Body request: AssiduidadeConfigRequest
+    ): Response<Unit>
 
     // Pedidos de férias/ausências (rh.go:1090, ListarAusencias)
     @GET("api/rh/ausencias")

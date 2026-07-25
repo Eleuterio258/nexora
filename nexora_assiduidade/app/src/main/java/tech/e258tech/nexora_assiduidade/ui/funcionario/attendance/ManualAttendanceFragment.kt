@@ -57,6 +57,10 @@ class ManualAttendanceFragment : Fragment() {
             btnRegister.isEnabled = false
             registerClock(sessionManager, userId, btnRegister)
         }
+
+        view.findViewById<View>(R.id.ivBack).setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
     }
 
     private fun registerClock(

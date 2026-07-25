@@ -10,6 +10,7 @@ import androidx.cardview.widget.CardView
 import androidx.fragment.app.Fragment
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.ui.auth.LoginActivity
+import tech.e258tech.nexora_assiduidade.ui.gestor.configuracao.ConfigAssiduidadeFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.dispositivos.DispositivosFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ocorrencias.AlertasFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ocorrencias.OcorrenciasFragment
@@ -44,14 +45,17 @@ class MaisFragment : Fragment() {
         // em vez de deixar aparecer 403 ao abrir o ecrã.
         val temVerDispositivos = PermissionUtils.has(sessionManager, "hardware", "ver_dispositivos")
         val temVerFuncionarios = PermissionUtils.has(sessionManager, "recursos-humanos", "ver_funcionarios")
+        val temVerConfiguracoes = PermissionUtils.has(sessionManager, "sistema-configuracao", "ver_configuracoes")
 
         val cardDispositivos = view.findViewById<CardView>(R.id.cardDispositivos)
         val cardOcorrencias = view.findViewById<CardView>(R.id.cardOcorrencias)
         val cardAlertas = view.findViewById<CardView>(R.id.cardAlertas)
+        val cardConfig = view.findViewById<CardView>(R.id.cardConfig)
 
         cardDispositivos.visibility = if (temVerDispositivos) View.VISIBLE else View.GONE
         cardOcorrencias.visibility = if (temVerFuncionarios) View.VISIBLE else View.GONE
         cardAlertas.visibility = if (temVerFuncionarios) View.VISIBLE else View.GONE
+        cardConfig.visibility = if (temVerConfiguracoes) View.VISIBLE else View.GONE
 
         cardDispositivos.setOnClickListener {
             (activity as? LoginActivity)?.pushFragment(DispositivosFragment())
@@ -65,8 +69,8 @@ class MaisFragment : Fragment() {
         view.findViewById<CardView>(R.id.cardRegistoManual).setOnClickListener {
             (activity as? LoginActivity)?.pushFragment(RegistoManualFragment())
         }
-        view.findViewById<CardView>(R.id.cardConfig).setOnClickListener {
-            Toast.makeText(context, "Configurações em breve.", Toast.LENGTH_SHORT).show()
+        cardConfig.setOnClickListener {
+            (activity as? LoginActivity)?.pushFragment(ConfigAssiduidadeFragment())
         }
         view.findViewById<CardView>(R.id.cardAjuda).setOnClickListener {
             Toast.makeText(context, "Ajuda em breve.", Toast.LENGTH_SHORT).show()

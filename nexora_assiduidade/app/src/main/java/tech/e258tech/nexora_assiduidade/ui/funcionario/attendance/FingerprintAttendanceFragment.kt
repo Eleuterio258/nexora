@@ -70,6 +70,10 @@ class FingerprintAttendanceFragment : Fragment() {
         btnAuthenticate.setOnClickListener {
             startBiometricAuthentication()
         }
+
+        view.findViewById<View>(R.id.ivBack).setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
     }
 
     private fun startBiometricAuthentication() {

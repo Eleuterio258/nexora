@@ -130,6 +130,10 @@ class FacialAttendanceFragment : Fragment() {
         btnCapture.setOnClickListener {
             beginCapture()
         }
+
+        view.findViewById<View>(R.id.ivBack).setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
     }
 
     private fun beginCapture() {

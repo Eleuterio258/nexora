@@ -76,6 +76,10 @@ class PinAttendanceFragment : Fragment() {
 
             validatePinAndRegister(pin)
         }
+
+        view.findViewById<View>(R.id.ivBack).setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
     }
 
     private fun validatePinAndRegister(pin: String) {

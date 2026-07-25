@@ -125,6 +125,10 @@ class SelfieGpsAttendanceFragment : Fragment() {
         btnCaptureSelfie.setOnClickListener {
             openCamera()
         }
+
+        view.findViewById<View>(R.id.ivBack).setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
     }
 
     private fun fetchLocation() {
