@@ -3,7 +3,7 @@ package tech.e258tech.nexora_assiduidade.data.model
 import com.google.gson.annotations.SerializedName
 
 /**
- * Body para enviar mensagem via REST (POST /chat/conversas/{id}/mensagens).
+ * Body para enviar mensagem via REST (POST /api/self-service/chat/conversas/{id}/mensagens).
  */
 data class ChatMessageRequest(
     val conteudo: String,

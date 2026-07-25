@@ -315,25 +315,30 @@ interface ErpApiService {
     ): Response<RelatorioRH>
 
     // Chat — conversas
-    @GET("chat/conversas")
+    // O chat vive no grupo /api/self-service do ERP (ver router.go, r.Route
+    // "/api/self-service" -> r.Route "/chat"), não na raiz: sem o prefixo estes
+    // quatro pedidos davam 404 e o ecrã de chat ficava sempre vazio, apesar de
+    // o WebSocket (/ws/chat) ligar bem e dar a impressão de estar tudo a
+    // funcionar.
+    @GET("api/self-service/chat/conversas")
     suspend fun getConversas(
         @Header("Authorization") token: String
     ): Response<ConversationListResponse>
 
-    @POST("chat/conversas")
+    @POST("api/self-service/chat/conversas")
     suspend fun createConversa(
         @Header("Authorization") token: String,
         @Body request: Conversation
     ): Response<ConversationCreateResponse>
 
     // Chat — mensagens
-    @GET("chat/conversas/{id}/mensagens")
+    @GET("api/self-service/chat/conversas/{id}/mensagens")
     suspend fun getChatMessages(
         @Header("Authorization") token: String,
         @Path("id") conversaId: String
     ): Response<ChatMessageListResponse>
 
-    @POST("chat/conversas/{id}/mensagens")
+    @POST("api/self-service/chat/conversas/{id}/mensagens")
     suspend fun sendChatMessage(
         @Header("Authorization") token: String,
         @Path("id") conversaId: String,
