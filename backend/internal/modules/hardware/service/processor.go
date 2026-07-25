@@ -84,11 +84,20 @@ func (p *Processor) Process(ctx context.Context, deviceID, tenantID int64, event
 }
 
 func (p *Processor) processEntity(ctx context.Context, tenantID, deviceID int64, event *models.NormalizedEvent, eventID int64) ProcessResult {
+	saasTenantID, err := tenantid.ResolveSaas(ctx, p.db, tenantID)
+	if err != nil {
+		return ProcessResult{ErrorMessage: "dispositivo sem empresa/tenant associado correctamente"}
+	}
+
+	if activo, metodo := p.metodoAssiduidadeActivo(ctx, saasTenantID, event.CredentialType); !activo {
+		return ProcessResult{ErrorMessage: fmt.Sprintf("Método de assiduidade '%s' não permitido para este tenant.", metodo)}
+	}
+
 	var mapping struct {
 		EntityType string
 		EntityID   int64
 	}
-	err := p.db.QueryRow(ctx, `
+	err = p.db.QueryRow(ctx, `
 		SELECT entity_type, entity_id
 		  FROM hardware.device_users
 		 WHERE device_id = $1 AND employee_no = $2 AND ativo = TRUE`,
@@ -96,11 +105,6 @@ func (p *Processor) processEntity(ctx context.Context, tenantID, deviceID int64,
 	).Scan(&mapping.EntityType, &mapping.EntityID)
 	if err != nil {
 		return ProcessResult{ErrorMessage: "employee_no não mapeado"}
-	}
-
-	saasTenantID, err := tenantid.ResolveSaas(ctx, p.db, tenantID)
-	if err != nil {
-		return ProcessResult{ErrorMessage: "dispositivo sem empresa/tenant associado correctamente"}
 	}
 
 	switch mapping.EntityType {
@@ -125,6 +129,70 @@ func (p *Processor) processEntity(ctx context.Context, tenantID, deviceID int64,
 	default:
 		return ProcessResult{ErrorMessage: "entity_type não suportado"}
 	}
+}
+
+// credentialTypeToMetodo traduz o credential_type normalizado por um adapter
+// (ex.: generic_rest — ver HardwareEventMapper.kt no nexora_assiduidade) para
+// a chave usada em rh.assiduidade.configuracao.metodos — mesmo vocabulário de
+// _SOURCE_TO_METODO em
+// assiduidade_system_backend/app/services/attendance_validation.py.
+var credentialTypeToMetodo = map[string]string{
+	"face":        "facial",
+	"fingerprint": "fingerprint",
+	"qr":          "qr_code",
+	"nfc":         "nfc",
+	"pin":         "pin",
+	"geolocation": "geolocation",
+	"manual":      "manual",
+}
+
+// metodoAssiduidadeActivo verifica se um método de assiduidade está permitido
+// para o tenant, segundo a mesma configuração editada em
+// PUT /api/system/configuracao/tenant/feature/rh.assiduidade
+// (sistema-configuracao/handlers/assiduidade.go). Até esta função existir,
+// esse ecrã só tinha efeito real sobre o método Facial — validado dentro do
+// FaceClock, em /biometric/verify — porque os outros 6 métodos (Manual, PIN,
+// QR, NFC, Impressão Digital, Selfie+GPS) falam directamente com este
+// endpoint genérico e nunca passavam por essa validação.
+//
+// Falha aberta (permite) em qualquer caso ambíguo — credential_type sem
+// mapeamento, feature rh.assiduidade inexistente/inactiva para o tenant, ou
+// método sem entrada explícita na configuração — espelhando
+// validar_metodo_assiduidade no FaceClock, para não bloquear
+// dispositivos/tenants antes de existir configuração completa.
+func (p *Processor) metodoAssiduidadeActivo(ctx context.Context, tenantID int64, credentialType string) (bool, string) {
+	metodo, ok := credentialTypeToMetodo[credentialType]
+	if !ok {
+		return true, ""
+	}
+
+	var activo bool
+	var configuracao []byte
+	err := p.db.QueryRow(ctx, `
+		SELECT COALESCE(tf.activo, fc.ativo_por_defeito), COALESCE(tf.configuracao, '{}'::jsonb)
+		  FROM saas.feature_catalog fc
+		  LEFT JOIN sistema_configuracao.tenant_feature_flags tf
+		    ON tf.tenant_id = $1 AND tf.codigo = fc.key
+		 WHERE fc.key = 'rh.assiduidade'`, tenantID).
+		Scan(&activo, &configuracao)
+	if err != nil || !activo {
+		return true, ""
+	}
+
+	var cfg struct {
+		Metodos map[string]struct {
+			Ativo *bool `json:"ativo"`
+		} `json:"metodos"`
+	}
+	if err := json.Unmarshal(configuracao, &cfg); err != nil {
+		return true, ""
+	}
+
+	metodoCfg, ok := cfg.Metodos[metodo]
+	if !ok || metodoCfg.Ativo == nil || *metodoCfg.Ativo {
+		return true, ""
+	}
+	return false, metodo
 }
 
 // registarEventoAssiduidade grava o evento numa das duas famílias

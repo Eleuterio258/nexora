@@ -53,8 +53,16 @@ class AttendanceRepository(context: Context) {
             val eventRequest = HardwareEventMapper.toGenericHardwareEvent(request, employeeCode)
             val response = erpApiService.registerEventDevice(BuildConfig.DEVICE_API_KEY, eventRequest)
 
-            if (response.isSuccessful && response.body() != null) {
-                RegisterResult.Success(response.body()!!)
+            val body = response.body()
+            if (response.isSuccessful && body != null) {
+                if (body.processed) {
+                    RegisterResult.Success(body)
+                } else {
+                    // HTTP 200 com processed=false: o ERP recebeu o evento mas
+                    // recusou-o (ex.: metodo desactivado para o tenant, ou
+                    // employee_no nao mapeado) — nao e sucesso, mesmo com HTTP 2xx.
+                    RegisterResult.Error(body.error ?: "Nao foi possivel registar o ponto.")
+                }
             } else {
                 val errorMessage = errorMessageDevice(response.code(), response.errorBody()?.string())
                 if (shouldSaveOffline(response.code())) {
