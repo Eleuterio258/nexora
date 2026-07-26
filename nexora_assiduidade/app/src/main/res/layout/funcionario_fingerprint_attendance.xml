@@ -50,17 +50,25 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/tvFingerprintTitle" />
 
-        <ImageView
-            android:id="@+id/ivFingerprint"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
+        <FrameLayout
+            android:id="@+id/fingerprintBadge"
+            android:layout_width="160dp"
+            android:layout_height="160dp"
             android:layout_marginTop="32dp"
-            android:contentDescription="Icone de impressao digital"
-            android:src="@drawable/ic_method_fingerprint"
-            app:tint="@color/brand_accent"
+            android:background="@drawable/bg_method_badge"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvFingerprintInfo" />
+            app:layout_constraintTop_toBottomOf="@id/tvFingerprintInfo">
+
+            <ImageView
+                android:id="@+id/ivFingerprint"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_gravity="center"
+                android:contentDescription="Icone de impressao digital"
+                android:src="@drawable/ic_method_fingerprint"
+                app:tint="@color/brand_accent_dark" />
+        </FrameLayout>
 
         <Button
             android:id="@+id/btnAuthenticate"
@@ -70,7 +78,7 @@
             android:text="Autenticar com Impressao Digital"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/ivFingerprint" />
+            app:layout_constraintTop_toBottomOf="@id/fingerprintBadge" />
 
         <ProgressBar
             android:id="@+id/progressBar"

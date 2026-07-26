@@ -128,3 +128,21 @@ VALUES
     ('generic_mqtt', 'MQTT Genérico', 'Leitores via broker MQTT', '1.0'),
     ('custom', 'Custom', 'Driver personalizado', '1.0')
 ON CONFLICT (codigo) DO NOTHING;
+
+-- Templates de impressão digital para identificação 1:N.
+CREATE TABLE IF NOT EXISTS hardware.fingerprint_templates (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    tenant_id BIGINT NOT NULL REFERENCES empresas.companies(id) ON DELETE CASCADE,
+    erp_user_id VARCHAR(50) NOT NULL,
+    erp_funcionario_id VARCHAR(50),
+    finger_type VARCHAR(50) NOT NULL DEFAULT 'right_thumb',
+    template_base64 TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (tenant_id, erp_user_id, finger_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hardware_fingerprint_templates_tenant_user
+    ON hardware.fingerprint_templates(tenant_id, erp_user_id);
+CREATE INDEX IF NOT EXISTS idx_hardware_fingerprint_templates_tenant_funcionario
+    ON hardware.fingerprint_templates(tenant_id, erp_funcionario_id);

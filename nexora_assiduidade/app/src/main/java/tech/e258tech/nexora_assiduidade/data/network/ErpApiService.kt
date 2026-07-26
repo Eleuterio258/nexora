@@ -15,6 +15,8 @@ import retrofit2.http.Query
 import tech.e258tech.nexora_assiduidade.data.model.AdminSetPinRequest
 import tech.e258tech.nexora_assiduidade.data.model.AssiduidadeConfigRequest
 import tech.e258tech.nexora_assiduidade.data.model.AgendaItem
+import tech.e258tech.nexora_assiduidade.data.model.CaptureImage
+import tech.e258tech.nexora_assiduidade.data.model.EnrollFacialRequest
 import tech.e258tech.nexora_assiduidade.data.model.AgendaItemRequest
 import tech.e258tech.nexora_assiduidade.data.model.Atividade
 import tech.e258tech.nexora_assiduidade.data.model.AtividadeListResponse
@@ -48,6 +50,7 @@ import tech.e258tech.nexora_assiduidade.data.model.chat.Conversation
 import tech.e258tech.nexora_assiduidade.utils.Constants
 import tech.e258tech.nexora_assiduidade.data.model.response.AssiduidadeConfigResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.AtividadeCreateResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.EnrollFacialResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageListResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ConversationCreateResponse
@@ -301,6 +304,15 @@ interface ErpApiService {
         @Query("data_inicio") dataInicio: String? = null,
         @Query("data_fim") dataFim: String? = null
     ): Response<List<ResultadoDiarioResponse>>
+
+    // Enrollment facial de um funcionário, feito por gestor RH.
+    // O ERP faz proxy para o FaceClock após validar consentimento LGPD e configuração do tenant.
+    @POST("api/rh/funcionarios/{id}/biometria/facial/enroll")
+    suspend fun enrollFacialFuncionario(
+        @Header("Authorization") token: String,
+        @Path("id") funcionarioId: Long,
+        @Body request: EnrollFacialRequest
+    ): Response<EnrollFacialResponse>
 
     // Configuração dos métodos de assiduidade activos para o tenant
     // (sistema-configuracao/handlers/assiduidade.go). GET exige

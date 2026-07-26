@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../features/applications/presentation/bloc/application_bloc.dart';
 import '../features/auth/presentation/bloc/auth_bloc.dart';
 import '../features/jobs/presentation/bloc/job_bloc.dart';
+import '../l10n/strings.dart';
 import '../widgets/nexora_logo.dart';
 import 'dashboard_screen.dart';
 import 'jobs_screen.dart';
@@ -60,31 +61,31 @@ class _MainScreenState extends State<MainScreen> {
           selectedFontSize: 11,
           unselectedFontSize: 11,
           selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-          items: const [
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined, size: 26),
-              activeIcon: Icon(Icons.home, size: 26),
-              label: 'Dashboard',
+              icon: const Icon(Icons.home_outlined, size: 26),
+              activeIcon: const Icon(Icons.home, size: 26),
+              label: AppStrings.of(context).navHome,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.work_outline, size: 26),
-              activeIcon: Icon(Icons.work, size: 26),
-              label: 'Jobs',
+              icon: const Icon(Icons.work_outline, size: 26),
+              activeIcon: const Icon(Icons.work, size: 26),
+              label: AppStrings.of(context).navJobs,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.description_outlined, size: 26),
-              activeIcon: Icon(Icons.description, size: 26),
-              label: 'Applications',
+              icon: const Icon(Icons.description_outlined, size: 26),
+              activeIcon: const Icon(Icons.description, size: 26),
+              label: AppStrings.of(context).navApplications,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.chat_bubble_outline, size: 26),
-              activeIcon: Icon(Icons.chat_bubble, size: 26),
-              label: 'Messages',
+              icon: const Icon(Icons.chat_bubble_outline, size: 26),
+              activeIcon: const Icon(Icons.chat_bubble, size: 26),
+              label: AppStrings.of(context).navMessages,
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline, size: 26),
-              activeIcon: Icon(Icons.person, size: 26),
-              label: 'Profile',
+              icon: const Icon(Icons.person_outline, size: 26),
+              activeIcon: const Icon(Icons.person, size: 26),
+              label: AppStrings.of(context).navProfile,
             ),
           ],
         ),

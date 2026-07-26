@@ -19,8 +19,10 @@ import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.model.response.ResultadoDiarioResponse
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
+import tech.e258tech.nexora_assiduidade.ui.gestor.funcionarios.EnrollFacialFragment
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
+import tech.e258tech.nexora_assiduidade.utils.PermissionUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
@@ -59,10 +61,22 @@ class DetalheFuncionarioFragment : Fragment() {
         val funcionarioId = arguments?.getLong(ARG_FUNCIONARIO_ID)
         val token = SessionManager(requireContext()).getToken()
         val tvName = view.findViewById<TextView>(R.id.tvEmployeeName)
+        val btnCadastrarRosto = view.findViewById<android.widget.Button>(R.id.btnCadastrarRosto)
 
         if (funcionarioId == null || token.isNullOrBlank()) {
             tvName.text = "Não foi possível carregar o funcionário."
             return
+        }
+
+        val sessionManager = SessionManager(requireContext())
+        if (PermissionUtils.has(sessionManager, "recursos-humanos", "gerir_funcionarios")) {
+            btnCadastrarRosto.visibility = View.VISIBLE
+            btnCadastrarRosto.setOnClickListener {
+                parentFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, EnrollFacialFragment.newInstance(funcionarioId))
+                    .addToBackStack(null)
+                    .commit()
+            }
         }
 
         loadFuncionario(view, funcionarioId, token)

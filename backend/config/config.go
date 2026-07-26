@@ -115,6 +115,10 @@ type Config struct {
 	SignatureCARootsPEM         string
 	SignatureCAIntermediatesPEM string
 
+	// FaceClock — gateway de biometria facial/digital (assiduidade_system_backend).
+	// Usado pelo ERP para enrollment biométrico iniciado por gestores RH.
+	FaceClockBaseURL string
+
 	// Authorization Server OAuth2 — chave(s) RS256 que assinam os access
 	// tokens emitidos por /oauth/token. Ver internal/modules/auth/oauthkeys.
 	// Por omissão o servidor RECUSA arrancar sem uma chave válida já
@@ -207,6 +211,8 @@ func Load() *Config {
 		SignatureINTICKeyPath:       env("SIGNATURE_INTIC_KEY_PATH", ""),
 		SignatureCARootsPEM:         env("SIGNATURE_CA_ROOTS_PEM", ""),
 		SignatureCAIntermediatesPEM: env("SIGNATURE_CA_INTERMEDIATES_PEM", ""),
+
+		FaceClockBaseURL: env("FACECLOCK_BASE_URL", "https://asseduidade.e258tech.tech"),
 
 		OAuthSigningKeysDir:    env("OAUTH_SIGNING_KEYS_DIR", "./data/oauth-keys"),
 		OAuthAllowGeneratedKey: envBool("OAUTH_ALLOW_GENERATED_KEY", false),

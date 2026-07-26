@@ -1830,6 +1830,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Post("/{id}/desligar", rh.DesligarFuncionario)
 				r.Post("/{id}/nfc-tags", rh.CriarNFCTag)
 				r.Delete("/nfc-tags/{id}", rh.RemoverNFCTag)
+				r.Post("/{id}/biometria/facial/enroll", rh.EnrollFacial)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "recursos-humanos", "ver_salarios"))
@@ -2578,6 +2579,21 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Get("/candidatos/candidaturas/{id}/mensagens", recrut.MensagensCandidatura)
 			r.Post("/candidatos/candidaturas/{id}/mensagens", recrut.EnviarMensagemCandidatura)
 			r.Post("/candidatos/push-token", recrut.RegistarPushToken)
+
+			// CV do candidato — experiência, formação e notificações
+			r.Get("/candidatos/experiencias", recrut.ListarExperiencias)
+			r.Post("/candidatos/experiencias", recrut.CriarExperiencia)
+			r.Put("/candidatos/experiencias/{id}", recrut.AtualizarExperiencia)
+			r.Delete("/candidatos/experiencias/{id}", recrut.RemoverExperiencia)
+
+			r.Get("/candidatos/formacoes", recrut.ListarFormacoes)
+			r.Post("/candidatos/formacoes", recrut.CriarFormacao)
+			r.Put("/candidatos/formacoes/{id}", recrut.AtualizarFormacao)
+			r.Delete("/candidatos/formacoes/{id}", recrut.RemoverFormacao)
+
+			r.Get("/candidatos/notificacoes", recrut.ListarNotificacoes)
+			r.Put("/candidatos/notificacoes/lidas", recrut.MarcarTodasNotificacoesLidas)
+			r.Put("/candidatos/notificacoes/{id}/lida", recrut.MarcarNotificacaoLida)
 		})
 	})
 
@@ -2735,6 +2751,18 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 					Delete("/users/{mappingId}", hardware.RemoverDeviceUser)
 			})
 		})
+	})
+
+	// ── Impressão digital (/api/v1/fingerprint) ──────────────────────────────
+	r.Route("/api/v1/fingerprint", func(r chi.Router) {
+		r.Use(mw.RequireAuth(cfg.JWTSecret, db, oauthKeys))
+
+		r.With(mw.RequirePermission(db, "hardware", "gerir_dispositivos")).
+			Post("/enroll", hardware.EnrollFingerprint)
+		r.With(mw.RequirePermission(db, "hardware", "ver_dispositivos")).
+			Post("/identify", hardware.IdentifyFingerprint)
+		r.With(mw.RequirePermission(db, "hardware", "gerir_dispositivos")).
+			Delete("/enroll/{user_id}", hardware.DeleteFingerprintEnrollment)
 	})
 
 	return r

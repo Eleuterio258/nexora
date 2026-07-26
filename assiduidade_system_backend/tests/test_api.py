@@ -86,8 +86,11 @@ class TestFingerprint:
             },
             headers=admin_headers,
         )
-        assert response.status_code == 200
-        assert response.json()["success"] is True
+        assert response.status_code == 201
+        data = response.json()
+        assert data["success"] is True
+        assert data["template_id"] is not None
+        assert data["user_id"] == erp_user_id
 
         response = client.post(
             "/api/v1/fingerprint/identify",
@@ -115,6 +118,18 @@ class TestFingerprint:
         )
         assert response.status_code == 200
         assert response.json()["success"] is True
+
+    def test_enroll_rejects_invalid_base64(self, client, admin_headers, erp_user_id):
+        response = client.post(
+            "/api/v1/fingerprint/enroll",
+            json={
+                "user_id": erp_user_id,
+                "finger_type": "right_thumb",
+                "template_base64": "not-valid-base64!!!",
+            },
+            headers=admin_headers,
+        )
+        assert response.status_code == 422
 
 
 # ============================================================
