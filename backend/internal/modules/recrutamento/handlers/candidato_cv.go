@@ -112,7 +112,7 @@ func (h *Handler) CriarExperiencia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	e, err := h.db.QueryRow(r.Context(), `
+	row := h.db.QueryRow(r.Context(), `
 		INSERT INTO recrutamento.candidato_experiencias
 			(candidato_id, tenant_id, cargo, empresa, local, data_inicio, data_fim, actual, descricao)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -120,15 +120,7 @@ func (h *Handler) CriarExperiencia(w http.ResponseWriter, r *http.Request) {
 		c.ID, c.TenantID, clean(body.Cargo, 150), clean(body.Empresa, 150),
 		nullIfEmpty(clean(ptrString(body.Local), 150)), body.DataInicio,
 		nullIfEmpty(clean(ptrString(body.DataFim), 10)), *body.Actual,
-		nullIfEmpty(clean(ptrString(body.Descricao), 2000)),
-	).Scan(&body) // placeholder evitado abaixo com scanExperiencia
-	_ = e
-
-	row := h.db.QueryRow(r.Context(), `
-		SELECT `+experienciaSelectCols+`
-		  FROM recrutamento.candidato_experiencias
-		 WHERE candidato_id=$1 AND tenant_id=$2
-		 ORDER BY created_at DESC LIMIT 1`, c.ID, c.TenantID)
+		nullIfEmpty(clean(ptrString(body.Descricao), 2000)))
 	exp, err := scanExperiencia(row)
 	if err != nil {
 		jsonErr(w, "Erro ao criar experiência", http.StatusInternalServerError)
@@ -453,9 +445,4 @@ type validationError string
 func errValidation(msg string) error { return validationError(msg) }
 func (e validationError) Error() string { return string(e) }
 
-func ptrString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
+
