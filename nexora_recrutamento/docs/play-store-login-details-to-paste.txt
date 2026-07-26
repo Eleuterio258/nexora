@@ -1,0 +1,92 @@
+================================================================================
+DETALHES DE LOGIN PARA COLAR NA GOOGLE PLAY CONSOLE
+Nexora Recrutamento
+================================================================================
+
+NOTA: A Google Play exige que as informacoes estejam em INGLES. Use o texto em
+ingles abaixo. A versao em portugues serve apenas para referencia.
+
+================================================================================
+ENTRADA 1 - CONTA DE CANDIDATO (CANDIDATE ACCOUNT)
+================================================================================
+
+Nome (Name):
+Candidate Test Account
+
+Nome de usuario / e-mail (Username / email):
+candidate.test@e258tech.tech
+
+Senha (Password):
+TestCandidate123!
+
+Outras informacoes (Other information):
+No additional steps required. After login, the reviewer can browse public job listings, create a professional profile, submit applications, and track application status. Push notifications can be ignored or disabled in device settings.
+
+
+================================================================================
+ENTRADA 2 - CONTA DE RECRUTADOR (RECRUITER ACCOUNT)
+================================================================================
+
+Nome (Name):
+Recruiter Test Account
+
+Nome de usuario / e-mail (Username / email):
+recruiter.test@e258tech.tech
+
+Senha (Password):
+TestRecruiter123!
+
+Outras informacoes (Other information):
+No additional steps required. After login, the reviewer can publish jobs, view received applications, evaluate candidates, schedule interviews, and communicate with applicants. Push notifications can be ignored or disabled in device settings.
+
+
+================================================================================
+ENTRADA 3 - CONTA DE ADMINISTRADOR (ADMINISTRATOR ACCOUNT)
+================================================================================
+
+Nome (Name):
+Administrator Test Account
+
+Nome de usuario / e-mail (Username / email):
+admin.test@e258tech.tech
+
+Senha (Password):
+TestAdmin123!
+
+Outras informacoes (Other information):
+No additional steps required. After login, the reviewer has full access to recruiter features plus user management, system settings, and analytics reports. Push notifications can be ignored or disabled in device settings.
+
+
+================================================================================
+INSTRUCOES PARA ADICIONAR NA PLAY CONSOLE
+================================================================================
+
+1. Aceda a "Detalhes do login" na consola.
+2. Clique em "Adicionar detalhes de login".
+3. Preencha com a Entrada 1 (Candidate Test Account).
+4. Clique em "Adicionar detalhes de login" novamente.
+5. Preencha com a Entrada 2 (Recruiter Test Account).
+6. Clique em "Adicionar detalhes de login" novamente.
+7. Preencha com a Entrada 3 (Administrator Test Account).
+8. Guarde as alteracoes.
+
+================================================================================
+VERSAO RESUMIDA PARA O CAMPO "OUTRAS INFORMACOES" (ALTERNATIVA)
+================================================================================
+
+Se preferir usar apenas uma conta e colocar as outras no campo "Outras 
+informacoes", cole isto (em ingles):
+
+"The app requires authentication. Three test accounts are provided below:
+- Candidate: candidate.test@e258tech.tech / TestCandidate123!
+- Recruiter: recruiter.test@e258tech.tech / TestRecruiter123!
+- Administrator: admin.test@e258tech.tech / TestAdmin123!
+No additional verification is needed (no 2FA, biometric, QR code, payment, or referral code). Push notifications can be disabled in device settings."
+
+================================================================================
+LEMBRETE IMPORTANTE
+================================================================================
+
+ANTES de submeter, certifique-se de que estas contas realmente existem no
+backend do Nexora Recrutamento e que as palavras-passe estao corretas. Se a
+equipa do Google Play nao conseguir fazer login, o app pode ser rejeitado.

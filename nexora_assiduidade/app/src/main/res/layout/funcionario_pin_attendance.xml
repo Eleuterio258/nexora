@@ -26,29 +26,169 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
+        <ImageView
+            android:id="@+id/ivPinBadge"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_pin_badge"
+            android:contentDescription="@null"
+            android:padding="14dp"
+            android:src="@drawable/ic_method_pin"
+            app:tint="@color/brand_accent_dark"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/ivBack" />
+
         <TextView
             android:id="@+id/tvPinTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="16dp"
             android:text="Entrada com PIN"
             android:textColor="@color/text_primary"
             android:textSize="24sp"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/ivBack" />
+            app:layout_constraintTop_toBottomOf="@id/ivPinBadge" />
 
+        <TextView
+            android:id="@+id/tvPinSubtitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Digite o seu PIN para registar o ponto"
+            android:textColor="@color/text_muted"
+            android:textSize="14sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="@id/tvPinTitle"
+            app:layout_constraintTop_toBottomOf="@id/tvPinTitle" />
+
+        <!-- Guarda o valor real do PIN (o teclado próprio abaixo escreve aqui) — sem
+             presença visual, quem mostra o progresso são os pontos (pinDotsContainer).
+             Nunca abre o teclado do sistema: focusable=false + setShowSoftInputOnFocus(false)
+             (feito em Kotlin, ver PinAttendanceFragment — o atributo XML é @hide). -->
         <EditText
             android:id="@+id/etPin"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:background="@null"
+            android:cursorVisible="false"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:importantForAccessibility="no"
+            android:inputType="numberPassword"
+            android:longClickable="false"
+            android:maxLength="6"
+            android:textSize="1sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvPinSubtitle" />
+
+        <!-- Pontos do PIN — o estado (vazio/preenchido) é actualizado directamente pelo
+             teclado numérico em Kotlin, sem TextWatcher (todas as mutações de etPin já
+             passam pelo próprio teclado). -->
+        <LinearLayout
+            android:id="@+id/pinDotsContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:contentDescription="Progresso do PIN digitado"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/etPin">
+
+            <View android:id="@+id/pinDot1" android:layout_width="16dp" android:layout_height="16dp" android:layout_marginHorizontal="8dp" android:background="@drawable/bg_pin_dot_empty" />
+            <View android:id="@+id/pinDot2" android:layout_width="16dp" android:layout_height="16dp" android:layout_marginHorizontal="8dp" android:background="@drawable/bg_pin_dot_empty" />
+            <View android:id="@+id/pinDot3" android:layout_width="16dp" android:layout_height="16dp" android:layout_marginHorizontal="8dp" android:background="@drawable/bg_pin_dot_empty" />
+            <View android:id="@+id/pinDot4" android:layout_width="16dp" android:layout_height="16dp" android:layout_marginHorizontal="8dp" android:background="@drawable/bg_pin_dot_empty" />
+            <View android:id="@+id/pinDot5" android:layout_width="16dp" android:layout_height="16dp" android:layout_marginHorizontal="8dp" android:background="@drawable/bg_pin_dot_empty" />
+            <View android:id="@+id/pinDot6" android:layout_width="16dp" android:layout_height="16dp" android:layout_marginHorizontal="8dp" android:background="@drawable/bg_pin_dot_empty" />
+        </LinearLayout>
+
+        <!-- Teclado numérico próprio — substitui o teclado do sistema, mesmo estilo
+             visual da app (bg_keypad_button.xml: contorno @color/border, fundo @color/surface). -->
+        <LinearLayout
+            android:id="@+id/keypadContainer"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:hint="Digite seu PIN"
-            android:inputType="numberPassword"
-            android:maxLength="6"
+            android:orientation="vertical"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvPinTitle" />
+            app:layout_constraintTop_toBottomOf="@id/pinDotsContainer">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <Button android:id="@+id/btnKey1" style="@style/PinKeypadButton" android:text="1" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <Button android:id="@+id/btnKey2" style="@style/PinKeypadButton" android:text="2" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <Button android:id="@+id/btnKey3" style="@style/PinKeypadButton" android:text="3" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <Button android:id="@+id/btnKey4" style="@style/PinKeypadButton" android:text="4" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <Button android:id="@+id/btnKey5" style="@style/PinKeypadButton" android:text="5" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <Button android:id="@+id/btnKey6" style="@style/PinKeypadButton" android:text="6" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <Button android:id="@+id/btnKey7" style="@style/PinKeypadButton" android:text="7" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <Button android:id="@+id/btnKey8" style="@style/PinKeypadButton" android:text="8" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <Button android:id="@+id/btnKey9" style="@style/PinKeypadButton" android:text="9" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <!-- Célula vazia — mantém o "0" alinhado ao centro, como em qualquer teclado PIN. -->
+                <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
+                <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <Button android:id="@+id/btnKey0" style="@style/PinKeypadButton" android:text="0" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1">
+                    <ImageButton
+                        android:id="@+id/btnBackspace"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_keypad_button"
+                        android:contentDescription="Apagar"
+                        android:padding="18dp"
+                        android:src="@drawable/ic_backspace"
+                        app:tint="@color/text_muted" />
+                </FrameLayout>
+            </LinearLayout>
+        </LinearLayout>
 
         <Button
             android:id="@+id/btnValidatePin"
@@ -58,7 +198,7 @@
             android:text="Validar"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/etPin" />
+            app:layout_constraintTop_toBottomOf="@id/keypadContainer" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>

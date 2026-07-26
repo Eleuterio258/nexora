@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../features/auth/presentation/bloc/auth_bloc.dart';
+import '../l10n/strings.dart';
 import '../widgets/nexora_logo.dart';
 import 'notifications_screen.dart';
 import 'personal_info_screen.dart';
@@ -39,6 +40,10 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+    final authState = context.watch<AuthBloc>().state;
+    final user = authState is AuthAuthenticated ? authState.user : null;
+
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is AuthUnauthenticated) {
@@ -67,8 +72,8 @@ class ProfileScreen extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: const [
+                          const Row(
+                            children: [
                               NexoraLogoIcon(size: 26, isWhite: true),
                               SizedBox(width: 8),
                               Text(
@@ -158,9 +163,9 @@ class ProfileScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Arjun Mehta',
-                                  style: TextStyle(
+                                Text(
+                                  user?.nome ?? strings.profileTitle,
+                                  style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 22,
                                     fontWeight: FontWeight.w800,
@@ -168,9 +173,9 @@ class ProfileScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 3),
                                 Text(
-                                  'Product Manager',
-                                  style: TextStyle(
-                                    color: const Color.fromRGBO(
+                                  user?.email ?? '',
+                                  style: const TextStyle(
+                                    color: Color.fromRGBO(
                                       255,
                                       255,
                                       255,
@@ -178,33 +183,6 @@ class ProfileScreen extends StatelessWidget {
                                     ),
                                     fontSize: 14,
                                   ),
-                                ),
-                                const SizedBox(height: 6),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Icon(
-                                      Icons.work_outline,
-                                      color: Color.fromRGBO(255, 255, 255, 0.7),
-                                      size: 14,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Expanded(
-                                      child: Text(
-                                        'Building user-centric products that solve real-world problems.',
-                                        style: TextStyle(
-                                          color: const Color.fromRGBO(
-                                            255,
-                                            255,
-                                            255,
-                                            0.75,
-                                          ),
-                                          fontSize: 12,
-                                          height: 1.4,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
                                 ),
                               ],
                             ),
@@ -230,40 +208,40 @@ class ProfileScreen extends StatelessWidget {
                     children: [
                       _MenuItem(
                         icon: Icons.person_outline,
-                        title: 'Personal Info',
-                        subtitle: 'View and update your personal details',
+                        title: strings.profilePersonalInfoTitle,
+                        subtitle: strings.profilePersonalInfoSubtitle,
                         onTap: () => Navigator.push(context,
                             MaterialPageRoute(builder: (_) => const PersonalInfoScreen())),
                       ),
                       const SizedBox(height: 14),
                       _MenuItem(
                         icon: Icons.work_outline,
-                        title: 'Experience',
-                        subtitle: 'Add and manage your work experience',
+                        title: strings.profileExperienceTitle,
+                        subtitle: strings.profileExperienceSubtitle,
                         onTap: () => Navigator.push(context,
                             MaterialPageRoute(builder: (_) => const ExperienceScreen())),
                       ),
                       const SizedBox(height: 14),
                       _MenuItem(
                         icon: Icons.school_outlined,
-                        title: 'Education',
-                        subtitle: 'Add and manage your educational background',
+                        title: strings.profileEducationTitle,
+                        subtitle: strings.profileEducationSubtitle,
                         onTap: () => Navigator.push(context,
                             MaterialPageRoute(builder: (_) => const EducationScreen())),
                       ),
                       const SizedBox(height: 14),
                       _MenuItem(
                         icon: Icons.settings_outlined,
-                        title: 'Settings',
-                        subtitle: 'Manage your account and preferences',
+                        title: strings.profileSettingsTitle,
+                        subtitle: strings.profileSettingsSubtitle,
                         onTap: () => Navigator.push(context,
                             MaterialPageRoute(builder: (_) => const SettingsScreen())),
                       ),
                       const SizedBox(height: 14),
                       _MenuItem(
                         icon: Icons.logout,
-                        title: 'Logout',
-                        subtitle: 'Sign out of your account',
+                        title: strings.profileLogoutTitle,
+                        subtitle: strings.profileLogoutSubtitle,
                         onTap: () => _confirmLogout(context),
                       ),
                       const SizedBox(height: 24),
@@ -300,9 +278,9 @@ class ProfileScreen extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'Complete your profile',
-                                    style: TextStyle(
+                                  Text(
+                                    strings.profileCompleteTitle,
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 14,
                                       color: Color(0xFF1A2E2A),
@@ -310,7 +288,7 @@ class ProfileScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    'A complete profile increases your chances of getting hired.',
+                                    strings.profileCompleteSubtitle,
                                     style: TextStyle(
                                       color: Colors.grey.shade500,
                                       fontSize: 12,
@@ -337,9 +315,9 @@ class ProfileScreen extends StatelessWidget {
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              child: const Text(
-                                '85% Complete',
-                                style: TextStyle(
+                              child: Text(
+                                strings.profileCompletePercent.replaceFirst('%s', '85'),
+                                style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                 ),

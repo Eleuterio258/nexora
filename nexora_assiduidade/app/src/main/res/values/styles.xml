@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Botão circular do teclado numérico de PIN (funcionario_pin_attendance.xml) —
+         Borderless como base para remover a elevação/tint por omissão do MaterialButton
+         e usar só o nosso bg_keypad_button.xml (contorno + fundo). -->
+    <style name="PinKeypadButton" parent="android:Widget.Material.Button.Borderless">
+        <item name="android:layout_width">64dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_gravity">center</item>
+        <item name="android:background">@drawable/bg_keypad_button</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:textSize">22sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:padding">0dp</item>
+    </style>
+
+</resources>

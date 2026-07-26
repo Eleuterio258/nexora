@@ -10,13 +10,16 @@ estiver disponível. Até la, o metodo FINGERPRINT na app Android continua a usa
 BiometricPrompt apenas como prova de presença vinculada ao utilizador autenticado.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+import base64
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import ActorContext, apply_tenant, get_actor
+from app.limiter import limiter
 from app.models import FingerprintTemplate
 
 router = APIRouter(tags=["Fingerprint"])
@@ -24,12 +27,38 @@ router = APIRouter(tags=["Fingerprint"])
 
 class FingerprintEnrollRequest(BaseModel):
     user_id: str
+    erp_funcionario_id: str | None = None
     finger_type: str = "right_thumb"
     template_base64: str
+
+    @field_validator("template_base64")
+    @classmethod
+    def _validate_base64(cls, value: str) -> str:
+        try:
+            base64.b64decode(value, validate=True)
+        except Exception as exc:
+            raise ValueError("template_base64 deve ser uma string base64 valida.") from exc
+        return value
 
 
 class FingerprintVerifyRequest(BaseModel):
     template_base64: str
+
+    @field_validator("template_base64")
+    @classmethod
+    def _validate_base64(cls, value: str) -> str:
+        try:
+            base64.b64decode(value, validate=True)
+        except Exception as exc:
+            raise ValueError("template_base64 deve ser uma string base64 valida.") from exc
+        return value
+
+
+class FingerprintEnrollResponse(BaseModel):
+    success: bool
+    template_id: str | None = None
+    user_id: str | None = None
+    message: str
 
 
 class FingerprintResponse(BaseModel):
@@ -38,48 +67,71 @@ class FingerprintResponse(BaseModel):
     message: str
 
 
-@router.post("/fingerprint/enroll", response_model=FingerprintResponse)
+@router.post(
+    "/fingerprint/enroll",
+    response_model=FingerprintEnrollResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+@limiter.limit("20/hour")
 def enroll_fingerprint(
-    request: FingerprintEnrollRequest,
+    request: Request,
+    payload: FingerprintEnrollRequest,
     db: Session = Depends(get_db),
     actor: ActorContext = Depends(get_actor),
-) -> FingerprintResponse:
-    """Regista um template de impressão digital para um utilizador."""
-    erp_user_id = request.user_id
+) -> FingerprintEnrollResponse:
+    """Regista ou actualiza um template de impressão digital para um utilizador."""
+    erp_user_id = payload.user_id
 
     existing = db.scalar(
         apply_tenant(
             select(FingerprintTemplate).where(
                 FingerprintTemplate.erp_user_id == erp_user_id,
-                FingerprintTemplate.finger_type == request.finger_type,
+                FingerprintTemplate.finger_type == payload.finger_type,
             ),
             actor,
             FingerprintTemplate,
         )
     )
     if existing:
-        existing.template_base64 = request.template_base64
+        existing.template_base64 = payload.template_base64
+        existing.erp_funcionario_id = payload.erp_funcionario_id
     else:
         db.add(
             FingerprintTemplate(
                 tenant_id=actor.tenant_id,
                 erp_user_id=erp_user_id,
-                finger_type=request.finger_type,
-                template_base64=request.template_base64,
+                erp_funcionario_id=payload.erp_funcionario_id,
+                finger_type=payload.finger_type,
+                template_base64=payload.template_base64,
             )
         )
     db.commit()
 
-    return FingerprintResponse(
+    # Recarrega para obter o id gerado.
+    template = db.scalar(
+        apply_tenant(
+            select(FingerprintTemplate).where(
+                FingerprintTemplate.erp_user_id == erp_user_id,
+                FingerprintTemplate.finger_type == payload.finger_type,
+            ),
+            actor,
+            FingerprintTemplate,
+        )
+    )
+
+    return FingerprintEnrollResponse(
         success=True,
-        user_id=request.user_id,
+        template_id=template.id if template else None,
+        user_id=payload.user_id,
         message="Template de impressão digital registado.",
     )
 
 
 @router.post("/fingerprint/identify", response_model=FingerprintResponse)
+@limiter.limit("30/minute")
 def identify_fingerprint(
-    request: FingerprintVerifyRequest,
+    request: Request,
+    payload: FingerprintVerifyRequest,
     db: Session = Depends(get_db),
     actor: ActorContext = Depends(get_actor),
 ) -> FingerprintResponse:
@@ -95,7 +147,7 @@ def identify_fingerprint(
     ).all()
 
     for template in templates:
-        if template.template_base64 == request.template_base64:
+        if template.template_base64 == payload.template_base64:
             return FingerprintResponse(
                 success=True,
                 user_id=template.erp_user_id,
@@ -109,7 +161,9 @@ def identify_fingerprint(
 
 
 @router.delete("/fingerprint/enroll/{user_id}")
+@limiter.limit("20/hour")
 def delete_fingerprint_enrollment(
+    request: Request,
     user_id: str,
     finger_type: str | None = None,
     db: Session = Depends(get_db),

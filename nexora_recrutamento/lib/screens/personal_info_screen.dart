@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../features/auth/presentation/bloc/auth_bloc.dart';
+import '../l10n/strings.dart';
 import '../widgets/nexora_logo.dart';
 
 class PersonalInfoScreen extends StatefulWidget {
@@ -9,14 +12,21 @@ class PersonalInfoScreen extends StatefulWidget {
 }
 
 class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
-  final _nameCtrl = TextEditingController(text: 'Arjun Mehta');
-  final _emailCtrl = TextEditingController(text: 'arjun.mehta@gmail.com');
-  final _phoneCtrl = TextEditingController(text: '+91 98765 43210');
-  final _locationCtrl = TextEditingController(text: 'Bangalore, India');
-  final _titleCtrl = TextEditingController(text: 'Product Manager');
-  final _bioCtrl = TextEditingController(
-      text:
-          'Building user-centric products that solve real-world problems. 5+ years in product management across fintech and edtech.');
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _emailCtrl;
+  final _phoneCtrl = TextEditingController();
+  final _locationCtrl = TextEditingController();
+  final _titleCtrl = TextEditingController();
+  final _bioCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final authState = context.read<AuthBloc>().state;
+    final user = authState is AuthAuthenticated ? authState.user : null;
+    _nameCtrl = TextEditingController(text: user?.nome ?? '');
+    _emailCtrl = TextEditingController(text: user?.email ?? '');
+  }
 
   @override
   void dispose() {
@@ -31,6 +41,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFFE8F5EE),
       appBar: AppBar(
@@ -40,19 +52,25 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Personal Info',
-          style: TextStyle(
-              color: Colors.white, fontWeight: FontWeight.w700, fontSize: 17),
+        title: Text(
+          strings.personalInfoTitle,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: 17,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Save',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15)),
+            child: Text(
+              strings.personalInfoSave,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+            ),
           ),
         ],
       ),
@@ -61,7 +79,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Avatar section
             Center(
               child: Stack(
                 children: [
@@ -77,37 +94,74 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       width: 32,
                       height: 32,
                       decoration: const BoxDecoration(
-                          color: kPrimary, shape: BoxShape.circle),
-                      child: const Icon(Icons.camera_alt,
-                          color: Colors.white, size: 16),
+                        color: kPrimary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 8),
-            const Center(
-              child: Text('Tap to change photo',
-                  style: TextStyle(color: Color(0xFF9AA5B1), fontSize: 13)),
+            Center(
+              child: Text(
+                strings.personalInfoPhotoHint,
+                style: const TextStyle(
+                  color: Color(0xFF9AA5B1),
+                  fontSize: 13,
+                ),
+              ),
             ),
             const SizedBox(height: 28),
-            _SectionLabel('Basic Details'),
+            _SectionLabel(strings.personalInfoBasicDetails),
             const SizedBox(height: 12),
-            _Field(label: 'Full Name', controller: _nameCtrl, icon: Icons.person_outline),
+            _Field(
+              label: strings.personalInfoFullName,
+              controller: _nameCtrl,
+              icon: Icons.person_outline,
+            ),
             const SizedBox(height: 12),
-            _Field(label: 'Job Title', controller: _titleCtrl, icon: Icons.work_outline),
+            _Field(
+              label: strings.personalInfoJobTitle,
+              controller: _titleCtrl,
+              icon: Icons.work_outline,
+            ),
             const SizedBox(height: 12),
-            _Field(label: 'Location', controller: _locationCtrl, icon: Icons.location_on_outlined),
+            _Field(
+              label: strings.personalInfoLocation,
+              controller: _locationCtrl,
+              icon: Icons.location_on_outlined,
+            ),
             const SizedBox(height: 24),
-            _SectionLabel('Contact'),
+            _SectionLabel(strings.personalInfoContact),
             const SizedBox(height: 12),
-            _Field(label: 'Email', controller: _emailCtrl, icon: Icons.email_outlined, keyboard: TextInputType.emailAddress),
+            _Field(
+              label: strings.personalInfoEmail,
+              controller: _emailCtrl,
+              icon: Icons.email_outlined,
+              keyboard: TextInputType.emailAddress,
+            ),
             const SizedBox(height: 12),
-            _Field(label: 'Phone', controller: _phoneCtrl, icon: Icons.phone_outlined, keyboard: TextInputType.phone),
+            _Field(
+              label: strings.personalInfoPhone,
+              controller: _phoneCtrl,
+              icon: Icons.phone_outlined,
+              keyboard: TextInputType.phone,
+            ),
             const SizedBox(height: 24),
-            _SectionLabel('About'),
+            _SectionLabel(strings.personalInfoAbout),
             const SizedBox(height: 12),
-            _Field(label: 'Bio', controller: _bioCtrl, icon: Icons.notes_outlined, maxLines: 4),
+            _Field(
+              label: strings.personalInfoBio,
+              controller: _bioCtrl,
+              icon: Icons.notes_outlined,
+              maxLines: 4,
+            ),
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
@@ -119,11 +173,16 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text('Save Changes',
-                    style:
-                        TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                child: Text(
+                  strings.personalInfoSaveChanges,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
           ],
@@ -139,12 +198,15 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(text,
-        style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF9AA5B1),
-            letterSpacing: 0.5));
+    return Text(
+      text,
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: Color(0xFF9AA5B1),
+        letterSpacing: 0.5,
+      ),
+    );
   }
 }
 
@@ -170,7 +232,11 @@ class _Field extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.all(Radius.circular(8)),
         boxShadow: [
-          BoxShadow(color: Color(0x07000000), blurRadius: 8, offset: Offset(0, 2))
+          BoxShadow(
+            color: Color(0x07000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          )
         ],
       ),
       child: TextField(
@@ -179,12 +245,16 @@ class _Field extends StatelessWidget {
         maxLines: maxLines,
         decoration: InputDecoration(
           labelText: label,
-          labelStyle:
-              const TextStyle(color: Color(0xFF9AA5B1), fontSize: 13),
+          labelStyle: const TextStyle(
+            color: Color(0xFF9AA5B1),
+            fontSize: 13,
+          ),
           prefixIcon: Icon(icon, color: kPrimary, size: 20),
           border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
     );
