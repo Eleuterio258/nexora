@@ -29,10 +29,6 @@ class ERPUnavailableError(Exception):
     """ERP não responde ou não está configurado."""
 
 
-class ERPAuthError(Exception):
-    """Credenciais inválidas no ERP."""
-
-
 class ERPResponseError(Exception):
     """O ERP respondeu com um erro (4xx/5xx) a reencaminhar tal-qual ao chamador.
 
@@ -113,47 +109,12 @@ class ERPClient:
 
         return response.json()
 
-    async def validate_bearer_token(self, token: str) -> dict[str, Any]:
-        """Valida o Bearer token de um utilizador (não API Key de device) junto
-        do Nexora ERP, delegando a resolução de identidade em vez de decifrar o
-        token localmente — o FaceClock não partilha segredo de assinatura com o
-        ERP, por isso não pode validar um JWT do ERP sozinho.
-
-        Chama `GET /api/auth/gateway/validate`, reencaminhando o MESMO token do
-        utilizador (`Authorization: Bearer <token>`) — ao contrário dos outros
-        métodos deste cliente, que usam a API Key de device
-        (`_device_headers()`). O ERP já valida o token com o seu próprio JWT
-        middleware antes de chegar ao handler (ver
-        `backend/internal/router/router.go`, grupo `RequireAuth` em
-        `/api/auth`), e devolve a identidade via headers `X-Auth-*` (incluindo
-        `X-Auth-User-Role`, já traduzido para o vocabulário do FaceClock —
-        `ADMIN_SISTEMA`/`GESTOR_RH`/`COLABORADOR` — ver
-        `GatewayValidate`/`gatewayAppRole` em
-        `backend/internal/modules/auth/handlers/auth.go`).
-        """
-        if not self._is_configured():
-            raise ERPUnavailableError("ERP_BASE_URL nao configurado.")
-
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(
-                    f"{self.base_url}/api/auth/gateway/validate",
-                    headers={
-                        **self._headers(), "Authorization": f"Bearer {token}"},
-                )
-        except httpx.RequestError as exc:
-            raise ERPUnavailableError(f"ERP indisponivel: {exc}") from exc
-
-        if response.status_code in (401, 403):
-            raise ERPAuthError("Token invalido ou expirado no ERP.")
-        response.raise_for_status()
-
-        headers = response.headers
-        return {
-            "id": headers.get("X-Auth-User-Id"),
-            "role": headers.get("X-Auth-User-Role"),
-            "tenant_id": headers.get("X-Auth-Tenant-Id"),
-        }
+    # validate_bearer_token (round-trip a GET /api/auth/gateway/validate) foi
+    # removido — a verificação de identidade de utilizadores finais passou a
+    # ser local, via JWKS (ver app.oauth_jwks.decode_erp_access_token,
+    # consumido por deps._validate_local_jwt). GatewayValidate/gatewayAppRole
+    # continuam a existir no ERP só para o caso residual de headers X-Auth-*
+    # de confiança (ver deps._check_gateway_secret), não para Bearer tokens.
 
     def _raise_for_proxy(self, response: httpx.Response) -> None:
         if response.status_code >= 400:

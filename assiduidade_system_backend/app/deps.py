@@ -1,6 +1,4 @@
-import hashlib
 import hmac
-import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -76,52 +74,62 @@ def _decode_local_jwt(token: str) -> ActorContext | None:
     return ActorContext(id=user_id, role=role, tenant_id=tenant_id)
 
 
-_ERP_TOKEN_CACHE_TTL_SECONDS = 60.0
-_erp_token_cache: dict[str, tuple[float, ActorContext]] = {}
-
-
-async def _validate_via_erp(token: str) -> ActorContext:
-    """Resolve a identidade de um Bearer token delegando no Nexora ERP
-    (`GET /api/auth/gateway/validate`, ver `erp_client.validate_bearer_token`)
-    — o FaceClock não assina nem partilha segredo com os tokens do ERP, por
-    isso não pode validá-los localmente. Cacheado por 60s por token (hash, não
-    o valor em claro) para não bater no ERP a cada pedido.
+def _role_from_erp_claims(payload: dict) -> str:
+    """Traduz as claims do access token OAuth2 do ERP (tipo/scope) para o
+    vocabulário de role do FaceClock — mesma regra que o ERP aplicava
+    server-side em `gatewayAppRole` (auth.go) quando a identidade vinha por
+    `GET /api/auth/gateway/validate`. Agora o FaceClock tem a claim `scope`
+    (permissões RBAC finas, espaço-separadas, ou "*" para superadmin)
+    directamente no token, por isso pode calcular isto sozinho, sem depender
+    de um header já traduzido pelo ERP.
     """
-    from app.erp_client import ERPAuthError, ERPUnavailableError, erp_client
+    if payload.get("tipo") == "superadmin":
+        return "ADMIN_SISTEMA"
+    scope = (payload.get("scope") or "").split()
+    if "*" in scope or "recursos-humanos:aprovar_ausencias" in scope:
+        return "GESTOR_RH"
+    return "COLABORADOR"
 
-    cache_key = hashlib.sha256(token.encode()).hexdigest()
-    now = time.monotonic()
-    cached = _erp_token_cache.get(cache_key)
-    if cached and now < cached[0]:
-        return cached[1]
+
+async def _validate_local_jwt(token: str) -> ActorContext:
+    """Verifica um access token RS256 do Nexora ERP localmente via JWKS
+    (`GET /oauth/jwks`, ver `app.oauth_jwks`) — sem round-trip. Substitui o
+    antigo `_validate_via_erp` (round-trip a `GET /api/auth/gateway/validate`,
+    ver `erp_client.validate_bearer_token`, removido): o ERP passou a assinar
+    RS256 com uma chave por `kid`, publicada em JWKS, justamente para
+    permitir isto.
+    """
+    import jwt as pyjwt
+
+    from app.oauth_jwks import decode_erp_access_token
 
     try:
-        result = await erp_client.validate_bearer_token(token)
-    except ERPAuthError:
+        payload = decode_erp_access_token(token)
+    except pyjwt.PyJWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token de autenticacao invalido.",
-        )
-    except ERPUnavailableError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Nao foi possivel validar o token junto do ERP: {exc}",
+            detail=f"Token invalido ou expirado: {exc}",
         )
 
-    if not result.get("id"):
+    user_id = payload.get("sub")
+    if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token sem identificacao de utilizador.",
         )
 
-    actor = ActorContext(id=result["id"], role=result.get("role") or "COLABORADOR", tenant_id=result.get("tenant_id"))
-    _erp_token_cache[cache_key] = (now + _ERP_TOKEN_CACHE_TTL_SECONDS, actor)
-    return actor
+    tenant_id = payload.get("tid")
+    return ActorContext(
+        id=str(user_id),
+        role=_role_from_erp_claims(payload),
+        tenant_id=str(tenant_id) if tenant_id else None,
+    )
 
 
 async def _get_actor_from_jwt(authorization: str | None) -> ActorContext | None:
     """Extrai o actor de um Bearer token — primeiro tenta como JWT local do
-    FaceClock (compatibilidade/testes), depois delega no ERP."""
+    FaceClock (compatibilidade/testes), depois verifica como access token
+    RS256 do ERP via JWKS local."""
     if not authorization or not authorization.lower().startswith("bearer "):
         return None
 
@@ -129,7 +137,7 @@ async def _get_actor_from_jwt(authorization: str | None) -> ActorContext | None:
     local_actor = _decode_local_jwt(token)
     if local_actor:
         return local_actor
-    return await _validate_via_erp(token)
+    return await _validate_local_jwt(token)
 
 
 def _check_gateway_secret(x_gateway_secret: str | None) -> None:

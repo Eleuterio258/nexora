@@ -114,6 +114,16 @@ type Config struct {
 	SignatureINTICKeyPath       string
 	SignatureCARootsPEM         string
 	SignatureCAIntermediatesPEM string
+
+	// Authorization Server OAuth2 — chave(s) RS256 que assinam os access
+	// tokens emitidos por /oauth/token. Ver internal/modules/auth/oauthkeys.
+	// Por omissão o servidor RECUSA arrancar sem uma chave válida já
+	// presente em OAuthSigningKeysDir — mesmo padrão de reconhecimento
+	// explícito usado por SignatureAllowInsecureProvider.
+	OAuthSigningKeysDir    string
+	OAuthAllowGeneratedKey bool
+	OAuthIssuer            string
+	OAuthAudience          string
 }
 
 func Load() *Config {
@@ -197,6 +207,11 @@ func Load() *Config {
 		SignatureINTICKeyPath:       env("SIGNATURE_INTIC_KEY_PATH", ""),
 		SignatureCARootsPEM:         env("SIGNATURE_CA_ROOTS_PEM", ""),
 		SignatureCAIntermediatesPEM: env("SIGNATURE_CA_INTERMEDIATES_PEM", ""),
+
+		OAuthSigningKeysDir:    env("OAUTH_SIGNING_KEYS_DIR", "./data/oauth-keys"),
+		OAuthAllowGeneratedKey: envBool("OAUTH_ALLOW_GENERATED_KEY", false),
+		OAuthIssuer:            env("OAUTH_ISSUER", "nexora-erp"),
+		OAuthAudience:          env("OAUTH_AUDIENCE", "nexora-api"),
 	}
 }
 

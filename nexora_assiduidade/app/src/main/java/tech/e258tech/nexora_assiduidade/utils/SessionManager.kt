@@ -138,6 +138,15 @@ class SessionManager(context: Context) {
         encryptedPrefs.edit().putString(Constants.KEY_USER_TOKEN, token).apply()
     }
 
+    /** Actualiza o refresh token — o Authorization Server do ERP RODA o
+     * refresh_token a cada uso (o anterior fica imediatamente inválido); sem
+     * persistir o novo aqui, a próxima renovação falharia e, pior, seria
+     * tratada como reuse de um token comprometido (revoga a sessão inteira).
+     * Ver [tech.e258tech.nexora_assiduidade.data.network.AuthAuthenticator]. */
+    fun updateRefreshToken(refreshToken: String) {
+        encryptedPrefs.edit().putString(Constants.KEY_REFRESH_TOKEN, refreshToken).apply()
+    }
+
     fun isLoggedIn(): Boolean = encryptedPrefs.getBoolean(Constants.KEY_IS_LOGGED_IN, false)
 
     fun getToken(): String? = encryptedPrefs.getString(Constants.KEY_USER_TOKEN, null)

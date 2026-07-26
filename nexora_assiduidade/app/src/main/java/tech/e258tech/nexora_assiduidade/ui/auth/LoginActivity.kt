@@ -24,7 +24,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import tech.e258tech.nexora_assiduidade.BuildConfig
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.ErpLoginRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.NfcAttendanceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.chat.ChatFragment
@@ -174,21 +173,18 @@ class LoginActivity : AppCompatActivity() {
 
     private fun performLogin(email: String, password: String) {
         setLoading(true)
-        Log.d(TAG, "performLogin: a iniciar POST /api/auth/login")
+        Log.d(TAG, "performLogin: a iniciar POST /oauth/token (grant_type=password)")
 
         uiScope.launch {
             try {
-                // Fase 6: login passa a ser feito directamente no Nexora ERP
-                // (nao no FaceClock) — ver ErpLoginRequest/ErpLoginResponse.
+                // Authorization Server OAuth2 do ERP — ver ErpApiService.oauthLogin.
                 // Limite de 20s: o OkHttpClient já tem timeouts de 30s por fase
                 // (connect/read/write, ver RetrofitClient.baseOkHttpClient), mas
                 // um limite aqui garante que nunca fica preso indefinidamente
                 // nem que o utilizador espera mais de 20s sem feedback de erro.
                 val response = withTimeoutOrNull(20000L) {
                     withContext(Dispatchers.IO) {
-                        RetrofitClient.erpApiService.login(
-                            ErpLoginRequest(email = email, password = password)
-                        )
+                        RetrofitClient.erpApiService.oauthLogin(username = email, password = password)
                     }
                 }
                 if (response == null) {
@@ -211,40 +207,51 @@ class LoginActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                val payload = response.body() ?: return@launch
+                val tokens = response.body() ?: return@launch
+                val bearer = ApiUtils.bearerToken(tokens.access_token)
 
-                // O `modulos` da resposta de login pode vir desactualizado/vazio
-                // em produção (observado: /api/auth/login e /api/auth/me/acesso
-                // usam a mesma LoadUserAccess mas devolvem resultados diferentes,
-                // aponta para o binário do login estar atrasado) — confirma-se
-                // sempre com /me/acesso, a fonte em tempo real. Limite de 5s:
-                // esta chamada é só um enriquecimento, nunca deve bloquear o
-                // login — se demorar ou falhar, segue com o modulos do login.
-                Log.d(TAG, "performLogin: a consultar /api/auth/me/acesso")
+                // /oauth/token não devolve identidade nem permissões (ao
+                // contrário do antigo /api/auth/login) — duas chamadas à
+                // parte, em paralelo com o mesmo limite de 5s cada: esta
+                // informação é um enriquecimento, nunca deve bloquear o login
+                // além do razoável.
+                Log.d(TAG, "performLogin: a consultar /api/auth/me e /api/auth/me/acesso")
+                val me = withTimeoutOrNull(5000L) {
+                    withContext(Dispatchers.IO) {
+                        runCatching { RetrofitClient.erpApiService.getMe(bearer).body() }.getOrNull()
+                    }
+                }
+                if (me == null) {
+                    Log.w(TAG, "performLogin: /api/auth/me falhou ou expirou — sem identidade, a abortar login")
+                    Toast.makeText(
+                        this@LoginActivity,
+                        "Não foi possível obter os dados da conta. Tenta novamente.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    return@launch
+                }
                 val modulos = withTimeoutOrNull(5000L) {
                     withContext(Dispatchers.IO) {
                         try {
-                            val acessoResponse = RetrofitClient.erpApiService.getMeuAcesso(
-                                ApiUtils.bearerToken(payload.access_token)
-                            )
+                            val acessoResponse = RetrofitClient.erpApiService.getMeuAcesso(bearer)
                             acessoResponse.body()?.modulos
                         } catch (e: Exception) {
-                            Log.w(TAG, "performLogin: /me/acesso falhou, a usar modulos do login", e)
+                            Log.w(TAG, "performLogin: /me/acesso falhou", e)
                             null
                         }
                     }
-                } ?: payload.modulos
+                } ?: emptyList()
                 Log.d(TAG, "performLogin: modulos resolvido (${modulos.size} modulo(s))")
 
                 val role = RoleUtils.fromErpLogin(modulos)
                 sessionManager.saveSession(
-                    token = payload.access_token,
-                    refreshToken = payload.refresh_token,
-                    userId = payload.user.id.toString(),
-                    userName = payload.user.nome,
-                    userEmail = payload.user.email,
+                    token = tokens.access_token,
+                    refreshToken = tokens.refresh_token,
+                    userId = me.id.toString(),
+                    userName = me.nome,
+                    userEmail = me.email,
                     userRole = role,
-                    employeeCode = payload.user.email,
+                    employeeCode = me.email,
                     modulos = modulos
                 )
                 Toast.makeText(

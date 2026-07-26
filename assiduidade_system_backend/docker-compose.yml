@@ -13,11 +13,11 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:admin@pg:5432/faceclock}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-}
-      # Sem isto, app/erp_client.py fica "não configurado" e QUALQUER Bearer
-      # token falha a validação em app/deps.py:_validate_via_erp (401 "Nao foi
-      # possivel validar o token junto do ERP: ERP_BASE_URL nao configurado.")
-      # — partia /biometric/verify, /liveness/*, audit-logs, etc. por faltar
-      # aqui, mesmo que estivesse definido no ambiente do host.
+      # Sem isto, QUALQUER Bearer token falha a validação em
+      # app/deps.py:_validate_local_jwt (via app/oauth_jwks.py, que deriva
+      # ERP_JWKS_URL = ERP_BASE_URL + "/oauth/jwks" por omissão) — partia
+      # /biometric/verify, /liveness/*, audit-logs, etc. por faltar aqui,
+      # mesmo que estivesse definido no ambiente do host.
       ERP_BASE_URL: ${ERP_BASE_URL:-https://api.nexora.e258tech.tech}
       ERP_API_KEY: ${ERP_API_KEY:-}
       SEED_DATA_ON_STARTUP: "false"

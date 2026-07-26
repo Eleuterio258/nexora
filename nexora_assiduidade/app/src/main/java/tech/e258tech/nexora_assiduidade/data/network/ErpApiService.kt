@@ -3,6 +3,9 @@ package tech.e258tech.nexora_assiduidade.data.network
 import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.Field
+import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
@@ -13,16 +16,27 @@ import tech.e258tech.nexora_assiduidade.data.model.AdminSetPinRequest
 import tech.e258tech.nexora_assiduidade.data.model.AssiduidadeConfigRequest
 import tech.e258tech.nexora_assiduidade.data.model.AgendaItem
 import tech.e258tech.nexora_assiduidade.data.model.AgendaItemRequest
+import tech.e258tech.nexora_assiduidade.data.model.Atividade
+import tech.e258tech.nexora_assiduidade.data.model.AtividadeListResponse
+import tech.e258tech.nexora_assiduidade.data.model.AtividadeRequest
 import tech.e258tech.nexora_assiduidade.data.model.Ausencia
 import tech.e258tech.nexora_assiduidade.data.model.ChatMessageRequest
 import tech.e258tech.nexora_assiduidade.data.model.DispositivoErp
-import tech.e258tech.nexora_assiduidade.data.model.ErpLoginRequest
-import tech.e258tech.nexora_assiduidade.data.model.ErpRefreshRequest
 import tech.e258tech.nexora_assiduidade.data.model.FuncionarioDetalhe
 import tech.e258tech.nexora_assiduidade.data.model.FuncionarioListResponse
 import tech.e258tech.nexora_assiduidade.data.model.GenericHardwareEventRequest
 import tech.e258tech.nexora_assiduidade.data.model.JustificacaoRequest
+import tech.e258tech.nexora_assiduidade.data.model.Lead
+import tech.e258tech.nexora_assiduidade.data.model.LeadConverterRequest
+import tech.e258tech.nexora_assiduidade.data.model.LeadEstadoRequest
+import tech.e258tech.nexora_assiduidade.data.model.LeadListResponse
+import tech.e258tech.nexora_assiduidade.data.model.LeadRequest
 import tech.e258tech.nexora_assiduidade.data.model.Notification
+import tech.e258tech.nexora_assiduidade.data.model.Oportunidade
+import tech.e258tech.nexora_assiduidade.data.model.OportunidadeEstagioRequest
+import tech.e258tech.nexora_assiduidade.data.model.OportunidadeListResponse
+import tech.e258tech.nexora_assiduidade.data.model.OportunidadePerderRequest
+import tech.e258tech.nexora_assiduidade.data.model.OportunidadeRequest
 import tech.e258tech.nexora_assiduidade.data.model.PinValidateRequest
 import tech.e258tech.nexora_assiduidade.data.model.PresencaOcorrencia
 import tech.e258tech.nexora_assiduidade.data.model.QRGenerateDeviceRequest
@@ -31,21 +45,28 @@ import tech.e258tech.nexora_assiduidade.data.model.RelatorioRH
 import tech.e258tech.nexora_assiduidade.data.model.TotpSetupRequest
 import tech.e258tech.nexora_assiduidade.data.model.TotpValidateRequest
 import tech.e258tech.nexora_assiduidade.data.model.chat.Conversation
+import tech.e258tech.nexora_assiduidade.utils.Constants
 import tech.e258tech.nexora_assiduidade.data.model.response.AssiduidadeConfigResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.AtividadeCreateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageListResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ConversationCreateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ConversationListResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ErpAcessoResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ErpLoginResponse
-import tech.e258tech.nexora_assiduidade.data.model.response.ErpRefreshResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.ErpMeResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.OAuthTokenResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.EventoAssiduidadeResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.FuncionarioIntegracaoResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.GeofenceDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.HardwareEventResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.JustificacaoCreateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.JustificacaoResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.LeadConverterResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.LeadCreateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.NFCDeviceResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.OkResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.OportunidadeCreateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.PresencaResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.QRGenerateDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.QRValidateDeviceResponse
@@ -61,9 +82,24 @@ import tech.e258tech.nexora_assiduidade.data.model.response.TotpSetupResponse
  */
 interface ErpApiService {
 
-    // Login (Fase 6 — identidade vem sempre do ERP, ver ErpLoginRequest)
-    @POST("api/auth/login")
-    suspend fun login(@Body request: ErpLoginRequest): Response<ErpLoginResponse>
+    // Login — Authorization Server OAuth2 do ERP (grant_type=password,
+    // client_id=android-app, cliente público sem client_secret; ver
+    // oauth_token.go). Substitui o antigo POST /api/auth/login: a resposta já
+    // não traz `user`/`modulos`, por isso o login busca a identidade à parte
+    // via getMe() e getMeuAcesso() (ver LoginActivity.performLogin).
+    @FormUrlEncoded
+    @POST("oauth/token")
+    suspend fun oauthLogin(
+        @Field("username") username: String,
+        @Field("password") password: String,
+        @Field("grant_type") grantType: String = "password",
+        @Field("client_id") clientId: String = Constants.OAUTH_CLIENT_ID
+    ): Response<OAuthTokenResponse>
+
+    // Identidade do utilizador autenticado (auth.go:630) — só usada depois
+    // do login via /oauth/token para obter id/nome/email (ver OAuthTokenResponse).
+    @GET("api/auth/me")
+    suspend fun getMe(@Header("Authorization") token: String): Response<ErpMeResponse>
 
     // Permissões RBAC em tempo real do utilizador autenticado (permissoes.go:14,
     // ObterAcessoUtilizador → models.LoadUserAccess) — chamado logo após o
@@ -72,11 +108,19 @@ interface ErpApiService {
     @GET("api/auth/me/acesso")
     suspend fun getMeuAcesso(@Header("Authorization") token: String): Response<ErpAcessoResponse>
 
-    // Renovação de sessão (auth.go:402) — versão síncrona (Call, não suspend)
-    // porque é invocada a partir de AuthAuthenticator, que corre fora de
-    // uma coroutine (callback OkHttp numa thread de background).
-    @POST("api/auth/refresh")
-    fun refreshSync(@Body request: ErpRefreshRequest): Call<ErpRefreshResponse>
+    // Renovação de sessão — grant_type=refresh_token no Authorization Server
+    // (substitui POST /api/auth/refresh). Versão síncrona (Call, não suspend)
+    // porque é invocada a partir de AuthAuthenticator, que corre fora de uma
+    // coroutine (callback OkHttp numa thread de background). O ERP RODA o
+    // refresh_token a cada uso — a resposta traz sempre um novo, que tem de
+    // ser persistido (ver AuthAuthenticator), nunca reutilizar o anterior.
+    @FormUrlEncoded
+    @POST("oauth/token")
+    fun oauthRefreshSync(
+        @Field("refresh_token") refreshToken: String,
+        @Field("grant_type") grantType: String = "refresh_token",
+        @Field("client_id") clientId: String = Constants.OAUTH_CLIENT_ID
+    ): Call<OAuthTokenResponse>
 
     // Login alternativo por PIN/TOTP (authcode.go) — chamado directamente no
     // ERP desde 2026-07-12 (deixou de passar pelo proxy do FaceClock).
@@ -313,6 +357,151 @@ interface ErpApiService {
     suspend fun getRelatorioRH(
         @Header("Authorization") token: String
     ): Response<RelatorioRH>
+
+    // ── CRM — Leads (crm/handlers/leads.go) ─────────────────────────────────
+    @GET("api/crm/leads")
+    suspend fun getLeads(
+        @Header("Authorization") token: String,
+        @Query("estado") estado: String? = null,
+        @Query("origem") origem: String? = null,
+        @Query("search") search: String? = null,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20
+    ): Response<LeadListResponse>
+
+    @GET("api/crm/leads/{id}")
+    suspend fun getLead(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long
+    ): Response<Lead>
+
+    @POST("api/crm/leads")
+    suspend fun criarLead(
+        @Header("Authorization") token: String,
+        @Body request: LeadRequest
+    ): Response<LeadCreateResponse>
+
+    @PUT("api/crm/leads/{id}")
+    suspend fun actualizarLead(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long,
+        @Body request: LeadRequest
+    ): Response<Unit>
+
+    @PUT("api/crm/leads/{id}/estado")
+    suspend fun moverLead(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long,
+        @Body request: LeadEstadoRequest
+    ): Response<OkResponse>
+
+    @POST("api/crm/leads/{id}/converter")
+    suspend fun converterLead(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long,
+        @Body request: LeadConverterRequest
+    ): Response<LeadConverterResponse>
+
+    @DELETE("api/crm/leads/{id}")
+    suspend fun eliminarLead(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long
+    ): Response<Unit>
+
+    // ── CRM — Oportunidades (crm/handlers/oportunidades.go) ─────────────────
+    @GET("api/crm/oportunidades")
+    suspend fun getOportunidades(
+        @Header("Authorization") token: String,
+        @Query("estagio") estagio: String? = null,
+        @Query("lead_id") leadId: Long? = null,
+        @Query("cliente_id") clienteId: Long? = null,
+        @Query("search") search: String? = null,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20
+    ): Response<OportunidadeListResponse>
+
+    @GET("api/crm/oportunidades/{id}")
+    suspend fun getOportunidade(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long
+    ): Response<Oportunidade>
+
+    @POST("api/crm/oportunidades")
+    suspend fun criarOportunidade(
+        @Header("Authorization") token: String,
+        @Body request: OportunidadeRequest
+    ): Response<OportunidadeCreateResponse>
+
+    @PUT("api/crm/oportunidades/{id}")
+    suspend fun actualizarOportunidade(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long,
+        @Body request: OportunidadeRequest
+    ): Response<Unit>
+
+    @PUT("api/crm/oportunidades/{id}/estagio")
+    suspend fun moverOportunidade(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long,
+        @Body request: OportunidadeEstagioRequest
+    ): Response<OkResponse>
+
+    @POST("api/crm/oportunidades/{id}/perder")
+    suspend fun marcarOportunidadePerdida(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long,
+        @Body request: OportunidadePerderRequest
+    ): Response<OkResponse>
+
+    @DELETE("api/crm/oportunidades/{id}")
+    suspend fun eliminarOportunidade(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long
+    ): Response<Unit>
+
+    // ── CRM — Atividades (crm/handlers/atividades.go) ───────────────────────
+    @GET("api/crm/atividades")
+    suspend fun getAtividades(
+        @Header("Authorization") token: String,
+        @Query("lead_id") leadId: Long? = null,
+        @Query("oportunidade_id") oportunidadeId: Long? = null,
+        @Query("tipo") tipo: String? = null,
+        @Query("concluida") concluida: Boolean? = null,
+        @Query("search") search: String? = null,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 50
+    ): Response<AtividadeListResponse>
+
+    @GET("api/crm/atividades/{id}")
+    suspend fun getAtividade(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long
+    ): Response<Atividade>
+
+    @POST("api/crm/atividades")
+    suspend fun criarAtividade(
+        @Header("Authorization") token: String,
+        @Body request: AtividadeRequest
+    ): Response<AtividadeCreateResponse>
+
+    @PUT("api/crm/atividades/{id}")
+    suspend fun actualizarAtividade(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long,
+        @Body request: AtividadeRequest
+    ): Response<Unit>
+
+    @POST("api/crm/atividades/{id}/concluir")
+    suspend fun concluirAtividade(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long
+    ): Response<OkResponse>
+
+    @DELETE("api/crm/atividades/{id}")
+    suspend fun eliminarAtividade(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long
+    ): Response<Unit>
 
     // Chat — conversas
     // O chat vive no grupo /api/self-service do ERP (ver router.go, r.Route

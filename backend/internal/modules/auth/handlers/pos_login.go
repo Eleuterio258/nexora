@@ -9,6 +9,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	mw "nexora/internal/middleware"
+	"nexora/internal/modules/auth/models"
 )
 
 // ── Login único (PayCore Mobile): utilizador + terminal ──────────────────────
@@ -202,10 +203,17 @@ func (h *Handler) refreshTerminalPOS(w http.ResponseWriter, r *http.Request, ref
 }
 
 // issueTerminalTokens emite tokens de longa duração (30 dias) para uma conta
-// de terminal — mesma mecânica de issueFuncionarioTokens, com expiry maior e
-// envelope de resposta próprio (terminal_token em vez de access_token).
+// de terminal — mesma mecânica de issueFuncionarioTokens (RS256 via
+// signOAuthAccessToken, ver comentário lá), com expiry maior e envelope de
+// resposta próprio (terminal_token em vez de access_token). Terminais só têm
+// a permissão pos:operar_pos (ver comentário no topo do ficheiro) — o scope
+// reflecte isso via LoadUserAccess, tal como qualquer outra conta.
 func (h *Handler) issueTerminalTokens(w http.ResponseWriter, r *http.Request, u *userIdentity, terminal, tenant map[string]interface{}) {
-	accessToken, err := h.signAccessWithExpiry(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, terminalTokenExpiry)
+	scope := ""
+	if userAccess, err := models.LoadUserAccess(r.Context(), h.db, u.id, u.membershipID); err == nil {
+		scope = scopeStringFromAccess(userAccess)
+	}
+	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, scope, terminalTokenExpiry)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return

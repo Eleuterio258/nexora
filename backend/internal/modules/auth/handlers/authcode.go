@@ -53,8 +53,21 @@ func (h *Handler) lookupUserByEmail(ctx context.Context, email string) (*userIde
 
 // issueFuncionarioTokens cria access + refresh tokens, regista a sessão e
 // devolve a resposta padrão de login do ERP. É usada por Login, PIN e TOTP.
+//
+// O access token é assinado RS256 (signOAuthAccessToken, mesmo helper de
+// /oauth/token) — RequireAuth aceita HS256 e RS256 em simultâneo durante a
+// transição (ver jwtKeyFunc), mas só RS256 vai sobreviver à Fase 6. O
+// refresh token continua HS256 por agora (signRefresh) — RequireAuth nunca
+// o valida directamente, só refreshWithToken, que fica para uma fase
+// posterior.
 func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request, u *userIdentity) {
-	accessToken, err := h.signAccess(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo)
+	userAccess, _ := models.LoadUserAccess(r.Context(), h.db, u.id, u.membershipID)
+	scope := ""
+	if userAccess != nil {
+		scope = scopeStringFromAccess(userAccess)
+	}
+
+	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, scope, h.cfg.JWTExpiresIn)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -72,8 +85,6 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 	}
 
 	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, u.id)
-
-	userAccess, _ := models.LoadUserAccess(r.Context(), h.db, u.id, u.membershipID)
 
 	userObj := map[string]interface{}{
 		"id":     u.id,

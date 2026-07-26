@@ -37,6 +37,18 @@ class Settings:
     erp_base_url: str = os.getenv("ERP_BASE_URL", "")
     erp_api_key: str = os.getenv("ERP_API_KEY", "")
     erp_timeout_seconds: int = int(os.getenv("ERP_TIMEOUT_SECONDS", "10"))
+    # JWKS do Authorization Server do Nexora ERP — usado para verificar
+    # localmente (sem round-trip) os access tokens RS256 emitidos por
+    # /oauth/token. erp_token_audience tem de bater com a claim "aud" que o
+    # ERP emite (OAUTH_AUDIENCE no backend Go, default "nexora-api").
+    erp_token_audience: str = os.getenv("ERP_TOKEN_AUDIENCE", "nexora-api")
+
+    @property
+    def erp_jwks_url(self) -> str:
+        override = os.getenv("ERP_JWKS_URL", "")
+        if override:
+            return override
+        return f"{self.erp_base_url.rstrip('/')}/oauth/jwks" if self.erp_base_url else ""
     erp_fallback_local_login: bool = os.getenv(
         "ERP_FALLBACK_LOCAL_LOGIN", "true"
     ).lower() == "true"

@@ -46,6 +46,10 @@ object Constants {
     const val LOCATION_TIMEOUT = 10000L
     const val LOCATION_MIN_DISTANCE = 10f
 
+    // client_id OAuth2 público (sem client_secret) desta app no Authorization
+    // Server do ERP — seedado na migration 20260727000001_oauth2_authorization_server.
+    const val OAUTH_CLIENT_ID = "android-app"
+
     const val DEMO_FUNCIONARIO_EMAIL = "olimpia.chitlhango@e258tech.tech"
     const val DEMO_FUNCIONARIO_PASSWORD = "1234567890"
     const val DEMO_GESTOR_EMAIL = "penina.tembe@e258tech.tech"

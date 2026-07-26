@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	authModels "nexora/internal/modules/auth/models"
+	"nexora/internal/modules/auth/oauthkeys"
 )
 
 type contextKey string
@@ -31,6 +32,34 @@ func HashToken(token string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(token)))
 }
 
+// jwtKeyFunc devolve um keyfunc consciente de dois algoritmos: HS256
+// (legado, jwtSecret) e RS256 (emitido por /oauth/token, verificado via
+// "kid" contra oauthkeys.Provider, sem round-trip). Isto é permanente, não
+// transitório: /api/auth/login e /api/auth/refresh continuam a servir
+// contas de portal (aluno/encarregado/candidato/portal_professor) com
+// tokens HS256 indefinidamente — o Authorization Server OAuth2
+// (/oauth/token) só emite RS256 e só para funcionario/superadmin (decisão
+// registada: migrar contas de portal para OAuth2 exigiria resolver primeiro
+// o facto de não terem um "sub" numérico consistente no espaço auth.users,
+// ver oauth_token.go). RequireAuth tem de continuar a aceitar os dois.
+func jwtKeyFunc(jwtSecret string, oauthKeys *oauthkeys.Provider) jwt.Keyfunc {
+	return func(t *jwt.Token) (interface{}, error) {
+		switch t.Method.(type) {
+		case *jwt.SigningMethodHMAC:
+			return []byte(jwtSecret), nil
+		case *jwt.SigningMethodRSA:
+			kid, _ := t.Header["kid"].(string)
+			pub, ok := oauthKeys.PublicKey(kid)
+			if !ok {
+				return nil, fmt.Errorf("kid desconhecido: %q", kid)
+			}
+			return pub, nil
+		default:
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+	}
+}
+
 // escopoPermitidoParaPath determina se um dado escopo pode aceder ao path.
 // Superadmin é tratado separadamente pelos middlewares (bypass).
 func escopoPermitidoParaPath(path, escopo string) bool {
@@ -48,8 +77,10 @@ func escopoPermitidoParaPath(path, escopo string) bool {
 }
 
 // RequireAuth valida o JWT e verifica a sessão na base de dados (auth-service).
-// Aceita o token apenas via header "Authorization: Bearer <token>".
-func RequireAuth(jwtSecret string, pool *pgxpool.Pool) func(http.Handler) http.Handler {
+// Aceita o token apenas via header "Authorization: Bearer <token>". Aceita
+// tanto HS256 (legado, jwtSecret) como RS256 (emitido por /oauth/token,
+// verificado via oauthKeys) — ver jwtKeyFunc.
+func RequireAuth(jwtSecret string, pool *pgxpool.Pool, oauthKeys *oauthkeys.Provider) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
@@ -63,12 +94,7 @@ func RequireAuth(jwtSecret string, pool *pgxpool.Pool) func(http.Handler) http.H
 				return
 			}
 
-			token, err := jwt.Parse(rawToken, func(t *jwt.Token) (interface{}, error) {
-				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, fmt.Errorf("unexpected signing method")
-				}
-				return []byte(jwtSecret), nil
-			})
+			token, err := jwt.Parse(rawToken, jwtKeyFunc(jwtSecret, oauthKeys))
 			if err != nil || !token.Valid {
 				JSONErr(w, "Token inválido ou expirado", http.StatusUnauthorized)
 				return
@@ -136,8 +162,9 @@ func RequireAuth(jwtSecret string, pool *pgxpool.Pool) func(http.Handler) http.H
 	}
 }
 
-// RequireJWT valida apenas o JWT sem verificar sessão na DB (para serviços sem acesso à auth DB).
-func RequireJWT(jwtSecret string) func(http.Handler) http.Handler {
+// RequireJWT valida apenas o JWT sem verificar sessão na DB (para serviços
+// sem acesso à auth DB). Aceita HS256 (legado) e RS256 — ver jwtKeyFunc.
+func RequireJWT(jwtSecret string, oauthKeys *oauthkeys.Provider) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
@@ -145,12 +172,7 @@ func RequireJWT(jwtSecret string) func(http.Handler) http.Handler {
 				JSONErr(w, "Token em falta", http.StatusUnauthorized)
 				return
 			}
-			token, err := jwt.Parse(header[7:], func(t *jwt.Token) (interface{}, error) {
-				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, fmt.Errorf("unexpected signing method")
-				}
-				return []byte(jwtSecret), nil
-			})
+			token, err := jwt.Parse(header[7:], jwtKeyFunc(jwtSecret, oauthKeys))
 			if err != nil || !token.Valid {
 				JSONErr(w, "Token inválido ou expirado", http.StatusUnauthorized)
 				return

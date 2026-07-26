@@ -4,13 +4,13 @@ import okhttp3.Authenticator
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.Route
-import tech.e258tech.nexora_assiduidade.data.model.ErpRefreshRequest
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
  * Renova a sessão automaticamente num 401, usando o refresh_token guardado
- * — ver POST /api/auth/refresh (backend/internal/modules/auth/handlers/auth.go:402).
+ * — ver POST /oauth/token, grant_type=refresh_token (Authorization Server
+ * OAuth2, backend/internal/modules/auth/handlers/oauth_token.go).
  *
  * Corre numa thread de background do OkHttp (nunca a main thread), por isso
  * é seguro bloquear em [refreshApiService]'s `.execute()`. Usa um
@@ -32,11 +32,15 @@ class AuthAuthenticator(
 
         val refreshToken = sessionManager.getRefreshToken() ?: return null
 
-        val novoToken = runCatching {
-            refreshApiService.refreshSync(ErpRefreshRequest(refreshToken)).execute()
-        }.getOrNull()?.takeIf { it.isSuccessful }?.body()?.access_token
+        // O ERP RODA o refresh_token a cada uso — o corpo desta resposta traz
+        // sempre um novo refresh_token, que TEM de ser persistido (senão a
+        // próxima renovação apresenta um token já revogado e o ERP trata isso
+        // como reuse de token comprometido, revogando a sessão inteira).
+        val novoTokens = runCatching {
+            refreshApiService.oauthRefreshSync(refreshToken).execute()
+        }.getOrNull()?.takeIf { it.isSuccessful }?.body()
 
-        if (novoToken == null) {
+        if (novoTokens == null) {
             // refresh_token também expirado/inválido — limpa a sessão; o
             // próximo arranque da app (LoginActivity/MainActivity.onCreate)
             // já redirecciona para o login. Não há redirecionamento imediato
@@ -45,10 +49,11 @@ class AuthAuthenticator(
             return null
         }
 
-        sessionManager.updateAccessToken(novoToken)
+        sessionManager.updateAccessToken(novoTokens.access_token)
+        sessionManager.updateRefreshToken(novoTokens.refresh_token)
 
         return response.request.newBuilder()
-            .header("Authorization", ApiUtils.bearerToken(novoToken))
+            .header("Authorization", ApiUtils.bearerToken(novoTokens.access_token))
             .build()
     }
 

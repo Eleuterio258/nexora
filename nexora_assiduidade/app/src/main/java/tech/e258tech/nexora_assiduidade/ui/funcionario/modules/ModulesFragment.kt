@@ -16,6 +16,7 @@ import tech.e258tech.nexora_assiduidade.ui.gestor.dashboard.DashboardGestorFragm
 import tech.e258tech.nexora_assiduidade.ui.gestor.dispositivos.DispositivosFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.equipa.EquipaGestorFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ferias.PedidosFeriasFragment
+import tech.e258tech.nexora_assiduidade.ui.gestor.crm.CrmMenuFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ocorrencias.AlertasFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.ocorrencias.OcorrenciasFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.qrcode.GestorQrMenuFragment
@@ -126,6 +127,18 @@ class ModulesFragment : Fragment() {
                 "QR Code de Assiduidade",
                 R.drawable.ic_method_qrcode
             ) { openFragment(GestorQrMenuFragment()) }
+        }
+
+        // CRM — "crm:ver_leads" é a permissão de leitura mais ampla do módulo
+        // CRM, usada só para decidir a visibilidade desta entrada (os 3
+        // sub-ecrãs aplicam depois as suas próprias permissões finas:
+        // gerir_leads, mover_leads, converter_leads, ver_oportunidades,
+        // gerir_oportunidades, gerir_atividades, eliminar_leads).
+        if (temPermissao("crm", "ver_leads")) {
+            items += ModuleMenuItem(
+                "CRM",
+                android.R.drawable.ic_menu_share
+            ) { openFragment(CrmMenuFragment()) }
         }
 
         // "recursos-humanos:aprovar_ausencias" — a mesma acção que antes

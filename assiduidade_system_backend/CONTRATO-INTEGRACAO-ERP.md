@@ -201,3 +201,15 @@ Antes de implementar os 12 ecrãs `ui/gestor/*` (até agora placeholders), corri
 - Nenhum código no `backend/` (Go) chama ainda o FaceClock — o segredo partilhado só protege o lado FaceClock; falta decidir e implementar quem, no ERP ou no gateway, efectivamente envia `X-Gateway-Secret` nos pedidos reencaminhados.
 - Registo real do FaceClock como `hardware.devices` em produção (API Key gerada, mapeamento `hardware.device_users` por funcionário) — só foi feito com dados de teste, removidos no fim de cada sessão.
 - Teste E2E automatizado cross-serviço (8.6) — bloqueado pela mesma decisão de rede/gateway.
+
+## 11. Migração para Authorization Server OAuth2 (2026-07-26, em curso)
+
+O ERP passou a ter um Authorization Server OAuth2 real (`/oauth/token`, `/oauth/authorize`+PKCE, `/oauth/jwks`), substituindo por completo o mecanismo anterior de JWT HS256 partilhado — ver `C:\Users\Eleuterio\.claude\plans\whimsical-napping-stearns.md` para o plano completo. Impacto directo neste contrato:
+
+- **`app/erp_client.py:validate_bearer_token()` removido.** O round-trip a `GET /api/auth/gateway/validate` descrito na secção 1 deixa de ser o caminho para validar Bearer tokens de utilizadores finais.
+- **Novo `app/oauth_jwks.py`**: `decode_erp_access_token()` verifica a assinatura RS256 localmente via `GET /oauth/jwks` (`PyJWKClient`, cache de 1h, tolera `kid` novo por rotação de chave sem reinício). `app/deps.py:_validate_local_jwt()` substitui `_validate_via_erp()` — mesma posição na cadeia de `get_actor()` (tenta primeiro JWT local do FaceClock, depois isto), zero mudança de contrato para quem já chama `get_actor()`.
+- **`X-Auth-User-Role` deixa de ser necessário para Bearer tokens** — a claim `scope` do próprio access token (permissões RBAC finas, ex. `recursos-humanos:aprovar_ausencias`) já vai no token; `deps._role_from_erp_claims()` replica localmente a mesma regra que `gatewayAppRole` (Go) aplicava antes de reencaminhar o header. **A secção 1 (headers `X-Auth-*`) continua válida tal-e-qual para o caminho de headers de confiança** (`_check_gateway_secret`) — esse caminho não foi tocado, é usado por outros chamadores de confiança independentes de Bearer token.
+- **Bug de interoperabilidade descoberto e corrigido durante a migração**: o backend Go emite a claim `sub` como número (`int64` do `user_id`), não como string — o PyJWT rejeita isso por omissão (`InvalidSubjectError`, RFC 7519 recomenda string mas o Go nunca seguiu essa recomendação, e mudar o tipo em todo o middleware Go teria um raio de impacto muito maior do que desligar a validação no lado Python). Corrigido com `options={"verify_sub": False}` em `decode_erp_access_token`.
+- `requirements.txt`: nova dependência `cryptography` (RS256 no PyJWT precisa dela).
+- Testado: `tests/test_oauth_jwks.py` (verificação local com chave RSA gerada em teste, sem rede), suite completa continua verde.
+- **Ainda por fazer** (fora do âmbito desta secção): app Android e nada mais no FaceClock muda — quem migra para `/oauth/token` é a app e o portal PHP, não o FaceClock (ele é resource server puro, nunca chama `/oauth/token`).
