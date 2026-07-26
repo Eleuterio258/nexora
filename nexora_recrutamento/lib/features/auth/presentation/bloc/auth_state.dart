@@ -36,3 +36,10 @@ class AuthFailureState extends AuthState {
   @override
   List<Object?> get props => [message];
 }
+
+class AuthProfileUpdateSuccess extends AuthState {
+  final User user;
+  const AuthProfileUpdateSuccess(this.user);
+  @override
+  List<Object?> get props => [user];
+}

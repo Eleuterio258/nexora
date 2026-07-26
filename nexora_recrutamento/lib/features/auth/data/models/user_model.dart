@@ -5,6 +5,7 @@ class UserModel extends User {
     required super.id,
     required super.nome,
     required super.email,
+    super.telefone,
     required super.token,
     super.refreshToken,
     required super.permissoes,
@@ -20,6 +21,7 @@ class UserModel extends User {
       id: json['id'] as int,
       nome: json['nome'] as String? ?? json['name'] as String? ?? '',
       email: json['email'] as String,
+      telefone: json['telefone'] as String?,
       token: token,
       refreshToken: refreshToken,
       // API devolve as permissões em "escopo" (ex.: ["portal_candidato"]);
@@ -37,6 +39,7 @@ class UserModel extends User {
         'id': id,
         'nome': nome,
         'email': email,
+        'telefone': telefone,
         'permissoes': permissoes,
         'tenant_id': tenantId,
       };

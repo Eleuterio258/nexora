@@ -134,7 +134,7 @@ func Load() *Config {
 	webhookProviders, webhookSecrets := loadSignatureWebhookProviders()
 	return &Config{
 		DatabaseURL: env("DATABASE_URL",
-			"postgres://postgres:admin@localhost:5432/nexora_erp?sslmode=disable"+
+			"postgres://postgres:admin@209.126.86.55:5432/nexora_erp?sslmode=disable"+
 				"&options=-csearch_path%3D"+
 				"auth%2Cutilizadores%2Cempresas%2Cauditoria%2C"+
 				"sistema_configuracao%2Cclientes%2Cprodutos%2Cstock%2Cfaturacao%2C"+

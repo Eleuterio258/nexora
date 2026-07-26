@@ -6,8 +6,11 @@ import 'core/navigation/app_navigator.dart';
 import 'core/push/push_notification_service.dart';
 import 'features/applications/presentation/bloc/application_bloc.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/education/presentation/bloc/education_bloc.dart';
+import 'features/experience/presentation/bloc/experience_bloc.dart';
 import 'features/jobs/presentation/bloc/job_bloc.dart';
 import 'features/messages/presentation/bloc/messages_bloc.dart';
+import 'features/notifications/presentation/bloc/notifications_bloc.dart';
 import 'injection_container.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
@@ -26,6 +29,9 @@ class NexoraApp extends StatelessWidget {
         BlocProvider<JobBloc>.value(value: getIt<JobBloc>()),
         BlocProvider<ApplicationBloc>.value(value: getIt<ApplicationBloc>()),
         BlocProvider<MessagesBloc>.value(value: getIt<MessagesBloc>()),
+        BlocProvider<ExperienceBloc>.value(value: getIt<ExperienceBloc>()),
+        BlocProvider<EducationBloc>.value(value: getIt<EducationBloc>()),
+        BlocProvider<NotificationsBloc>.value(value: getIt<NotificationsBloc>()),
       ],
       child: BlocListener<AuthBloc, AuthState>(
         // Regista o token FCM assim que há sessão de candidato válida — quer

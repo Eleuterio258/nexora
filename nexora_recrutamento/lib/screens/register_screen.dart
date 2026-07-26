@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../core/constants/app_colors.dart';
 import '../features/auth/presentation/bloc/auth_bloc.dart';
+import '../l10n/strings.dart';
 import '../widgets/nexora_logo.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -36,7 +38,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 15),
-      prefixIcon: Icon(icon, color: kPrimary, size: 22),
+      prefixIcon: Icon(icon, color: AppColors.primary, size: 22),
       suffixIcon: suffix,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -48,7 +50,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: kPrimary, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
@@ -66,6 +68,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _submit(BuildContext context) {
+    final s = AppStrings.of(context);
     final nome = _nameCtrl.text.trim();
     final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
@@ -73,26 +76,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (nome.length < 2 || email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preencha todos os campos.')),
+        SnackBar(content: Text(s.registerFillAllFields)),
       );
       return;
     }
     if (password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('A palavra-passe deve ter pelo menos 6 caracteres.')),
+        SnackBar(content: Text(s.registerPasswordMinLength)),
       );
       return;
     }
     if (password != confirm) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('As palavras-passe não coincidem.')),
+        SnackBar(content: Text(s.registerPasswordsDoNotMatch)),
       );
       return;
     }
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tem de aceitar os Termos e Condições.')),
+        SnackBar(content: Text(s.registerAcceptTerms)),
       );
       return;
     }
@@ -105,6 +107,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is AuthAuthenticated) {
@@ -164,9 +168,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         const SizedBox(height: 24),
 
-                        const Text(
-                          'Create Account',
-                          style: TextStyle(
+                        Text(
+                          s.registerTitle,
+                          style: const TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF1A2E2A),
@@ -174,7 +178,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'Join Nexora and experience smarter,\nfaster, and better banking.',
+                          s.registerSubtitle,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
@@ -189,7 +193,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           controller: _nameCtrl,
                           textCapitalization: TextCapitalization.words,
                           decoration: _fieldDeco(
-                            hint: 'Full Name',
+                            hint: s.authName,
                             icon: Icons.person_outline,
                           ),
                         ),
@@ -200,7 +204,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           controller: _emailCtrl,
                           keyboardType: TextInputType.emailAddress,
                           decoration: _fieldDeco(
-                            hint: 'Email',
+                            hint: s.authEmail,
                             icon: Icons.email_outlined,
                           ),
                         ),
@@ -211,7 +215,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           controller: _passwordCtrl,
                           obscureText: !_passwordVisible,
                           decoration: _fieldDeco(
-                            hint: 'Password',
+                            hint: s.authPassword,
                             icon: Icons.lock_outline,
                             suffix: _eyeIcon(
                               _passwordVisible,
@@ -227,7 +231,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           controller: _confirmPasswordCtrl,
                           obscureText: !_confirmPasswordVisible,
                           decoration: _fieldDeco(
-                            hint: 'Confirm Password',
+                            hint: s.registerConfirmPasswordHint,
                             icon: Icons.lock_outline,
                             suffix: _eyeIcon(
                               _confirmPasswordVisible,
@@ -249,7 +253,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 value: _agreeToTerms,
                                 onChanged: (v) =>
                                     setState(() => _agreeToTerms = v ?? false),
-                                activeColor: kPrimary,
+                                activeColor: AppColors.primary,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(4),
                                 ),
@@ -262,16 +266,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             Expanded(
                               child: Text.rich(
                                 TextSpan(
-                                  text: 'I agree to the ',
+                                  text: s.registerAgreeTerms,
                                   style: TextStyle(
                                     color: Colors.grey.shade600,
                                     fontSize: 14,
                                   ),
-                                  children: const [
+                                  children: [
                                     TextSpan(
-                                      text: 'Terms and Conditions',
-                                      style: TextStyle(
-                                        color: kPrimary,
+                                      text: s.registerTermsAndConditions,
+                                      style: const TextStyle(
+                                        color: AppColors.primary,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -294,7 +298,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 onPressed:
                                     loading ? null : () => _submit(context),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: kPrimary,
+                                  backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
@@ -310,9 +314,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                           color: Colors.white,
                                         ),
                                       )
-                                    : const Text(
-                                        'Sign Up',
-                                        style: TextStyle(
+                                    : Text(
+                                        s.authRegister,
+                                        style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -334,7 +338,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 14),
                               child: Text(
-                                'OR',
+                                s.loginOrDivider,
                                 style: TextStyle(
                                   color: Colors.grey.shade400,
                                   fontSize: 13,
@@ -355,7 +359,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'Already have an account? ',
+                              s.authHaveAccount,
                               style: TextStyle(
                                 color: Colors.grey.shade600,
                                 fontSize: 14,
@@ -363,10 +367,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             GestureDetector(
                               onTap: () => Navigator.pop(context),
-                              child: const Text(
-                                'Login',
-                                style: TextStyle(
-                                  color: kPrimary,
+                              child: Text(
+                                s.authLogin,
+                                style: const TextStyle(
+                                  color: AppColors.primary,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
                                 ),

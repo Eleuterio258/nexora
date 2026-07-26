@@ -62,4 +62,22 @@ class AuthRepositoryImpl implements AuthRepository {
       return Left(CacheFailure(e.message));
     }
   }
+
+  @override
+  Future<Either<Failure, User>> updateProfile({
+    required String nome,
+    String? telefone,
+  }) async {
+    try {
+      final user = await remote.updateProfile(nome: nome, telefone: telefone);
+      await local.cacheUser(user);
+      return Right(user);
+    } on AuthException catch (e) {
+      return Left(AuthFailure(e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message, statusCode: e.statusCode));
+    } on NetworkException {
+      return const Left(NetworkFailure());
+    }
+  }
 }

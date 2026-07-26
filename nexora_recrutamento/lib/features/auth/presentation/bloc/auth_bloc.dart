@@ -3,6 +3,7 @@ import '../../domain/usecases/get_current_user.dart';
 import '../../domain/usecases/login.dart';
 import '../../domain/usecases/logout.dart';
 import '../../domain/usecases/register.dart';
+import '../../domain/usecases/update_profile.dart';
 import '../../../../core/usecases/usecase.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
@@ -15,21 +16,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final Register _register;
   final Logout _logout;
   final GetCurrentUser _getCurrentUser;
+  final UpdateProfile _updateProfile;
 
   AuthBloc({
     required Login login,
     required Register register,
     required Logout logout,
     required GetCurrentUser getCurrentUser,
+    required UpdateProfile updateProfile,
   })  : _login = login,
         _register = register,
         _logout = logout,
         _getCurrentUser = getCurrentUser,
+        _updateProfile = updateProfile,
         super(const AuthInitial()) {
     on<AuthCheckRequested>(_onCheck);
     on<AuthLoginRequested>(_onLogin);
     on<AuthRegisterRequested>(_onRegister);
     on<AuthLogoutRequested>(_onLogout);
+    on<AuthProfileUpdateRequested>(_onUpdateProfile);
   }
 
   Future<void> _onCheck(
@@ -71,5 +76,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       AuthLogoutRequested event, Emitter<AuthState> emit) async {
     await _logout(const NoParams());
     emit(const AuthUnauthenticated());
+  }
+
+  Future<void> _onUpdateProfile(
+      AuthProfileUpdateRequested event, Emitter<AuthState> emit) async {
+    emit(const AuthLoading());
+    final result = await _updateProfile(
+      UpdateProfileParams(nome: event.nome, telefone: event.telefone),
+    );
+    result.fold(
+      (failure) => emit(AuthFailureState(failure.message)),
+      (user) => emit(AuthProfileUpdateSuccess(user)),
+    );
   }
 }

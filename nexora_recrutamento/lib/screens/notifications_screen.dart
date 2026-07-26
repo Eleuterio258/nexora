@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../features/notifications/data/models/notification_model.dart';
+import '../features/notifications/presentation/bloc/notifications_bloc.dart';
 import '../l10n/strings.dart';
 import '../widgets/nexora_logo.dart';
 
@@ -10,20 +13,19 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final List<_NotifData> _notifs = [];
+  @override
+  void initState() {
+    super.initState();
+    context.read<NotificationsBloc>().add(const NotificationsLoadRequested());
+  }
 
   void _markAllRead() {
-    setState(() {
-      for (final n in _notifs) {
-        n.read = true;
-      }
-    });
+    context.read<NotificationsBloc>().add(const AllNotificationsMarkedAsRead());
   }
 
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
-    final unread = _notifs.where((n) => !n.read).length;
 
     return Scaffold(
       backgroundColor: kPrimary,
@@ -61,20 +63,27 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             ),
                           ),
                           const Spacer(),
-                          if (unread > 0)
-                            TextButton(
-                              onPressed: _markAllRead,
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.white70,
-                                padding: EdgeInsets.zero,
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              child: Text(
-                                strings.notifMarkAllRead,
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                            ),
+                          BlocBuilder<NotificationsBloc, NotificationsState>(
+                            builder: (context, state) {
+                              final unread = state is NotificationsLoaded
+                                  ? state.notifications.where((n) => !n.lida).length
+                                  : 0;
+                              if (unread == 0) return const SizedBox.shrink();
+                              return TextButton(
+                                onPressed: _markAllRead,
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.white70,
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  strings.notifMarkAllRead,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              );
+                            },
+                          ),
                         ],
                       ),
                       const SizedBox(height: 20),
@@ -88,27 +97,37 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          if (unread > 0) ...[
-                            const SizedBox(width: 10),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFF5252),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                '$unread ${strings.notifNew}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
+                          BlocBuilder<NotificationsBloc, NotificationsState>(
+                            builder: (context, state) {
+                              final unread = state is NotificationsLoaded
+                                  ? state.notifications.where((n) => !n.lida).length
+                                  : 0;
+                              if (unread == 0) return const SizedBox.shrink();
+                              return Row(
+                                children: [
+                                  const SizedBox(width: 10),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 9,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFF5252),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      '$unread ${strings.notifNew}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -132,8 +151,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     top: Radius.circular(24),
                   ),
                 ),
-                child: _notifs.isEmpty
-                    ? Center(
+                child: BlocBuilder<NotificationsBloc, NotificationsState>(
+                  builder: (context, state) {
+                    if (state is NotificationsLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final notifications = state is NotificationsLoaded
+                        ? state.notifications
+                        : <NotificationModel>[];
+
+                    if (notifications.isEmpty) {
+                      return Center(
                         child: Text(
                           strings.notifEmpty,
                           style: const TextStyle(
@@ -141,17 +170,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             fontSize: 15,
                           ),
                         ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-                        itemCount: _notifs.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (context, i) => _NotifCard(
-                          notif: _notifs[i],
-                          onTap: () => setState(() => _notifs[i].read = true),
-                          onDismiss: () => setState(() => _notifs.removeAt(i)),
-                        ),
+                      );
+                    }
+
+                    return ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                      itemCount: notifications.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, i) => _NotifCard(
+                        notif: notifications[i],
+                        onTap: () => context
+                            .read<NotificationsBloc>()
+                            .add(NotificationMarkedAsRead(notifications[i].id)),
                       ),
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -161,204 +195,150 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 }
 
-enum _NotifType { application, interview, message, status, job }
-
-class _NotifData {
-  final _NotifType type;
-  final String title;
-  final String body;
-  final String time;
-  bool read;
-  final Color avatarBg;
-  final String avatarText;
-
-  _NotifData({
-    required this.type,
-    required this.title,
-    required this.body,
-    required this.time,
-    required this.read,
-    required this.avatarBg,
-    required this.avatarText,
-  });
-}
-
 class _NotifCard extends StatelessWidget {
-  final _NotifData notif;
+  final NotificationModel notif;
   final VoidCallback onTap;
-  final VoidCallback onDismiss;
 
-  const _NotifCard({
-    required this.notif,
-    required this.onTap,
-    required this.onDismiss,
-  });
+  const _NotifCard({required this.notif, required this.onTap});
 
   IconData get _typeIcon {
-    switch (notif.type) {
-      case _NotifType.interview:
+    switch (notif.tipo) {
+      case 'interview':
         return Icons.event_available_outlined;
-      case _NotifType.message:
+      case 'message':
         return Icons.chat_bubble_outline_rounded;
-      case _NotifType.status:
-        return Icons.info_outline_rounded;
-      case _NotifType.job:
+      case 'job':
         return Icons.work_outline_rounded;
-      case _NotifType.application:
+      case 'application':
         return Icons.send_rounded;
+      case 'status':
+      default:
+        return Icons.info_outline_rounded;
     }
   }
 
   Color get _typeColor {
-    switch (notif.type) {
-      case _NotifType.interview:
+    switch (notif.tipo) {
+      case 'interview':
         return const Color(0xFFE57C00);
-      case _NotifType.message:
+      case 'message':
         return const Color(0xFF4A90D9);
-      case _NotifType.status:
-        return kPrimary;
-      case _NotifType.job:
+      case 'job':
         return const Color(0xFF8A7AB5);
-      case _NotifType.application:
+      case 'application':
+        return kPrimary;
+      case 'status':
+      default:
         return kPrimary;
     }
   }
 
+  String _formatTime(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return 'Agora';
+    if (diff.inHours < 1) return '${diff.inMinutes} min';
+    if (diff.inDays < 1) return '${diff.inHours} h';
+    if (diff.inDays < 7) return '${diff.inDays} d';
+    return '${dt.day}/${dt.month}/${dt.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-      key: ValueKey(notif.title + notif.time),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFFFFEBEE),
-          borderRadius: BorderRadius.circular(8),
+          color: notif.lida ? Colors.white : const Color(0xFFF0FBF5),
+          borderRadius: const BorderRadius.all(Radius.circular(8)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x07000000),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+          border: notif.lida
+              ? null
+              : Border.all(color: const Color(0xFFB8EDD4), width: 1),
         ),
-        child: const Icon(
-          Icons.delete_outline,
-          color: Color(0xFFE53935),
-          size: 22,
-        ),
-      ),
-      onDismissed: (_) => onDismiss(),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            color: notif.read ? Colors.white : const Color(0xFFF0FBF5),
-            borderRadius: const BorderRadius.all(Radius.circular(8)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x07000000),
-                blurRadius: 8,
-                offset: Offset(0, 2),
-              ),
-            ],
-            border: notif.read
-                ? null
-                : Border.all(color: const Color(0xFFB8EDD4), width: 1),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Stack(
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: notif.avatarBg,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          notif.avatarText,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: notif.avatarText.length > 2 ? 9 : 15,
-                          ),
-                        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: _typeColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        _typeIcon,
+                        color: Colors.white,
+                        size: 22,
                       ),
                     ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 18,
-                        height: 18,
-                        decoration: BoxDecoration(
-                          color: _typeColor,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            notif.titulo,
+                            style: TextStyle(
+                              fontWeight: notif.lida
+                                  ? FontWeight.w600
+                                  : FontWeight.w700,
+                              fontSize: 13.5,
+                              color: const Color(0xFF1A2E2A),
+                            ),
+                          ),
                         ),
-                        child: Icon(
-                          _typeIcon,
-                          color: Colors.white,
-                          size: 10,
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatTime(notif.createdAt),
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 11,
+                          ),
                         ),
+                        if (!notif.lida) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: const BoxDecoration(
+                              color: kPrimary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      notif.corpo,
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                        height: 1.4,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              notif.title,
-                              style: TextStyle(
-                                fontWeight: notif.read
-                                    ? FontWeight.w600
-                                    : FontWeight.w700,
-                                fontSize: 13.5,
-                                color: const Color(0xFF1A2E2A),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            notif.time,
-                            style: TextStyle(
-                              color: Colors.grey.shade400,
-                              fontSize: 11,
-                            ),
-                          ),
-                          if (!notif.read) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: const BoxDecoration(
-                                color: kPrimary,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        notif.body,
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 13,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

@@ -1,3 +1,4 @@
+import '../../../../core/error/exceptions.dart';
 import '../../../../core/error/rest_exception_mapper.dart';
 import '../../../../core/rest_client/rest_client.dart';
 import '../../../../core/rest_client/rest_client_exception.dart';
@@ -6,6 +7,7 @@ import '../models/user_model.dart';
 abstract class AuthRemoteDataSource {
   Future<UserModel> login(String email, String password);
   Future<UserModel> register(String nome, String email, String password);
+  Future<UserModel> updateProfile({required String nome, String? telefone});
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -44,9 +46,37 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         '/api/public/recrutamento/candidatos/registar',
         data: {'nome': nome, 'email': email, 'password': password},
       );
+      return login(email, password);
     } on RestClientException catch (e) {
       mapRestException(e);
     }
-    return login(email, password);
+  }
+
+  @override
+  Future<UserModel> updateProfile({
+    required String nome,
+    String? telefone,
+  }) async {
+    try {
+      // O PUT devolve 204 No Content (sem body).
+      await client.auth().put<void>(
+        '/api/public/recrutamento/candidatos/perfil',
+        data: {
+          'nome': nome,
+          if (telefone != null && telefone.isNotEmpty) 'telefone': telefone,
+        },
+      );
+      // Vamos buscar o perfil actualizado para manter o cache sincronizado.
+      final res = await client.auth().get<Map<String, dynamic>>(
+        '/api/public/recrutamento/candidatos/perfil',
+      );
+      final data = res.data;
+      if (data is! Map<String, dynamic>) {
+        throw const ServerException('Resposta de perfil inválida');
+      }
+      return UserModel.fromJson(data);
+    } on RestClientException catch (e) {
+      mapRestException(e);
+    }
   }
 }

@@ -36,3 +36,14 @@ class AuthLogoutRequested extends AuthEvent {
   @override
   List<Object> get props => [];
 }
+
+class AuthProfileUpdateRequested extends AuthEvent {
+  final String nome;
+  final String? telefone;
+  const AuthProfileUpdateRequested({
+    required this.nome,
+    this.telefone,
+  });
+  @override
+  List<Object?> get props => [nome, telefone];
+}

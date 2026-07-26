@@ -19,11 +19,6 @@ class AppStrings {
   String get onbHaveAccount => _pt ? 'Já tens uma conta? ' : 'Already have an account? ';
   String get onbSignIn => _pt ? 'Entrar' : 'Sign In';
 
-  String get onbChipJobs => _pt ? '50k+ Vagas' : '50k+ Jobs';
-  String get onbChipApply => _pt ? 'Candidatura Rápida' : 'Quick Apply';
-  String get onbChipTracking => _pt ? 'Seguimento em Directo' : 'Live Tracking';
-  String get onbChipHired => _pt ? 'Sê Contratado' : 'Get Hired';
-
   List<OnbSlideStrings> get onbSlides => _pt ? _slidesPt : _slidesEn;
 
   static const _slidesPt = [
@@ -34,10 +29,6 @@ class AppStrings {
     OnbSlideStrings(
       title: 'Candidata-te\nCom Um Toque',
       body: 'Guarda o teu perfil uma vez e candidata-te a várias posições instantaneamente. Destaca-te junto dos recrutadores com um perfil completo e cuidado.',
-    ),
-    OnbSlideStrings(
-      title: 'Acompanha Cada\nCandidatura',
-      body: 'Mantém-te a par da tua pesquisa de emprego. Monitoriza estados, recebe actualizações de entrevistas e mensagens directas dos recrutadores.',
     ),
     OnbSlideStrings(
       title: 'Conquista\na Oferta',
@@ -55,10 +46,6 @@ class AppStrings {
       body: 'Save your profile once and apply to multiple positions instantly. Stand out to recruiters with a polished, complete profile.',
     ),
     OnbSlideStrings(
-      title: 'Track Every\nApplication',
-      body: 'Stay on top of your job search. Monitor statuses, get interview updates, and receive direct messages from recruiters.',
-    ),
-    OnbSlideStrings(
       title: 'Land the\nOffer',
       body: 'Get notified the moment a recruiter is interested. Chat, schedule interviews, and accept offers — all in one place.',
     ),
@@ -74,6 +61,26 @@ class AppStrings {
   String get authNoAccount => _pt ? 'Não tens conta? ' : "Don't have an account? ";
   String get authHaveAccount => _pt ? 'Já tens conta? ' : 'Already have an account? ';
   String get authName => _pt ? 'Nome completo' : 'Full name';
+
+  // Login screen
+  String get loginWelcome => _pt ? 'Bem-vindo de volta!' : 'Welcome back!';
+  String get loginSubtitle => _pt ? 'Entra para continuar na tua conta.' : 'Sign in to continue to your account.';
+  String get loginEmailHint => _pt ? 'Insere o teu e-mail' : 'Enter your email';
+  String get loginPasswordHint => _pt ? 'Insere a tua palavra-passe' : 'Enter your password';
+  String get loginOrDivider => _pt ? 'OU' : 'OR';
+  String get loginContinueWith => _pt ? 'Continuar com' : 'Continue with';
+  String get loginFillFields => _pt ? 'Preenche o e-mail e a palavra-passe.' : 'Please fill in email and password.';
+
+  // Register screen
+  String get registerTitle => _pt ? 'Criar Conta' : 'Create Account';
+  String get registerSubtitle => _pt ? 'Junta-te à Nexora e encontra as melhores oportunidades de emprego.' : 'Join Nexora and find the best job opportunities.';
+  String get registerConfirmPasswordHint => _pt ? 'Confirmar palavra-passe' : 'Confirm Password';
+  String get registerAgreeTerms => _pt ? 'Concordo com os ' : 'I agree to the ';
+  String get registerTermsAndConditions => _pt ? 'Termos e Condições' : 'Terms and Conditions';
+  String get registerFillAllFields => _pt ? 'Preenche todos os campos.' : 'Please fill in all fields.';
+  String get registerPasswordMinLength => _pt ? 'A palavra-passe deve ter pelo menos 6 caracteres.' : 'Password must be at least 6 characters.';
+  String get registerPasswordsDoNotMatch => _pt ? 'As palavras-passe não coincidem.' : 'Passwords do not match.';
+  String get registerAcceptTerms => _pt ? 'Tem de aceitar os Termos e Condições.' : 'You must accept the Terms and Conditions.';
 
   // ── Common ─────────────────────────────────────────────────────
 

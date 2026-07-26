@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import '../core/constants/app_colors.dart';
 import '../features/auth/presentation/bloc/auth_bloc.dart';
+import '../l10n/strings.dart';
 import '../widgets/nexora_logo.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -31,14 +34,14 @@ class _LoginScreenState extends State<LoginScreen> {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(
-        color: kPrimary,
+        color: AppColors.primary,
         fontSize: 14,
         fontWeight: FontWeight.w500,
       ),
       floatingLabelBehavior: FloatingLabelBehavior.always,
       hintText: hint,
       hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 15),
-      prefixIcon: Icon(icon, color: kPrimary, size: 22),
+      prefixIcon: Icon(icon, color: AppColors.primary, size: 22),
       suffixIcon: suffix,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -50,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: kPrimary, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
     );
@@ -59,9 +62,10 @@ class _LoginScreenState extends State<LoginScreen> {
   void _submit(BuildContext context) {
     final email = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
+    final s = AppStrings.of(context);
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preencha o email e a palavra-passe.')),
+        SnackBar(content: Text(s.loginFillFields)),
       );
       return;
     }
@@ -72,6 +76,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is AuthAuthenticated) {
@@ -125,9 +131,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 44),
 
                     // Welcome
-                    const Text(
-                      'Welcome back!',
-                      style: TextStyle(
+                    Text(
+                      s.loginWelcome,
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF1A2E2A),
@@ -135,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Sign in to continue to your account.',
+                      s.loginSubtitle,
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey.shade500,
@@ -148,8 +154,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: _emailCtrl,
                       keyboardType: TextInputType.emailAddress,
                       decoration: _floatingDecoration(
-                        label: 'Email',
-                        hint: 'Enter your email',
+                        label: s.authEmail,
+                        hint: s.loginEmailHint,
                         icon: Icons.email_outlined,
                       ),
                     ),
@@ -160,8 +166,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: _passwordCtrl,
                       obscureText: !_passwordVisible,
                       decoration: _floatingDecoration(
-                        label: 'Password',
-                        hint: 'Enter your password',
+                        label: s.authPassword,
+                        hint: s.loginPasswordHint,
                         icon: Icons.lock_outline,
                         suffix: IconButton(
                           icon: Icon(
@@ -189,10 +195,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: const Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            color: kPrimary,
+                        child: Text(
+                          s.authForgotPassword,
+                          style: const TextStyle(
+                            color: AppColors.primary,
                             fontWeight: FontWeight.w500,
                             fontSize: 14,
                           ),
@@ -211,7 +217,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: ElevatedButton(
                             onPressed: loading ? null : () => _submit(context),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: kPrimary,
+                              backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
@@ -227,9 +233,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Text(
-                                    'Login',
-                                    style: TextStyle(
+                                : Text(
+                                    s.authLogin,
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -252,7 +258,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 14),
                           child: Text(
-                            'OR',
+                            s.loginOrDivider,
                             style: TextStyle(
                               color: Colors.grey.shade400,
                               fontSize: 13,
@@ -272,7 +278,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     Center(
                       child: Text(
-                        'Continue with',
+                        s.loginContinueWith,
                         style: TextStyle(
                           color: Colors.grey.shade500,
                           fontSize: 14,
@@ -287,7 +293,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         Expanded(
                           child: _SocialButton(
                             onPressed: () {},
-                            icon: const _GoogleIcon(),
+                            icon: SvgPicture.asset(
+                              'assets/icons/google-icon-logo-svgrepo-com.svg',
+                              width: 22,
+                              height: 22,
+                            ),
                             label: 'Google',
                           ),
                         ),
@@ -295,7 +305,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         Expanded(
                           child: _SocialButton(
                             onPressed: () {},
-                            icon: const _LinkedInIcon(),
+                            icon: SvgPicture.asset(
+                              'assets/icons/linkedin-svgrepo-com.svg',
+                              width: 22,
+                              height: 22,
+                            ),
                             label: 'LinkedIn',
                           ),
                         ),
@@ -308,7 +322,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          "Don't have an account? ",
+                          s.authNoAccount,
                           style: TextStyle(
                             color: Colors.grey.shade600,
                             fontSize: 14,
@@ -317,10 +331,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         GestureDetector(
                           onTap: () =>
                               Navigator.pushNamed(context, '/register'),
-                          child: const Text(
-                            'Sign up',
-                            style: TextStyle(
-                              color: kPrimary,
+                          child: Text(
+                            s.authRegister,
+                            style: const TextStyle(
+                              color: AppColors.primary,
                               fontWeight: FontWeight.w600,
                               fontSize: 14,
                             ),
@@ -375,86 +389,6 @@ class _SocialButton extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _GoogleIcon extends StatelessWidget {
-  const _GoogleIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 22,
-      height: 22,
-      child: CustomPaint(painter: _GoogleGPainter()),
-    );
-  }
-}
-
-class _GoogleGPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    final r = size.width * 0.43;
-    final sw = size.width * 0.185;
-    final rect = Rect.fromCircle(center: Offset(cx, cy), radius: r);
-
-    Paint arc(Color c) => Paint()
-      ..color = c
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = sw
-      ..strokeCap = StrokeCap.butt;
-
-    // Red: top arc (from ~-126° sweeping 138° clockwise)
-    canvas.drawArc(rect, -2.2, 2.4, false, arc(const Color(0xFFEA4335)));
-    // Blue: left arc
-    canvas.drawArc(rect, 0.2, 1.35, false, arc(const Color(0xFF4285F4)));
-    // Yellow: bottom-left
-    canvas.drawArc(rect, 1.55, 0.48, false, arc(const Color(0xFFFBBC05)));
-    // Green: bottom-right
-    canvas.drawArc(rect, 2.03, 0.42, false, arc(const Color(0xFF34A853)));
-
-    // Horizontal bar (blue)
-    canvas.drawLine(
-      Offset(cx, cy - sw * 0.05),
-      Offset(cx + r + sw * 0.45, cy - sw * 0.05),
-      Paint()
-        ..color = const Color(0xFF4285F4)
-        ..strokeWidth = sw * 0.78
-        ..strokeCap = StrokeCap.butt
-        ..style = PaintingStyle.stroke,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _LinkedInIcon extends StatelessWidget {
-  const _LinkedInIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A66C2),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: const Center(
-        child: Text(
-          'in',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-            height: 1.0,
-          ),
-        ),
       ),
     );
   }

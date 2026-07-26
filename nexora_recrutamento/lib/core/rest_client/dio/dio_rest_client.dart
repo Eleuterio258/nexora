@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:nexora_recrutamento/core/rest_client/dio/auth_interceptor.dart';
 import 'package:nexora_recrutamento/core/rest_client/rest_client.dart';
@@ -155,8 +157,40 @@ class DioRestClient implements RestClient {
   Future<RestClientResponse<T>> _dioResponseConverter<T>(
     Response<dynamic> response,
   ) async {
+    dynamic data = response.data;
+
+    // Alguns endpoints devolvem texto puro (ex.: "OK" ou uma página de erro
+    // HTML) em vez de JSON. Se for uma string que parece JSON, tentamos
+    // descodificar; caso contrário, lançamos uma excepção informativa.
+    if (data is String && data.trim().isNotEmpty) {
+      final trimmed = data.trim();
+      final looksLikeJson =
+          (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+              (trimmed.startsWith('[') && trimmed.endsWith(']'));
+      if (looksLikeJson) {
+        try {
+          data = jsonDecode(data);
+        } catch (_) {
+          // Mantém a string original se a descodificação falhar.
+        }
+      } else if (T != String) {
+        throw RestClientException(
+          error: data,
+          message:
+              'Resposta inesperada do servidor (status ${response.statusCode}). '
+              'Esperado JSON, recebido: ${trimmed.length > 120 ? '${trimmed.substring(0, 120)}...' : trimmed}',
+          statusCode: response.statusCode,
+          response: RestClientResponse(
+            data: data,
+            statusMessage: response.statusMessage,
+            statusCode: response.statusCode,
+          ),
+        );
+      }
+    }
+
     return RestClientResponse<T>(
-      data: response.data,
+      data: data,
       statusCode: response.statusCode,
       statusMessage: response.statusMessage,
     );
