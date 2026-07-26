@@ -169,6 +169,12 @@ if (str_starts_with($uri, '/admin')) {
         http_response_code(404);
         echo 'Página não encontrada no painel escolar.';
     }
+} elseif ($uri === '/nexora-recrutamento/politica-de-privacidade') {
+    $app = Application::bootstrap();
+    $activePage = 'privacidade';
+    $app = (object) ['openVacancies' => $app->openVacancies];
+    require __DIR__ . '/src/View/templates/public/politica_privacidade_recrutamento.php';
+    exit;
 } elseif (str_starts_with($uri, '/nexora')) {
     $app  = Application::bootstrap();
 
@@ -550,6 +556,7 @@ if (str_starts_with($uri, '/admin')) {
 } else {
     $app = Application::bootstrap();
     $path = rtrim($uri, '/') ?: '/';
+
     match ($path) {
         '/vagas'                      => $app->carreira->render(),
         '/carreira'                   => $app->carreira->render(),
