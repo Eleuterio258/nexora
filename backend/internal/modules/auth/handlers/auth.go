@@ -14,7 +14,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	mw "nexora/internal/middleware"
-	"nexora/internal/modules/auth/models"
 )
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -795,57 +794,6 @@ func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	h.db.Exec(r.Context(), `UPDATE users SET email_verificado = TRUE, updated_at = NOW() WHERE id = $1`, userID)
 	h.db.Exec(r.Context(), `UPDATE email_verifications SET usado_em = NOW() WHERE id = $1`, verID)
 
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// ── Gateway Validate ──────────────────────────────────────────────────────────
-
-// gatewayAppRole traduz a identidade ERP (tipo + permissões RBAC) para o
-// vocabulário de role usado por consumidores externos de confiança (hoje só o
-// FaceClock, via GET /api/auth/gateway/validate) — "ADMIN_SISTEMA"/"GESTOR_RH"/
-// "COLABORADOR". O ERP não tem estes três roles como conceito nativo (só
-// `tipo` + permissões RBAC finas), por isso este mapeamento vive aqui, não no
-// consumidor: só o ERP sabe calcular permissões a partir de cargo/permissões
-// diretas/tipo. GESTOR_RH é definido operacionalmente como "tem a permissão
-// recursos-humanos.aprovar_ausencias" — a mesma que already protege
-// POST /api/rh/ausencias/{id}/aprovar no router (não existe um role
-// dedicado "gestor" na tabela auth.users.tipo).
-func gatewayAppRole(ua *models.UserAccess) string {
-	if ua.Tipo == "superadmin" {
-		return "ADMIN_SISTEMA"
-	}
-	if ua.Can("recursos-humanos", "aprovar_ausencias") {
-		return "GESTOR_RH"
-	}
-	return "COLABORADOR"
-}
-
-func (h *Handler) GatewayValidate(w http.ResponseWriter, r *http.Request) {
-	user := mw.GetUser(r)
-	var id, tenantID int64
-	var nome, email, escopo, tipo string
-	err := h.db.QueryRow(r.Context(), `
-		SELECT u.id, COALESCE(m.tenant_id, 0), u.nome, u.email, COALESCE(NULLIF(m.escopo, ''), 'erp'), u.tipo
-		  FROM users u LEFT JOIN auth.memberships m ON m.id = $2 AND m.user_id = u.id AND m.ativo = true
-		 WHERE u.id = $1`, user.ID, user.MembershipID).
-		Scan(&id, &tenantID, &nome, &email, &escopo, &tipo)
-	if err != nil {
-		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
-		return
-	}
-
-	appRole := "COLABORADOR"
-	if ua, err := models.LoadUserAccess(r.Context(), h.db, id, user.MembershipID); err == nil {
-		appRole = gatewayAppRole(ua)
-	}
-
-	w.Header().Set("X-Auth-User-Id", itoa(id))
-	w.Header().Set("X-Auth-Tenant-Id", itoa(tenantID))
-	w.Header().Set("X-Auth-Session-Id", itoa(user.SessionID))
-	w.Header().Set("X-Auth-User-Email", email)
-	w.Header().Set("X-Auth-User-Name", nome)
-	w.Header().Set("X-Auth-User-Scope", escopo)
-	w.Header().Set("X-Auth-User-Role", appRole)
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -245,7 +245,6 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Get("/me/perm-ts", auth.MePermTs)
 			r.Post("/logout", auth.Logout)
 			r.Post("/change-password", auth.ChangePassword)
-			r.Get("/gateway/validate", auth.GatewayValidate)
 			r.Post("/push-token", auth.RegisterPushToken)
 		})
 
@@ -301,20 +300,6 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Get("/", auth.ListarSessoes)
 				r.Post("/{id}/revogar", auth.RevogarSessao)
 				r.Post("/revogar-todas", auth.RevogarTodasSessoes)
-			})
-		})
-
-		// API Keys (requer permissão)
-		r.Group(func(r chi.Router) {
-			r.Use(mw.RequireAuth(cfg.JWTSecret, db, oauthKeys))
-			r.Use(mw.RequirePermission(db, "autorizacao", "gerir_utilizadores"))
-
-			r.Route("/api-keys", func(r chi.Router) {
-				r.Get("/", auth.ListarAPIKeys)
-				r.Post("/", auth.CriarAPIKey)
-				r.Get("/{id}", auth.ObterAPIKey)
-				r.Put("/{id}", auth.ActualizarAPIKey)
-				r.Post("/{id}/revogar", auth.RevogarAPIKey)
 			})
 		})
 	})

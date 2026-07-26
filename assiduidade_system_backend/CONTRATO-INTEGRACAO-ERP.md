@@ -13,7 +13,7 @@
 O FaceClock resolve o "actor" de cada pedido em duas etapas (`app/deps.py:get_actor`), por ordem de prioridade:
 
 1. **JWT Bearer local** (`Authorization: Bearer ...`) — usado pela app/totem quando ainda autentica directamente no FaceClock.
-2. **Headers de confiança**, no formato devolvido por `GET /api/auth/gateway/validate` do Nexora ERP:
+2. **Headers de confiança** (formato histórico, ver nota da secção 11 — `GET /api/auth/gateway/validate` já não existe no ERP; este caminho só é exercido se um gateway/proxy futuro vier a montar estes headers manualmente):
 
 | Header | Origem | Obrigatório |
 |---|---|---|
