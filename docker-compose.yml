@@ -40,6 +40,13 @@ services:
     volumes:
       - api_uploads:/app/uploads
       - api_avatars:/app/avatars
+      # Chave RSA de assinatura dos tokens OAuth2 (oauthkeys.NewProvider). Tem
+      # de sobreviver a rebuilds: se mudar, todos os access tokens já emitidos
+      # deixam de validar contra o JWKS e o FaceClock rejeita as sessões (ver
+      # app/oauth_jwks.py no assiduidade_system_backend). Em produção
+      # OAUTH_ALLOW_GENERATED_KEY fica a false, por isso a chave é gerada uma
+      # única vez com oauthkeys.GenerateAndSave e persiste aqui.
+      - api_oauth_keys:/app/data/oauth-keys
     networks:
       - backend
     labels:
@@ -158,6 +165,8 @@ volumes:
   api_uploads:
     driver: local
   api_avatars:
+    driver: local
+  api_oauth_keys:
     driver: local
   web_uploads:
     driver: local
