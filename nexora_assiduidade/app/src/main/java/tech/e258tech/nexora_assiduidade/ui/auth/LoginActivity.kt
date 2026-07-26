@@ -174,6 +174,8 @@ class LoginActivity : AppCompatActivity() {
     private fun performLogin(email: String, password: String) {
         setLoading(true)
         Log.d(TAG, "performLogin: a iniciar POST /oauth/token (grant_type=password)")
+        Log.d(TAG, "performLogin: ERP_BASE_URL=${BuildConfig.ERP_BASE_URL}")
+        Log.d(TAG, "performLogin: username='$email', passwordLength=${password.length}")
 
         uiScope.launch {
             try {
@@ -199,9 +201,11 @@ class LoginActivity : AppCompatActivity() {
                 Log.d(TAG, "performLogin: resposta do login recebida, status=${response.code()}")
 
                 if (!response.isSuccessful || response.body() == null) {
+                    val errorBody = response.errorBody()?.string().orEmpty()
+                    Log.w(TAG, "performLogin: erro no login body=$errorBody")
                     Toast.makeText(
                         this@LoginActivity,
-                        ApiUtils.errorMessage(response),
+                        ApiUtils.oauthErrorMessage(response),
                         Toast.LENGTH_LONG
                     ).show()
                     return@launch

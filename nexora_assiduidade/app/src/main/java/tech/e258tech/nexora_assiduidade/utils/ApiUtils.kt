@@ -33,4 +33,22 @@ object ApiUtils {
             "Falha na comunicacao com o servidor."
         }
     }
+
+    /**
+     * Erro no formato RFC 6749 usado pelo Authorization Server OAuth2
+     * (/oauth/token): {"error":"invalid_grant","error_description":"..."}.
+     * Devolve a descrição amigável quando disponível; fallback para [errorMessage].
+     */
+    fun oauthErrorMessage(response: Response<*>): String {
+        val body = response.errorBody()?.string().orEmpty()
+        if (body.isBlank()) {
+            return errorMessage(response)
+        }
+        return runCatching {
+            val json = gson.fromJson(body, JsonObject::class.java)
+            json.get("error_description")?.asString ?: json.get("error")?.asString
+        }.getOrNull().orEmpty().ifBlank {
+            errorMessage(response)
+        }
+    }
 }

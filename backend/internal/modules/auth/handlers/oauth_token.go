@@ -203,6 +203,12 @@ func (h *Handler) oauthClientCredentialsGrant(w http.ResponseWriter, r *http.Req
 // issueOAuthTokenResponse assina o access token, gera e persiste um refresh
 // token novo (família nova — usado pelos grants iniciais; oauthRefreshTokenGrant
 // usa a variante de rotation) e escreve a resposta JSON standard.
+//
+// Para sujeitos humanos (funcionario/superadmin) também cria uma entrada em
+// auth.sessions, porque o middleware RequireAuth ainda valida o access token
+// contra essa tabela (compatibilidade com sessões HS256 legadas e rotas
+// protegidas do ERP). client_credentials não cria sessão — é um token de
+// máquina, sem utilizador.
 func (h *Handler) issueOAuthTokenResponse(w http.ResponseWriter, r *http.Request, client *models.OAuthClient, subjectType string, subjectID, tenantID, membershipID int64, escopo, scope string, expiry time.Duration) {
 	accessToken, _, err := h.signOAuthAccessToken(subjectID, tenantID, membershipID, subjectType, escopo, scope, expiry)
 	if err != nil {
@@ -214,6 +220,14 @@ func (h *Handler) issueOAuthTokenResponse(w http.ResponseWriter, r *http.Request
 		oauthErr(w, http.StatusInternalServerError, "server_error", "erro ao emitir refresh token")
 		return
 	}
+
+	if subjectType == "funcionario" || subjectType == "superadmin" {
+		if err := h.insertSession(r, subjectID, mw.HashToken(accessToken), time.Now().Add(expiry)); err != nil {
+			oauthErr(w, http.StatusInternalServerError, "server_error", "erro ao criar sessão")
+			return
+		}
+	}
+
 	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, subjectID)
 	jsonOK(w, map[string]interface{}{
 		"access_token":  accessToken,
