@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/internal/modules/hardware/models"
 	"nexora/internal/modules/recursos-humanos/service/assiduidade"
+	"nexora/internal/modules/recursos-humanos/service/funcionario"
 	"nexora/internal/pkg/tenantid"
 )
 
@@ -17,11 +18,16 @@ import (
 type Processor struct {
 	db          *pgxpool.Pool
 	assiduidade *assiduidade.Service
+	funcionario *funcionario.Service
 }
 
 // NewProcessor cria um novo processor.
 func NewProcessor(db *pgxpool.Pool) *Processor {
-	return &Processor{db: db, assiduidade: assiduidade.NewService(db)}
+	return &Processor{
+		db:          db,
+		assiduidade: assiduidade.NewService(db),
+		funcionario: funcionario.NewService(db),
+	}
 }
 
 // ProcessResult representa o resultado do processamento de um evento.
@@ -109,7 +115,17 @@ func (p *Processor) processEntity(ctx context.Context, tenantID, deviceID int64,
 
 	switch mapping.EntityType {
 	case "funcionario", "professor":
-		eventoID, err := p.registarEventoAssiduidade(ctx, saasTenantID, deviceID, mapping.EntityID, event, eventID)
+		// Uniformização: valida o funcionário através do resolver centralizado,
+		// garantindo que o entity_id obtido do device_users corresponde a um
+		// funcionário activo no tenant SaaS.
+		funcionario, err := p.funcionario.PorID(ctx, saasTenantID, mapping.EntityID)
+		if err != nil {
+			return ProcessResult{ErrorMessage: "funcionário não encontrado"}
+		}
+		if err := funcionario.VerificarAtivo(); err != nil {
+			return ProcessResult{ErrorMessage: "funcionário inativo"}
+		}
+		eventoID, err := p.registarEventoAssiduidade(ctx, saasTenantID, deviceID, funcionario.ID, event, eventID)
 		if err != nil {
 			return ProcessResult{ErrorMessage: "erro ao registar evento de assiduidade: " + err.Error()}
 		}

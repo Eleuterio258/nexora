@@ -109,15 +109,17 @@ func (h *Handler) ValidarNFCDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var funcionarioID int64
 	var funcionarioUserID *int64
+	var employeeNo *string
 	var funcionarioNome string
 	var activo bool
 	err = h.db.QueryRow(r.Context(), `
-		SELECT f.user_id, f.nome_completo, t.activo
+		SELECT f.id, f.user_id, f.numero_funcionario, f.nome_completo, t.activo
 		  FROM rh.nfc_tags t
 		  JOIN rh.funcionarios f ON f.id = t.funcionario_id
 		 WHERE t.tag_uid=$1 AND t.tenant_id=$2`,
-		tagUID, tenantID).Scan(&funcionarioUserID, &funcionarioNome, &activo)
+		tagUID, tenantID).Scan(&funcionarioID, &funcionarioUserID, &employeeNo, &funcionarioNome, &activo)
 	if err != nil {
 		jsonOK(w, map[string]any{"valid": false, "reason": "tag_not_found"}, http.StatusOK)
 		return
@@ -127,9 +129,15 @@ func (h *Handler) ValidarNFCDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonOK(w, map[string]any{
-		"valid":       true,
-		"erp_user_id": *funcionarioUserID,
-		"funcionario": funcionarioNome,
-	}, http.StatusOK)
+	resp := map[string]any{
+		"valid":          true,
+		"funcionario_id": funcionarioID,
+		"erp_user_id":    *funcionarioUserID,
+		"employee_no":    employeeNo,
+		"funcionario":    funcionarioNome,
+	}
+	if employeeNo == nil {
+		resp["employee_no"] = nil
+	}
+	jsonOK(w, resp, http.StatusOK)
 }

@@ -13,6 +13,7 @@ import (
 
 	mw "nexora/internal/middleware"
 	"nexora/internal/modules/auth/models"
+	"nexora/internal/modules/recursos-humanos/service/funcionario"
 )
 
 const (
@@ -60,7 +61,7 @@ func (h *Handler) lookupUserByEmail(ctx context.Context, email string) (*userIde
 // refresh token continua HS256 por agora (signRefresh) — RequireAuth nunca
 // o valida directamente, só refreshWithToken, que fica para uma fase
 // posterior.
-func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request, u *userIdentity) {
+func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request, u *userIdentity, funcionarioID *int64) {
 	userAccess, _ := models.LoadUserAccess(r.Context(), h.db, u.id, u.membershipID)
 	scope := ""
 	if userAccess != nil {
@@ -91,6 +92,9 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 		"nome":   u.nome,
 		"email":  u.email,
 		"escopo": escoposPorTipoEscopo(u.tipo, u.escopo),
+	}
+	if funcionarioID != nil {
+		userObj["funcionario_id"] = *funcionarioID
 	}
 	features := []string{}
 	if userAccess != nil {
@@ -177,7 +181,18 @@ func (h *Handler) LoginPorPIN(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logAuthAttempt(r, u, body.Email, true, nil)
-	h.issueFuncionarioTokens(w, r, u)
+
+	// Resolve funcionario_id para uniformizar a identidade do utilizador no
+	// contexto de assiduidade.
+	var funcionarioID *int64
+	if u.tenantID > 0 {
+		svc := funcionario.NewService(h.db)
+		if f, err := svc.PorUserID(r.Context(), u.tenantID, u.id); err == nil {
+			funcionarioID = &f.ID
+		}
+	}
+
+	h.issueFuncionarioTokens(w, r, u, funcionarioID)
 }
 
 // ── TOTP ─────────────────────────────────────────────────────────────────────
@@ -289,7 +304,7 @@ func (h *Handler) ValidarTOTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logAuthAttempt(r, u, body.Email, true, nil)
-	h.issueFuncionarioTokens(w, r, u)
+	h.issueFuncionarioTokens(w, r, u, nil)
 }
 
 // ── Admin: definir PIN ───────────────────────────────────────────────────────

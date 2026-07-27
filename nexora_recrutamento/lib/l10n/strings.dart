@@ -68,7 +68,6 @@ class AppStrings {
   String get loginEmailHint => _pt ? 'Insere o teu e-mail' : 'Enter your email';
   String get loginPasswordHint => _pt ? 'Insere a tua palavra-passe' : 'Enter your password';
   String get loginOrDivider => _pt ? 'OU' : 'OR';
-  String get loginContinueWith => _pt ? 'Continuar com' : 'Continue with';
   String get loginFillFields => _pt ? 'Preenche o e-mail e a palavra-passe.' : 'Please fill in email and password.';
 
   // Register screen

@@ -107,21 +107,22 @@ class DetalheFuncionarioFragment : Fragment() {
                     return@launch
                 }
 
-                val f = response.body()!!
-                tvName.text = f.nome_completo
-                tvEmail.text = f.email ?: "Sem email registado"
-                tvCargo.text = f.cargo ?: "Sem cargo definido"
-                tvUnidade.text = "Unidade: ${f.unidade_nome ?: "Sem unidade"}"
-                tvNumero.text = "Número: ${f.numero_funcionario ?: "-"}"
-                tvTelefone.text = "Telefone: ${f.telefone ?: "-"}"
-                tvAdmissao.text = "Admissão: ${f.data_admissao?.let { DateTimeUtils.formatDate(it) } ?: "-"}"
+                val body = response.body()!!
+                val funcionario = body.funcionario
+                tvName.text = funcionario.nome_completo
+                tvEmail.text = funcionario.email ?: "Sem email registado"
+                tvCargo.text = funcionario.cargo ?: "Sem cargo definido"
+                tvUnidade.text = "Unidade: ${funcionario.unidade_nome ?: "Sem unidade"}"
+                tvNumero.text = "Número: ${funcionario.numero_funcionario ?: "-"}"
+                tvTelefone.text = "Telefone: ${funcionario.telefone ?: "-"}"
+                tvAdmissao.text = "Admissão: ${funcionario.data_admissao?.let { DateTimeUtils.formatDate(it) } ?: "-"}"
                 tvEstado.text = "Estado: ${
-                    when (f.estado) {
+                    when (funcionario.estado) {
                         "ativo" -> "Activo"
                         "suspenso" -> "Suspenso"
                         "licenca" -> "Em licença"
                         "desligado" -> "Desligado"
-                        else -> f.estado
+                        else -> funcionario.estado
                     }
                 }"
             } catch (e: CancellationException) {

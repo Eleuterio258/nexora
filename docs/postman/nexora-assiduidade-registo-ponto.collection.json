@@ -1,0 +1,721 @@
+{
+  "info": {
+    "_postman_id": "nexora-assiduidade-ponto-001",
+    "name": "Nexora Assiduidade - Registo de Ponto",
+    "description": "Collection dos endpoints de registo de ponto/assiduidade do Nexora ERP. As rotas de hardware usam X-API-Key do dispositivo; rotas de RH/gestão usam Bearer JWT.\n\nNOTA SOBRE IDENTIFICAÇÃO DO FUNCIONÁRIO:\n- employee_no: número do funcionário usado nos endpoints genéricos de hardware (/api/hardware/events/generic).\n- funcionario_id: ID interno do funcionário no ERP, usado em endpoints de RH (/api/rh/...).\n- user_id: ID do utilizador na tabela auth.users, usado em autenticação/admin (/api/authcode/...).\n- email: email do utilizador, usado na validação de PIN.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "00 - Identificação do Funcionário",
+      "item": [
+        {
+          "name": "Resumo dos Identificadores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}",
+              "host": ["{{base_url}}"]
+            },
+            "description": "Os endpoints de hardware (/api/hardware/...) identificam o funcionário pelo employee_no.\n\nOs endpoints de RH (/api/rh/...) usam funcionario_id.\n\nOs endpoints de autenticação/admin (/api/authcode/...) usam user_id ou email.\n\nPara testar, mantém estes três valores sincronizados no mesmo funcionário:\n- employee_no → FUNC001\n- funcionario_id → 1\n- user_id → 1\n- email → funcionario@nexora.test"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Genérico",
+      "item": [
+        {
+          "name": "Registar Evento Genérico",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/hardware/events/generic",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hardware", "events", "generic"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_serial\": \"{{device_serial}}\",\n  \"employee_no\": \"{{employee_no}}\",\n  \"event_time\": \"{{event_time}}\",\n  \"event_type\": \"AUTO\",\n  \"direction\": \"unknown\",\n  \"credential_type\": \"{{credential_type}}\"\n}"
+            },
+            "description": "Endpoint central para registo de ponto. Identifica o funcionário pelo employee_no. O ERP infere entrada/saída pela paridade dos eventos do dia."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Manual",
+      "item": [
+        {
+          "name": "Registo Manual (app/genérico)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/hardware/events/generic",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hardware", "events", "generic"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_serial\": \"{{device_serial}}\",\n  \"employee_no\": \"{{employee_no}}\",\n  \"event_time\": \"{{event_time}}\",\n  \"event_type\": \"AUTO\",\n  \"direction\": \"unknown\",\n  \"credential_type\": \"manual\"\n}"
+            },
+            "description": "Registo manual de ponto via app. Usa employee_no para identificar o funcionário."
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Evento Manual (RH/gestor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/rh/eventos",
+              "host": ["{{base_url}}"],
+              "path": ["api", "rh", "eventos"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"funcionario_id\": {{funcionario_id}},\n  \"tipo_evento_codigo\": \"ENTRADA\",\n  \"metodo_codigo\": \"manual\",\n  \"origem\": \"backoffice\",\n  \"ocorrido_em\": \"{{event_time}}\",\n  \"data_referencia\": \"{{data_referencia}}\",\n  \"latitude\": null,\n  \"longitude\": null,\n  \"localidade_id\": null,\n  \"foto_url\": null,\n  \"motivo\": \"Registo manual pelo RH\",\n  \"observacoes\": \"\"\n}"
+            },
+            "description": "Criação manual de evento de assiduidade no backoffice por RH/gestor. Usa funcionario_id (não employee_no)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "QR Code",
+      "item": [
+        {
+          "name": "Validar QR Code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/hardware/assiduidade/qr/validar",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hardware", "assiduidade", "qr", "validar"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qr_code\": \"{{qr_code}}\"\n}"
+            },
+            "description": "Valida um token QR de assiduidade. A resposta devolve employee_no (entre outros dados) para usar no registo genérico."
+          },
+          "response": []
+        },
+        {
+          "name": "Registar Ponto via QR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/hardware/events/generic",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hardware", "events", "generic"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_serial\": \"{{device_serial}}\",\n  \"employee_no\": \"{{employee_no}}\",\n  \"event_time\": \"{{event_time}}\",\n  \"event_type\": \"AUTO\",\n  \"direction\": \"unknown\",\n  \"credential_type\": \"qr\",\n  \"qr_token_id\": \"{{qr_token_id}}\"\n}"
+            },
+            "description": "Envia o evento de ponto após validar o QR code. Usa employee_no retornado pela validação."
+          },
+          "response": []
+        },
+        {
+          "name": "Gerar QR (gestor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/rh/assiduidade/qr/gerar",
+              "host": ["{{base_url}}"],
+              "path": ["api", "rh", "assiduidade", "qr", "gerar"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"location_id\": {{location_id}},\n  \"duracao_segundos\": 300,\n  \"funcionario_id\": {{funcionario_id}}\n}"
+            },
+            "description": "Gera QR code fixo para uma localidade/funcionário. Requer permissão recursos-humanos:ver_funcionarios. Usa funcionario_id."
+          },
+          "response": []
+        },
+        {
+          "name": "Gerar QR Pessoal (self-service)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/self-service/assiduidade/qr/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "self-service", "assiduidade", "qr", "me"]
+            },
+            "description": "Gera QR code pessoal vinculado ao funcionário autenticado (token JWT)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reconhecimento Facial",
+      "item": [
+        {
+          "name": "Verificar Face (FaceClock)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{faceclock_url}}/biometric/verify",
+              "host": ["{{faceclock_url}}"],
+              "path": ["biometric", "verify"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"{{employee_no}}\",\n  \"device_id\": \"{{device_serial}}\",\n  \"image_base64\": \"{{image_base64}}\"\n}"
+            },
+            "description": "Verificação biométrica no serviço FaceClock. O campo user_id do FaceClock corresponde ao employee_no do ERP. Devolve match, confidence_score e liveness_score."
+          },
+          "response": []
+        },
+        {
+          "name": "Registar Ponto via Face",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/hardware/events/generic",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hardware", "events", "generic"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_serial\": \"{{device_serial}}\",\n  \"employee_no\": \"{{employee_no}}\",\n  \"event_time\": \"{{event_time}}\",\n  \"event_type\": \"AUTO\",\n  \"direction\": \"unknown\",\n  \"credential_type\": \"face\",\n  \"confidence_score\": 0.97,\n  \"liveness_score\": 0.95\n}"
+            },
+            "description": "Envia o evento de ponto após verificação facial. Usa employee_no."
+          },
+          "response": []
+        },
+        {
+          "name": "Enroll Facial",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/rh/funcionarios/{{funcionario_id}}/biometria/facial/enroll",
+              "host": ["{{base_url}}"],
+              "path": ["api", "rh", "funcionarios", "{{funcionario_id}}", "biometria", "facial", "enroll"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"captures\": [\n    { \"image_base64\": \"{{image_base64}}\" },\n    { \"image_base64\": \"{{image_base64}}\" },\n    { \"image_base64\": \"{{image_base64}}\" }\n  ]\n}"
+            },
+            "description": "Cadastra a face de um funcionário. Usa funcionario_id na URL. Mínimo 3 capturas. Requer consentimento LGPD."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Selfie + GPS",
+      "item": [
+        {
+          "name": "Validar Geofence",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/hardware/assiduidade/geofence/validar?unidade_id={{unidade_id}}&latitude={{latitude}}&longitude={{longitude}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hardware", "assiduidade", "geofence", "validar"],
+              "query": [
+                {
+                  "key": "unidade_id",
+                  "value": "{{unidade_id}}"
+                },
+                {
+                  "key": "latitude",
+                  "value": "{{latitude}}"
+                },
+                {
+                  "key": "longitude",
+                  "value": "{{longitude}}"
+                }
+              ]
+            },
+            "description": "Consulta se as coordenadas GPS estão dentro do raio permitido da unidade."
+          },
+          "response": []
+        },
+        {
+          "name": "Registar Ponto via Selfie + GPS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/hardware/events/generic",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hardware", "events", "generic"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_serial\": \"{{device_serial}}\",\n  \"employee_no\": \"{{employee_no}}\",\n  \"event_time\": \"{{event_time}}\",\n  \"event_type\": \"AUTO\",\n  \"direction\": \"unknown\",\n  \"credential_type\": \"geolocation\",\n  \"latitude\": {{latitude}},\n  \"longitude\": {{longitude}},\n  \"foto_url\": \"{{foto_url}}\"\n}"
+            },
+            "description": "Regista ponto com geolocalização e selfie. Usa employee_no."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "PIN",
+      "item": [
+        {
+          "name": "Validar PIN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/authcode/pin/validate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "authcode", "pin", "validate"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"pin\": \"{{pin}}\"\n}"
+            },
+            "description": "Valida o PIN do funcionário. Usa email (não employee_no). A resposta inclui user.funcionario_id quando o utilizador tem perfil de funcionário."
+          },
+          "response": []
+        },
+        {
+          "name": "Registar Ponto via PIN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/hardware/events/generic",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hardware", "events", "generic"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_serial\": \"{{device_serial}}\",\n  \"employee_no\": \"{{employee_no}}\",\n  \"event_time\": \"{{event_time}}\",\n  \"event_type\": \"AUTO\",\n  \"direction\": \"unknown\",\n  \"credential_type\": \"pin\"\n}"
+            },
+            "description": "Regista ponto após validação do PIN. Usa employee_no."
+          },
+          "response": []
+        },
+        {
+          "name": "Definir PIN (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/authcode/admin/set-pin",
+              "host": ["{{base_url}}"],
+              "path": ["api", "authcode", "admin", "set-pin"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": {{user_id}},\n  \"pin\": \"{{pin}}\"\n}"
+            },
+            "description": "Administrador/gestor define o PIN de um funcionário. Usa user_id (ID da tabela auth.users). Normalmente coincide com funcionario_id."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "NFC",
+      "item": [
+        {
+          "name": "Validar Tag NFC",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/hardware/assiduidade/nfc/validar?tag_uid={{tag_uid}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hardware", "assiduidade", "nfc", "validar"],
+              "query": [
+                {
+                  "key": "tag_uid",
+                  "value": "{{tag_uid}}"
+                }
+              ]
+            },
+            "description": "Valida uma tag NFC. A resposta devolve funcionario_id, employee_no e erp_user_id para usar no registo genérico."
+          },
+          "response": []
+        },
+        {
+          "name": "Registar Ponto via NFC",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/hardware/events/generic",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hardware", "events", "generic"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_serial\": \"{{device_serial}}\",\n  \"employee_no\": \"{{employee_no}}\",\n  \"event_time\": \"{{event_time}}\",\n  \"event_type\": \"AUTO\",\n  \"direction\": \"unknown\",\n  \"credential_type\": \"nfc\"\n}"
+            },
+            "description": "Regista ponto após validação da tag NFC. Usa employee_no retornado pela validação."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Impressão Digital",
+      "item": [
+        {
+          "name": "Registar Ponto via Impressão Digital",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/hardware/events/generic",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hardware", "events", "generic"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_serial\": \"{{device_serial}}\",\n  \"employee_no\": \"{{employee_no}}\",\n  \"event_time\": \"{{event_time}}\",\n  \"event_type\": \"AUTO\",\n  \"direction\": \"unknown\",\n  \"credential_type\": \"fingerprint\",\n  \"confidence_score\": 1.0\n}"
+            },
+            "description": "Regista ponto via impressão digital (app Android usa BiometricPrompt local). Usa employee_no."
+          },
+          "response": []
+        },
+        {
+          "name": "Enroll Impressão Digital (hardware)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/fingerprint/enroll",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "fingerprint", "enroll"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"funcionario_id\": {{funcionario_id}},\n  \"employee_no\": \"{{employee_no}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"finger_type\": \"right_thumb\",\n  \"template_base64\": \"{{fingerprint_template}}\"\n}"
+            },
+            "description": "Cadastra template de impressão digital em dispositivo/hardware. Aceita funcionario_id, employee_no ou user_id; o sistema resolve automaticamente. Não usado pela app Android atual."
+          },
+          "response": []
+        },
+        {
+          "name": "Identificar Impressão Digital (hardware)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/fingerprint/identify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "fingerprint", "identify"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"template\": \"{{fingerprint_template}}\"\n}"
+            },
+            "description": "Identifica um utilizador por template de impressão digital em hardware. A resposta devolve employee_no."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "faceclock_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "sua_api_key_aqui",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "seu_jwt_aqui",
+      "type": "string"
+    },
+    {
+      "key": "device_serial",
+      "value": "DISPOSITIVO_TESTE_001",
+      "type": "string"
+    },
+    {
+      "key": "employee_no",
+      "value": "FUNC001",
+      "type": "string",
+      "description": "Número do funcionário. Usado nos endpoints de hardware (/api/hardware/...)."
+    },
+    {
+      "key": "funcionario_id",
+      "value": "1",
+      "type": "string",
+      "description": "ID interno do funcionário no ERP. Usado nos endpoints de RH (/api/rh/...)."
+    },
+    {
+      "key": "user_id",
+      "value": "1",
+      "type": "string",
+      "description": "ID do utilizador na tabela auth.users. Usado em autenticação/admin (/api/authcode/...). Normalmente coincide com funcionario_id."
+    },
+    {
+      "key": "event_time",
+      "value": "2026-07-27T08:00:00Z",
+      "type": "string"
+    },
+    {
+      "key": "data_referencia",
+      "value": "2026-07-27",
+      "type": "string"
+    },
+    {
+      "key": "credential_type",
+      "value": "pin",
+      "type": "string"
+    },
+    {
+      "key": "email",
+      "value": "funcionario@nexora.test",
+      "type": "string",
+      "description": "Email do utilizador. Usado na validação de PIN."
+    },
+    {
+      "key": "pin",
+      "value": "123456",
+      "type": "string"
+    },
+    {
+      "key": "qr_code",
+      "value": "token_qr_aqui",
+      "type": "string"
+    },
+    {
+      "key": "qr_token_id",
+      "value": "uuid_do_token_qr",
+      "type": "string"
+    },
+    {
+      "key": "tag_uid",
+      "value": "A1:B2:C3:D4",
+      "type": "string"
+    },
+    {
+      "key": "latitude",
+      "value": "-25.9702",
+      "type": "string"
+    },
+    {
+      "key": "longitude",
+      "value": "32.5732",
+      "type": "string"
+    },
+    {
+      "key": "unidade_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "location_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "foto_url",
+      "value": "data:image/jpeg;base64,/9j/4AAQ...",
+      "type": "string"
+    },
+    {
+      "key": "image_base64",
+      "value": "/9j/4AAQ...",
+      "type": "string"
+    },
+    {
+      "key": "fingerprint_template",
+      "value": "template_base64_aqui",
+      "type": "string"
+    }
+  ]
+}

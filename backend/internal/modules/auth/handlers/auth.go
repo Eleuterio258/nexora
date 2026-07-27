@@ -227,7 +227,7 @@ func (h *Handler) loginFuncionario(w http.ResponseWriter, r *http.Request, userI
 		estado:       "ativo",
 		tipo:         tipo,
 		escopo:       escopo,
-	})
+	}, nil)
 }
 
 func (h *Handler) loginAluno(w http.ResponseWriter, r *http.Request, userID int64, nome string) {

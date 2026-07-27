@@ -1,0 +1,264 @@
+{
+  "info": {
+    "name": "Nexora RH - Funcionários",
+    "description": "Collection para gestão de funcionários no Nexora ERP",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"eleuterio.notico@e258tech.tech\",\n  \"password\": \"1234567890\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "auth",
+            "login"
+          ]
+        },
+        "description": "Autenticação para obter o token Bearer"
+      }
+    },
+    {
+      "name": "Listar funcionários",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/rh/funcionarios",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "rh",
+            "funcionarios"
+          ]
+        },
+        "description": "Permissão: recursos-humanos:ver_funcionarios"
+      }
+    },
+    {
+      "name": "Detalhe do funcionário",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/rh/funcionarios/{{funcionario_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "rh",
+            "funcionarios",
+            "{{funcionario_id}}"
+          ]
+        },
+        "description": "Permissão: recursos-humanos:ver_funcionarios. Os dados vêm dentro da chave 'funcionario'."
+      }
+    },
+    {
+      "name": "Criar funcionário",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nome_completo\": \"Novo Funcionario\",\n  \"email\": \"novo.funcionario@e258tech.mz\",\n  \"telefone\": \"840000000\",\n  \"genero\": \"M\",\n  \"data_nascimento\": \"1995-01-15\",\n  \"nuit\": \"123456789\",\n  \"data_admissao\": \"2026-07-26\",\n  \"cargo_id\": 1,\n  \"unit_id\": 1,\n  \"horario_id\": 1,\n  \"tipo_contrato\": \"indeterminado\",\n  \"salario_base\": 50000\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/rh/funcionarios",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "rh",
+            "funcionarios"
+          ]
+        },
+        "description": "Permissão: recursos-humanos:gerir_funcionarios"
+      }
+    },
+    {
+      "name": "Actualizar funcionário",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"telefone\": \"841234567\",\n  \"endereco\": \"Av. Eduardo Mondlane, 123\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/rh/funcionarios/{{funcionario_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "rh",
+            "funcionarios",
+            "{{funcionario_id}}"
+          ]
+        },
+        "description": "Permissão: recursos-humanos:gerir_funcionarios"
+      }
+    },
+    {
+      "name": "Desligar funcionário",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"motivo\": \"Pedido de demissão\",\n  \"data_saida\": \"2026-07-26\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/rh/funcionarios/{{funcionario_id}}/desligar",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "rh",
+            "funcionarios",
+            "{{funcionario_id}}",
+            "desligar"
+          ]
+        },
+        "description": "Permissão: recursos-humanos:gerir_funcionarios"
+      }
+    },
+    {
+      "name": "Cadastrar rosto",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"capturas\": [\n    \"<base64-imagem-1>\",\n    \"<base64-imagem-2>\",\n    \"<base64-imagem-3>\"\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/rh/funcionarios/{{funcionario_id}}/biometria/facial/enroll",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "rh",
+            "funcionarios",
+            "{{funcionario_id}}",
+            "biometria",
+            "facial",
+            "enroll"
+          ]
+        },
+        "description": "Permissão: recursos-humanos:gerir_funcionarios. Envia 3 capturas faciais em base64 para o FaceClock."
+      }
+    }
+  ],
+  "event": [],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.nexora.e258tech.tech",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "funcionario_id",
+      "value": "82",
+      "type": "string"
+    }
+  ]
+}
