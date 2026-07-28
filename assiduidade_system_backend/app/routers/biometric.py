@@ -114,7 +114,14 @@ def enroll_biometric(
 
 
 @router.post("/biometric/verify", response_model=VerifyResponse)
-@limiter.limit("30/minute")
+# 30/minute fazia sentido quando cada telemóvel chamava o FaceClock
+# directamente (limite por dispositivo, via get_remote_address). Desde que o
+# ERP passou a fazer proxy deste endpoint (CONTRATO-INTEGRACAO-ERP.md secção
+# 12), todos os tenants/funcionários partilham o mesmo IP de origem — 30/min
+# para a plataforma inteira rejeitava verificações legítimas em hora de
+# ponta. Subido para um valor que serve de protecção contra abuso grosseiro
+# sem colidir com uso normal multi-tenant.
+@limiter.limit("1000/minute")
 async def verify_biometric(
     request: Request,
     payload: VerifyRequest,
