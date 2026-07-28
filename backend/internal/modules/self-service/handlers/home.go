@@ -47,8 +47,8 @@ func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 			  COALESCE(SUM(CASE WHEN hora_entrada IS NOT NULL AND hora_saida IS NOT NULL
 			                    THEN EXTRACT(EPOCH FROM (hora_saida::time - hora_entrada::time))/3600
 			                    ELSE COALESCE(horas_extra,0) END),0)                             AS horas,
-			  COUNT(*) FILTER (WHERE tipo='atraso')                                              AS atrasos,
-			  COUNT(*) FILTER (WHERE tipo='falta')                                               AS faltas
+			  COUNT(*) FILTER (WHERE tipo='atraso' AND NOT justificado)                          AS atrasos,
+			  COUNT(*) FILTER (WHERE tipo='falta' AND NOT justificado)                           AS faltas
 			FROM rh.presencas
 			WHERE funcionario_id=$1 AND tenant_id=$2
 			  AND EXTRACT(YEAR FROM data)=$3 AND EXTRACT(MONTH FROM data)=$4`,

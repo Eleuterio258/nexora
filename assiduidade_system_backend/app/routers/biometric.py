@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.biometric_metrics import biometric_metrics
 from app.config import settings
 from app.database import get_db
-from app.deps import ActorContext, apply_tenant, get_actor
+from app.deps import ActorContext, apply_tenant, get_actor, require_self_or_manager
 from app.limiter import limiter
 from app.models import FaceTemplate
 from app.schemas.common import SourceType, TemplateStatus
@@ -41,6 +41,7 @@ def enroll_biometric(
     actor: ActorContext = Depends(get_actor),
 ) -> EnrollResponse:
     erp_user_id = str(payload.user_id)
+    require_self_or_manager(actor, erp_user_id)
 
     # TODO: validar consentimento LGPD activo via ERP (Fase 6)
     # antes de permitir enrollment. Por enquanto assume consentimento
@@ -123,6 +124,7 @@ async def verify_biometric(
     await validar_metodo_assiduidade(SourceType.FACIAL)
 
     erp_user_id = str(payload.user_id)
+    require_self_or_manager(actor, erp_user_id)
 
     try:
         quality_score, quality_reason = assess_capture_quality(payload.image_base64)

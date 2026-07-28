@@ -346,10 +346,10 @@ func (h *Handler) CriarFuncionario(w http.ResponseWriter, r *http.Request) {
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
 		INSERT INTO rh.funcionarios (tenant_id, numero_funcionario, nome_completo, data_nascimento, genero, nuit, telefone, email,
-		  endereco, provincia, cidade, bairro, unit_id, cargo, cargo_id, horario_id, data_admissao, tipo_contrato, salario_base, estado, user_id)
-		VALUES ($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,COALESCE($17::date,CURRENT_DATE),$18,$19,$20,$21) RETURNING id`,
+		  endereco, provincia, cidade, bairro, unit_id, cargo, cargo_id, horario_id, data_admissao, tipo_contrato, salario_base, estado, user_id, criado_por)
+		VALUES ($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,COALESCE($17::date,CURRENT_DATE),$18,$19,$20,$21,$22) RETURNING id`,
 		user.TenantID, body.NumeroFuncionario, body.NomeCompleto, body.DataNascimento, genero, body.Nuit, body.Telefone, body.Email,
-		body.Endereco, body.Provincia, body.Cidade, body.Bairro, body.UnitID, body.Cargo, cargoID, horarioID, body.DataAdmissao, tipoContrato, body.SalarioBase, estado, body.UserID).Scan(&id)
+		body.Endereco, body.Provincia, body.Cidade, body.Bairro, body.UnitID, body.Cargo, cargoID, horarioID, body.DataAdmissao, tipoContrato, body.SalarioBase, estado, body.UserID, user.ID).Scan(&id)
 	if err != nil {
 		switch uniqueViolationConstraint(err) {
 		case "uq_funcionarios_user_id":
@@ -567,7 +567,10 @@ func (h *Handler) ObterFuncionario(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ActualizarFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id, ok := h.verificarPodeGerirFuncionario(w, r, "id")
+	if !ok {
+		return
+	}
 	var body struct {
 		NumeroFuncionario *string  `json:"numero_funcionario"`
 		NomeCompleto      *string  `json:"nome_completo"`
@@ -663,7 +666,10 @@ func (h *Handler) ActualizarFuncionario(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handler) DesligarFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	id := chi.URLParam(r, "id")
+	id, ok := h.verificarPodeGerirFuncionario(w, r, "id")
+	if !ok {
+		return
+	}
 	var body struct {
 		DataSaida *string `json:"data_saida"`
 	}

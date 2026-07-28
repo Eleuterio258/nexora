@@ -24,12 +24,14 @@ do detector usado aqui.
 import base64
 import binascii
 import json
-import math
 import logging
+import math
 from pathlib import Path
 
 import cv2
 import numpy as np
+
+from app.security import get_biometric_encryption
 
 log = logging.getLogger(__name__)
 
@@ -466,12 +468,16 @@ def average_embeddings(embeddings: list[list[float]]) -> list[float]:
 
 
 def serialize_embedding(embedding: list[float]) -> bytes:
-    return json.dumps(embedding, separators=(",", ":")).encode("utf-8")
+    """Serializa e encripta o embedding facial antes de persistir."""
+    plaintext = json.dumps(embedding, separators=(",", ":")).encode("utf-8")
+    return get_biometric_encryption().encrypt(plaintext)
 
 
 def deserialize_embedding(blob: bytes) -> list[float]:
+    """Desencripta (se necessario) e desserializa o embedding facial."""
     try:
-        return [float(v) for v in json.loads(blob.decode("utf-8"))]
+        plaintext = get_biometric_encryption().decrypt(blob)
+        return [float(v) for v in json.loads(plaintext.decode("utf-8"))]
     except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
         raise ValueError("invalid_embedding_data")
 

@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.model.response.ResultadoDiarioResponse
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
+import tech.e258tech.nexora_assiduidade.ui.gestor.funcionarios.DefinirPinFuncionarioFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.funcionarios.EnrollFacialFragment
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
@@ -31,6 +32,11 @@ import tech.e258tech.nexora_assiduidade.utils.SessionManager
 class DetalheFuncionarioFragment : Fragment() {
 
     private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    // Preenchido por loadFuncionario() quando a resposta chega — null tanto
+    // enquanto ainda carrega como quando o funcionário não tem conta de
+    // utilizador associada (ver guardarPin em DefinirPinFuncionarioFragment).
+    private var funcionarioUserId: Long? = null
 
     companion object {
         private const val ARG_FUNCIONARIO_ID = "funcionario_id"
@@ -79,6 +85,26 @@ class DetalheFuncionarioFragment : Fragment() {
             }
         }
 
+        val btnDefinirPin = view.findViewById<android.widget.Button>(R.id.btnDefinirPin)
+        if (PermissionUtils.has(sessionManager, "auth", "pin_admin")) {
+            btnDefinirPin.visibility = View.VISIBLE
+            btnDefinirPin.setOnClickListener {
+                val uid = funcionarioUserId
+                if (uid == null) {
+                    Toast.makeText(
+                        context,
+                        "A carregar dados do funcionário, tenta novamente em instantes.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@setOnClickListener
+                }
+                parentFragmentManager.beginTransaction()
+                    .replace(R.id.fragment_container, DefinirPinFuncionarioFragment.newInstance(uid))
+                    .addToBackStack(null)
+                    .commit()
+            }
+        }
+
         loadFuncionario(view, funcionarioId, token)
         loadAssiduidade(view, funcionarioId, token)
     }
@@ -109,6 +135,12 @@ class DetalheFuncionarioFragment : Fragment() {
 
                 val body = response.body()!!
                 val funcionario = body.funcionario
+                funcionarioUserId = funcionario.user_id
+                val btnDefinirPin = view.findViewById<android.widget.Button>(R.id.btnDefinirPin)
+                if (funcionario.user_id == null && btnDefinirPin.visibility == View.VISIBLE) {
+                    btnDefinirPin.isEnabled = false
+                    btnDefinirPin.text = "Sem conta de utilizador associada"
+                }
                 tvName.text = funcionario.nome_completo
                 tvEmail.text = funcionario.email ?: "Sem email registado"
                 tvCargo.text = funcionario.cargo ?: "Sem cargo definido"

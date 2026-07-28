@@ -6,6 +6,7 @@ load_dotenv()
 
 
 DEFAULT_JWT_SECRET_KEY = "change-me-in-production"
+DEFAULT_BIOMETRIC_ENCRYPTION_KEY = "change-me-in-production-biometric-key-32bytes"
 
 
 class Settings:
@@ -60,6 +61,12 @@ class Settings:
     gateway_shared_secret: str = os.getenv("GATEWAY_SHARED_SECRET", "")
 
     @property
+    def biometric_encryption_key(self) -> bytes:
+        """Chave para criptografia em repouso de templates biométricos."""
+        key = os.getenv("BIOMETRIC_ENCRYPTION_KEY", DEFAULT_BIOMETRIC_ENCRYPTION_KEY)
+        return key.encode("utf-8")
+
+    @property
     def jwt_secret_key(self) -> str:
         """Retorna a chave JWT garantindo tamanho minimo de 32 bytes."""
         key = os.getenv("JWT_SECRET_KEY", DEFAULT_JWT_SECRET_KEY)
@@ -91,6 +98,12 @@ class Settings:
                 "Sem ele, qualquer chamador com acesso de rede pode forjar-se como "
                 "outro utilizador via headers X-Auth-*. Defina o segredo partilhado "
                 "com o gateway/ERP antes de arrancar."
+            )
+        if os.getenv("BIOMETRIC_ENCRYPTION_KEY", DEFAULT_BIOMETRIC_ENCRYPTION_KEY) == DEFAULT_BIOMETRIC_ENCRYPTION_KEY:
+            raise RuntimeError(
+                "BIOMETRIC_ENCRYPTION_KEY nao configurado (ou igual ao default versionado) "
+                "com ENVIRONMENT=production. Defina uma chave forte e unica de 32 bytes "
+                "antes de arrancar."
             )
 
 

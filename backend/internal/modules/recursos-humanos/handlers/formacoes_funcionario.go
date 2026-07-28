@@ -61,6 +61,9 @@ func (h *Handler) ListarFormacoesFuncionario(w http.ResponseWriter, r *http.Requ
 func (h *Handler) AdicionarFormacaoFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 
 	var body struct {
 		FormacaoID  int64   `json:"formacao_id"`
@@ -104,6 +107,9 @@ func (h *Handler) AdicionarFormacaoFuncionario(w http.ResponseWriter, r *http.Re
 func (h *Handler) ActualizarFormacaoFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 	registoID := chi.URLParam(r, "registoId")
 
 	var body struct {
@@ -145,6 +151,9 @@ func (h *Handler) ActualizarFormacaoFuncionario(w http.ResponseWriter, r *http.R
 func (h *Handler) RemoverFormacaoFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 	registoID := chi.URLParam(r, "registoId")
 
 	tag, err := h.db.Exec(r.Context(), `

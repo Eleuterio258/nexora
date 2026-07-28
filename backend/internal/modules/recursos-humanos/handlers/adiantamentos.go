@@ -53,6 +53,9 @@ func (h *Handler) ListarAdiantamentos(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CriarAdiantamento(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 
 	var body struct {
 		ValorTotal    float64 `json:"valor_total"`
@@ -138,6 +141,9 @@ func (h *Handler) ListarEmprestimos(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CriarEmprestimo(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 
 	var body struct {
 		ValorTotal    float64  `json:"valor_total"`

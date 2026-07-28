@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
@@ -12,8 +14,16 @@ import (
 	"nexora/internal/storage"
 )
 
+// DB define a interface minima de pool de BD usada pelo modulo.
+type DB interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
 type Handler struct {
-	db        *pgxpool.Pool
+	db        DB
 	cfg       *config.Config
 	storage   storage.Provider
 	signature contracts.SignaturePort
@@ -42,4 +52,12 @@ func isUniqueViolation(err error) bool {
 		return pgErr.Code == "23505"
 	}
 	return false
+}
+
+// empresaDoTenant verifica se a empresa com o ID fornecido pertence ao tenant.
+// Devolve o ID da empresa e true se existir e pertencer ao tenant.
+func (h *Handler) empresaDoTenant(ctx context.Context, companyID string, tenantID int64) (int64, bool) {
+	var id int64
+	err := h.db.QueryRow(ctx, `SELECT id FROM empresas.companies WHERE id = $1 AND tenant_id = $2`, companyID, tenantID).Scan(&id)
+	return id, err == nil
 }

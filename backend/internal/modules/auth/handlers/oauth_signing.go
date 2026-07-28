@@ -18,7 +18,7 @@ import (
 // scope é a string de permissões RBAC finas ("modulo:acao modulo2:acao2 ..."),
 // já calculada por quem chama (ver models.LoadUserAccess) — este helper não
 // vai à BD, só assina.
-func (h *Handler) signOAuthAccessToken(userID, tenantID, membershipID int64, tipo, escopo, scope string, expiry time.Duration) (token string, jti string, err error) {
+func (h *Handler) signOAuthAccessToken(userID, tenantID, membershipID int64, tipo, escopo, scope string, expiry time.Duration, reauthAt time.Time) (token string, jti string, err error) {
 	if escopo == "" {
 		escopo = "erp"
 	}
@@ -28,17 +28,18 @@ func (h *Handler) signOAuthAccessToken(userID, tenantID, membershipID int64, tip
 	}
 	now := time.Now()
 	claims := jwt.MapClaims{
-		"iss":    h.cfg.OAuthIssuer,
-		"aud":    h.cfg.OAuthAudience,
-		"sub":    userID,
-		"tid":    tenantID,
-		"mid":    membershipID,
-		"tipo":   tipo,
-		"escopo": escopo, // painel (erp/escola/portal_*) — não confundir com "scope" (permissões RBAC)
-		"scope":  scope,
-		"jti":    jti,
-		"exp":    now.Add(expiry).Unix(),
-		"iat":    now.Unix(),
+		"iss":        h.cfg.OAuthIssuer,
+		"aud":        h.cfg.OAuthAudience,
+		"sub":        userID,
+		"tid":        tenantID,
+		"mid":        membershipID,
+		"tipo":       tipo,
+		"escopo":     escopo, // painel (erp/escola/portal_*) — não confundir com "scope" (permissões RBAC)
+		"scope":      scope,
+		"jti":        jti,
+		"exp":        now.Add(expiry).Unix(),
+		"iat":        now.Unix(),
+		"reauth_at":  reauthAt.Unix(),
 	}
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	jwtToken.Header["kid"] = h.oauthKeys.ActiveKID()

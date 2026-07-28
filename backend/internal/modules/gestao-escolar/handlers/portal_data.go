@@ -437,6 +437,16 @@ func (h *Handler) PortalMensagens(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) PortalEventos(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetAlunoUser(r)
+
+	var classID, courseID int64
+	_ = h.db.QueryRow(r.Context(), `
+		SELECT e.class_id, c.course_id
+		  FROM gestao_escolar.school_enrollments e
+		  JOIN gestao_escolar.school_classes c ON c.id = e.class_id
+		 WHERE e.student_id=$1 AND e.tenant_id=$2 AND e.status='activa'
+		 LIMIT 1`, u.ID, u.TenantID,
+	).Scan(&classID, &courseID)
+
 	var result any
 	err := h.db.QueryRow(r.Context(), `
 		SELECT COALESCE(jsonb_agg(
@@ -446,7 +456,14 @@ func (h *Handler) PortalEventos(w http.ResponseWriter, r *http.Request) {
 		FROM gestao_escolar.school_calendar_events ce
 		LEFT JOIN gestao_escolar.school_calendar_event_types et ON et.id = ce.event_type_id
 		WHERE ce.tenant_id = $1
-		  AND ce.data_inicio >= CURRENT_DATE - INTERVAL '7 days'`, u.TenantID,
+		  AND ce.data_inicio >= CURRENT_DATE - INTERVAL '7 days'
+		  AND (
+			    ce.publico_alvo = 'todos'
+			 OR ce.publico_alvo = 'alunos'
+			 OR (ce.publico_alvo = 'turma'  AND ce.publico_alvo_id = $2)
+			 OR (ce.publico_alvo = 'curso'  AND ce.publico_alvo_id = $3)
+			 OR (ce.publico_alvo = 'professores' AND false)
+		  )`, u.TenantID, classID, courseID,
 	).Scan(&result)
 	if err != nil {
 		jsonErr(w, "Erro ao obter eventos", http.StatusInternalServerError)
@@ -549,6 +566,18 @@ func (h *Handler) PortalAlunoMarcarPresencas(w http.ResponseWriter, r *http.Requ
 	}
 	if !h.alunoTemPermissaoTurma(r, u.ID, body.ClassID, u.TenantID, "marcar_presencas") {
 		jsonErr(w, "Sem permissão para marcar presenças nesta turma", http.StatusForbidden)
+		return
+	}
+	// O aluno só pode marcar presenças na própria turma.
+	var matriculado bool
+	_ = h.db.QueryRow(r.Context(), `
+		SELECT EXISTS(
+			SELECT 1 FROM gestao_escolar.school_enrollments
+			 WHERE student_id=$1 AND class_id=$2 AND tenant_id=$3 AND status='activa'
+		)`, u.ID, body.ClassID, u.TenantID,
+	).Scan(&matriculado)
+	if !matriculado {
+		jsonErr(w, "Aluno não matriculado nesta turma", http.StatusForbidden)
 		return
 	}
 

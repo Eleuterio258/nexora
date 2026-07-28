@@ -17,14 +17,15 @@ import (
 func (h *Handler) PortalDashboardAluno(w http.ResponseWriter, r *http.Request) {
 	u := mw.GetAlunoUser(r)
 
-	// Dados base da matrícula activa (turma e ano lectivo)
-	var classID, schoolYearID int64
+	// Dados base da matrícula activa (turma, curso e ano lectivo)
+	var classID, schoolYearID, courseID int64
 	err := h.db.QueryRow(r.Context(), `
-		SELECT e.class_id, e.school_year_id
+		SELECT e.class_id, e.school_year_id, c.course_id
 		  FROM gestao_escolar.school_enrollments e
+		  JOIN gestao_escolar.school_classes c ON c.id = e.class_id
 		 WHERE e.student_id = $1 AND e.tenant_id = $2 AND e.status = 'activa'
 		 LIMIT 1`, u.ID, u.TenantID,
-	).Scan(&classID, &schoolYearID)
+	).Scan(&classID, &schoolYearID, &courseID)
 	if err != nil {
 		jsonOK(w, map[string]any{
 			"aulas_hoje":            0,
@@ -139,6 +140,13 @@ func (h *Handler) PortalDashboardAluno(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN gestao_escolar.school_calendar_event_types et ON et.id=ce.event_type_id
 			WHERE ce.tenant_id=$1
 			  AND ce.data_inicio BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
+			  AND (
+				    ce.publico_alvo = 'todos'
+				 OR ce.publico_alvo = 'alunos'
+				 OR (ce.publico_alvo = 'turma'  AND ce.publico_alvo_id = $2)
+				 OR (ce.publico_alvo = 'curso'  AND ce.publico_alvo_id = $3)
+				 OR (ce.publico_alvo = 'professores' AND false)
+			  )
 			UNION ALL
 			SELECT t.titulo, t.data_fim::text AS data, NULL AS hora,
 				   'tarefa' AS tipo, '#00B87A' AS cor, 'Tarefa' AS categoria
@@ -153,7 +161,7 @@ func (h *Handler) PortalDashboardAluno(w http.ResponseWriter, r *http.Request) {
 			  AND i.data_avaliacao BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
 			ORDER BY data
 			LIMIT 10
-		) x`, u.TenantID, classID,
+		) x`, u.TenantID, classID, courseID,
 	).Scan(&compromissos)
 
 	jsonOK(w, map[string]any{

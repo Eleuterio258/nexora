@@ -329,6 +329,7 @@
                     android:id="@+id/cardFingerprint"
                     android:layout_width="100dp"
                     android:layout_height="140dp"
+                    android:layout_marginEnd="10dp"
                     android:clickable="true"
                     android:focusable="true"
                     app:cardElevation="0dp"
@@ -409,15 +410,16 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:text="14"
+                    android:text=""
                     android:textColor="@color/text_primary"
                     android:textSize="26sp"
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/tvSaldoFeriasTotal"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="de 22 dias atribuídos"
+                    android:text=""
                     android:textColor="@color/text_muted"
                     android:textSize="12sp" />
             </LinearLayout>
@@ -463,7 +465,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:text="18 dias trabalhados"
+                    android:text=""
                     android:textColor="@color/text_primary"
                     android:textSize="13sp" />
 
@@ -472,7 +474,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="1dp"
-                    android:text="144.5 horas"
+                    android:text=""
                     android:textColor="@color/text_muted"
                     android:textSize="12sp" />
 
@@ -485,10 +487,11 @@
                     android:drawablePadding="6dp"
                     android:drawableTint="@color/amber"
                     android:gravity="center_vertical"
-                    android:text="2 atrasos"
+                    android:text=""
                     android:textColor="@color/amber"
                     android:textSize="12sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/tvFaltas"
@@ -499,10 +502,11 @@
                     android:drawablePadding="6dp"
                     android:drawableTint="@color/red"
                     android:gravity="center_vertical"
-                    android:text="1 falta"
+                    android:text=""
                     android:textColor="@color/red"
                     android:textSize="12sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
 
@@ -518,6 +522,7 @@
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingVertical="10dp"
+            android:visibility="gone"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/rowSaldoAssiduidade">
@@ -548,7 +553,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="1"
+                    android:text=""
                     android:textColor="@color/text_muted"
                     android:textSize="13sp" />
             </LinearLayout>
@@ -623,11 +628,12 @@
                     android:textSize="11sp" />
 
                 <TextView
+                    android:id="@+id/tvDiaSemana1"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:layout_marginTop="4dp"
                     android:gravity="center"
-                    android:text="21"
+                    android:text=""
                     android:textColor="@color/text_primary"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -647,15 +653,14 @@
                     android:textSize="11sp" />
 
                 <TextView
+                    android:id="@+id/tvDiaSemana2"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:layout_marginTop="4dp"
-                    android:background="@drawable/day_selected_bg"
                     android:gravity="center"
-                    android:text="22"
-                    android:textColor="@color/white"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:text=""
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
             </LinearLayout>
 
             <LinearLayout
@@ -673,11 +678,12 @@
                     android:textSize="11sp" />
 
                 <TextView
+                    android:id="@+id/tvDiaSemana3"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:layout_marginTop="4dp"
                     android:gravity="center"
-                    android:text="23"
+                    android:text=""
                     android:textColor="@color/text_primary"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -697,11 +703,12 @@
                     android:textSize="11sp" />
 
                 <TextView
+                    android:id="@+id/tvDiaSemana4"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:layout_marginTop="4dp"
                     android:gravity="center"
-                    android:text="24"
+                    android:text=""
                     android:textColor="@color/text_primary"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -721,11 +728,12 @@
                     android:textSize="11sp" />
 
                 <TextView
+                    android:id="@+id/tvDiaSemana5"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:layout_marginTop="4dp"
                     android:gravity="center"
-                    android:text="25"
+                    android:text=""
                     android:textColor="@color/text_primary"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -745,11 +753,12 @@
                     android:textSize="11sp" />
 
                 <TextView
+                    android:id="@+id/tvDiaSemana6"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:layout_marginTop="4dp"
                     android:gravity="center"
-                    android:text="26"
+                    android:text=""
                     android:textColor="@color/text_primary"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -769,251 +778,43 @@
                     android:textSize="11sp" />
 
                 <TextView
+                    android:id="@+id/tvDiaSemana7"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
                     android:layout_marginTop="4dp"
                     android:gravity="center"
-                    android:text="27"
+                    android:text=""
                     android:textColor="@color/text_primary"
                     android:textSize="14sp" />
             </LinearLayout>
         </LinearLayout>
 
-        <androidx.cardview.widget.CardView
-            android:id="@+id/itemEventoReuniao"
+        <TextView
+            android:id="@+id/tvEventosVazio"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            android:clickable="true"
-            android:focusable="true"
-            app:cardCornerRadius="0dp"
-            app:cardElevation="0dp"
-            android:foreground="?attr/selectableItemBackground"
-            app:cardBackgroundColor="@android:color/transparent"
+            android:text="Sem eventos agendados esta semana"
+            android:textColor="@color/text_muted"
+            android:textSize="13sp"
+            android:visibility="gone"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/rowDiasSemana">
+            app:layout_constraintTop_toBottomOf="@id/rowDiasSemana" />
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <View
-                    android:layout_width="4dp"
-                    android:layout_height="match_parent"
-                    android:background="@color/green" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="12dp">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-
-                            <ImageView
-                                android:layout_width="14dp"
-                                android:layout_height="14dp"
-                                android:src="@drawable/ic_nav_attendance"
-                                app:tint="@color/text_muted" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="4dp"
-                                android:text="10:00"
-                                android:textColor="@color/text_primary"
-                                android:textSize="13sp"
-                                android:textStyle="bold" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="18dp"
-                            android:layout_marginTop="2dp"
-                            android:text="11:30"
-                            android:textColor="@color/text_muted"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-
-                            <View
-                                android:layout_width="8dp"
-                                android:layout_height="8dp"
-                                android:layout_marginEnd="6dp"
-                                android:background="@drawable/dot_indicator"
-                                android:backgroundTint="@color/green" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Reunião de Equipa"
-                                android:textColor="@color/text_primary"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Alinhamento de objetivos e atualização de projetos."
-                            android:textColor="@color/text_muted"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:layout_marginStart="8dp"
-                        android:src="@drawable/ic_dashboard_chevron_right"
-                        app:tint="@color/text_muted" />
-                </LinearLayout>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <androidx.cardview.widget.CardView
-            android:id="@+id/itemEventoWorkshop"
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerViewEventosHome"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:clickable="true"
-            android:focusable="true"
-            app:cardCornerRadius="0dp"
-            app:cardElevation="0dp"
-            android:foreground="?attr/selectableItemBackground"
-            app:cardBackgroundColor="@android:color/transparent"
+            android:layout_marginTop="14dp"
+            android:clipToPadding="false"
+            android:orientation="horizontal"
+            android:paddingEnd="8dp"
+            android:visibility="gone"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/itemEventoReuniao">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <View
-                    android:layout_width="4dp"
-                    android:layout_height="match_parent"
-                    android:background="@color/blue" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="12dp">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-
-                            <ImageView
-                                android:layout_width="14dp"
-                                android:layout_height="14dp"
-                                android:src="@drawable/ic_nav_attendance"
-                                app:tint="@color/text_muted" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="4dp"
-                                android:text="14:00"
-                                android:textColor="@color/text_primary"
-                                android:textSize="13sp"
-                                android:textStyle="bold" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="18dp"
-                            android:layout_marginTop="2dp"
-                            android:text="16:00"
-                            android:textColor="@color/text_muted"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-
-                            <View
-                                android:layout_width="8dp"
-                                android:layout_height="8dp"
-                                android:layout_marginEnd="6dp"
-                                android:background="@drawable/dot_indicator"
-                                android:backgroundTint="@color/blue" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Workshop de Formação"
-                                android:textColor="@color/text_primary"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="2dp"
-                            android:text="Formação sobre novas ferramentas e processos."
-                            android:textColor="@color/text_muted"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:layout_marginStart="8dp"
-                        android:src="@drawable/ic_dashboard_chevron_right"
-                        app:tint="@color/text_muted" />
-                </LinearLayout>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
+            app:layout_constraintTop_toBottomOf="@id/rowDiasSemana" />
 
         <!-- 7. Divisor antes do feed social/informativo -->
         <View
@@ -1024,7 +825,7 @@
             android:background="@color/border"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/itemEventoWorkshop" />
+            app:layout_constraintTop_toBottomOf="@id/recyclerViewEventosHome" />
 
         <!-- 8. Notificações -->
         <TextView
@@ -1079,27 +880,30 @@
                 android:orientation="vertical">
 
                 <TextView
+                    android:id="@+id/tvNotificacaoTitulo"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Pedido aprovado"
+                    android:text=""
                     android:textColor="@color/text_primary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/tvNotificacaoCorpo"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="O teu pedido de férias foi aprovado"
+                    android:text=""
                     android:textColor="@color/text_muted"
                     android:textSize="13sp" />
             </LinearLayout>
 
             <TextView
+                android:id="@+id/tvNotificacaoData"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:text="22 Jul"
+                android:text=""
                 android:textColor="@color/text_muted"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -1163,29 +967,33 @@
                     android:orientation="horizontal">
 
                     <TextView
+                        android:id="@+id/tvComunicadoTitulo"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Feriado municipal na sexta-feira"
+                        android:text=""
                         android:textColor="@color/text_primary"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
                     <TextView
+                        android:id="@+id/tvComunicadoNovo"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="6dp"
                         android:text="Nova"
                         android:textColor="@color/blue"
                         android:textSize="11sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        android:visibility="gone" />
                 </LinearLayout>
 
                 <TextView
+                    android:id="@+id/tvComunicadoData"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="Informamos que na próxima sexta-feira, 25 de Junho, é feriado."
+                    android:text=""
                     android:textColor="@color/text_muted"
                     android:textSize="13sp" />
             </LinearLayout>
@@ -1258,14 +1066,16 @@
                 android:orientation="vertical">
 
                 <TextView
+                    android:id="@+id/tvAniversarioNome"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Maria Costa (25/07)"
+                    android:text=""
                     android:textColor="@color/text_primary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/tvAniversarioSub"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"

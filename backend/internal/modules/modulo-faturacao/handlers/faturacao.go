@@ -153,6 +153,10 @@ func (h *Handler) CriarOrcamento(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "customer_id é obrigatório", http.StatusBadRequest)
 		return
 	}
+	if !h.existeNoTenant(r.Context(), "clientes.customers", "id", body.CustomerID, user.TenantID) {
+		jsonErr(w, "Cliente não encontrado", http.StatusNotFound)
+		return
+	}
 	ctx := r.Context()
 	tx, err := h.db.Begin(ctx)
 	if err != nil {
@@ -232,7 +236,12 @@ func (h *Handler) ObterOrcamento(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) AdicionarItemOrcamento(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
+	if !h.existeNoTenant(r.Context(), "sales_quotes", "id", id, user.TenantID) {
+		jsonErr(w, "Orçamento não encontrado", http.StatusNotFound)
+		return
+	}
 	var body struct {
 		ProductID       *int64  `json:"product_id"`
 		Descricao       *string `json:"descricao"`
@@ -249,23 +258,64 @@ func (h *Handler) AdicionarItemOrcamento(w http.ResponseWriter, r *http.Request)
 	descontoValor := subtotal * body.DescontoPercent / 100
 	impostoValor := (subtotal - descontoValor) * body.ImpostoPercent / 100
 	total := subtotal - descontoValor + impostoValor
+
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
 	var iid int64
-	h.db.QueryRow(r.Context(), `
+	if err := tx.QueryRow(r.Context(), `
 		INSERT INTO sales_quote_items (sales_quote_id, product_id, descricao, quantidade, preco_unitario,
 		  desconto_percent, desconto_valor, imposto_percent, imposto_valor, subtotal, total)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
 		id, body.ProductID, body.Descricao, body.Quantidade, body.PrecoUnitario,
-		body.DescontoPercent, descontoValor, body.ImpostoPercent, impostoValor, subtotal-descontoValor, total).Scan(&iid)
-	h.db.Exec(r.Context(), `UPDATE sales_quotes SET total=total+$1, imposto_total=imposto_total+$2 WHERE id=$3`, total, impostoValor, id)
+		body.DescontoPercent, descontoValor, body.ImpostoPercent, impostoValor, subtotal-descontoValor, total).Scan(&iid); err != nil {
+		jsonErr(w, "Erro ao adicionar item", http.StatusInternalServerError)
+		return
+	}
+	if tag, err := tx.Exec(r.Context(), `UPDATE sales_quotes SET total=total+$1, imposto_total=imposto_total+$2 WHERE id=$3 AND tenant_id=$4`, total, impostoValor, id, user.TenantID); err != nil || tag.RowsAffected() != 1 {
+		jsonErr(w, "Erro ao actualizar total do orçamento", http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
 	jsonOK(w, map[string]any{"id": iid, "total": total}, http.StatusCreated)
 }
 
 func (h *Handler) RemoverItemOrcamento(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
+	if !h.existeNoTenant(r.Context(), "sales_quotes", "id", id, user.TenantID) {
+		jsonErr(w, "Orçamento não encontrado", http.StatusNotFound)
+		return
+	}
 	itemID := chi.URLParam(r, "itemId")
+
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
 	var total, impostoValor float64
-	h.db.QueryRow(r.Context(), `DELETE FROM sales_quote_items WHERE id=$1 AND sales_quote_id=$2 RETURNING total, imposto_valor`, itemID, id).Scan(&total, &impostoValor)
-	h.db.Exec(r.Context(), `UPDATE sales_quotes SET total=total-$1, imposto_total=imposto_total-$2 WHERE id=$3`, total, impostoValor, id)
+	if err := tx.QueryRow(r.Context(), `DELETE FROM sales_quote_items WHERE id=$1 AND sales_quote_id=$2 RETURNING total, imposto_valor`, itemID, id).Scan(&total, &impostoValor); err != nil {
+		jsonErr(w, "Item não encontrado", http.StatusNotFound)
+		return
+	}
+	if tag, err := tx.Exec(r.Context(), `UPDATE sales_quotes SET total=total-$1, imposto_total=imposto_total-$2 WHERE id=$3 AND tenant_id=$4`, total, impostoValor, id, user.TenantID); err != nil || tag.RowsAffected() != 1 {
+		jsonErr(w, "Erro ao actualizar total do orçamento", http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -273,7 +323,11 @@ func (h *Handler) mudarStatusOrcamento(status string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := mw.GetUser(r)
 		id := chi.URLParam(r, "id")
-		h.db.Exec(r.Context(), `UPDATE sales_quotes SET status=$1 WHERE id=$2 AND tenant_id=$3`, status, id, user.TenantID)
+		tag, err := h.db.Exec(r.Context(), `UPDATE sales_quotes SET status=$1 WHERE id=$2 AND tenant_id=$3`, status, id, user.TenantID)
+		if err != nil || tag.RowsAffected() != 1 {
+			jsonErr(w, "Orçamento não encontrado", http.StatusNotFound)
+			return
+		}
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -329,6 +383,10 @@ func (h *Handler) CriarEncomenda(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.CustomerID == 0 {
 		jsonErr(w, "customer_id é obrigatório", http.StatusBadRequest)
+		return
+	}
+	if !h.existeNoTenant(r.Context(), "clientes.customers", "id", body.CustomerID, user.TenantID) {
+		jsonErr(w, "Cliente não encontrado", http.StatusNotFound)
 		return
 	}
 	ctx := r.Context()
@@ -438,6 +496,10 @@ func (h *Handler) CriarFatura(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "customer_id é obrigatório", http.StatusBadRequest)
 		return
 	}
+	if !h.existeNoTenant(r.Context(), "clientes.customers", "id", body.CustomerID, user.TenantID) {
+		jsonErr(w, "Cliente não encontrado", http.StatusNotFound)
+		return
+	}
 	tipo := "normal"
 	if body.Tipo != nil && *body.Tipo != "" {
 		tipo = *body.Tipo
@@ -541,7 +603,12 @@ func (h *Handler) ObterFatura(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) AdicionarItemFatura(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
+	if !h.existeNoTenant(r.Context(), "invoices", "id", id, user.TenantID) {
+		jsonErr(w, "Fatura não encontrada", http.StatusNotFound)
+		return
+	}
 	var body struct {
 		ProductID       *int64  `json:"product_id"`
 		Descricao       *string `json:"descricao"`
@@ -558,28 +625,54 @@ func (h *Handler) AdicionarItemFatura(w http.ResponseWriter, r *http.Request) {
 	descontoValor := subtotal * body.DescontoPercent / 100
 	impostoValor := (subtotal - descontoValor) * body.ImpostoPercent / 100
 	total := subtotal - descontoValor + impostoValor
+
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
 	var iid int64
-	h.db.QueryRow(r.Context(), `
+	if err := tx.QueryRow(r.Context(), `
 		INSERT INTO invoice_items (invoice_id, product_id, descricao, quantidade, preco_unitario,
 		  desconto_percent, desconto_valor, imposto_percent, imposto_valor, subtotal, total)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
 		id, body.ProductID, body.Descricao, body.Quantidade, body.PrecoUnitario,
-		body.DescontoPercent, descontoValor, body.ImpostoPercent, impostoValor, subtotal-descontoValor, total).Scan(&iid)
-	h.db.Exec(r.Context(), `UPDATE invoices SET total=total+$1, imposto_total=imposto_total+$2 WHERE id=$3`, total, impostoValor, id)
+		body.DescontoPercent, descontoValor, body.ImpostoPercent, impostoValor, subtotal-descontoValor, total).Scan(&iid); err != nil {
+		jsonErr(w, "Erro ao adicionar item", http.StatusInternalServerError)
+		return
+	}
+	if tag, err := tx.Exec(r.Context(), `UPDATE invoices SET total=total+$1, imposto_total=imposto_total+$2 WHERE id=$3 AND tenant_id=$4`, total, impostoValor, id, user.TenantID); err != nil || tag.RowsAffected() != 1 {
+		jsonErr(w, "Erro ao actualizar total da fatura", http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
 	jsonOK(w, map[string]any{"id": iid, "total": total, "imposto_valor": impostoValor}, http.StatusCreated)
 }
 
 func (h *Handler) EmitirFatura(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
-	h.db.Exec(r.Context(), `UPDATE invoices SET status='emitida', emitida_em=NOW() WHERE id=$1 AND tenant_id=$2 AND status='rascunho'`, id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), `UPDATE invoices SET status='emitida', emitida_em=NOW() WHERE id=$1 AND tenant_id=$2 AND status='rascunho'`, id, user.TenantID)
+	if err != nil || tag.RowsAffected() != 1 {
+		jsonErr(w, "Fatura não encontrada ou já emitida", http.StatusConflict)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) CancelarFatura(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
-	h.db.Exec(r.Context(), `UPDATE invoices SET status='cancelada' WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
+	tag, err := h.db.Exec(r.Context(), `UPDATE invoices SET status='cancelada' WHERE id=$1 AND tenant_id=$2`, id, user.TenantID)
+	if err != nil || tag.RowsAffected() != 1 {
+		jsonErr(w, "Fatura não encontrada", http.StatusNotFound)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -624,6 +717,10 @@ func (h *Handler) CriarRecibo(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "invoice_id e valor são obrigatórios", http.StatusBadRequest)
 		return
 	}
+	if !h.existeNoTenant(r.Context(), "invoices", "id", body.InvoiceID, user.TenantID) {
+		jsonErr(w, "Fatura não encontrada", http.StatusNotFound)
+		return
+	}
 	ctx := r.Context()
 	tx, err := h.db.Begin(ctx)
 	if err != nil {
@@ -647,7 +744,7 @@ func (h *Handler) CriarRecibo(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
-	if _, err := tx.Exec(ctx, `UPDATE invoices SET valor_pago=valor_pago+$1 WHERE id=$2`, body.Valor, body.InvoiceID); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE invoices SET valor_pago=valor_pago+$1 WHERE id=$2 AND tenant_id=$3`, body.Valor, body.InvoiceID, user.TenantID); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
@@ -699,6 +796,14 @@ func (h *Handler) CriarNotaCredito(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.CustomerID == 0 || body.Motivo == "" {
 		jsonErr(w, "customer_id e motivo são obrigatórios", http.StatusBadRequest)
+		return
+	}
+	if !h.existeNoTenant(r.Context(), "clientes.customers", "id", body.CustomerID, user.TenantID) {
+		jsonErr(w, "Cliente não encontrado", http.StatusNotFound)
+		return
+	}
+	if body.InvoiceID != nil && !h.existeNoTenant(r.Context(), "invoices", "id", *body.InvoiceID, user.TenantID) {
+		jsonErr(w, "Fatura não encontrada", http.StatusNotFound)
 		return
 	}
 	ctx := r.Context()

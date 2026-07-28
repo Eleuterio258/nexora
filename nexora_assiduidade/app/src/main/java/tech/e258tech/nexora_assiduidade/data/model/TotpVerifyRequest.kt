@@ -1,6 +1,5 @@
 package tech.e258tech.nexora_assiduidade.data.model
 
-data class TotpValidateRequest(
-    val email: String,
+data class TotpVerifyRequest(
     val code: String
 )

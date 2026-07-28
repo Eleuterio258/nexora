@@ -69,6 +69,9 @@ func (h *Handler) ListarProcessosDisciplinaresFuncionario(w http.ResponseWriter,
 func (h *Handler) CriarProcessoDisciplinarFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 
 	var body struct {
 		Tipo           string  `json:"tipo"`
@@ -104,6 +107,9 @@ func (h *Handler) CriarProcessoDisciplinarFuncionario(w http.ResponseWriter, r *
 func (h *Handler) ActualizarProcessoDisciplinarFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 	registoID := chi.URLParam(r, "registoId")
 
 	var body struct {
@@ -155,6 +161,9 @@ func (h *Handler) ActualizarProcessoDisciplinarFuncionario(w http.ResponseWriter
 func (h *Handler) RemoverProcessoDisciplinarFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 	registoID := chi.URLParam(r, "registoId")
 
 	tag, err := h.db.Exec(r.Context(), `

@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	authModels "nexora/internal/modules/auth/models"
@@ -23,9 +25,10 @@ type AuthUser struct {
 	ID           int64
 	TenantID     int64
 	SessionID    int64
-	MembershipID int64  // auth.memberships.id usado neste login; 0 se não houver (ex.: superadmin)
-	Tipo         string // "superadmin" | "funcionario"
-	Escopo       string // "erp" | "escola"
+	MembershipID int64     // auth.memberships.id usado neste login; 0 se não houver (ex.: superadmin)
+	Tipo         string    // "superadmin" | "funcionario"
+	Escopo       string    // "erp" | "escola"
+	ReauthAt     time.Time // momento da última reautenticação (step-up)
 }
 
 func HashToken(token string) string {
@@ -118,6 +121,13 @@ func RequireAuth(jwtSecret string, pool *pgxpool.Pool, oauthKeys *oauthkeys.Prov
 			midRaw, _ := claims["mid"].(float64)
 			membershipID := int64(midRaw)
 
+			var reauthAt time.Time
+			if raw, ok := claims["reauth_at"].(float64); ok && raw > 0 {
+				reauthAt = time.Unix(int64(raw), 0)
+			} else if raw, ok := claims["iat"].(float64); ok && raw > 0 {
+				reauthAt = time.Unix(int64(raw), 0)
+			}
+
 			// Rejeitar pedidos fora do escopo antes de consultar a base de dados.
 			if tipo != "superadmin" && !escopoPermitidoParaPath(r.URL.Path, escopo) {
 				JSONErr(w, "Acesso negado ao painel solicitado", http.StatusForbidden)
@@ -156,6 +166,7 @@ func RequireAuth(jwtSecret string, pool *pgxpool.Pool, oauthKeys *oauthkeys.Prov
 			ctx := context.WithValue(r.Context(), UserKey, &AuthUser{
 				ID: userID, TenantID: tenantID, SessionID: sessionID,
 				MembershipID: membershipID, Tipo: tipo, Escopo: escopo,
+				ReauthAt: reauthAt,
 			})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -199,8 +210,16 @@ func RequireJWT(jwtSecret string, oauthKeys *oauthkeys.Provider) func(http.Handl
 				return
 			}
 
+			var reauthAt time.Time
+			if raw, ok := claims["reauth_at"].(float64); ok && raw > 0 {
+				reauthAt = time.Unix(int64(raw), 0)
+			} else if raw, ok := claims["iat"].(float64); ok && raw > 0 {
+				reauthAt = time.Unix(int64(raw), 0)
+			}
+
 			ctx := context.WithValue(r.Context(), UserKey, &AuthUser{
 				ID: userID, TenantID: int64(tidRaw), MembershipID: int64(midRaw), Tipo: tipo, Escopo: escopo,
+				ReauthAt: reauthAt,
 			})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -322,9 +341,15 @@ func RestricaoEscopo() func(http.Handler) http.Handler {
 	}
 }
 
+// DBPool é a interface mínima de base de dados usada pelos middlewares.
+type DBPool interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
 // RequireFeature verifica se uma funcionalidade está activa para o tenant.
 // Superadmin tem acesso total. Deve ser usado após RequireAuth.
-func RequireFeature(pool *pgxpool.Pool, feature string) func(http.Handler) http.Handler {
+func RequireFeature(pool DBPool, feature string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := GetUser(r)

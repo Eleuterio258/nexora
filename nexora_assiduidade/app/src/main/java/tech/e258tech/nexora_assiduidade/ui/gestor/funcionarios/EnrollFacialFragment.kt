@@ -39,6 +39,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.model.CaptureImage
+import tech.e258tech.nexora_assiduidade.data.model.ConsentimentoLGPDRequest
 import tech.e258tech.nexora_assiduidade.data.model.EnrollFacialRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.FaceOverlayView
@@ -156,6 +157,37 @@ class EnrollFacialFragment : Fragment() {
     }
 
     private fun beginCapture() {
+        val token = sessionManager.getToken()
+        if (token.isNullOrBlank()) {
+            Toast.makeText(context, "Sessao invalida.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        setLoading(true)
+        uiScope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.erpApiService.getConsentimentoFuncionario(
+                        ApiUtils.bearerToken(token),
+                        funcionarioId
+                    )
+                }
+                if (response.isSuccessful && response.body() != null) {
+                    startCaptureFlow()
+                } else {
+                    showConsentDialog()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(context, "Erro ao verificar consentimento: ${e.message}", Toast.LENGTH_LONG).show()
+                setLoading(false)
+            }
+        }
+    }
+
+    private fun startCaptureFlow() {
+        setLoading(false)
         captures.clear()
         consecutiveGoodFrames = 0
         captureInProgress = false
@@ -175,6 +207,50 @@ class EnrollFacialFragment : Fragment() {
             startCamera()
         } else {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private fun showConsentDialog() {
+        setLoading(false)
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Consentimento LGPD — Biometria Facial")
+            .setMessage("Para cadastrar o rosto do funcionario e necessario o consentimento para tratamento de dados biometricos. O funcionario declara estar ciente de que as imagens serao usadas exclusivamente para registo de assiduidade, podendo ser revogadas a qualquer momento.")
+            .setPositiveButton("Concordar e continuar") { _, _ -> registerConsentAndCapture() }
+            .setNegativeButton("Cancelar", null)
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun registerConsentAndCapture() {
+        val token = sessionManager.getToken()
+        if (token.isNullOrBlank()) {
+            Toast.makeText(context, "Sessao invalida.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        setLoading(true)
+        uiScope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.erpApiService.criarConsentimentoFuncionario(
+                        ApiUtils.bearerToken(token),
+                        funcionarioId,
+                        ConsentimentoLGPDRequest()
+                    )
+                }
+                if (response.isSuccessful) {
+                    startCaptureFlow()
+                } else {
+                    val msg = ApiUtils.errorMessage(response)
+                    Toast.makeText(context, "Erro ao registar consentimento: $msg", Toast.LENGTH_LONG).show()
+                    setLoading(false)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(context, "Erro de rede: ${e.message}", Toast.LENGTH_LONG).show()
+                setLoading(false)
+            }
         }
     }
 

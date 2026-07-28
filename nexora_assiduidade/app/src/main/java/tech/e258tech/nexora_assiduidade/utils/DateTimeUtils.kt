@@ -47,6 +47,16 @@ object DateTimeUtils {
         return apiDateFormatter.format(cal.time)
     }
 
+    /** Segunda-feira da semana corrente (semana começa na segunda, convenção PT). */
+    fun startOfWeek(): java.util.Calendar {
+        val cal = java.util.Calendar.getInstance()
+        val diasDesdeSegunda = (cal.get(java.util.Calendar.DAY_OF_WEEK) - java.util.Calendar.MONDAY + 7) % 7
+        cal.add(java.util.Calendar.DAY_OF_MONTH, -diasDesdeSegunda)
+        return cal
+    }
+
+    fun formatApiDate(cal: java.util.Calendar): String = apiDateFormatter.format(cal.time)
+
     /** Constrói "YYYY-MM-DDTHH:MM" (formato alternativo aceite pelo ERP para
      * `data_atividade` do CRM, equivalente a <input type=datetime-local>). */
     fun localDateTimeForApi(year: Int, month: Int, day: Int, hour: Int, minute: Int): String {

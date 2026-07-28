@@ -167,22 +167,60 @@ async def get_actor(
     x_auth_tenant_id: str | None = Header(default=None, alias="X-Auth-Tenant-Id"),
     x_gateway_secret: str | None = Header(default=None, alias="X-Gateway-Secret"),
 ) -> ActorContext:
+    """Resolve a identidade do chamador. Nunca devolve um actor anónimo — um
+    pedido sem Bearer válido nem headers de gateway confiáveis é rejeitado
+    com 401 (P0 da analise de seguranca: os endpoints biometricos nao podem
+    ser alcancaveis sem identidade, porque apply_tenant() nao filtra quando
+    tenant_id e None)."""
     jwt_actor = await _get_actor_from_jwt(authorization)
     if jwt_actor:
         return jwt_actor
     if x_auth_user_id:
         _check_gateway_secret(x_gateway_secret)
-    return ActorContext(
-        id=x_auth_user_id,
-        role=x_auth_user_role or "SYSTEM",
-        tenant_id=x_auth_tenant_id,
+        return ActorContext(
+            id=x_auth_user_id,
+            role=x_auth_user_role or "SYSTEM",
+            tenant_id=x_auth_tenant_id,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Identidade nao fornecida: Bearer token ou headers de gateway em falta.",
     )
 
 
 def apply_tenant(stmt, actor: ActorContext, model) -> Any:
-    """Aplica filtro por tenant a uma query SQLAlchemy quando o actor tiver tenant_id."""
-    if actor.tenant_id:
-        return stmt.where(model.tenant_id == actor.tenant_id)
-    return stmt
+    """Aplica filtro por tenant a uma query SQLAlchemy.
+
+    ADMIN_SISTEMA (superadmin no ERP) pode legitimamente nao ter tenant_id
+    (acesso cross-tenant). Qualquer outro role sem tenant_id e uma anomalia,
+    nao uma consulta global — falha fechado (403) em vez de devolver dados
+    de todos os tenants sem filtro.
+    """
+    if actor.role == "ADMIN_SISTEMA":
+        return stmt
+    if not actor.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Actor sem tenant identificado.",
+        )
+    return stmt.where(model.tenant_id == actor.tenant_id)
+
+
+def require_self_or_manager(actor: ActorContext, target_user_id: str) -> None:
+    """Impede que um COLABORADOR actue em nome de outro utilizador.
+
+    Mesma regra ja aplicada em /clock/register antes de ser removido na
+    limpeza stateless (ver CONTRATO-INTEGRACAO-ERP.md secção 8.5): qualquer
+    role de gestor pode operar em nome de outrem do seu tenant; um
+    colaborador comum só pode operar sobre a própria identidade.
+    """
+    if actor.id == target_user_id:
+        return
+    if actor.role in ("ADMIN_SISTEMA", "GESTOR_RH"):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Nao pode realizar esta operacao em nome de outro utilizador.",
+    )
 
 

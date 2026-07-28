@@ -109,8 +109,13 @@ func (h *Handler) DesactivarArmazem(w http.ResponseWriter, r *http.Request) {
 // â”€â”€ LocalizaÃ§Ãµes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func (h *Handler) ListarLocalizacoes(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
-	rows, _ := h.db.Query(r.Context(), `SELECT id, codigo, nome, ativo FROM warehouse_locations WHERE warehouse_id=$1 ORDER BY codigo`, id)
+	rows, _ := h.db.Query(r.Context(), `
+		SELECT l.id, l.codigo, l.nome, l.ativo
+		  FROM warehouse_locations l
+		  JOIN warehouses w ON w.id = l.warehouse_id
+		 WHERE l.warehouse_id=$1 AND w.tenant_id=$2 ORDER BY l.codigo`, id, user.TenantID)
 	defer rows.Close()
 	type Row struct {
 		ID     int64  `json:"id"`
@@ -129,6 +134,7 @@ func (h *Handler) ListarLocalizacoes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CriarLocalizacao(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 	var body struct {
 		Codigo string `json:"codigo"`
@@ -139,12 +145,31 @@ func (h *Handler) CriarLocalizacao(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var lid int64
-	h.db.QueryRow(r.Context(), `INSERT INTO warehouse_locations (warehouse_id,codigo,nome) VALUES ($1,$2,$3) RETURNING id`, id, body.Codigo, body.Nome).Scan(&lid)
+	err := h.db.QueryRow(r.Context(), `
+		INSERT INTO warehouse_locations (warehouse_id,codigo,nome)
+		SELECT $1,$2,$3 FROM warehouses WHERE id=$1 AND tenant_id=$4
+		RETURNING id`, id, body.Codigo, body.Nome, user.TenantID).Scan(&lid)
+	if err != nil {
+		jsonErr(w, "ArmazÃ©m nÃ£o encontrado", http.StatusNotFound)
+		return
+	}
 	jsonOK(w, map[string]any{"id": lid}, http.StatusCreated)
 }
 
 func (h *Handler) RemoverLocalizacao(w http.ResponseWriter, r *http.Request) {
-	h.db.Exec(r.Context(), `DELETE FROM warehouse_locations WHERE id=$1 AND warehouse_id=$2`, chi.URLParam(r, "locId"), chi.URLParam(r, "id"))
+	user := mw.GetUser(r)
+	tag, err := h.db.Exec(r.Context(), `
+		DELETE FROM warehouse_locations l USING warehouses w
+		 WHERE l.id=$1 AND l.warehouse_id=$2 AND w.id=l.warehouse_id AND w.tenant_id=$3`,
+		chi.URLParam(r, "locId"), chi.URLParam(r, "id"), user.TenantID)
+	if err != nil {
+		jsonErr(w, "Erro ao eliminar", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		jsonErr(w, "LocalizaÃ§Ã£o nÃ£o encontrada", http.StatusNotFound)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

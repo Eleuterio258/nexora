@@ -62,3 +62,12 @@ func isUniqueViolation(err error) bool {
 	}
 	return false
 }
+
+// existeNoTenant verifica se um registro existe numa tabela filtrada por tenant_id.
+// Nomes de tabela são controlados internamente (nunca vindos do cliente).
+func (h *Handler) existeNoTenant(ctx context.Context, tabela, colunaID string, id any, tenantID int64) bool {
+	var um int
+	query := fmt.Sprintf("SELECT 1 FROM %s WHERE %s=$1 AND tenant_id=$2", tabela, colunaID)
+	err := h.db.QueryRow(ctx, query, id, tenantID).Scan(&um)
+	return err == nil
+}

@@ -375,8 +375,8 @@ func (h *Handler) ConverterLead(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := tx.Exec(ctx,
-		"UPDATE crm.leads SET estado='convertido', cliente_id=$1, convertido_em=NOW(), updated_at=NOW() WHERE id=$2",
-		clienteID, id,
+		"UPDATE crm.leads SET estado='convertido', cliente_id=$1, convertido_em=NOW(), updated_at=NOW() WHERE id=$2 AND tenant_id=$3",
+		clienteID, id, user.TenantID,
 	); err != nil {
 		jsonErr(w, "Erro ao actualizar lead.", http.StatusInternalServerError)
 		return

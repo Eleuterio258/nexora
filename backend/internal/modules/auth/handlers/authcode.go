@@ -68,7 +68,7 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 		scope = scopeStringFromAccess(userAccess)
 	}
 
-	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, scope, h.cfg.JWTExpiresIn)
+	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, scope, h.cfg.JWTExpiresIn, time.Now())
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -193,6 +193,88 @@ func (h *Handler) LoginPorPIN(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.issueFuncionarioTokens(w, r, u, funcionarioID)
+}
+
+// ── Verificação de PIN/TOTP para prova de presença (assiduidade) ───────────
+//
+// Distintos de LoginPorPIN/ValidarTOTP: aqueles autenticam um utilizador
+// ainda SEM sessão e emitem tokens novos (fluxo de login). Estes dois
+// verificam o código de um utilizador JÁ AUTENTICADO (RequireAuth) — não
+// emitem tokens nem tocam na sessão existente. Existem porque marcar ponto
+// por PIN/TOTP não é um login: o colaborador já está autenticado na app, só
+// precisa de provar "sou mesmo eu, agora" antes de bater o ponto — a mesma
+// distinção que /biometric/verify (FaceClock) já faz para a biometria facial
+// (verifica identidade sem emitir sessão nova). Antes destes endpoints
+// existirem, a app reaproveitava LoginPorPIN/ValidarTOTP para marcar ponto,
+// o que substituía silenciosamente a sessão activa do utilizador a cada
+// marcação — confuso e conceptualmente errado.
+
+func (h *Handler) VerificarPIN(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	if user == nil {
+		jsonErr(w, "Não autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	var body struct {
+		PIN string `json:"pin"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.PIN == "" {
+		jsonErr(w, "pin é obrigatório", http.StatusBadRequest)
+		return
+	}
+
+	var pinHash string
+	err := h.db.QueryRow(r.Context(), `
+		SELECT secret_hash FROM auth.user_auth_codes
+		 WHERE user_id = $1 AND tipo = $2 AND ativo = true`,
+		user.ID, authCodeTypePIN,
+	).Scan(&pinHash)
+	if err != nil {
+		jsonOK(w, map[string]any{"match": false, "reason": "pin_nao_configurado"}, http.StatusOK)
+		return
+	}
+
+	if bcrypt.CompareHashAndPassword([]byte(pinHash), []byte(body.PIN)) != nil {
+		jsonOK(w, map[string]any{"match": false, "reason": "pin_incorrecto"}, http.StatusOK)
+		return
+	}
+
+	jsonOK(w, map[string]any{"match": true}, http.StatusOK)
+}
+
+func (h *Handler) VerificarTOTP(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	if user == nil {
+		jsonErr(w, "Não autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Code == "" {
+		jsonErr(w, "code é obrigatório", http.StatusBadRequest)
+		return
+	}
+
+	var secret string
+	err := h.db.QueryRow(r.Context(), `
+		SELECT secret_hash FROM auth.user_auth_codes
+		 WHERE user_id = $1 AND tipo = $2 AND ativo = true`,
+		user.ID, authCodeTypeTOTP,
+	).Scan(&secret)
+	if err != nil {
+		jsonOK(w, map[string]any{"match": false, "reason": "totp_nao_configurado"}, http.StatusOK)
+		return
+	}
+
+	if !totp.Validate(body.Code, secret) {
+		jsonOK(w, map[string]any{"match": false, "reason": "codigo_invalido"}, http.StatusOK)
+		return
+	}
+
+	jsonOK(w, map[string]any{"match": true}, http.StatusOK)
 }
 
 // ── TOTP ─────────────────────────────────────────────────────────────────────
@@ -325,11 +407,17 @@ func (h *Handler) AdminDefinirPIN(w http.ResponseWriter, r *http.Request) {
 
 	admin := mw.GetUser(r)
 
-	// Verificar que o utilizador alvo existe e é elegível (funcionário/superadmin).
+	// Verificar que o utilizador alvo existe, é elegível e pertence ao mesmo tenant (ou superadmin).
 	var targetEstado, targetTipo string
+	var targetTenantID int64
 	if err := h.db.QueryRow(r.Context(), `
-		SELECT estado, tipo FROM users WHERE id = $1`, body.UserID,
-	).Scan(&targetEstado, &targetTipo); err != nil {
+		SELECT u.estado, u.tipo, COALESCE(m.tenant_id, 0)
+		  FROM users u
+		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
+		 WHERE u.id = $1
+		 ORDER BY m.principal DESC NULLS LAST, m.id ASC
+		 LIMIT 1`, body.UserID,
+	).Scan(&targetEstado, &targetTipo, &targetTenantID); err != nil {
 		if err == pgx.ErrNoRows {
 			jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
 		} else {
@@ -343,6 +431,10 @@ func (h *Handler) AdminDefinirPIN(w http.ResponseWriter, r *http.Request) {
 	}
 	if targetTipo != "funcionario" && targetTipo != "superadmin" {
 		jsonErr(w, "Tipo de utilizador não suportado", http.StatusForbidden)
+		return
+	}
+	if admin.Tipo != "superadmin" && targetTenantID != admin.TenantID {
+		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
 		return
 	}
 
@@ -369,5 +461,106 @@ func (h *Handler) AdminDefinirPIN(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Reautenticação (step-up) ─────────────────────────────────────────────────
+
+// Reauth emite um novo access token com reauth_at atualizado, exigindo
+// password e/ou TOTP do utilizador já autenticado. Usado por superadmin para
+// operações críticas.
+func (h *Handler) Reauth(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	if user == nil {
+		jsonErr(w, "Não autenticado", http.StatusUnauthorized)
+		return
+	}
+
+	var body struct {
+		Password string `json:"password"`
+		TOTP     string `json:"totp"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonErr(w, "JSON inválido", http.StatusBadRequest)
+		return
+	}
+
+	var passwordHash, email, estado string
+	var tenantID, membershipID int64
+	err := h.db.QueryRow(r.Context(), `
+		SELECT u.password_hash, u.email, u.estado, COALESCE(m.tenant_id, 0), COALESCE(m.id, 0)
+		  FROM users u
+		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
+		 WHERE u.id = $1
+		 ORDER BY m.principal DESC NULLS LAST, m.id ASC
+		 LIMIT 1`, user.ID,
+	).Scan(&passwordHash, &email, &estado, &tenantID, &membershipID)
+	if err != nil {
+		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
+		return
+	}
+	if estado != "ativo" {
+		jsonErr(w, "Conta "+estado, http.StatusForbidden)
+		return
+	}
+
+	// Validar password se fornecida.
+	if body.Password != "" {
+		if bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(body.Password)) != nil {
+			h.logAuthAttempt(r, &userIdentity{id: user.ID, tenantID: tenantID, email: email}, email, false, "password inválida na reauth")
+			jsonErr(w, "Credenciais inválidas", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	// Validar TOTP se configurado.
+	var totpSecret string
+	totpErr := h.db.QueryRow(r.Context(), `
+		SELECT secret_hash FROM auth.user_auth_codes
+		 WHERE user_id = $1 AND tipo = $2 AND ativo = true`,
+		user.ID, authCodeTypeTOTP,
+	).Scan(&totpSecret)
+	if totpErr == nil {
+		if body.TOTP == "" || !totp.Validate(body.TOTP, totpSecret) {
+			h.logAuthAttempt(r, &userIdentity{id: user.ID, tenantID: tenantID, email: email}, email, false, "totp inválido na reauth")
+			jsonErr(w, "Código TOTP inválido", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	// Se não forneceu password nem TOTP e não tem TOTP configurado, exige password.
+	if body.Password == "" && totpErr != nil {
+		jsonErr(w, "Password é obrigatória", http.StatusBadRequest)
+		return
+	}
+
+	h.logAuthAttempt(r, &userIdentity{id: user.ID, tenantID: tenantID, email: email}, email, true, "reauth")
+
+	// Emitir novo access token com reauth_at atualizado.
+	userAccess, _ := models.LoadUserAccess(r.Context(), h.db, user.ID, membershipID)
+	scope := ""
+	if userAccess != nil {
+		scope = scopeStringFromAccess(userAccess)
+	}
+	escopo := user.Escopo
+	if escopo == "" {
+		escopo = "erp"
+	}
+	accessToken, _, err := h.signOAuthAccessToken(user.ID, tenantID, membershipID, user.Tipo, escopo, scope, h.cfg.JWTExpiresIn, time.Now())
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	expiresAt := time.Now().Add(h.cfg.JWTExpiresIn)
+	if err := h.insertSession(r, user.ID, mw.HashToken(accessToken), expiresAt); err != nil {
+		jsonErr(w, "Erro ao criar sessão", http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w, map[string]interface{}{
+		"access_token": accessToken,
+		"token_type":   "Bearer",
+		"expires_in":   int(h.cfg.JWTExpiresIn.Seconds()),
+	}, http.StatusOK)
 }
 

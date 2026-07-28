@@ -60,6 +60,10 @@ func (h *Handler) EnrollFacial(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "ID do funcionário inválido", http.StatusBadRequest)
 		return
 	}
+	if !h.podeGerirFuncionario(r, funcionarioID) {
+		jsonErr(w, "Sem permissão para gerir este funcionário", http.StatusForbidden)
+		return
+	}
 
 	var body EnrollFacialRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

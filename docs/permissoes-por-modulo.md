@@ -2,6 +2,10 @@
 
 > Lista gerada automaticamente a partir de `backend/internal/router/router.go`.
 > Cada permissão é verificada pelo middleware `RequirePermission` / `RequirePermissionAny`.
+>
+> **Atualização 2026-07-27:** a migration `backend/migrations/20260727093000_permissoes_cargos_padrao_finas.up.sql`
+> alinhou os cargos padrão com estas permissões finas. Anteriormente, os cargos padrão usavam
+> ações genéricas (`ver`, `criar`, `editar`, `apagar`) que não eram reconhecidas pelo router.
 
 ---
 
@@ -80,18 +84,25 @@
 
 - `aprovar_pedidos`
 - `criar_pedidos`
+- `faturar_compras`
+- `gerir_devolucoes`
+- `gerir_pagamentos`
+- `receber_mercadoria`
 - `ver_compras`
 
 ---
 
 ## `contabilidade`
 
+- `estornar_lancamentos`
+- `fechar_ano_fiscal`
 - `fechar_periodo`
 - `gerir_ativos_fixos`
 - `gerir_lancamentos`
 - `gerir_orcamentos`
 - `gerir_periodos`
 - `gerir_plano_contas`
+- `reabrir_periodo`
 - `ver_contabilidade`
 - `ver_relatorios`
 
@@ -101,10 +112,12 @@
 
 - `converter_leads`
 - `eliminar_leads`
+- `eliminar_oportunidades`
 - `gerir_atividades`
 - `gerir_leads`
 - `gerir_oportunidades`
 - `mover_leads`
+- `ver_atividades`
 - `ver_leads`
 - `ver_oportunidades`
 
@@ -121,6 +134,7 @@
 
 ## `faturacao`
 
+- `cancelar_documentos`
 - `configurar_series`
 - `emitir_encomendas`
 - `emitir_faturas`
@@ -195,6 +209,7 @@
 
 ## `pedido-ferias`
 
+- `aprovar`
 - `submeter_pedido`
 - `ver_pedidos`
 
@@ -213,12 +228,14 @@
 - `gerir_descontos`
 - `gerir_terminais`
 - `operar_pos`
+- `ver_vendas`
 
 ---
 
 ## `recrutamento`
 
 - `configurar_recrutamento`
+- `contratar`
 - `gerir_candidaturas`
 - `gerir_vagas`
 - `ver_candidaturas`
@@ -229,6 +246,7 @@
 ## `recursos-humanos`
 
 - `aprovar_ausencias`
+- `desligar_funcionarios`
 - `gerir_avaliacoes`
 - `gerir_beneficios`
 - `gerir_contratos`
@@ -240,6 +258,7 @@
 - `ver_funcionarios`
 - `ver_processos_disciplinares`
 - `ver_recibos`
+- `ver_relatorios`
 - `ver_salarios`
 
 ---
@@ -283,6 +302,7 @@
 
 ## `tesouraria`
 
+- `gerir_contas`
 - `gerir_movimentos`
 - `gerir_reconciliacao`
 - `ver_tesouraria`
@@ -304,6 +324,30 @@
 6. `clientes` — 5 permissões
 
 ---
+
+## Features por módulo (Fase 4)
+
+Além das permissões acima, os seguintes módulos estão protegidos por
+`RequireFeature`:
+
+| Módulo | Feature |
+|---|---|
+| `compras` | `compras` / `compras.aprovacoes` |
+| `crm` | `crm.leads` / `crm.oportunidades` / `crm.atividades` |
+| `faturacao` | `vendas.fatura_direta` / `vendas.orcamentos` / `vendas.encomendas` / `vendas.devolucoes` |
+| `recursos-humanos` | `rh.assiduidade` / `rh.ferias` / `rh.avaliacoes` / `rh.formacoes` / `rh.folha_pagamento` / `rh.disciplinar` |
+| `stock` | `stock` / `stock.alertas` / `stock.series` |
+| `contabilidade` | `contabilidade` / `cont.ativo_fixo` / `cont.centros_custo` |
+| `centros-custo` | `cont.centros_custo` |
+| `logistica` | `logistica` |
+
+## Segurança de superadmin (Fase 5)
+
+- **IP allowlist:** `auth.superadmin_ip_allowlist` restringe origens de acesso.
+- **Reautenticação:** operações críticas (tenants, plans, modules, features,
+  settings) exigem token com `reauth_at` recente via `POST /api/auth/reauth`.
+- **Auditoria:** `mw.AuditModule` cobre superadmin, auth, companies, faturacao,
+  crm, pos e todos os módulos anteriormente auditados.
 
 ## Nota
 

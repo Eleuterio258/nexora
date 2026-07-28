@@ -18,9 +18,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import ActorContext, apply_tenant, get_actor
+from app.deps import ActorContext, apply_tenant, get_actor, require_self_or_manager
 from app.limiter import limiter
 from app.models import FingerprintTemplate
+from app.security import get_biometric_encryption
 
 router = APIRouter(tags=["Fingerprint"])
 
@@ -81,6 +82,7 @@ def enroll_fingerprint(
 ) -> FingerprintEnrollResponse:
     """Regista ou actualiza um template de impressão digital para um utilizador."""
     erp_user_id = payload.user_id
+    require_self_or_manager(actor, erp_user_id)
 
     existing = db.scalar(
         apply_tenant(
@@ -92,8 +94,11 @@ def enroll_fingerprint(
             FingerprintTemplate,
         )
     )
+    encryption = get_biometric_encryption()
+    encrypted_template = encryption.encrypt_text(payload.template_base64)
+
     if existing:
-        existing.template_base64 = payload.template_base64
+        existing.template_base64 = encrypted_template
         existing.erp_funcionario_id = payload.erp_funcionario_id
     else:
         db.add(
@@ -102,7 +107,7 @@ def enroll_fingerprint(
                 erp_user_id=erp_user_id,
                 erp_funcionario_id=payload.erp_funcionario_id,
                 finger_type=payload.finger_type,
-                template_base64=payload.template_base64,
+                template_base64=encrypted_template,
             )
         )
     db.commit()
@@ -142,12 +147,14 @@ def identify_fingerprint(
     Em producao, deve usar um algoritmo de matching de minutias (ISO/IEC 19794-2)
     fornecido pelo SDK do leitor.
     """
+    encryption = get_biometric_encryption()
     templates = db.scalars(
         apply_tenant(select(FingerprintTemplate), actor, FingerprintTemplate)
     ).all()
 
     for template in templates:
-        if template.template_base64 == payload.template_base64:
+        stored_template = encryption.decrypt_text(template.template_base64)
+        if stored_template == payload.template_base64:
             return FingerprintResponse(
                 success=True,
                 user_id=template.erp_user_id,
@@ -170,6 +177,7 @@ def delete_fingerprint_enrollment(
     actor: ActorContext = Depends(get_actor),
 ) -> dict:
     """Remove o enrolamento de impressão digital de um utilizador."""
+    require_self_or_manager(actor, user_id)
     stmt = apply_tenant(
         select(FingerprintTemplate).where(FingerprintTemplate.erp_user_id == user_id),
         actor,

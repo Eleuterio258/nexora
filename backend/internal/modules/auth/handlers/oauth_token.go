@@ -187,7 +187,7 @@ func (h *Handler) oauthClientCredentialsGrant(w http.ResponseWriter, r *http.Req
 		return
 	}
 	scope := strings.Join(client.AllowedScopes, " ")
-	accessToken, _, err := h.signOAuthAccessToken(0, 0, 0, "client", "erp", scope, h.cfg.JWTExpiresIn)
+	accessToken, _, err := h.signOAuthAccessToken(0, 0, 0, "client", "erp", scope, h.cfg.JWTExpiresIn, time.Now())
 	if err != nil {
 		oauthErr(w, http.StatusInternalServerError, "server_error", "erro ao emitir token")
 		return
@@ -210,7 +210,7 @@ func (h *Handler) oauthClientCredentialsGrant(w http.ResponseWriter, r *http.Req
 // protegidas do ERP). client_credentials não cria sessão — é um token de
 // máquina, sem utilizador.
 func (h *Handler) issueOAuthTokenResponse(w http.ResponseWriter, r *http.Request, client *models.OAuthClient, subjectType string, subjectID, tenantID, membershipID int64, escopo, scope string, expiry time.Duration) {
-	accessToken, _, err := h.signOAuthAccessToken(subjectID, tenantID, membershipID, subjectType, escopo, scope, expiry)
+	accessToken, _, err := h.signOAuthAccessToken(subjectID, tenantID, membershipID, subjectType, escopo, scope, expiry, time.Now())
 	if err != nil {
 		oauthErr(w, http.StatusInternalServerError, "server_error", "erro ao emitir access token")
 		return
@@ -340,7 +340,7 @@ func (h *Handler) oauthRefreshTokenGrant(w http.ResponseWriter, r *http.Request)
 		h.db.QueryRow(r.Context(), `SELECT COALESCE(tenant_id,0) FROM auth.memberships WHERE id = $1`, membershipID).Scan(&tenantID)
 	}
 	expiry := h.cfg.JWTExpiresIn
-	accessToken, _, err := h.signOAuthAccessToken(subjectID, tenantID, membershipID, subjectType, "erp", scope, expiry)
+	accessToken, _, err := h.signOAuthAccessToken(subjectID, tenantID, membershipID, subjectType, "erp", scope, expiry, time.Now())
 	if err != nil {
 		oauthErr(w, http.StatusInternalServerError, "server_error", "erro ao emitir access token")
 		return

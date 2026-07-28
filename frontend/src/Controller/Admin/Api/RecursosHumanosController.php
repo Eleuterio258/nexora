@@ -1091,4 +1091,30 @@ final class RecursosHumanosController
             }
         });
     }
+
+    public function rhBiometriaFacialEnroll(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        $funcionarioId = $request->int('funcionario_id') ?? 0;
+        $capturas = (array) ($request->all()['capturas'] ?? []);
+
+        return $d->result(fn() => $d->rh->enrollFacial($funcionarioId, $capturas));
+    }
+
+    public function rhConsentimentoGet(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        $funcionarioId = $request->int('funcionario_id') ?? 0;
+        $consentimento = $d->rh->getConsentimentoAtivo($funcionarioId);
+
+        return new ApiResult([
+            'ok' => $consentimento !== null,
+            'consentimento' => $consentimento,
+        ], $consentimento !== null ? 200 : 404);
+    }
+
+    public function rhConsentimentoSave(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        $funcionarioId = $request->int('funcionario_id') ?? 0;
+
+        return $d->result(fn() => $d->rh->criarConsentimento($funcionarioId));
+    }
 }

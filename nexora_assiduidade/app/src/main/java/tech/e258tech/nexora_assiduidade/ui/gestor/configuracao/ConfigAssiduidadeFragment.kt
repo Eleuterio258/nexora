@@ -46,8 +46,9 @@ class ConfigAssiduidadeFragment : Fragment() {
     private lateinit var switchQrCode: SwitchMaterial
     private lateinit var switchNfc: SwitchMaterial
     private lateinit var switchPin: SwitchMaterial
-    private lateinit var switchGeolocation: SwitchMaterial
+    private lateinit var switchSelfieGps: SwitchMaterial
     private lateinit var switchManual: SwitchMaterial
+    private lateinit var switchTotp: SwitchMaterial
     private lateinit var btnGuardar: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var tvStatus: TextView
@@ -76,8 +77,9 @@ class ConfigAssiduidadeFragment : Fragment() {
         switchQrCode = view.findViewById(R.id.switchQrCode)
         switchNfc = view.findViewById(R.id.switchNfc)
         switchPin = view.findViewById(R.id.switchPin)
-        switchGeolocation = view.findViewById(R.id.switchGeolocation)
+        switchSelfieGps = view.findViewById(R.id.switchSelfieGps)
         switchManual = view.findViewById(R.id.switchManual)
+        switchTotp = view.findViewById(R.id.switchTotp)
         btnGuardar = view.findViewById(R.id.btnGuardarConfig)
         progressBar = view.findViewById(R.id.progressBarConfig)
         tvStatus = view.findViewById(R.id.tvConfigStatus)
@@ -115,8 +117,9 @@ class ConfigAssiduidadeFragment : Fragment() {
                 switchQrCode.isChecked = metodos["qr_code"]?.ativo ?: true
                 switchNfc.isChecked = metodos["nfc"]?.ativo ?: true
                 switchPin.isChecked = metodos["pin"]?.ativo ?: true
-                switchGeolocation.isChecked = metodos["geolocation"]?.ativo ?: true
+                switchSelfieGps.isChecked = metodos["selfie"]?.ativo ?: true
                 switchManual.isChecked = metodos["manual"]?.ativo ?: true
+                switchTotp.isChecked = metodos["totp"]?.ativo ?: true
                 setLoading(false)
             } catch (e: CancellationException) {
                 throw e
@@ -138,8 +141,9 @@ class ConfigAssiduidadeFragment : Fragment() {
             "qr_code" to MetodoAssiduidadeConfig(switchQrCode.isChecked),
             "nfc" to MetodoAssiduidadeConfig(switchNfc.isChecked),
             "pin" to MetodoAssiduidadeConfig(switchPin.isChecked),
-            "geolocation" to MetodoAssiduidadeConfig(switchGeolocation.isChecked),
-            "manual" to MetodoAssiduidadeConfig(switchManual.isChecked)
+            "selfie" to MetodoAssiduidadeConfig(switchSelfieGps.isChecked),
+            "manual" to MetodoAssiduidadeConfig(switchManual.isChecked),
+            "totp" to MetodoAssiduidadeConfig(switchTotp.isChecked)
         )
         val request = AssiduidadeConfigRequest(
             activo = switchActivo.isChecked,

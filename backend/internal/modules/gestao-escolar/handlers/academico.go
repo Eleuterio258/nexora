@@ -167,16 +167,4 @@ func (h *Handler) ObterFrequencia(w http.ResponseWriter, r *http.Request) {
 		WHERE a.id=$1 AND a.tenant_id=$2) x`, chi.URLParam(r, "id"), u.TenantID)
 }
 
-func (h *Handler) ListarAvaliacoes(w http.ResponseWriter, r *http.Request) {
-	u := mw.GetUser(r)
-	where := "g.tenant_id=$1"
-	args := []any{u.TenantID}
-	appendSchoolFilter(&where, &args, "g.class_id", r.URL.Query().Get("class_id"))
-	appendSchoolFilter(&where, &args, "g.subject_id", r.URL.Query().Get("subject_id"))
-	appendSchoolFilter(&where, &args, "g.term_id", r.URL.Query().Get("term_id"))
-	h.schoolList(w, r, `SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.data_avaliacao DESC),'[]') FROM (
-		SELECT g.*,c.nome turma,s.nome disciplina,t.nome periodo FROM gestao_escolar.school_grade_items g
-		JOIN gestao_escolar.school_classes c ON c.id=g.class_id JOIN gestao_escolar.school_subjects s ON s.id=g.subject_id
-		JOIN gestao_escolar.school_terms t ON t.id=g.term_id WHERE `+where+`) x`, args...)
-}
 

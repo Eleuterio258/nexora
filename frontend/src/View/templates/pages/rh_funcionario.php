@@ -247,6 +247,7 @@
     echo $tab('processos-disciplinares','Proc. Disciplinares',     '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',count($processosDisciplinares));
     echo $tab('contactos',              'Contactos Emerg.',        '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.362 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.338 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>',count($contactosEmergencia));
     echo $tab('documentos',             'Documentos',              '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',count($documentos));
+    echo $tab('biometria',              'Biometria',               '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',0, true, false);
     ?>
 </div>
 
@@ -1474,6 +1475,67 @@
     </div>
 </div>
 
+<!-- ── Biometria Facial ───────────────────────────────────── -->
+<div class="adm-tab-panel" id="tab-biometria">
+    <div class="adm-card adm-mb-6">
+        <div class="adm-card-header"><h2 class="adm-card-title">Cadastrar Rosto</h2></div>
+        <div class="adm-card-body">
+            <div id="bio-consent-warning" class="adm-alert adm-alert--warning" style="display:none;margin-bottom:var(--adm-sp-4)">
+                <strong>Consentimento LGPD em falta.</strong>
+                <p style="margin:var(--adm-sp-2) 0">O funcionário ainda não deu consentimento para recolha de dados biométricos. É obrigatório registar o consentimento antes de cadastrar o rosto.</p>
+                <button class="adm-btn adm-btn-primary adm-btn-sm" type="button" onclick="registarConsentimento()">
+                    Registar Consentimento
+                </button>
+            </div>
+
+            <div id="bio-consent-ok" class="adm-alert adm-alert--success" style="display:none;margin-bottom:var(--adm-sp-4)">
+                ✅ Consentimento LGPD activo registado em <span id="bio-consent-data"></span>.
+            </div>
+
+            <div id="bio-enroll-area" style="display:none">
+                <p class="adm-text-muted adm-mb-4">Capture 3 fotos do rosto do funcionário para registo biométrico. Certifique-se de boa iluminação e de que o rosto está centrado.</p>
+
+                <div style="display:flex;gap:var(--adm-sp-4);flex-wrap:wrap;margin-bottom:var(--adm-sp-4)">
+                    <div style="flex:1;min-width:280px;max-width:480px">
+                        <div style="position:relative;background:#000;border-radius:var(--adm-radius);overflow:hidden;aspect-ratio:4/3">
+                            <video id="bio-video" autoplay playsinline style="width:100%;height:100%;object-fit:cover;display:block"></video>
+                            <canvas id="bio-canvas" style="display:none"></canvas>
+                            <div id="bio-overlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.4);color:#fff;font-size:.9rem;text-align:center;padding:var(--adm-sp-4)">
+                                Clique em "Iniciar Câmara"
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:var(--adm-sp-3);margin-top:var(--adm-sp-3)">
+                            <button class="adm-btn adm-btn-outline" type="button" id="bio-start-btn" onclick="startBiometriaCamera()">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                Iniciar Câmara
+                            </button>
+                            <button class="adm-btn adm-btn-primary" type="button" id="bio-capture-btn" onclick="captureBiometria()" disabled>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                                Capturar Foto
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="flex:1;min-width:260px">
+                        <h3 class="adm-card-title" style="font-size:1rem;margin-bottom:var(--adm-sp-3)">Capturas (mínimo 3)</h3>
+                        <div id="bio-captures" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:var(--adm-sp-3)">
+                            <!-- miniaturas -->
+                        </div>
+                        <div style="margin-top:var(--adm-sp-4)">
+                            <button class="adm-btn adm-btn-primary" type="button" id="bio-submit-btn" onclick="submitBiometria()" disabled>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                Enviar Cadastro
+                            </button>
+                            <button class="adm-btn adm-btn-outline" type="button" onclick="resetBiometria()" style="margin-left:var(--adm-sp-2)">Reiniciar</button>
+                        </div>
+                        <div id="bio-status" class="adm-alert" style="display:none;margin-top:var(--adm-sp-4)"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 </div> <!-- /main col -->
 
 <aside>
@@ -2225,6 +2287,185 @@ function eliminarDocumento(id) {
         await postJSON('/nexora/api/rh_documento_remover', { id, csrf: CSRF }, 'documentos');
     });
 }
+
+// ── Biometria Facial ───────────────────────────────────────────
+let bioStream = null;
+let bioCaptures = [];
+
+async function startBiometriaCamera() {
+    const video = document.getElementById('bio-video');
+    const overlay = document.getElementById('bio-overlay');
+    const captureBtn = document.getElementById('bio-capture-btn');
+
+    try {
+        bioStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+        video.srcObject = bioStream;
+        overlay.style.display = 'none';
+        captureBtn.disabled = false;
+    } catch (err) {
+        showToast('Não foi possível aceder à câmara: ' + err.message, 'error');
+    }
+}
+
+function stopBiometriaCamera() {
+    if (bioStream) {
+        bioStream.getTracks().forEach(t => t.stop());
+        bioStream = null;
+    }
+    document.getElementById('bio-video').srcObject = null;
+}
+
+function captureBiometria() {
+    const video = document.getElementById('bio-video');
+    const canvas = document.getElementById('bio-canvas');
+    if (!video.srcObject) { showToast('A câmara não está activa.', 'error'); return; }
+
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const base64 = canvas.toDataURL('image/jpeg', 0.9);
+    bioCaptures.push(base64);
+    renderBiometriaCaptures();
+
+    if (bioCaptures.length >= 3) {
+        document.getElementById('bio-submit-btn').disabled = false;
+    }
+}
+
+function renderBiometriaCaptures() {
+    const container = document.getElementById('bio-captures');
+    container.innerHTML = '';
+    bioCaptures.forEach((img, idx) => {
+        const div = document.createElement('div');
+        div.style.cssText = 'position:relative;border-radius:var(--adm-radius);overflow:hidden;border:1px solid var(--adm-border)';
+        div.innerHTML = `<img src="${img}" style="width:100%;aspect-ratio:4/3;object-fit:cover">` +
+            `<button type="button" onclick="removeBiometriaCapture(${idx})" style="position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:1">×</button>`;
+        container.appendChild(div);
+    });
+}
+
+function removeBiometriaCapture(idx) {
+    bioCaptures.splice(idx, 1);
+    renderBiometriaCaptures();
+    document.getElementById('bio-submit-btn').disabled = bioCaptures.length < 3;
+}
+
+function resetBiometria() {
+    bioCaptures = [];
+    renderBiometriaCaptures();
+    document.getElementById('bio-submit-btn').disabled = true;
+    document.getElementById('bio-status').style.display = 'none';
+}
+
+async function submitBiometria() {
+    if (bioCaptures.length < 3) {
+        showToast('São necessárias pelo menos 3 capturas.', 'error');
+        return;
+    }
+
+    const statusEl = document.getElementById('bio-status');
+    statusEl.className = 'adm-alert';
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'A enviar...';
+    document.getElementById('bio-submit-btn').disabled = true;
+
+    try {
+        const res = await fetch('/nexora/api/rh_biometria_facial_enroll', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ funcionario_id: FUNC_ID, capturas: bioCaptures, csrf: CSRF })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            statusEl.className = 'adm-alert adm-alert--success';
+            statusEl.textContent = data.msg || 'Rosto cadastrado com sucesso.';
+            showToast(data.msg || 'Rosto cadastrado com sucesso.');
+            stopBiometriaCamera();
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            statusEl.className = 'adm-alert adm-alert--error';
+            statusEl.textContent = data.erro || 'Erro ao cadastrar rosto.';
+            showToast(data.erro || 'Erro ao cadastrar rosto.', 'error');
+            document.getElementById('bio-submit-btn').disabled = false;
+        }
+    } catch (err) {
+        statusEl.className = 'adm-alert adm-alert--error';
+        statusEl.textContent = 'Erro de ligação.';
+        showToast('Erro de ligação.', 'error');
+        document.getElementById('bio-submit-btn').disabled = false;
+    }
+}
+
+// ── Consentimento LGPD ─────────────────────────────────────────
+let bioConsentimentoAtivo = false;
+
+async function checkConsentimento() {
+    try {
+        const res = await fetch('/nexora/api/rh_consentimento_get?funcionario_id=' + FUNC_ID);
+        const data = await res.json();
+        bioConsentimentoAtivo = data.ok === true;
+        renderConsentimentoState(data.consentimento);
+    } catch (err) {
+        bioConsentimentoAtivo = false;
+        renderConsentimentoState(null);
+    }
+}
+
+function renderConsentimentoState(consentimento) {
+    const warningEl = document.getElementById('bio-consent-warning');
+    const okEl = document.getElementById('bio-consent-ok');
+    const enrollArea = document.getElementById('bio-enroll-area');
+
+    if (consentimento && consentimento.id) {
+        warningEl.style.display = 'none';
+        okEl.style.display = 'block';
+        enrollArea.style.display = 'block';
+        const dataAceite = consentimento.aceite_em ? new Date(consentimento.aceite_em).toLocaleString('pt-PT') : '';
+        document.getElementById('bio-consent-data').textContent = dataAceite;
+    } else {
+        warningEl.style.display = 'block';
+        okEl.style.display = 'none';
+        enrollArea.style.display = 'none';
+    }
+}
+
+async function registarConsentimento() {
+    const btn = document.querySelector('#bio-consent-warning button');
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch('/nexora/api/rh_consentimento_save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ funcionario_id: FUNC_ID, csrf: CSRF })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            showToast('Consentimento registado com sucesso.');
+            await checkConsentimento();
+        } else {
+            showToast(data.erro || 'Erro ao registar consentimento.', 'error');
+            if (btn) btn.disabled = false;
+        }
+    } catch (err) {
+        showToast('Erro de ligação.', 'error');
+        if (btn) btn.disabled = false;
+    }
+}
+
+// Verifica consentimento quando a tab biometria é activada
+document.addEventListener('DOMContentLoaded', () => {
+    const bioTabBtn = document.querySelector('#mainTabs .adm-tab[data-tab="biometria"]');
+    if (bioTabBtn) {
+        bioTabBtn.addEventListener('click', checkConsentimento);
+    }
+    // Se entrar directamente com #biometria, verifica também
+    if (location.hash === '#biometria') {
+        setTimeout(checkConsentimento, 100);
+    }
+});
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>

@@ -7,7 +7,9 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, get_db
 from app.main import app
+from app.models import FingerprintTemplate
 from app.schemas.common import SourceType, TemplateStatus
+from app.security import get_biometric_encryption
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test_faceclock.db"
 
@@ -131,6 +133,34 @@ class TestFingerprint:
         )
         assert response.status_code == 422
 
+    def test_enroll_encrypts_template_at_rest(
+        self, client, admin_headers, erp_user_id, db_session
+    ):
+        template_base64 = "dGVzdDE="
+        response = client.post(
+            "/api/v1/fingerprint/enroll",
+            json={
+                "user_id": erp_user_id,
+                "finger_type": "right_thumb",
+                "template_base64": template_base64,
+            },
+            headers=admin_headers,
+        )
+        assert response.status_code == 201
+
+        template = (
+            db_session.query(FingerprintTemplate)
+            .filter(FingerprintTemplate.erp_user_id == erp_user_id)
+            .first()
+        )
+        assert template is not None
+        assert template.template_base64 != template_base64
+        assert template.template_base64.startswith("enc:v1:")
+        assert (
+            get_biometric_encryption().decrypt_text(template.template_base64)
+            == template_base64
+        )
+
 
 # ============================================================
 # TESTES: Biometric (mockado)
@@ -195,6 +225,76 @@ class TestBiometric:
         )
         assert response.status_code == 200
         assert response.json()["reason"] == "user_not_enrolled"
+
+
+# ============================================================
+# TESTES: Controlo de acesso (P0 — get_actor/apply_tenant/self-or-manager)
+# ============================================================
+class TestAccessControlP0:
+    def test_anonymous_request_rejected(self, client, erp_user_id):
+        response = client.post(
+            "/api/v1/fingerprint/enroll",
+            json={
+                "user_id": erp_user_id,
+                "finger_type": "right_thumb",
+                "template_base64": "dGVzdDE=",
+            },
+        )
+        assert response.status_code == 401
+
+    def test_colaborador_cannot_enroll_fingerprint_of_other_user(
+        self, client, collab_headers, erp_user_id
+    ):
+        response = client.post(
+            "/api/v1/fingerprint/enroll",
+            json={
+                "user_id": erp_user_id,
+                "finger_type": "right_thumb",
+                "template_base64": "dGVzdDE=",
+            },
+            headers=collab_headers,
+        )
+        assert response.status_code == 403
+
+    def test_colaborador_cannot_verify_biometric_of_other_user(
+        self, client, collab_headers, erp_user_id
+    ):
+        response = client.post(
+            "/api/v1/biometric/verify",
+            json={
+                "user_id": erp_user_id,
+                "device_id": str(uuid.uuid4()),
+                "image_base64": "fake",
+            },
+            headers=collab_headers,
+        )
+        assert response.status_code == 403
+
+    def test_colaborador_can_enroll_own_fingerprint(self, client, collab_headers):
+        response = client.post(
+            "/api/v1/fingerprint/enroll",
+            json={
+                "user_id": "collab-erp-99",
+                "finger_type": "right_thumb",
+                "template_base64": "dGVzdDE=",
+            },
+            headers={**collab_headers, "X-Auth-Tenant-Id": "5"},
+        )
+        assert response.status_code == 201
+
+    def test_colaborador_without_tenant_id_is_forbidden(self, client, collab_headers):
+        # Sem X-Auth-Tenant-Id, apply_tenant() falha fechado para roles
+        # que nao sejam ADMIN_SISTEMA — nao devolve dados sem filtro.
+        response = client.post(
+            "/api/v1/fingerprint/enroll",
+            json={
+                "user_id": "collab-erp-99",
+                "finger_type": "right_thumb",
+                "template_base64": "dGVzdDE=",
+            },
+            headers=collab_headers,
+        )
+        assert response.status_code == 403
 
 
 # ============================================================

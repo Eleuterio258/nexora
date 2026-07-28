@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/surface_bg"
+    android:fillViewport="true">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <ImageView
+            android:id="@+id/ivBack"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:contentDescription="Voltar"
+            android:src="@drawable/ic_dashboard_chevron_right"
+            android:rotation="180"
+            app:tint="@color/text_primary"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/tvDefinirPinTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Definir PIN de assiduidade"
+            android:textColor="@color/text_primary"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/ivBack" />
+
+        <TextView
+            android:id="@+id/tvDefinirPinSubtitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="O funcionário vai usar este PIN para marcar presença pelo método PIN. Só o gestor/admin pode definir ou alterar este código."
+            android:textColor="@color/text_muted"
+            android:textSize="13sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvDefinirPinTitle" />
+
+        <LinearLayout
+            android:id="@+id/layoutDefinirPinForm"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/login_demo_button_bg"
+            android:orientation="vertical"
+            android:padding="16dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvDefinirPinSubtitle">
+
+            <EditText
+                android:id="@+id/etNovoPin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Novo PIN (mínimo 6 dígitos)"
+                android:inputType="numberPassword"
+                android:maxLength="10"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted" />
+
+            <EditText
+                android:id="@+id/etConfirmarPin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:hint="Confirmar PIN"
+                android:inputType="numberPassword"
+                android:maxLength="10"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvDefinirPinStatus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text=""
+            android:textColor="@color/red"
+            android:textSize="13sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/layoutDefinirPinForm" />
+
+        <Button
+            android:id="@+id/btnGuardarPin"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Guardar PIN"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvDefinirPinStatus" />
+
+        <ProgressBar
+            android:id="@+id/progressBarDefinirPin"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/btnGuardarPin" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>

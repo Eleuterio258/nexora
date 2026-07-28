@@ -55,6 +55,9 @@ func (h *Handler) ListarHistoricoSalarial(w http.ResponseWriter, r *http.Request
 func (h *Handler) CriarAlteracaoSalarial(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 
 	var body struct {
 		SalarioNovo  float64 `json:"salario_novo"`

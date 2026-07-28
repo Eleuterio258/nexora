@@ -53,7 +53,7 @@ func (h *Handler) ListarPresencasPorTipo(w http.ResponseWriter, r *http.Request)
 
 	rows, err := h.db.Query(r.Context(), `
 		SELECT p.id, p.funcionario_id, f.nome_completo, f.unit_id, u.nome,
-		       p.data, p.hora_entrada, p.hora_saida, p.tipo, p.observacoes
+		       p.data, p.hora_entrada, p.hora_saida, p.tipo, p.observacoes, p.justificado
 		  FROM rh.presencas p
 		  JOIN rh.funcionarios f ON f.id = p.funcionario_id
 		  LEFT JOIN rh.unidades_organizacionais u ON u.id = f.unit_id
@@ -76,12 +76,13 @@ func (h *Handler) ListarPresencasPorTipo(w http.ResponseWriter, r *http.Request)
 		HoraSaida      *string   `json:"hora_saida"`
 		Tipo           *string   `json:"tipo"`
 		Observacoes    *string   `json:"observacoes"`
+		Justificado    bool      `json:"justificado"`
 	}
 	data := []Row{}
 	for rows.Next() {
 		var p Row
 		if rows.Scan(&p.ID, &p.FuncionarioID, &p.FuncionarioNome, &p.UnitID, &p.UnidadeNome,
-			&p.Data, &p.HoraEntrada, &p.HoraSaida, &p.Tipo, &p.Observacoes) == nil {
+			&p.Data, &p.HoraEntrada, &p.HoraSaida, &p.Tipo, &p.Observacoes, &p.Justificado) == nil {
 			data = append(data, p)
 		}
 	}
@@ -124,6 +125,9 @@ func (h *Handler) ListarPresencas(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CriarPresenca(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 
 	var body struct {
 		Data        string   `json:"data"`
@@ -172,6 +176,9 @@ func (h *Handler) CriarPresenca(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) RemoverPresenca(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 	presencaID := chi.URLParam(r, "presencaId")
 
 	tag, err := h.db.Exec(r.Context(), `

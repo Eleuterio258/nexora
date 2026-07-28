@@ -49,7 +49,7 @@ func (h *Handler) PosLogin(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, "codigo_terminal e activation_code são obrigatórios", http.StatusBadRequest)
 			return
 		}
-		h.loginTerminalPOS(w, r, body.CodigoTerminal, body.ActivationCode)
+		h.loginTerminalPOS(w, r, body.CodigoTerminal, body.ActivationCode, body.TenantSlug)
 	default:
 		jsonErr(w, "tipo inválido: utilizador ou terminal", http.StatusBadRequest)
 	}
@@ -87,14 +87,21 @@ func (h *Handler) PosRefresh(w http.ResponseWriter, r *http.Request) {
 // único, só por tenant — pos.pos_terminals UNIQUE(tenant_id, codigo)) e
 // desambigua pelo activation_code, comparado por bcrypt contra cada
 // candidato, tal como uma password normal.
-func (h *Handler) loginTerminalPOS(w http.ResponseWriter, r *http.Request, codigoTerminal, activationCode string) {
+func (h *Handler) loginTerminalPOS(w http.ResponseWriter, r *http.Request, codigoTerminal, activationCode, tenantSlug string) {
 	ctx := r.Context()
+	where := "t.codigo = $1"
+	args := []any{codigoTerminal}
+	if tenantSlug != "" {
+		args = append(args, tenantSlug)
+		where += " AND s.codigo = $2"
+	}
 	rows, err := h.db.Query(ctx, `
 		SELECT t.id, t.codigo, t.nome, t.activo, u.email
 		  FROM pos.pos_terminals t
 		  JOIN auth.users u ON u.id = t.user_id
-		 WHERE t.codigo = $1`,
-		codigoTerminal,
+		  JOIN saas.tenants s ON s.id = t.tenant_id
+		 WHERE `+where,
+		args...,
 	)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
@@ -213,7 +220,7 @@ func (h *Handler) issueTerminalTokens(w http.ResponseWriter, r *http.Request, u 
 	if userAccess, err := models.LoadUserAccess(r.Context(), h.db, u.id, u.membershipID); err == nil {
 		scope = scopeStringFromAccess(userAccess)
 	}
-	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, scope, terminalTokenExpiry)
+	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, scope, terminalTokenExpiry, time.Now())
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return

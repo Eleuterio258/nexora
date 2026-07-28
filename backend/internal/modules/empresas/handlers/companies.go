@@ -17,7 +17,7 @@ func (h *Handler) ListarEmpresas(w http.ResponseWriter, r *http.Request) {
 	args := []any{}
 	if caller.Tipo != "superadmin" {
 		args = append(args, caller.TenantID)
-		where = "id = $1"
+		where = "tenant_id = $1"
 	}
 	if status != "" {
 		args = append(args, status)
@@ -25,7 +25,7 @@ func (h *Handler) ListarEmpresas(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := h.db.Query(r.Context(),
-		"SELECT id, codigo, nome, nome_comercial, tipo, status, moeda_base, timezone, created_at FROM companies WHERE "+where+" ORDER BY nome",
+		"SELECT id, codigo, nome, nome_comercial, tipo, status, moeda_base, timezone, created_at FROM empresas.companies WHERE "+where+" ORDER BY nome",
 		args...)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
@@ -55,6 +55,7 @@ func (h *Handler) ListarEmpresas(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CriarEmpresa(w http.ResponseWriter, r *http.Request) {
+	caller := mw.GetUser(r)
 	var body struct {
 		Codigo      string  `json:"codigo"`
 		Nome        string  `json:"nome"`
@@ -71,10 +72,10 @@ func (h *Handler) CriarEmpresa(w http.ResponseWriter, r *http.Request) {
 	var id int64
 	var createdAt time.Time
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO companies (codigo, nome, nome_comercial, tipo, moeda_base, timezone)
-		VALUES ($1, $2, $3, COALESCE($4,'empresa'), COALESCE($5,'MZN'), COALESCE($6,'Africa/Maputo'))
+		INSERT INTO empresas.companies (codigo, nome, nome_comercial, tipo, moeda_base, timezone, tenant_id)
+		VALUES ($1, $2, $3, COALESCE($4,'empresa'), COALESCE($5,'MZN'), COALESCE($6,'Africa/Maputo'), $7)
 		RETURNING id, created_at`,
-		body.Codigo, body.Nome, body.NomeComercial, body.Tipo, body.MoedaBase, body.Timezone).
+		body.Codigo, body.Nome, body.NomeComercial, body.Tipo, body.MoedaBase, body.Timezone, caller.TenantID).
 		Scan(&id, &createdAt)
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -88,6 +89,7 @@ func (h *Handler) CriarEmpresa(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ObterEmpresa(w http.ResponseWriter, r *http.Request) {
+	caller := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 	var c struct {
 		ID            int64      `json:"id"`
@@ -103,7 +105,7 @@ func (h *Handler) ObterEmpresa(w http.ResponseWriter, r *http.Request) {
 	}
 	err := h.db.QueryRow(r.Context(), `
 		SELECT id, codigo, nome, nome_comercial, tipo, status, moeda_base, timezone, created_at, updated_at
-		  FROM companies WHERE id = $1`, id).
+		  FROM empresas.companies WHERE id = $1 AND (tenant_id = $2 OR $3)`, id, caller.TenantID, caller.Tipo == "superadmin").
 		Scan(&c.ID, &c.Codigo, &c.Nome, &c.NomeComercial, &c.Tipo, &c.Status, &c.MoedaBase, &c.Timezone, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		jsonErr(w, "Empresa não encontrada", http.StatusNotFound)
@@ -113,6 +115,7 @@ func (h *Handler) ObterEmpresa(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ActualizarEmpresa(w http.ResponseWriter, r *http.Request) {
+	caller := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 	var body struct {
 		Nome          *string `json:"nome"`
@@ -123,15 +126,15 @@ func (h *Handler) ActualizarEmpresa(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewDecoder(r.Body).Decode(&body)
 	tag, err := h.db.Exec(r.Context(), `
-		UPDATE companies SET
+		UPDATE empresas.companies SET
 		  nome           = COALESCE($1, nome),
 		  nome_comercial = COALESCE($2, nome_comercial),
 		  status         = COALESCE($3, status),
 		  moeda_base     = COALESCE($4, moeda_base),
 		  timezone       = COALESCE($5, timezone),
 		  updated_at     = NOW()
-		WHERE id = $6`,
-		body.Nome, body.NomeComercial, body.Status, body.MoedaBase, body.Timezone, id)
+		WHERE id = $6 AND (tenant_id = $7 OR $8)`,
+		body.Nome, body.NomeComercial, body.Status, body.MoedaBase, body.Timezone, id, caller.TenantID, caller.Tipo == "superadmin")
 	if err != nil || tag.RowsAffected() == 0 {
 		jsonErr(w, "Empresa não encontrada", http.StatusNotFound)
 		return

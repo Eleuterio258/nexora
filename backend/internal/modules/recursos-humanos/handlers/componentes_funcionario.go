@@ -53,6 +53,9 @@ func (h *Handler) ListarComponentesFuncionario(w http.ResponseWriter, r *http.Re
 func (h *Handler) AdicionarComponenteFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 
 	var body struct {
 		ComponenteID int64   `json:"componente_id"`
@@ -86,6 +89,9 @@ func (h *Handler) AdicionarComponenteFuncionario(w http.ResponseWriter, r *http.
 func (h *Handler) RemoverComponenteFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 	componenteID := chi.URLParam(r, "componenteId")
 
 	tag, err := h.db.Exec(r.Context(), `

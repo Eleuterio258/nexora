@@ -15,19 +15,9 @@ CREATE INDEX IF NOT EXISTS idx_funcionarios_email ON rh.funcionarios (email) WHE
 CREATE INDEX IF NOT EXISTS idx_funcionarios_tenant_email ON rh.funcionarios (tenant_id, email) WHERE email IS NOT NULL AND email <> '';
 
 -- Garantir unicidade de email por tenant (quando preenchido)
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conname = 'uq_funcionarios_tenant_email'
-          AND conrelid = 'rh.funcionarios'::regclass
-    ) THEN
-        ALTER TABLE rh.funcionarios
-            ADD CONSTRAINT uq_funcionarios_tenant_email
-            UNIQUE (tenant_id, email)
-            WHERE email IS NOT NULL AND email <> '';
-    END IF;
-END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_funcionarios_tenant_email
+    ON rh.funcionarios (tenant_id, email)
+    WHERE email IS NOT NULL AND email <> '';
 
 -- Garantir unicidade de numero_funcionario por tenant (quando preenchido)
 -- O baseline já deve ter criado este índice; repetimos IF NOT EXISTS por segurança.

@@ -49,6 +49,10 @@ func (h *Handler) CriarCategoria(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "nome e tipo sao obrigatorios", http.StatusBadRequest)
 		return
 	}
+	if b.ParentID != nil && !h.existeNoTenant(r.Context(), "financeiro.financial_categories", "id", *b.ParentID, u.TenantID) {
+		jsonErr(w, "Categoria pai invalida", http.StatusUnprocessableEntity)
+		return
+	}
 	var id int64
 	err := h.db.QueryRow(r.Context(), `INSERT INTO financeiro.financial_categories
 		(tenant_id,parent_id,codigo,nome,tipo) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
@@ -121,6 +125,14 @@ func (h *Handler) CriarContaAReceber(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "numero, customer_id, valor_total e data_vencimento sao obrigatorios", http.StatusBadRequest)
 		return
 	}
+	if !h.existeNoTenant(r.Context(), "clientes.customers", "id", b.CustomerID, u.TenantID) {
+		jsonErr(w, "Cliente invalido", http.StatusUnprocessableEntity)
+		return
+	}
+	if b.FinancialCategoryID != nil && !h.existeNoTenant(r.Context(), "financeiro.financial_categories", "id", *b.FinancialCategoryID, u.TenantID) {
+		jsonErr(w, "Categoria invalida", http.StatusUnprocessableEntity)
+		return
+	}
 	if b.DataEmissao == "" {
 		b.DataEmissao = "today"
 	}
@@ -148,6 +160,10 @@ func (h *Handler) RegistarPagamentoAReceber(w http.ResponseWriter, r *http.Reque
 	}
 	if json.NewDecoder(r.Body).Decode(&b) != nil || b.Valor <= 0 {
 		jsonErr(w, "valor e obrigatorio", http.StatusBadRequest)
+		return
+	}
+	if b.PaymentMethodID != nil && !h.existeNoTenant(r.Context(), "financeiro.payment_methods", "id", *b.PaymentMethodID, u.TenantID) {
+		jsonErr(w, "Metodo de pagamento invalido", http.StatusUnprocessableEntity)
 		return
 	}
 	if b.DataPagamento == "" {
@@ -209,6 +225,14 @@ func (h *Handler) CriarContaAPagar(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "numero, valor_total e data_vencimento sao obrigatorios", http.StatusBadRequest)
 		return
 	}
+	if b.SupplierID != nil && !h.existeNoTenant(r.Context(), "compras.suppliers", "id", *b.SupplierID, u.TenantID) {
+		jsonErr(w, "Fornecedor invalido", http.StatusUnprocessableEntity)
+		return
+	}
+	if b.FinancialCategoryID != nil && !h.existeNoTenant(r.Context(), "financeiro.financial_categories", "id", *b.FinancialCategoryID, u.TenantID) {
+		jsonErr(w, "Categoria invalida", http.StatusUnprocessableEntity)
+		return
+	}
 	var id int64
 	err := h.db.QueryRow(r.Context(), `INSERT INTO financeiro.accounts_payable
 		(tenant_id,numero,supplier_id,financial_category_id,origem_tipo,origem_id,descricao,valor_total,data_emissao,data_vencimento)
@@ -232,6 +256,10 @@ func (h *Handler) RegistarPagamentoAPagar(w http.ResponseWriter, r *http.Request
 	}
 	if json.NewDecoder(r.Body).Decode(&b) != nil || b.Valor <= 0 {
 		jsonErr(w, "valor e obrigatorio", http.StatusBadRequest)
+		return
+	}
+	if b.PaymentMethodID != nil && !h.existeNoTenant(r.Context(), "financeiro.payment_methods", "id", *b.PaymentMethodID, u.TenantID) {
+		jsonErr(w, "Metodo de pagamento invalido", http.StatusUnprocessableEntity)
 		return
 	}
 	if b.DataPagamento == "" {

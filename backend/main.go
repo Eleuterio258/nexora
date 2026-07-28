@@ -19,6 +19,9 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if err := cfg.AssertProductionSecrets(); err != nil {
+		log.Fatal(err)
+	}
 	pool := db.Connect(cfg.DatabaseURL)
 	defer pool.Close()
 

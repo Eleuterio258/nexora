@@ -50,6 +50,9 @@ func (h *Handler) ListarBeneficiosFuncionario(w http.ResponseWriter, r *http.Req
 func (h *Handler) AdicionarBeneficioFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 
 	var body struct {
 		BeneficioID int64    `json:"beneficio_id"`
@@ -102,6 +105,9 @@ func (h *Handler) AdicionarBeneficioFuncionario(w http.ResponseWriter, r *http.R
 func (h *Handler) RemoverBeneficioFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 	beneficioID := chi.URLParam(r, "beneficioId")
 
 	tag, err := h.db.Exec(r.Context(), `

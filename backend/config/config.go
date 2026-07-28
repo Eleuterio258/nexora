@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -8,6 +9,10 @@ import (
 )
 
 type Config struct {
+	// Ambiente de execução ("development" por omissão). Só um valor
+	// explícito "production" activa AssertProductionSecrets().
+	Environment string
+
 	// Base de dados
 	DatabaseURL string
 
@@ -100,10 +105,10 @@ type Config struct {
 	SignatureWebhookSecrets   map[string]string
 
 	// SMS — envio de notificações por SMS (opcional; "noop" ou vazio desativa).
-	SMSProvider   string
-	SMSTwilioSID  string
+	SMSProvider    string
+	SMSTwilioSID   string
 	SMSTwilioToken string
-	SMSTwilioFrom string
+	SMSTwilioFrom  string
 
 	// Antivírus — verificação de ficheiros no upload (opcional).
 	AntivirusProvider      string
@@ -130,6 +135,48 @@ type Config struct {
 	OAuthAudience          string
 }
 
+// defaultJWTSecret, defaultJWTRefreshSecret, defaultMinioAccessKey e
+// defaultMinioSecretKey são os mesmos valores por omissão usados em Load() —
+// mantidos como constantes para AssertProductionSecrets() os comparar sem
+// depender de duplicar as strings.
+const (
+	defaultJWTSecret        = "change-me-secret"
+	defaultJWTRefreshSecret = "change-me-refresh-secret"
+	defaultMinioAccessKey   = "histories"
+	defaultMinioSecretKey   = "histories"
+)
+
+// AssertProductionSecrets falha o arranque (log.Fatal, chamado pelo caller)
+// se Environment=="production" e algum segredo crítico ainda tiver o valor
+// por omissão versionado no repositório — mesmo padrão já aplicado no
+// FaceClock (assert_production_secrets(), app/config.py), agora replicado
+// aqui porque o ERP é a fonte de identidade de todo o SaaS: um JWT_SECRET
+// por omissão esquecido permite forjar tokens válidos para qualquer
+// utilizador/tenant. Sem ENVIRONMENT=production explícito, o comportamento
+// por omissão mantém-se inalterado (dev/staging não são afectados).
+func (c *Config) AssertProductionSecrets() error {
+	if c.Environment != "production" {
+		return nil
+	}
+	var bad []string
+	if c.JWTSecret == "" || c.JWTSecret == defaultJWTSecret {
+		bad = append(bad, "JWT_SECRET")
+	}
+	if c.JWTRefreshSecret == "" || c.JWTRefreshSecret == defaultJWTRefreshSecret {
+		bad = append(bad, "JWT_REFRESH_SECRET")
+	}
+	if c.MinioAccessKey == defaultMinioAccessKey {
+		bad = append(bad, "MINIO_ACCESS_KEY")
+	}
+	if c.MinioSecretKey == defaultMinioSecretKey {
+		bad = append(bad, "MINIO_SECRET_KEY")
+	}
+	if len(bad) > 0 {
+		return fmt.Errorf("ENVIRONMENT=production exige segredos reais para: %s (valores por omissão do repositório não são seguros)", strings.Join(bad, ", "))
+	}
+	return nil
+}
+
 func Load() *Config {
 	webhookProviders, webhookSecrets := loadSignatureWebhookProviders()
 	return &Config{
@@ -145,8 +192,9 @@ func Load() *Config {
 				"impostos%2Cmulti_moeda%2C"+
 				"assinaturas%2Cnotifications%2Cseguranca%2C"+
 				"gestao_escolar%2Cpublic"),
-		JWTSecret:           env("JWT_SECRET", "change-me-secret"),
-		JWTRefreshSecret:    env("JWT_REFRESH_SECRET", "change-me-refresh-secret"),
+		Environment:         env("ENVIRONMENT", "development"),
+		JWTSecret:           env("JWT_SECRET", defaultJWTSecret),
+		JWTRefreshSecret:    env("JWT_REFRESH_SECRET", defaultJWTRefreshSecret),
 		JWTExpiresIn:        parseDuration(env("JWT_EXPIRES_IN", "15m")),
 		JWTRefreshExpiresIn: parseDuration(env("JWT_REFRESH_EXPIRES_IN", "7d")),
 		Port:                env("PORT", "8080"),
@@ -176,8 +224,8 @@ func Load() *Config {
 		StorageLocalDir:  env("STORAGE_LOCAL_DIR", "./uploads"),
 		StoragePublicURL: env("STORAGE_PUBLIC_URL", ""),
 		MinioEndpoint:    env("MINIO_ENDPOINT", "localhost:9004"),
-		MinioAccessKey:   env("MINIO_ACCESS_KEY", "histories"),
-		MinioSecretKey:   env("MINIO_SECRET_KEY", "histories"),
+		MinioAccessKey:   env("MINIO_ACCESS_KEY", defaultMinioAccessKey),
+		MinioSecretKey:   env("MINIO_SECRET_KEY", defaultMinioSecretKey),
 		MinioBucket:      env("MINIO_BUCKET", "nexora"),
 		MinioUseSSL:      envBool("MINIO_USE_SSL", false),
 		MinioRegion:      env("MINIO_REGION", "us-east-1"),

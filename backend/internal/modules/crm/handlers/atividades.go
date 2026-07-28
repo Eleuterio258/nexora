@@ -147,14 +147,14 @@ func (h *Handler) CriarAtividade(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	if body.LeadID != nil {
 		var exists bool
-		if err := h.db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM leads WHERE id=$1 AND tenant_id=$2)", *body.LeadID, user.TenantID).Scan(&exists); err != nil || !exists {
+		if err := h.db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM crm.leads WHERE id=$1 AND tenant_id=$2)", *body.LeadID, user.TenantID).Scan(&exists); err != nil || !exists {
 			jsonErr(w, "Lead não encontrado.", http.StatusNotFound)
 			return
 		}
 	}
 	if body.OportunidadeID != nil {
 		var exists bool
-		if err := h.db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM oportunidades WHERE id=$1 AND tenant_id=$2)", *body.OportunidadeID, user.TenantID).Scan(&exists); err != nil || !exists {
+		if err := h.db.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM crm.oportunidades WHERE id=$1 AND tenant_id=$2)", *body.OportunidadeID, user.TenantID).Scan(&exists); err != nil || !exists {
 			jsonErr(w, "Oportunidade não encontrada.", http.StatusNotFound)
 			return
 		}

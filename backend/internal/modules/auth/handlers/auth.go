@@ -174,7 +174,9 @@ func (h *Handler) loginWithCredentials(w http.ResponseWriter, r *http.Request, e
 		SELECT u.id, COALESCE(m.tenant_id, 0), COALESCE(m.id, 0), u.nome, u.password_hash, u.estado, u.tipo, COALESCE(NULLIF(m.escopo, ''), 'erp')
 		  FROM users u
 		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
-		 WHERE u.email = LOWER($1)`,
+		 WHERE u.email = LOWER($1)
+		 ORDER BY m.principal DESC NULLS LAST, m.id ASC
+		 LIMIT 1`,
 		email,
 	).Scan(&userID, &tenantID, &membershipID, &nome, &passwordHash, &estado, &tipo, &escopo)
 
@@ -445,7 +447,9 @@ func (h *Handler) refreshWithToken(w http.ResponseWriter, r *http.Request, refre
 	err = h.db.QueryRow(r.Context(), `
 		SELECT COALESCE(m.tenant_id, 0), COALESCE(m.id, 0), u.estado, u.tipo, COALESCE(NULLIF(m.escopo, ''), 'erp')
 		  FROM users u LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
-		 WHERE u.id = $1`, userID).
+		 WHERE u.id = $1
+		 ORDER BY m.principal DESC NULLS LAST, m.id ASC
+		 LIMIT 1`, userID).
 		Scan(&tenantID, &membershipID, &estado, &tipo, &escopo)
 	if err == pgx.ErrNoRows || estado != "ativo" {
 		jsonErr(w, "Utilizador inactivo", http.StatusUnauthorized)
@@ -633,8 +637,10 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		       u.estado, u.email_verificado, u.ultimo_login_em, u.created_at,
 		       COALESCE(NULLIF(m.escopo, ''), 'erp')
 		  FROM users u
-		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true AND m.ativo = true
-		 WHERE u.id = $1`, user.ID)
+		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
+		 WHERE u.id = $1
+		 ORDER BY m.principal DESC NULLS LAST, m.id ASC
+		 LIMIT 1`, user.ID)
 
 	var u struct {
 		ID              int64      `json:"id"`

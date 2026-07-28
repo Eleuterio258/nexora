@@ -16,6 +16,8 @@ import tech.e258tech.nexora_assiduidade.data.model.AdminSetPinRequest
 import tech.e258tech.nexora_assiduidade.data.model.AssiduidadeConfigRequest
 import tech.e258tech.nexora_assiduidade.data.model.AgendaItem
 import tech.e258tech.nexora_assiduidade.data.model.CaptureImage
+import tech.e258tech.nexora_assiduidade.data.model.ConsentimentoLGPD
+import tech.e258tech.nexora_assiduidade.data.model.ConsentimentoLGPDRequest
 import tech.e258tech.nexora_assiduidade.data.model.EnrollFacialRequest
 import tech.e258tech.nexora_assiduidade.data.model.AgendaItemRequest
 import tech.e258tech.nexora_assiduidade.data.model.Atividade
@@ -40,12 +42,13 @@ import tech.e258tech.nexora_assiduidade.data.model.OportunidadeListResponse
 import tech.e258tech.nexora_assiduidade.data.model.OportunidadePerderRequest
 import tech.e258tech.nexora_assiduidade.data.model.OportunidadeRequest
 import tech.e258tech.nexora_assiduidade.data.model.PinValidateRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarLidaRequest
+import tech.e258tech.nexora_assiduidade.data.model.PinVerifyRequest
+import tech.e258tech.nexora_assiduidade.data.model.TotpVerifyRequest
 import tech.e258tech.nexora_assiduidade.data.model.PresencaOcorrencia
 import tech.e258tech.nexora_assiduidade.data.model.QRGenerateDeviceRequest
 import tech.e258tech.nexora_assiduidade.data.model.QRValidateDeviceRequest
 import tech.e258tech.nexora_assiduidade.data.model.RelatorioRH
-import tech.e258tech.nexora_assiduidade.data.model.TotpSetupRequest
-import tech.e258tech.nexora_assiduidade.data.model.TotpValidateRequest
 import tech.e258tech.nexora_assiduidade.data.model.chat.Conversation
 import tech.e258tech.nexora_assiduidade.utils.Constants
 import tech.e258tech.nexora_assiduidade.data.model.response.AssiduidadeConfigResponse
@@ -63,6 +66,8 @@ import tech.e258tech.nexora_assiduidade.data.model.response.EventoAssiduidadeRes
 import tech.e258tech.nexora_assiduidade.data.model.response.FuncionarioIntegracaoResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.GeofenceDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.HardwareEventResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.HomeResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.JustificacaoPendenteResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.JustificacaoCreateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.JustificacaoResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.LeadConverterResponse
@@ -74,7 +79,6 @@ import tech.e258tech.nexora_assiduidade.data.model.response.PresencaResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.QRGenerateDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.QRValidateDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ResultadoDiarioResponse
-import tech.e258tech.nexora_assiduidade.data.model.response.TotpSetupResponse
 
 /**
  * Serviços da API do ERP (Nexora ERP, Go). Rotas reais confirmadas em
@@ -125,26 +129,35 @@ interface ErpApiService {
         @Field("client_id") clientId: String = Constants.OAUTH_CLIENT_ID
     ): Call<OAuthTokenResponse>
 
-    // Login alternativo por PIN/TOTP (authcode.go) — chamado directamente no
+    // Login alternativo por PIN (authcode.go) — chamado directamente no
     // ERP desde 2026-07-12 (deixou de passar pelo proxy do FaceClock).
-    // pin/validate e totp/validate sao publicos no ERP (sem Authorization) —
-    // devolvem o mesmo payload de tokens que /api/auth/login.
+    // pin/validate e publico no ERP (sem Authorization) — devolve o mesmo
+    // payload de tokens que /api/auth/login.
     @POST("api/authcode/pin/validate")
     suspend fun validatePin(@Body request: PinValidateRequest): Response<ErpLoginResponse>
-
-    @POST("api/authcode/totp/validate")
-    suspend fun validateTotp(@Body request: TotpValidateRequest): Response<ErpLoginResponse>
-
-    @POST("api/authcode/totp/setup")
-    suspend fun setupTotp(
-        @Header("Authorization") token: String,
-        @Body request: TotpSetupRequest
-    ): Response<TotpSetupResponse>
 
     @POST("api/authcode/admin/set-pin")
     suspend fun setAdminPin(
         @Header("Authorization") token: String,
         @Body request: AdminSetPinRequest
+    ): Response<Unit>
+
+    // Agregado do ecrã inicial do colaborador (self-service/handlers/home.go)
+    @GET("api/self-service/home")
+    suspend fun getHome(
+        @Header("Authorization") token: String
+    ): Response<HomeResponse>
+
+    @POST("api/self-service/notificacoes/lida")
+    suspend fun marcarNotificacaoLida(
+        @Header("Authorization") token: String,
+        @Body request: MarcarLidaRequest
+    ): Response<Unit>
+
+    @POST("api/self-service/comunicados/lido")
+    suspend fun marcarComunicadoLido(
+        @Header("Authorization") token: String,
+        @Body request: MarcarLidaRequest
     ): Response<Unit>
 
     // Assiduidade do proprio colaborador (self-service/handlers/assiduidade.go)
@@ -314,6 +327,20 @@ interface ErpApiService {
         @Body request: EnrollFacialRequest
     ): Response<EnrollFacialResponse>
 
+    // Consentimento LGPD biométrico de um funcionário (GET/POST por gestor RH).
+    @GET("api/rh/funcionarios/{id}/consentimento")
+    suspend fun getConsentimentoFuncionario(
+        @Header("Authorization") token: String,
+        @Path("id") funcionarioId: Long
+    ): Response<ConsentimentoLGPD>
+
+    @POST("api/rh/funcionarios/{id}/consentimento")
+    suspend fun criarConsentimentoFuncionario(
+        @Header("Authorization") token: String,
+        @Path("id") funcionarioId: Long,
+        @Body request: ConsentimentoLGPDRequest = ConsentimentoLGPDRequest()
+    ): Response<Map<String, Long>>
+
     // Configuração dos métodos de assiduidade activos para o tenant
     // (sistema-configuracao/handlers/assiduidade.go). GET exige
     // sistema-configuracao.ver_configuracoes, PUT exige editar_configuracoes.
@@ -327,6 +354,17 @@ interface ErpApiService {
         @Header("Authorization") token: String,
         @Body request: AssiduidadeConfigRequest
     ): Response<Unit>
+
+    // Mesma config que getConfigAssiduidade, mas acessível a qualquer
+    // colaborador autenticado (assiduidade.ver_assiduidade, não
+    // sistema-configuracao.ver_configuracoes) — usado pelo ecrã do
+    // funcionário (HomeFuncionarioFragment) para esconder métodos
+    // desactivados, ao contrário do ecrã de configuração do gestor que usa
+    // getConfigAssiduidade acima.
+    @GET("api/self-service/assiduidade/metodos")
+    suspend fun getMetodosAssiduidade(
+        @Header("Authorization") token: String
+    ): Response<AssiduidadeConfigResponse>
 
     // Pedidos de férias/ausências (rh.go:1090, ListarAusencias)
     @GET("api/rh/ausencias")
@@ -346,6 +384,24 @@ interface ErpApiService {
     suspend fun rejeitarAusencia(
         @Header("Authorization") token: String,
         @Path("id") ausenciaId: Long
+    ): Response<Unit>
+
+    // Justificações de falta/atraso pendentes de decisão (recursos-humanos/handlers/justificacoes.go)
+    @GET("api/rh/justificacoes")
+    suspend fun getJustificacoesPendentes(
+        @Header("Authorization") token: String
+    ): Response<List<JustificacaoPendenteResponse>>
+
+    @POST("api/rh/justificacoes/{id}/aprovar")
+    suspend fun aprovarJustificacao(
+        @Header("Authorization") token: String,
+        @Path("id") justificacaoId: Long
+    ): Response<Unit>
+
+    @POST("api/rh/justificacoes/{id}/rejeitar")
+    suspend fun rejeitarJustificacao(
+        @Header("Authorization") token: String,
+        @Path("id") justificacaoId: Long
     ): Response<Unit>
 
     // Dispositivos — cadastro real dos leitores biométricos (hardware/handlers/devices.go)

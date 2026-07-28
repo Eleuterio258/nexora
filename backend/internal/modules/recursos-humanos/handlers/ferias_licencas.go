@@ -195,6 +195,9 @@ func (h *Handler) ListarSaldosAusenciaFuncionario(w http.ResponseWriter, r *http
 func (h *Handler) DefinirSaldoAusencia(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 
 	var body struct {
 		TipoAusenciaID int64    `json:"tipo_ausencia_id"`

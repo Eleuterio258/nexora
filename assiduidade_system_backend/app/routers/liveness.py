@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.biometric_metrics import biometric_metrics
 from app.config import settings
 from app.database import get_db
-from app.deps import ActorContext, apply_tenant, get_actor
+from app.deps import ActorContext, apply_tenant, get_actor, require_self_or_manager
 from app.limiter import limiter
 from app.models import FaceTemplate
 from app.schemas.common import SourceType, TemplateStatus
@@ -47,6 +47,7 @@ def request_liveness_challenge(
 ) -> dict:
     """Gera um desafio de prova de vida para o utilizador (válido 45s)."""
     erp_user_id = str(payload.user_id)
+    require_self_or_manager(actor, erp_user_id)
     challenge = create_challenge(erp_user_id)
     return {
         "challenge_id": challenge.challenge_id,
@@ -68,6 +69,7 @@ async def verify_liveness_challenge(
     await validar_metodo_assiduidade(SourceType.SELFIE_GPS)
 
     erp_user_id = str(payload.user_id)
+    require_self_or_manager(actor, erp_user_id)
 
     challenge = get_challenge(payload.challenge_id)
     if challenge is None or challenge.user_id != erp_user_id:

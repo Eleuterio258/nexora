@@ -128,6 +128,22 @@ func (h *Handler) CriarEnvio(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "numero e delivery_address sao obrigatorios", 400)
 		return
 	}
+	if b.CustomerID != nil && !h.existeNoTenant(r.Context(), "clientes.customers", "id", *b.CustomerID, u.TenantID) {
+		jsonErr(w, "Cliente invalido", http.StatusUnprocessableEntity)
+		return
+	}
+	if b.RouteID != nil && !h.existeNoTenant(r.Context(), "logistica.logistics_routes", "id", *b.RouteID, u.TenantID) {
+		jsonErr(w, "Rota invalida", http.StatusUnprocessableEntity)
+		return
+	}
+	if b.DriverID != nil && !h.existeNoTenant(r.Context(), "logistica.logistics_drivers", "id", *b.DriverID, u.TenantID) {
+		jsonErr(w, "Motorista invalido", http.StatusUnprocessableEntity)
+		return
+	}
+	if b.VehicleID != nil && !h.existeNoTenant(r.Context(), "logistica.logistics_vehicles", "id", *b.VehicleID, u.TenantID) {
+		jsonErr(w, "Viatura invalida", http.StatusUnprocessableEntity)
+		return
+	}
 	status := "planeada"
 	if b.Status != nil && *b.Status != "" {
 		status = *b.Status

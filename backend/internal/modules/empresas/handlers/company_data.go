@@ -7,14 +7,30 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	mw "nexora/internal/middleware"
 	"nexora/internal/shared/pessoas"
 )
+
+func (h *Handler) requerEmpresaDoTenant(w http.ResponseWriter, r *http.Request, companyID string) bool {
+	caller := mw.GetUser(r)
+	if caller.Tipo == "superadmin" {
+		return true
+	}
+	if _, ok := h.empresaDoTenant(r.Context(), companyID, caller.TenantID); !ok {
+		jsonErr(w, "Empresa não encontrada", http.StatusNotFound)
+		return false
+	}
+	return true
+}
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 func (h *Handler) ListarCompanySettings(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	rows, err := h.db.Query(r.Context(), `SELECT id, chave, valor, updated_at FROM company_settings WHERE company_id = $1 ORDER BY chave`, id)
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
+	rows, err := h.db.Query(r.Context(), `SELECT id, chave, valor, updated_at FROM empresas.company_settings WHERE company_id = $1 ORDER BY chave`, id)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -38,6 +54,9 @@ func (h *Handler) ListarCompanySettings(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handler) GuardarCompanySetting(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	var body struct {
 		Chave string  `json:"chave"`
 		Valor *string `json:"valor"`
@@ -47,7 +66,7 @@ func (h *Handler) GuardarCompanySetting(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	h.db.Exec(r.Context(), `
-		INSERT INTO company_settings (company_id, chave, valor)
+		INSERT INTO empresas.company_settings (company_id, chave, valor)
 		VALUES ($1, $2, $3)
 		ON CONFLICT (company_id, chave) DO UPDATE SET valor = $3, updated_at = NOW()`,
 		id, body.Chave, body.Valor)
@@ -58,6 +77,9 @@ func (h *Handler) GuardarCompanySetting(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handler) ObterTaxInfo(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	var t struct {
 		ID              int64      `json:"id"`
 		Nuit            string     `json:"nuit"`
@@ -69,7 +91,7 @@ func (h *Handler) ObterTaxInfo(w http.ResponseWriter, r *http.Request) {
 	}
 	err := h.db.QueryRow(r.Context(), `
 		SELECT id, nuit, regime_iva, taxa_iva_padrao, inicio_atividade, reparticao_fiscal, updated_at
-		  FROM company_tax_info WHERE company_id = $1`, id).
+		  FROM empresas.company_tax_info WHERE company_id = $1`, id).
 		Scan(&t.ID, &t.Nuit, &t.RegimeIva, &t.TaxaIvaPadrao, &t.InicioAtividade, &t.ReparticaoFiscal, &t.UpdatedAt)
 	if err != nil {
 		jsonErr(w, "Informação fiscal não encontrada", http.StatusNotFound)
@@ -80,6 +102,9 @@ func (h *Handler) ObterTaxInfo(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GuardarTaxInfo(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	var body struct {
 		Nuit             string   `json:"nuit"`
 		RegimeIva        *string  `json:"regime_iva"`
@@ -92,7 +117,7 @@ func (h *Handler) GuardarTaxInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, err := h.db.Exec(r.Context(), `
-		INSERT INTO company_tax_info (company_id, nuit, regime_iva, taxa_iva_padrao, inicio_atividade, reparticao_fiscal)
+		INSERT INTO empresas.company_tax_info (company_id, nuit, regime_iva, taxa_iva_padrao, inicio_atividade, reparticao_fiscal)
 		VALUES ($1, $2, $3, COALESCE($4, 17.00), $5::date, $6)
 		ON CONFLICT (company_id) DO UPDATE SET
 		  nuit = $2, regime_iva = $3,
@@ -112,9 +137,12 @@ func (h *Handler) GuardarTaxInfo(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListarBancos(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	rows, err := h.db.Query(r.Context(), `
 		SELECT id, banco, numero_conta, nib, iban, swift, moeda, principal, created_at
-		  FROM company_banks WHERE company_id = $1 ORDER BY principal DESC`, id)
+		  FROM empresas.company_banks WHERE company_id = $1 ORDER BY principal DESC`, id)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -143,6 +171,9 @@ func (h *Handler) ListarBancos(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) AdicionarBanco(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	var body struct {
 		Banco       string  `json:"banco"`
 		NumeroConta string  `json:"numero_conta"`
@@ -158,7 +189,7 @@ func (h *Handler) AdicionarBanco(w http.ResponseWriter, r *http.Request) {
 	}
 	var bid int64
 	h.db.QueryRow(r.Context(), `
-		INSERT INTO company_banks (company_id, banco, numero_conta, nib, iban, swift, moeda, principal)
+		INSERT INTO empresas.company_banks (company_id, banco, numero_conta, nib, iban, swift, moeda, principal)
 		VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,'MZN'),COALESCE($8,FALSE)) RETURNING id`,
 		id, body.Banco, body.NumeroConta, body.Nib, body.Iban, body.Swift, body.Moeda, body.Principal).Scan(&bid)
 	jsonOK(w, map[string]any{"id": bid}, http.StatusCreated)
@@ -168,8 +199,11 @@ func (h *Handler) AdicionarBanco(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListarContactos(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	rows, _ := h.db.Query(r.Context(), `
-		SELECT id, tipo, nome, telefone, email, principal FROM company_contacts WHERE company_id = $1`, id)
+		SELECT id, tipo, nome, telefone, email, principal FROM empresas.company_contacts WHERE company_id = $1`, id)
 	defer rows.Close()
 	type Row struct {
 		ID        int64   `json:"id"`
@@ -191,6 +225,9 @@ func (h *Handler) ListarContactos(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) AdicionarContacto(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	var body struct {
 		Tipo      *string `json:"tipo"`
 		Nome      *string `json:"nome"`
@@ -209,7 +246,7 @@ func (h *Handler) AdicionarContacto(w http.ResponseWriter, r *http.Request) {
 
 	var cid int64
 	h.db.QueryRow(r.Context(), `
-		INSERT INTO company_contacts (company_id, tipo, nome, telefone, email, principal, pessoa_id)
+		INSERT INTO empresas.company_contacts (company_id, tipo, nome, telefone, email, principal, pessoa_id)
 		VALUES ($1, COALESCE($2,'geral'), $3, $4, $5, COALESCE($6,FALSE), $7) RETURNING id`,
 		id, body.Tipo, body.Nome, body.Telefone, body.Email, body.Principal, pessoaID).Scan(&cid)
 	jsonOK(w, map[string]any{"id": cid}, http.StatusCreated)
@@ -219,8 +256,11 @@ func (h *Handler) AdicionarContacto(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListarEnderecos(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	rows, _ := h.db.Query(r.Context(), `
-		SELECT id, tipo, endereco, cidade, provincia, pais, codigo_postal FROM company_addresses WHERE company_id = $1`, id)
+		SELECT id, tipo, endereco, cidade, provincia, pais, codigo_postal FROM empresas.company_addresses WHERE company_id = $1`, id)
 	defer rows.Close()
 	type Row struct {
 		ID           int64   `json:"id"`
@@ -243,6 +283,9 @@ func (h *Handler) ListarEnderecos(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) AdicionarEndereco(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	var body struct {
 		Tipo         *string `json:"tipo"`
 		Endereco     string  `json:"endereco"`
@@ -256,7 +299,7 @@ func (h *Handler) AdicionarEndereco(w http.ResponseWriter, r *http.Request) {
 	}
 	var eid int64
 	h.db.QueryRow(r.Context(), `
-		INSERT INTO company_addresses (company_id, tipo, endereco, cidade, provincia, codigo_postal)
+		INSERT INTO empresas.company_addresses (company_id, tipo, endereco, cidade, provincia, codigo_postal)
 		VALUES ($1, COALESCE($2,'principal'), $3, $4, $5, $6) RETURNING id`,
 		id, body.Tipo, body.Endereco, body.Cidade, body.Provincia, body.CodigoPostal).Scan(&eid)
 	jsonOK(w, map[string]any{"id": eid}, http.StatusCreated)
@@ -266,9 +309,12 @@ func (h *Handler) AdicionarEndereco(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListarLicencas(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT id, plano, limite_usuarios, limite_filiais, inicia_em, expira_em, status
-		  FROM company_licenses WHERE company_id = $1 ORDER BY inicia_em DESC`, id)
+		  FROM empresas.company_licenses WHERE company_id = $1 ORDER BY inicia_em DESC`, id)
 	defer rows.Close()
 	type Row struct {
 		ID             int64      `json:"id"`
@@ -291,6 +337,9 @@ func (h *Handler) ListarLicencas(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) AdicionarLicenca(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	var body struct {
 		Plano          string  `json:"plano"`
 		LimiteUsuarios *int    `json:"limite_usuarios"`
@@ -304,7 +353,7 @@ func (h *Handler) AdicionarLicenca(w http.ResponseWriter, r *http.Request) {
 	}
 	var lid int64
 	h.db.QueryRow(r.Context(), `
-		INSERT INTO company_licenses (company_id, plano, limite_usuarios, limite_filiais, inicia_em, expira_em)
+		INSERT INTO empresas.company_licenses (company_id, plano, limite_usuarios, limite_filiais, inicia_em, expira_em)
 		VALUES ($1, $2, $3, $4, $5::date, $6::date) RETURNING id`,
 		id, body.Plano, body.LimiteUsuarios, body.LimiteFiliais, body.IniciaEm, body.ExpiraEm).Scan(&lid)
 	jsonOK(w, map[string]any{"id": lid}, http.StatusCreated)
@@ -314,8 +363,11 @@ func (h *Handler) AdicionarLicenca(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListarCompanyUsers(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	rows, _ := h.db.Query(r.Context(), `
-		SELECT id, user_id, branch_id, perfil_empresa, ativo FROM company_users WHERE company_id = $1`, id)
+		SELECT id, user_id, branch_id, perfil_empresa, ativo FROM empresas.company_users WHERE company_id = $1`, id)
 	defer rows.Close()
 	type Row struct {
 		ID             int64   `json:"id"`
@@ -336,6 +388,9 @@ func (h *Handler) ListarCompanyUsers(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) AdicionarCompanyUser(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, id) {
+		return
+	}
 	var body struct {
 		UserID        int64   `json:"user_id"`
 		BranchID      *int64  `json:"branch_id"`
@@ -347,7 +402,7 @@ func (h *Handler) AdicionarCompanyUser(w http.ResponseWriter, r *http.Request) {
 	}
 	var uid int64
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO company_users (company_id, user_id, branch_id, perfil_empresa)
+		INSERT INTO empresas.company_users (company_id, user_id, branch_id, perfil_empresa)
 		VALUES ($1, $2, $3, $4) RETURNING id`,
 		id, body.UserID, body.BranchID, body.PerfilEmpresa).Scan(&uid)
 	if err != nil {
@@ -363,8 +418,11 @@ func (h *Handler) AdicionarCompanyUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) RemoverCompanyUser(w http.ResponseWriter, r *http.Request) {
 	companyID := chi.URLParam(r, "id")
+	if !h.requerEmpresaDoTenant(w, r, companyID) {
+		return
+	}
 	userID := chi.URLParam(r, "userId")
-	tag, _ := h.db.Exec(r.Context(), `DELETE FROM company_users WHERE company_id = $1 AND user_id = $2`, companyID, userID)
+	tag, _ := h.db.Exec(r.Context(), `DELETE FROM empresas.company_users WHERE company_id = $1 AND user_id = $2`, companyID, userID)
 	if tag.RowsAffected() == 0 {
 		jsonErr(w, "Utilizador não encontrado nesta empresa", http.StatusNotFound)
 		return

@@ -12,22 +12,17 @@ import (
 	mw "nexora/internal/middleware"
 )
 
-// professorID resolve o teacher_id a partir do user_id do JWT.
+// professorID devolve a identidade de professor já resolvida e validada por
+// mw.RequireProfessorAuth (montado no router antes destes handlers) — deixa
+// de repetir aqui a verificação de escopo/lookup, que agora é imposta ao
+// nível do grupo de rotas, não por disciplina de cada handler.
 func (h *Handler) professorID(w http.ResponseWriter, r *http.Request) (teacherID, tenantID int64, ok bool) {
-	u := mw.GetUser(r)
-	if u == nil || u.Escopo != "portal_professor" {
+	u := mw.GetProfessorUser(r)
+	if u == nil {
 		jsonErr(w, "Acesso reservado a professores", http.StatusForbidden)
 		return 0, 0, false
 	}
-	err := h.db.QueryRow(r.Context(), `
-		SELECT id, tenant_id FROM gestao_escolar.school_teachers
-		 WHERE user_id = $1 LIMIT 1`, u.ID).
-		Scan(&teacherID, &tenantID)
-	if err != nil {
-		jsonErr(w, "Professor não encontrado", http.StatusNotFound)
-		return 0, 0, false
-	}
-	return teacherID, tenantID, true
+	return u.ID, u.TenantID, true
 }
 
 // professorEDirectorTurma confirma que teacherID é o professor director
@@ -39,6 +34,24 @@ func (h *Handler) professorEDirectorTurma(r *http.Request, teacherID, classID, t
 	_ = h.db.QueryRow(r.Context(), `
 		SELECT EXISTS(SELECT 1 FROM gestao_escolar.school_classes
 		 WHERE id=$1 AND tenant_id=$2 AND director_teacher_id=$3)`,
+		classID, tenantID, teacherID,
+	).Scan(&ok)
+	return ok
+}
+
+// professorAtribuidoTurma confirma que teacherID está atribuído (activo) à
+// turma classID, quer como professor director, quer como professor de
+// disciplina.
+func (h *Handler) professorAtribuidoTurma(r *http.Request, teacherID, classID, tenantID int64) bool {
+	var ok bool
+	_ = h.db.QueryRow(r.Context(), `
+		SELECT EXISTS(
+			SELECT 1 FROM gestao_escolar.school_classes
+			 WHERE id=$1 AND tenant_id=$2 AND director_teacher_id=$3
+			UNION
+			SELECT 1 FROM gestao_escolar.school_teacher_assignments
+			 WHERE class_id=$1 AND tenant_id=$2 AND teacher_id=$3 AND activo=true
+		)`,
 		classID, tenantID, teacherID,
 	).Scan(&ok)
 	return ok
@@ -262,6 +275,10 @@ func (h *Handler) ProfessorPortalTurma(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "ID inválido", http.StatusBadRequest)
 		return
 	}
+	if !h.professorAtribuidoTurma(r, tid, classID, tenID) {
+		jsonErr(w, "Não está atribuído a esta turma", http.StatusForbidden)
+		return
+	}
 	var result map[string]any
 	err = h.db.QueryRow(r.Context(), `
 		SELECT jsonb_build_object(
@@ -293,13 +310,17 @@ func (h *Handler) ProfessorPortalTurma(w http.ResponseWriter, r *http.Request) {
 // ── GET /api/portal/professor/me/turmas/{id}/alunos ──────────────────────────
 
 func (h *Handler) ProfessorPortalTurmaAlunos(w http.ResponseWriter, r *http.Request) {
-	_, tenID, ok := h.professorID(w, r)
+	tid, tenID, ok := h.professorID(w, r)
 	if !ok {
 		return
 	}
 	classID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		jsonErr(w, "ID inválido", http.StatusBadRequest)
+		return
+	}
+	if !h.professorAtribuidoTurma(r, tid, classID, tenID) {
+		jsonErr(w, "Não está atribuído a esta turma", http.StatusForbidden)
 		return
 	}
 	var result any
@@ -616,8 +637,8 @@ func (h *Handler) ProfessorPortalLogout(w http.ResponseWriter, r *http.Request) 
 // ── POST /api/portal/professor/alterar-senha ─────────────────────────────────
 
 func (h *Handler) ProfessorPortalAlterarSenha(w http.ResponseWriter, r *http.Request) {
-	u := mw.GetUser(r)
-	if u == nil || u.Escopo != "portal_professor" {
+	u := mw.GetProfessorUser(r)
+	if u == nil {
 		jsonErr(w, "Acesso negado", http.StatusForbidden)
 		return
 	}
@@ -630,7 +651,7 @@ func (h *Handler) ProfessorPortalAlterarSenha(w http.ResponseWriter, r *http.Req
 		return
 	}
 	var currentHash string
-	if err := h.db.QueryRow(r.Context(), `SELECT password_hash FROM auth.users WHERE id=$1`, u.ID).Scan(&currentHash); err != nil {
+	if err := h.db.QueryRow(r.Context(), `SELECT password_hash FROM auth.users WHERE id=$1`, u.UserID).Scan(&currentHash); err != nil {
 		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
 		return
 	}
@@ -639,6 +660,6 @@ func (h *Handler) ProfessorPortalAlterarSenha(w http.ResponseWriter, r *http.Req
 		return
 	}
 	newHash, _ := bcrypt.GenerateFromPassword([]byte(body.NovaSenha), 12)
-	h.db.Exec(r.Context(), `UPDATE auth.users SET password_hash=$1, updated_at=NOW() WHERE id=$2`, string(newHash), u.ID)
+	h.db.Exec(r.Context(), `UPDATE auth.users SET password_hash=$1, updated_at=NOW() WHERE id=$2`, string(newHash), u.UserID)
 	jsonOK(w, map[string]any{"ok": true}, http.StatusOK)
 }

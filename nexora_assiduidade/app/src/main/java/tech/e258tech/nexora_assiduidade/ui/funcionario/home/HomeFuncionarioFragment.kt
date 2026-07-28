@@ -10,12 +10,19 @@ import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.local.AppDatabase
 import tech.e258tech.nexora_assiduidade.data.local.PendingEventEntity
+import tech.e258tech.nexora_assiduidade.data.model.AgendaItem
+import tech.e258tech.nexora_assiduidade.data.model.MarcarLidaRequest
+import tech.e258tech.nexora_assiduidade.data.model.response.ComunicadoHome
+import tech.e258tech.nexora_assiduidade.data.model.response.NotificacaoHome
+import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.ui.auth.LoginActivity
 import tech.e258tech.nexora_assiduidade.ui.funcionario.agenda.AgendaFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.agenda.AgendaItemDetailFragment
@@ -26,16 +33,65 @@ import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.NfcAttendanceF
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.PinAttendanceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.QrCodeAttendanceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.SelfieGpsAttendanceFragment
+import tech.e258tech.nexora_assiduidade.utils.ApiUtils
+import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import kotlinx.coroutines.CancellationException
 
 /**
  * Tela Home do Funcionário
- * Exibe as 7 opções de registro de presença e o indicador de eventos pendentes.
+ * Exibe as opções de registro de presença, o resumo pessoal (saldo de
+ * férias/assiduidade/pedidos pendentes/notificações/comunicados/
+ * aniversários — GET /api/self-service/home) e a agenda da semana
+ * (GET /api/utilizadores/{userId}/agenda).
  */
 class HomeFuncionarioFragment : Fragment() {
 
     private lateinit var sessionManager: SessionManager
     private lateinit var tvPendingSync: TextView
+
+    // Cards de método, guardados como campos (não só locais no
+    // onViewCreated) para poderem ser escondidos/mostrados de forma
+    // assíncrona por aplicarMetodosActivos(), depois de a config do tenant
+    // chegar do ERP.
+    private lateinit var cardManual: CardView
+    private lateinit var cardQrCode: CardView
+    private lateinit var cardFacial: CardView
+    private lateinit var cardSelfieGps: CardView
+    private lateinit var cardPin: CardView
+    private lateinit var cardNfc: CardView
+    private lateinit var cardFingerprint: CardView
+
+    // Resumo pessoal (GET /api/self-service/home)
+    private lateinit var tvSaldoFeriasDias: TextView
+    private lateinit var tvSaldoFeriasTotal: TextView
+    private lateinit var tvDiasTrabalhados: TextView
+    private lateinit var tvHorasTrabalhadas: TextView
+    private lateinit var tvAtrasos: TextView
+    private lateinit var tvFaltas: TextView
+    private lateinit var cardPedidosPendentes: View
+    private lateinit var tvPedidosPendentesCount: TextView
+    private lateinit var itemNotificacaoRecente: View
+    private lateinit var tvNotificacaoTitulo: TextView
+    private lateinit var tvNotificacaoCorpo: TextView
+    private lateinit var tvNotificacaoData: TextView
+    private lateinit var itemComunicadoRecente: View
+    private lateinit var tvComunicadoTitulo: TextView
+    private lateinit var tvComunicadoNovo: TextView
+    private lateinit var tvComunicadoData: TextView
+    private lateinit var tvAniversarioNome: TextView
+    private lateinit var tvAniversarioSub: TextView
+
+    private var notificacaoActual: NotificacaoHome? = null
+    private var comunicadoActual: ComunicadoHome? = null
+
+    // Agenda da semana (GET /api/utilizadores/{userId}/agenda)
+    private lateinit var tvDiasSemana: List<TextView>
+    private lateinit var recyclerViewEventosHome: RecyclerView
+    private lateinit var tvEventosVazio: TextView
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -62,57 +118,57 @@ class HomeFuncionarioFragment : Fragment() {
             "Olá, ${sessionManager.getUserName() ?: "Funcionário"}!"
 
         // Configurar cliques nos cards de método
-        view.findViewById<CardView>(R.id.cardManual).setOnClickListener {
-            openFragment(ManualAttendanceFragment())
-        }
+        cardManual = view.findViewById(R.id.cardManual)
+        cardQrCode = view.findViewById(R.id.cardQrCode)
+        cardFacial = view.findViewById(R.id.cardFacial)
+        cardSelfieGps = view.findViewById(R.id.cardSelfieGps)
+        cardPin = view.findViewById(R.id.cardPin)
+        cardNfc = view.findViewById(R.id.cardNfc)
+        cardFingerprint = view.findViewById(R.id.cardFingerprint)
 
-        view.findViewById<CardView>(R.id.cardQrCode).setOnClickListener {
-            openFragment(QrCodeAttendanceFragment())
-        }
+        cardManual.setOnClickListener { openFragment(ManualAttendanceFragment()) }
+        cardQrCode.setOnClickListener { openFragment(QrCodeAttendanceFragment()) }
+        cardFacial.setOnClickListener { openFragment(FacialAttendanceFragment()) }
+        cardSelfieGps.setOnClickListener { openFragment(SelfieGpsAttendanceFragment()) }
+        cardPin.setOnClickListener { openFragment(PinAttendanceFragment()) }
+        cardNfc.setOnClickListener { openFragment(NfcAttendanceFragment()) }
+        cardFingerprint.setOnClickListener { openFragment(FingerprintAttendanceFragment()) }
 
-        view.findViewById<CardView>(R.id.cardFacial).setOnClickListener {
-            openFragment(FacialAttendanceFragment())
-        }
+        // Resumo pessoal
+        tvSaldoFeriasDias = view.findViewById(R.id.tvSaldoFeriasDias)
+        tvSaldoFeriasTotal = view.findViewById(R.id.tvSaldoFeriasTotal)
+        tvDiasTrabalhados = view.findViewById(R.id.tvDiasTrabalhados)
+        tvHorasTrabalhadas = view.findViewById(R.id.tvHorasTrabalhadas)
+        tvAtrasos = view.findViewById(R.id.tvAtrasos)
+        tvFaltas = view.findViewById(R.id.tvFaltas)
+        cardPedidosPendentes = view.findViewById(R.id.cardPedidosPendentes)
+        tvPedidosPendentesCount = view.findViewById(R.id.tvPedidosPendentesCount)
+        itemNotificacaoRecente = view.findViewById(R.id.itemNotificacaoRecente)
+        tvNotificacaoTitulo = view.findViewById(R.id.tvNotificacaoTitulo)
+        tvNotificacaoCorpo = view.findViewById(R.id.tvNotificacaoCorpo)
+        tvNotificacaoData = view.findViewById(R.id.tvNotificacaoData)
+        itemComunicadoRecente = view.findViewById(R.id.itemComunicadoRecente)
+        tvComunicadoTitulo = view.findViewById(R.id.tvComunicadoTitulo)
+        tvComunicadoNovo = view.findViewById(R.id.tvComunicadoNovo)
+        tvComunicadoData = view.findViewById(R.id.tvComunicadoData)
+        tvAniversarioNome = view.findViewById(R.id.tvAniversarioNome)
+        tvAniversarioSub = view.findViewById(R.id.tvAniversarioSub)
 
-        view.findViewById<CardView>(R.id.cardSelfieGps).setOnClickListener {
-            openFragment(SelfieGpsAttendanceFragment())
-        }
+        itemNotificacaoRecente.setOnClickListener { marcarNotificacaoLidaClicada() }
+        itemComunicadoRecente.setOnClickListener { marcarComunicadoLidoClicado() }
 
-        view.findViewById<CardView>(R.id.cardPin).setOnClickListener {
-            openFragment(PinAttendanceFragment())
-        }
+        // Agenda da semana
+        tvDiasSemana = listOf(
+            R.id.tvDiaSemana1, R.id.tvDiaSemana2, R.id.tvDiaSemana3, R.id.tvDiaSemana4,
+            R.id.tvDiaSemana5, R.id.tvDiaSemana6, R.id.tvDiaSemana7
+        ).map { view.findViewById(it) }
 
-        view.findViewById<CardView>(R.id.cardNfc).setOnClickListener {
-            openFragment(NfcAttendanceFragment())
-        }
+        recyclerViewEventosHome = view.findViewById(R.id.recyclerViewEventosHome)
+        recyclerViewEventosHome.layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+        tvEventosVazio = view.findViewById(R.id.tvEventosVazio)
 
-        view.findViewById<CardView>(R.id.cardFingerprint).setOnClickListener {
-            openFragment(FingerprintAttendanceFragment())
-        }
-
-        // Eventos
         view.findViewById<TextView>(R.id.tvVerTodosEventos).setOnClickListener {
             openFragment(AgendaFragment())
-        }
-
-        view.findViewById<CardView>(R.id.itemEventoReuniao).setOnClickListener {
-            openFragment(
-                AgendaItemDetailFragment.newInstance(
-                    title = "Reunião de Equipa",
-                    description = "Alinhamento de objetivos e atualização de projetos.",
-                    duration = "Hoje, 10:00 - 11:30"
-                )
-            )
-        }
-
-        view.findViewById<CardView>(R.id.itemEventoWorkshop).setOnClickListener {
-            openFragment(
-                AgendaItemDetailFragment.newInstance(
-                    title = "Workshop de Formação",
-                    description = "Formação sobre novas ferramentas e processos.",
-                    duration = "Hoje, 14:00 - 16:00"
-                )
-            )
         }
 
         loadPendingEventsCount()
@@ -121,6 +177,271 @@ class HomeFuncionarioFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         loadPendingEventsCount()
+        aplicarMetodosActivos()
+        loadHomeData()
+        loadAgendaSemana()
+    }
+
+    /**
+     * Esconde os cards de métodos que o gestor desactivou em
+     * "Configuração de Assiduidade" (rh.assiduidade, GET
+     * /api/self-service/assiduidade/metodos) — antes disto, os 7 métodos
+     * apareciam sempre, independentemente da configuração do tenant.
+     *
+     * Falha aberta: se o pedido falhar (rede/sessão), os cards ficam como
+     * estão (visíveis por omissão no XML) em vez de esconder tudo — mesmo
+     * comportamento de fail-open já usado no resto da integração
+     * FaceClock/ERP (validar_metodo_assiduidade, metodoFacialAtivo).
+     */
+    private fun aplicarMetodosActivos() {
+        val token = sessionManager.getToken() ?: return
+        lifecycleScope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.erpApiService.getMetodosAssiduidade(ApiUtils.bearerToken(token))
+                }
+                if (!isAdded) return@launch
+                val body = response.body()
+                if (!response.isSuccessful || body == null) return@launch
+
+                val metodos = body.configuracao?.metodos.orEmpty()
+                fun ativo(chave: String) = metodos[chave]?.ativo ?: true
+
+                cardManual.visibility = if (ativo("manual")) View.VISIBLE else View.GONE
+                cardQrCode.visibility = if (ativo("qr_code")) View.VISIBLE else View.GONE
+                cardFacial.visibility = if (ativo("facial")) View.VISIBLE else View.GONE
+                cardSelfieGps.visibility = if (ativo("selfie")) View.VISIBLE else View.GONE
+                cardPin.visibility = if (ativo("pin")) View.VISIBLE else View.GONE
+                cardNfc.visibility = if (ativo("nfc")) View.VISIBLE else View.GONE
+                cardFingerprint.visibility = if (ativo("fingerprint")) View.VISIBLE else View.GONE
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Falha de rede: mantém os cards como estavam (fail-open).
+            }
+        }
+    }
+
+    /**
+     * Carrega o agregado do ecrã inicial (saldo de férias, assiduidade do
+     * mês, pedidos pendentes, notificações/comunicados por ler e
+     * aniversariantes da semana) — GET /api/self-service/home.
+     */
+    private fun loadHomeData() {
+        val token = sessionManager.getToken() ?: return
+        lifecycleScope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.erpApiService.getHome(ApiUtils.bearerToken(token))
+                }
+                if (!isAdded) return@launch
+                val body = response.body()
+                if (!response.isSuccessful || body == null) return@launch
+
+                tvSaldoFeriasDias.text = formatDias(body.saldo_ferias.dias_disponiveis)
+                tvSaldoFeriasTotal.text = "de ${formatDias(body.saldo_ferias.dias_atribuidos)} dias atribuídos"
+
+                tvDiasTrabalhados.text = "${body.assiduidade_mes.dias_trabalhados} dias trabalhados"
+                tvHorasTrabalhadas.text = "${formatDias(body.assiduidade_mes.horas_totais)} horas"
+
+                tvAtrasos.text = "${body.assiduidade_mes.atrasos} atraso(s)"
+                tvAtrasos.visibility = if (body.assiduidade_mes.atrasos > 0) View.VISIBLE else View.GONE
+
+                tvFaltas.text = "${body.assiduidade_mes.faltas} falta(s)"
+                tvFaltas.visibility = if (body.assiduidade_mes.faltas > 0) View.VISIBLE else View.GONE
+
+                cardPedidosPendentes.visibility = if (body.pedidos_pendentes > 0) View.VISIBLE else View.GONE
+                tvPedidosPendentesCount.text = "${body.pedidos_pendentes}"
+
+                val notificacao = body.notificacoes.firstOrNull()
+                notificacaoActual = notificacao
+                if (notificacao == null) {
+                    tvNotificacaoTitulo.text = "Sem notificações novas"
+                    tvNotificacaoCorpo.visibility = View.GONE
+                    tvNotificacaoData.visibility = View.GONE
+                } else {
+                    tvNotificacaoTitulo.text = notificacao.titulo
+                    tvNotificacaoCorpo.visibility = View.VISIBLE
+                    tvNotificacaoCorpo.text = notificacao.corpo ?: ""
+                    tvNotificacaoData.visibility = View.VISIBLE
+                    tvNotificacaoData.text = formatShortDate(notificacao.created_at)
+                }
+
+                val comunicado = body.comunicados.firstOrNull()
+                comunicadoActual = comunicado
+                if (comunicado == null) {
+                    tvComunicadoTitulo.text = "Sem comunicados recentes"
+                    tvComunicadoNovo.visibility = View.GONE
+                    tvComunicadoData.visibility = View.GONE
+                } else {
+                    tvComunicadoTitulo.text = comunicado.titulo
+                    tvComunicadoNovo.visibility = if (comunicado.lido) View.GONE else View.VISIBLE
+                    tvComunicadoData.visibility = View.VISIBLE
+                    tvComunicadoData.text = formatShortDate(comunicado.created_at)
+                }
+
+                val aniversario = body.aniversarios.firstOrNull()
+                if (aniversario == null) {
+                    tvAniversarioNome.text = "Sem aniversários esta semana"
+                    tvAniversarioSub.visibility = View.GONE
+                } else {
+                    val dia = aniversario.dia.toString().padStart(2, '0')
+                    val mes = aniversario.mes.toString().padStart(2, '0')
+                    tvAniversarioNome.text = "${aniversario.nome} ($dia/$mes)"
+                    tvAniversarioSub.visibility = View.VISIBLE
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Falha de rede: mantém o resumo pessoal como estava (última carga bem-sucedida).
+            }
+        }
+    }
+
+    private fun marcarNotificacaoLidaClicada() {
+        val notificacao = notificacaoActual ?: return
+        val token = sessionManager.getToken() ?: return
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    RetrofitClient.erpApiService.marcarNotificacaoLida(
+                        ApiUtils.bearerToken(token),
+                        MarcarLidaRequest(notificacao.id)
+                    )
+                }
+                if (!isAdded) return@launch
+                loadHomeData()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Sem feedback bloqueante — o utilizador pode tentar novamente.
+            }
+        }
+    }
+
+    private fun marcarComunicadoLidoClicado() {
+        val comunicado = comunicadoActual ?: return
+        val token = sessionManager.getToken() ?: return
+        lifecycleScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    RetrofitClient.erpApiService.marcarComunicadoLido(
+                        ApiUtils.bearerToken(token),
+                        MarcarLidaRequest(comunicado.id)
+                    )
+                }
+                if (!isAdded) return@launch
+                loadHomeData()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Sem feedback bloqueante — o utilizador pode tentar novamente.
+            }
+        }
+    }
+
+    /**
+     * Carrega a semana corrente (segunda a domingo) e os eventos dessa
+     * janela — GET /api/utilizadores/{userId}/agenda?desde=&ate=, mesmo
+     * endpoint já usado pelo ecrã "Ver todos" (AgendaFragment). A faixa de
+     * eventos é um RecyclerView horizontal (não fica limitada a 2 itens
+     * fixos) — cada cartão é clicável e abre o detalhe real do evento.
+     */
+    private fun loadAgendaSemana() {
+        val token = sessionManager.getToken() ?: return
+        val userId = sessionManager.getUserId() ?: return
+
+        val segunda = DateTimeUtils.startOfWeek()
+        val hoje = Calendar.getInstance()
+        val diasSemana = (0..6).map { offset ->
+            (segunda.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, offset) }
+        }
+        diasSemana.forEachIndexed { index, dia ->
+            val tv = tvDiasSemana[index]
+            tv.text = dia.get(Calendar.DAY_OF_MONTH).toString()
+            val ehHoje = dia.get(Calendar.YEAR) == hoje.get(Calendar.YEAR) &&
+                dia.get(Calendar.DAY_OF_YEAR) == hoje.get(Calendar.DAY_OF_YEAR)
+            if (ehHoje) {
+                tv.setBackgroundResource(R.drawable.day_selected_bg)
+                tv.setTextColor(resources.getColor(R.color.white, null))
+                tv.setTypeface(null, android.graphics.Typeface.BOLD)
+            } else {
+                tv.background = null
+                tv.setTextColor(resources.getColor(R.color.text_primary, null))
+                tv.setTypeface(null, android.graphics.Typeface.NORMAL)
+            }
+        }
+
+        val desde = DateTimeUtils.formatApiDate(segunda)
+        val ate = DateTimeUtils.formatApiDate(diasSemana.last())
+
+        lifecycleScope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.erpApiService.getAgenda(
+                        ApiUtils.bearerToken(token),
+                        userId,
+                        desde,
+                        ate
+                    )
+                }
+                if (!isAdded) return@launch
+                val itens = if (response.isSuccessful) response.body().orEmpty() else emptyList()
+                exibirEventos(itens)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                exibirEventos(emptyList())
+            }
+        }
+    }
+
+    private fun exibirEventos(itens: List<AgendaItem>) {
+        if (itens.isEmpty()) {
+            recyclerViewEventosHome.visibility = View.GONE
+            tvEventosVazio.visibility = View.VISIBLE
+        } else {
+            tvEventosVazio.visibility = View.GONE
+            recyclerViewEventosHome.visibility = View.VISIBLE
+            recyclerViewEventosHome.adapter = EventosHomeAdapter(itens) { item -> abrirDetalheEvento(item) }
+        }
+    }
+
+    private fun abrirDetalheEvento(item: AgendaItem) {
+        val horario = if (item.hora_fim.isNullOrBlank()) {
+            item.hora_inicio
+        } else {
+            "${item.hora_inicio} - ${item.hora_fim}"
+        }
+        openFragment(
+            AgendaItemDetailFragment.newInstance(
+                title = item.titulo,
+                description = item.descricao ?: "Sem descrição",
+                duration = horario
+            )
+        )
+    }
+
+    /** Formata um double sem casas decimais desnecessárias (14.0 -> "14", 14.5 -> "14.5"). */
+    private fun formatDias(valor: Double): String {
+        return if (valor == valor.toLong().toDouble()) {
+            valor.toLong().toString()
+        } else {
+            String.format(Locale.getDefault(), "%.1f", valor)
+        }
+    }
+
+    private val shortDateFormatter = SimpleDateFormat("dd MMM", Locale("pt", "PT"))
+    private val isoParser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+
+    /** Formata um timestamp ISO do ERP ("2026-07-28T10:26:05.65...Z") como "28 Jul". */
+    private fun formatShortDate(iso: String): String {
+        return try {
+            val semFraccao = if (iso.length >= 19) iso.substring(0, 19) else iso
+            isoParser.parse(semFraccao)?.let { shortDateFormatter.format(it) } ?: iso
+        } catch (e: Exception) {
+            iso
+        }
     }
 
     private fun openFragment(fragment: Fragment) {

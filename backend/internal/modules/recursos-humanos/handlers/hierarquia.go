@@ -3,7 +3,9 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	mw "nexora/internal/middleware"
 	"nexora/internal/modules/auth/models"
@@ -47,13 +49,30 @@ func (h *Handler) IsResponsavelHierarquico(ctx context.Context, tenantID, funcio
 
 // podeGerirFuncionario verifica se o utilizador autenticado pode gerir
 // registos (ausências, avaliações, etc.) do funcionário targetFuncionarioID:
-// superadmins têm sempre permissão; os restantes utilizadores apenas se forem
-// o responsável (direto ou hierárquico) da unidade do funcionário.
+//   - superadmins têm sempre permissão;
+//   - utilizadores com a permissão (recursos-humanos, gerir_funcionarios);
+//   - o utilizador que criou o registo do funcionário (rh.funcionarios.criado_por);
+//   - o responsável (direto ou hierárquico) da unidade do funcionário.
 func (h *Handler) podeGerirFuncionario(r *http.Request, targetFuncionarioID int64) bool {
 	user := mw.GetUser(r)
 	if user.Tipo == "superadmin" {
 		return true
 	}
+
+	// Permissão global de gestão de funcionários.
+	access, err := models.LoadUserAccess(r.Context(), h.db, user.ID, user.MembershipID)
+	if err == nil && access.Can("recursos-humanos", "gerir_funcionarios") {
+		return true
+	}
+
+	// Regra de propriedade: quem criou o funcionário pode sempre geri-lo.
+	var criadoPor int64
+	err = h.db.QueryRow(r.Context(), `SELECT criado_por FROM rh.funcionarios WHERE id=$1 AND tenant_id=$2`, targetFuncionarioID, user.TenantID).Scan(&criadoPor)
+	if err == nil && criadoPor == user.ID {
+		return true
+	}
+
+	// Regra hierárquica: responsável direto ou de unidade ancestral.
 	meuFuncionarioID, err := h.GetUserFuncionario(r.Context(), user.TenantID, user.ID)
 	if err != nil || meuFuncionarioID == nil {
 		return false
@@ -78,4 +97,22 @@ func (h *Handler) PodeVerSalarios(r *http.Request) bool {
 		return false
 	}
 	return access.Can("recursos-humanos", "processar_salarios")
+}
+
+// verificarPodeGerirFuncionario valida e converte o URL param {id} do
+// funcionário-alvo e verifica se o utilizador autenticado pode geri-lo.
+// Devolve o ID numérico e true em caso de sucesso; em caso de erro responde
+// automaticamente ao cliente e devolve false.
+func (h *Handler) verificarPodeGerirFuncionario(w http.ResponseWriter, r *http.Request, idParam string) (int64, bool) {
+	idStr := chi.URLParam(r, idParam)
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		jsonErr(w, "ID inválido", http.StatusBadRequest)
+		return 0, false
+	}
+	if !h.podeGerirFuncionario(r, id) {
+		jsonErr(w, "Sem permissão para gerir este funcionário", http.StatusForbidden)
+		return 0, false
+	}
+	return id, true
 }

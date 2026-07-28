@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -87,8 +88,8 @@ func (h *Handler) ResumoAssiduidade(w http.ResponseWriter, r *http.Request) {
 		  COALESCE(SUM(CASE WHEN hora_entrada IS NOT NULL AND hora_saida IS NOT NULL
 		                    THEN EXTRACT(EPOCH FROM (hora_saida::time - hora_entrada::time))/3600
 		                    ELSE COALESCE(horas_extra,0) END),0)                            AS horas,
-		  COUNT(*) FILTER (WHERE tipo='atraso')                                             AS atrasos,
-		  COUNT(*) FILTER (WHERE tipo='falta')                                              AS faltas,
+		  COUNT(*) FILTER (WHERE tipo='atraso' AND NOT justificado)                         AS atrasos,
+		  COUNT(*) FILTER (WHERE tipo='falta' AND NOT justificado)                          AS faltas,
 		  COUNT(*) FILTER (WHERE horas_extra > 0)                                           AS horas_extra
 		FROM rh.presencas
 		WHERE funcionario_id=$1 AND tenant_id=$2
@@ -174,4 +175,38 @@ func (h *Handler) ListarJustificacoes(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	jsonOK(w, data, http.StatusOK)
+}
+
+// GET /api/self-service/assiduidade/metodos
+//
+// Devolve quais métodos de marcação de ponto (facial, fingerprint, qr_code,
+// nfc, selfie, geolocation, pin, manual) estão activos para o tenant do
+// colaborador autenticado, para a app poder esconder no ecrã principal os
+// métodos que o admin desactivou. Ao contrário de
+// GET /api/system/configuracao/tenant/feature/rh.assiduidade (protegido por
+// sistema-configuracao:ver_configuracoes, só para admins), este endpoint só
+// exige assiduidade:ver_assiduidade — a mesma permissão que já protege
+// MinhaAssiduidade/ResumoAssiduidade, que qualquer colaborador tem sobre os
+// seus próprios dados.
+func (h *Handler) ObterMetodosAssiduidade(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	var activo bool
+	var configuracao json.RawMessage
+	err := h.db.QueryRow(r.Context(), `
+		SELECT COALESCE(tf.activo, fc.ativo_por_defeito), COALESCE(tf.configuracao, '{}'::jsonb)
+		  FROM saas.feature_catalog fc
+		  LEFT JOIN sistema_configuracao.tenant_feature_flags tf
+		    ON tf.tenant_id = $1 AND tf.codigo = fc.key
+		 WHERE fc.key = 'rh.assiduidade'`, user.TenantID).
+		Scan(&activo, &configuracao)
+	if err != nil {
+		// Feature não existe no catálogo — fail-open, mesmo comportamento dos
+		// outros consumidores desta config (metodoFacialAtivo, FaceClock).
+		jsonOK(w, map[string]any{"activo": true, "configuracao": map[string]any{}}, http.StatusOK)
+		return
+	}
+	jsonOK(w, map[string]any{
+		"activo":       activo,
+		"configuracao": configuracao,
+	}, http.StatusOK)
 }

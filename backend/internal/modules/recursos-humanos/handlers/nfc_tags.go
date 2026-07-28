@@ -24,6 +24,9 @@ type nfcTagRow struct {
 func (h *Handler) CriarNFCTag(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	funcionarioID := chi.URLParam(r, "id")
+	if _, ok := h.verificarPodeGerirFuncionario(w, r, "id"); !ok {
+		return
+	}
 
 	var body struct {
 		TagUID string `json:"tag_uid"`

@@ -183,6 +183,21 @@ func (h *Handler) CriarOportunidade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if body.LeadID != nil {
+		var exists bool
+		if err := h.db.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM crm.leads WHERE id=$1 AND tenant_id=$2)", *body.LeadID, user.TenantID).Scan(&exists); err != nil || !exists {
+			jsonErr(w, "Lead não encontrado.", http.StatusNotFound)
+			return
+		}
+	}
+	if body.ClienteID != nil {
+		var exists bool
+		if err := h.db.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM clientes.customers WHERE id=$1 AND tenant_id=$2)", *body.ClienteID, user.TenantID).Scan(&exists); err != nil || !exists {
+			jsonErr(w, "Cliente não encontrado.", http.StatusNotFound)
+			return
+		}
+	}
+
 	if body.ResponsavelID != nil && body.Responsavel == nil {
 		body.Responsavel = h.resolveResponsavelNome(r, *body.ResponsavelID)
 	}
@@ -256,6 +271,21 @@ func (h *Handler) ActualizarOportunidade(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		jsonErr(w, "Formato de data de fecho prevista inválido.", http.StatusUnprocessableEntity)
 		return
+	}
+
+	if body.LeadID != nil {
+		var exists bool
+		if err := h.db.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM crm.leads WHERE id=$1 AND tenant_id=$2)", *body.LeadID, user.TenantID).Scan(&exists); err != nil || !exists {
+			jsonErr(w, "Lead não encontrado.", http.StatusNotFound)
+			return
+		}
+	}
+	if body.ClienteID != nil {
+		var exists bool
+		if err := h.db.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM clientes.customers WHERE id=$1 AND tenant_id=$2)", *body.ClienteID, user.TenantID).Scan(&exists); err != nil || !exists {
+			jsonErr(w, "Cliente não encontrado.", http.StatusNotFound)
+			return
+		}
 	}
 
 	if body.ResponsavelID != nil && body.Responsavel == nil {
@@ -343,7 +373,7 @@ func (h *Handler) MoverOportunidade(w http.ResponseWriter, r *http.Request) {
 			data_fecho_real = CASE WHEN $1::varchar IN ('ganho','perdido') THEN CURRENT_DATE ELSE data_fecho_real END,
 			probabilidade = CASE WHEN $1::varchar='ganho' THEN 100 WHEN $1::varchar='perdido' THEN 0 ELSE probabilidade END,
 			updated_at=NOW()
-		WHERE id=$2`, body.Estagio, id); err != nil {
+		WHERE id=$2 AND tenant_id=$3`, body.Estagio, id, user.TenantID); err != nil {
 		jsonErr(w, "Erro ao actualizar.", http.StatusInternalServerError)
 		return
 	}
@@ -403,7 +433,7 @@ func (h *Handler) MarcarPerdida(w http.ResponseWriter, r *http.Request) {
 		UPDATE crm.oportunidades SET
 			estagio='perdido', data_fecho_real=CURRENT_DATE, probabilidade=0,
 			motivo_perda=$1, updated_at=NOW()
-		WHERE id=$2`, nullIfEmpty(motivo), id); err != nil {
+		WHERE id=$2 AND tenant_id=$3`, nullIfEmpty(motivo), id, user.TenantID); err != nil {
 		jsonErr(w, "Erro ao actualizar.", http.StatusInternalServerError)
 		return
 	}

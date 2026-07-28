@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/internal/modules/hardware/models"
 	"nexora/internal/modules/recursos-humanos/service/assiduidade"
@@ -43,28 +44,32 @@ func (p *Processor) Process(ctx context.Context, deviceID, tenantID int64, event
 	raw, _ := json.Marshal(event.RawPayload)
 	eventHash := hashEvent(deviceID, event.EmployeeNo, event.EventTime, raw)
 
-	// Verifica duplicado.
-	var existingID int64
-	_ = p.db.QueryRow(ctx, `
-		SELECT id FROM hardware.device_events
-		 WHERE tenant_id = $1 AND event_hash = $2`,
-		tenantID, eventHash,
-	).Scan(&existingID)
-	if existingID > 0 {
-		return existingID, ProcessResult{Processed: true}, nil
-	}
-
-	// Insere evento bruto.
+	// Insere de forma atómica: ON CONFLICT evita a janela entre "verificar
+	// duplicado" e "inserir" (dois pedidos concorrentes com o mesmo
+	// event_hash — ex.: retry do dispositivo a colidir com o pedido
+	// original — já não fazem a segunda chamada falhar com erro de
+	// constraint UNIQUE; devolve o evento já existente como processado).
 	var eventID int64
+	var inserted bool
 	err := p.db.QueryRow(ctx, `
 		INSERT INTO hardware.device_events
 		  (tenant_id, device_id, event_type, employee_no, event_time, event_hash, raw_payload)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id`,
+		ON CONFLICT (event_hash) DO NOTHING
+		RETURNING id, TRUE`,
 		tenantID, deviceID, event.EventType, event.EmployeeNo,
 		event.EventTime, eventHash, raw,
-	).Scan(&eventID)
+	).Scan(&eventID, &inserted)
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			var existingID int64
+			if scanErr := p.db.QueryRow(ctx, `
+				SELECT id FROM hardware.device_events WHERE event_hash = $1`,
+				eventHash,
+			).Scan(&existingID); scanErr == nil {
+				return existingID, ProcessResult{Processed: true}, nil
+			}
+		}
 		return 0, ProcessResult{ErrorMessage: "erro ao registar evento"}, err
 	}
 

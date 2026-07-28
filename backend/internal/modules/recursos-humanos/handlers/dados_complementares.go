@@ -39,6 +39,10 @@ func (h *Handler) CriarContactoEmergencia(w http.ResponseWriter, r *http.Request
 		jsonErr(w, "Funcionário inválido", http.StatusBadRequest)
 		return
 	}
+	if !h.podeGerirFuncionario(r, body.FuncionarioID) {
+		jsonErr(w, "Sem permissão para gerir este funcionário", http.StatusForbidden)
+		return
+	}
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
 		INSERT INTO rh.contactos_emergencia (tenant_id, funcionario_id, nome, parentesco, telefone, email)
@@ -100,6 +104,10 @@ func (h *Handler) CriarDocumento(w http.ResponseWriter, r *http.Request) {
 	}
 	if !h.funcionarioPertenceTenant(r.Context(), body.FuncionarioID, user.TenantID) {
 		jsonErr(w, "Funcionário inválido", http.StatusBadRequest)
+		return
+	}
+	if !h.podeGerirFuncionario(r, body.FuncionarioID) {
+		jsonErr(w, "Sem permissão para gerir este funcionário", http.StatusForbidden)
 		return
 	}
 	var id int64

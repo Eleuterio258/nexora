@@ -1195,4 +1195,60 @@ final class RecursosHumanosService extends NexoraService
         $this->ensureSuccess($response, 'Erro ao guardar a configuração de RH.');
         return ['ok' => true, 'msg' => 'Configuração guardada com sucesso.'];
     }
+
+    public function enrollFacial(int $funcionarioId, array $captures): array
+    {
+        if ($funcionarioId <= 0) {
+            throw new OperationException('Funcionário inválido.');
+        }
+        if (count($captures) < 3) {
+            throw new OperationException('São necessárias pelo menos 3 capturas faciais.');
+        }
+
+        $response = $this->gateway->request('POST', "/api/rh/funcionarios/$funcionarioId/biometria/facial/enroll", [
+            'captures' => $captures,
+        ]);
+        $this->ensureSuccess($response, 'Erro ao cadastrar o rosto.');
+
+        return [
+            'ok' => true,
+            'msg' => 'Rosto cadastrado com sucesso.',
+            'template_id' => $response->body['template_id'] ?? null,
+            'face_id' => $response->body['face_id'] ?? null,
+        ];
+    }
+
+    public function getConsentimentoAtivo(int $funcionarioId): ?array
+    {
+        if ($funcionarioId <= 0) {
+            throw new OperationException('Funcionário inválido.');
+        }
+
+        $response = $this->gateway->request('GET', "/api/rh/funcionarios/$funcionarioId/consentimento");
+        if ($response->status === 404) {
+            return null;
+        }
+        $this->ensureSuccess($response, 'Erro ao verificar consentimento.');
+
+        return $response->body ?? null;
+    }
+
+    public function criarConsentimento(int $funcionarioId): array
+    {
+        if ($funcionarioId <= 0) {
+            throw new OperationException('Funcionário inválido.');
+        }
+
+        $response = $this->gateway->request('POST', "/api/rh/funcionarios/$funcionarioId/consentimento", [
+            'termo_versao' => 'v1',
+            'termo_hash' => 'sha256-termo-v1',
+        ]);
+        $this->ensureSuccess($response, 'Erro ao registar consentimento.');
+
+        return [
+            'ok' => true,
+            'msg' => 'Consentimento registado com sucesso.',
+            'id' => $response->body['id'] ?? null,
+        ];
+    }
 }

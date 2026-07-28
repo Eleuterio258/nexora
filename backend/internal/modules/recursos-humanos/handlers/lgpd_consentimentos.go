@@ -3,7 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 
 	mw "nexora/internal/middleware"
 )
@@ -177,6 +180,105 @@ func (h *Handler) ListarConsentimentosDevice(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	jsonOK(w, data, http.StatusOK)
+}
+
+// ── Endpoints para gestores (autenticação JWT) ───────────────────────────────
+
+// GET /api/rh/funcionarios/{id}/consentimento
+// Devolve o consentimento LGPD biométrico activo do funcionário.
+func (h *Handler) ObterConsentimentoFuncionario(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	funcionarioIDStr := chi.URLParam(r, "id")
+	funcionarioID, err := strconv.ParseInt(funcionarioIDStr, 10, 64)
+	if err != nil || funcionarioID <= 0 {
+		jsonErr(w, "ID de funcionário inválido", http.StatusBadRequest)
+		return
+	}
+
+	var c consentimentoRow
+	err = h.db.QueryRow(r.Context(), `
+		SELECT id, funcionario_id, termo_versao, termo_hash, aceite_em, revogado_em, created_at
+		  FROM lgpd.consentimentos
+		 WHERE funcionario_id=$1 AND tenant_id=$2 AND revogado_em IS NULL
+		 ORDER BY aceite_em DESC LIMIT 1`, funcionarioID, user.TenantID).
+		Scan(&c.ID, &c.FuncionarioID, &c.TermoVersao, &c.TermoHash, &c.AceiteEm, &c.RevogadoEm, &c.CreatedAt)
+	if err != nil {
+		jsonErr(w, "Nenhum consentimento activo encontrado", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, c, http.StatusOK)
+}
+
+// POST /api/rh/funcionarios/{id}/consentimento
+// Regista um consentimento LGPD biométrico para o funcionário (por um gestor).
+func (h *Handler) CriarConsentimentoFuncionario(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	funcionarioIDStr := chi.URLParam(r, "id")
+	funcionarioID, err := strconv.ParseInt(funcionarioIDStr, 10, 64)
+	if err != nil || funcionarioID <= 0 {
+		jsonErr(w, "ID de funcionário inválido", http.StatusBadRequest)
+		return
+	}
+	if !h.podeGerirFuncionario(r, funcionarioID) {
+		jsonErr(w, "Sem permissão para gerir este funcionário", http.StatusForbidden)
+		return
+	}
+
+	var body struct {
+		TermoVersao string `json:"termo_versao"`
+		TermoHash   string `json:"termo_hash"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonErr(w, "Body inválido", http.StatusBadRequest)
+		return
+	}
+	if body.TermoVersao == "" {
+		body.TermoVersao = "v1"
+	}
+	if body.TermoHash == "" {
+		body.TermoHash = "sha256-termo-v1"
+	}
+
+	// Verifica se o funcionário existe no tenant
+	var existe int
+	err = h.db.QueryRow(r.Context(),
+		`SELECT 1 FROM rh.funcionarios WHERE id=$1 AND tenant_id=$2`,
+		funcionarioID, user.TenantID).Scan(&existe)
+	if err != nil {
+		jsonErr(w, "Funcionário não encontrado", http.StatusNotFound)
+		return
+	}
+
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	if _, err := tx.Exec(r.Context(), `
+		UPDATE lgpd.consentimentos SET revogado_em = NOW()
+		 WHERE funcionario_id=$1 AND tenant_id=$2 AND revogado_em IS NULL`,
+		funcionarioID, user.TenantID); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	var id int64
+	if err := tx.QueryRow(r.Context(), `
+		INSERT INTO lgpd.consentimentos (tenant_id, funcionario_id, termo_versao, termo_hash, aceite_em, ip_address)
+		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+		user.TenantID, funcionarioID, body.TermoVersao, body.TermoHash, time.Now(), r.RemoteAddr,
+	).Scan(&id); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]any{"id": id}, http.StatusCreated)
 }
 
 // POST /api/hardware/assiduidade/consentimentos/revogar

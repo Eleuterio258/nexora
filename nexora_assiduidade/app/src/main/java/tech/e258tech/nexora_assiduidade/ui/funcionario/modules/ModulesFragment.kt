@@ -12,6 +12,7 @@ import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.JustifyAbsenceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.MeuQrCodeFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.notifications.NotificationsFragment
+import tech.e258tech.nexora_assiduidade.ui.gestor.assiduidade.JustificacoesPendentesFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.dashboard.DashboardGestorFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.dispositivos.DispositivosFragment
 import tech.e258tech.nexora_assiduidade.ui.gestor.equipa.EquipaGestorFragment
@@ -148,6 +149,17 @@ class ModulesFragment : Fragment() {
                 "Aprovar Pedidos de Férias",
                 R.drawable.ic_nav_vacation
             ) { openFragment(PedidosFeriasFragment()) }
+        }
+
+        // "assiduidade:aprovar_correcao" — mesma permissão de
+        // AprovarCorrecaoEvento/AprovarPedidoCorrecao (router.go); reaproveitada
+        // para justificações de falta/atraso (justificacoes.go) por serem o
+        // mesmo domínio de decisão sobre assiduidade.
+        if (temPermissao("assiduidade", "aprovar_correcao")) {
+            items += ModuleMenuItem(
+                "Aprovar Justificações",
+                android.R.drawable.ic_menu_agenda
+            ) { openFragment(JustificacoesPendentesFragment()) }
         }
 
         // "recursos-humanos:gerir_funcionarios" — registar assiduidade em nome

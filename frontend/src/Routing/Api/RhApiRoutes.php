@@ -95,6 +95,11 @@ final class RhApiRoutes
             'rh_funcionario_beneficio_save'               => ['module' => 'recursos-humanos', 'action' => 'gerir_beneficios'],
             'rh_funcionario_beneficio_remover'            => ['module' => 'recursos-humanos', 'action' => 'gerir_beneficios'],
 
+            // ── Biometria facial ────────────────────────────────────────────────────
+            'rh_biometria_facial_enroll'                  => ['module' => 'recursos-humanos', 'action' => 'gerir_funcionarios'],
+            'rh_consentimento_get'                        => ['module' => 'recursos-humanos', 'action' => 'ver_funcionarios', 'method' => 'GET'],
+            'rh_consentimento_save'                       => ['module' => 'recursos-humanos', 'action' => 'gerir_funcionarios'],
+
             // ── Gateway de operações RH ───────────────────────────────────────────
             'rh_operacao'                                 => ['module' => 'recursos-humanos', 'action' => 'gerir_funcionarios'],
         ];
