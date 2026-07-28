@@ -217,7 +217,7 @@ DECLARE
     v_tenant_id BIGINT;
 BEGIN
     FOR v_tenant_id IN
-        SELECT id FROM auth.tenants
+        SELECT id FROM saas.tenants
     LOOP
         PERFORM auth.adicionar_permissoes_granulares_fase3(v_tenant_id);
     END LOOP;
