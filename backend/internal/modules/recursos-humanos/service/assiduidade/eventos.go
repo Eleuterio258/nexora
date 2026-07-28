@@ -105,6 +105,10 @@ func (s *Service) RegistarEvento(ctx context.Context, tenantID int64, in Regista
 	}
 
 	var ev models.EventoAssiduidade
+	// ip_origem é uma coluna `inet`; sem o ::text explícito o pgx não a sabe
+	// entregar a um *string e o Scan falha DEPOIS de a linha já estar gravada —
+	// a escrita passa e o cliente recebe 500. Mesmo cuidado em
+	// buscarEventoPorHash, que lê as mesmas colunas.
 	err = s.db.QueryRow(ctx, `
 		INSERT INTO rh.eventos_assiduidade (
 			tenant_id, funcionario_id, tipo_evento_id, metodo_id,
@@ -123,7 +127,7 @@ func (s *Service) RegistarEvento(ctx context.Context, tenantID int64, in Regista
 			ocorrido_em, data_referencia, origem, dispositivo_id, qr_token_id, nfc_tag_id,
 			latitude, longitude, localidade_id, dentro_geofence,
 			foto_url, documento_url, estado, registado_por, motivo, observacoes,
-			evento_pai_id, duplicado_de_id, ip_origem, user_agent, hash_digital,
+			evento_pai_id, duplicado_de_id, ip_origem::text, user_agent, hash_digital,
 			created_at, updated_at`,
 		tenantID, in.FuncionarioID, tipoEventoID, metodoID,
 		in.OcorridoEm, dataReferencia, in.Origem, in.DispositivoID, in.QRTokenID, in.NFCTagID,
@@ -245,7 +249,7 @@ func (s *Service) buscarEventoPorHash(ctx context.Context, tenantID int64, hash 
 			ocorrido_em, data_referencia, origem, dispositivo_id, qr_token_id, nfc_tag_id,
 			latitude, longitude, localidade_id, dentro_geofence,
 			foto_url, documento_url, estado, registado_por, motivo, observacoes,
-			evento_pai_id, duplicado_de_id, ip_origem, user_agent, hash_digital,
+			evento_pai_id, duplicado_de_id, ip_origem::text, user_agent, hash_digital,
 			created_at, updated_at
 		  FROM rh.eventos_assiduidade
 		 WHERE tenant_id = $1 AND hash_digital = $2`,
@@ -258,8 +262,14 @@ func (s *Service) buscarEventoPorHash(ctx context.Context, tenantID int64, hash 
 		&ev.EventoPaiID, &ev.DuplicadoDeID, &ev.IPOrigem, &ev.UserAgent, &ev.HashDigital,
 		&ev.CreatedAt, &ev.UpdatedAt,
 	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil // "não encontrado" não é um erro aqui
+	}
 	if err != nil {
-		return nil, nil //nolint:nilerr // "não encontrado" não é um erro aqui
+		// Qualquer outra falha (leitura, tipos) tem de subir: tratá-la como
+		// "não encontrado" fazia a deduplicação passar ao lado e gravar uma
+		// segunda linha com o mesmo hash_digital.
+		return nil, err
 	}
 	return &ev, nil
 }
