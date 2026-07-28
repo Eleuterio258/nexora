@@ -56,7 +56,9 @@ import tech.e258tech.nexora_assiduidade.utils.SessionManager
  * (MediaPipe FaceDetector / BlazeFace short-range) — o overlay verde e o
  * "Mantem-te parado..." servem so para guiar o utilizador a um bom
  * enquadramento e disparar a captura automatica; quem decide se o rosto e
- * reconhecido continua a ser exclusivamente o backend, em /biometric/verify.
+ * reconhecido continua a ser exclusivamente o backend — o ERP recebe a
+ * captura em /api/self-service/assiduidade/biometria/facial/verificar e faz
+ * proxy para o FaceClock, que tem os templates.
  */
 class FacialAttendanceFragment : Fragment() {
 
@@ -316,10 +318,9 @@ class FacialAttendanceFragment : Fragment() {
         uiScope.launch {
             val verifyPair: Pair<FaceVerifyResponse?, String?> = withContext(Dispatchers.IO) {
                 try {
-                    val response = RetrofitClient.assiduidadeApiService.verifyFace(
+                    val response = RetrofitClient.erpApiService.verifyFacial(
                         ApiUtils.bearerToken(token),
                         FaceVerifyRequest(
-                            user_id = userId,
                             device_id = sessionManager.getOrCreateDeviceId(),
                             image_base64 = imageBase64
                         )

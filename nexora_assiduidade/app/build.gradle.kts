@@ -35,7 +35,6 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "ERP_BASE_URL", "\"https://api.nexora.e258tech.tech/\"")
-        buildConfigField("String", "ASSIDUIDADE_BASE_URL", "\"https://asseduidade.e258tech.tech/api/v1/\"")
         buildConfigField("String", "DEVICE_API_KEY", deviceApiKey())
     }
 
@@ -43,7 +42,6 @@ android {
         release {
             isMinifyEnabled = false
             buildConfigField("String", "ERP_BASE_URL", "\"https://api.nexora.e258tech.tech/\"")
-            buildConfigField("String", "ASSIDUIDADE_BASE_URL", "\"https://asseduidade.e258tech.tech/api/v1/\"")
             buildConfigField("String", "DEVICE_API_KEY", deviceApiKey())
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -55,7 +53,6 @@ android {
             // fisico; para apontar a um backend local a correr na tua
             // maquina, substitui pelo IP da tua rede local (ex.: 192.168.x.x).
             buildConfigField("String", "ERP_BASE_URL", "\"https://api.nexora.e258tech.tech/\"")
-            buildConfigField("String", "ASSIDUIDADE_BASE_URL", "\"https://asseduidade.e258tech.tech/api/v1/\"")
             buildConfigField("String", "DEVICE_API_KEY", deviceApiKey())
         }
     }

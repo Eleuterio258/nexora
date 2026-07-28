@@ -1,16 +1,14 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/pkg/faceclock"
 )
 
 // CaptureImage representa uma captura facial em base64.
@@ -126,7 +124,8 @@ func (h *Handler) EnrollFacial(w http.ResponseWriter, r *http.Request) {
 		UserID:   fmt.Sprintf("%d", erpUserID),
 		Captures: body.Captures,
 	}
-	faceClockResp, statusCode, err := h.callFaceClockEnroll(r, authHeader, faceClockReq)
+	client := faceclock.NewClient(h.cfg.FaceClockBaseURL)
+	faceClockResp, statusCode, err := client.PostAsUser(r.Context(), "/api/v1/biometric/enroll", authHeader, faceClockReq)
 	if err != nil {
 		jsonErr(w, fmt.Sprintf("Erro ao comunicar com FaceClock: %s", err.Error()), http.StatusBadGateway)
 		return
@@ -173,38 +172,4 @@ func (h *Handler) metodoFacialAtivo(ctx context.Context, tenantID int64) (bool, 
 		return true, nil // método não configurado explicitamente — falha aberta
 	}
 	return *metodoCfg.Ativo, nil
-}
-
-// callFaceClockEnroll faz o proxy do enrollment para o FaceClock.
-func (h *Handler) callFaceClockEnroll(r *http.Request, authHeader string, req FaceClockEnrollRequest) (map[string]interface{}, int, error) {
-	payload, err := json.Marshal(req)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	url := fmt.Sprintf("%s/api/v1/biometric/enroll", h.cfg.FaceClockBaseURL)
-	httpReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
-		return nil, 0, err
-	}
-	httpReq.Header.Set("Authorization", authHeader)
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, resp.StatusCode, err
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return map[string]interface{}{"raw": string(body)}, resp.StatusCode, nil
-	}
-	return result, resp.StatusCode, nil
 }

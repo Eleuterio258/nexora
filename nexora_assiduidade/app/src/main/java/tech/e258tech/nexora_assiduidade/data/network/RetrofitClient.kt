@@ -66,19 +66,7 @@ object RetrofitClient {
             .build()
     }
 
-    private val assiduidadeRetrofit: Retrofit by lazy {
-        Retrofit.Builder()
-            .baseUrl(BuildConfig.ASSIDUIDADE_BASE_URL)
-            .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
     val erpApiService: ErpApiService by lazy {
         erpRetrofit.create(ErpApiService::class.java)
-    }
-
-    val assiduidadeApiService: AssiduidadeApiService by lazy {
-        assiduidadeRetrofit.create(AssiduidadeApiService::class.java)
     }
 }

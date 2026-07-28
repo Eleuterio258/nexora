@@ -19,6 +19,7 @@ import tech.e258tech.nexora_assiduidade.data.model.CaptureImage
 import tech.e258tech.nexora_assiduidade.data.model.ConsentimentoLGPD
 import tech.e258tech.nexora_assiduidade.data.model.ConsentimentoLGPDRequest
 import tech.e258tech.nexora_assiduidade.data.model.EnrollFacialRequest
+import tech.e258tech.nexora_assiduidade.data.model.FaceVerifyRequest
 import tech.e258tech.nexora_assiduidade.data.model.AgendaItemRequest
 import tech.e258tech.nexora_assiduidade.data.model.Atividade
 import tech.e258tech.nexora_assiduidade.data.model.AtividadeListResponse
@@ -54,6 +55,7 @@ import tech.e258tech.nexora_assiduidade.utils.Constants
 import tech.e258tech.nexora_assiduidade.data.model.response.AssiduidadeConfigResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.AtividadeCreateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.EnrollFacialResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.FaceVerifyResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageListResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ConversationCreateResponse
@@ -326,6 +328,16 @@ interface ErpApiService {
         @Path("id") funcionarioId: Long,
         @Body request: EnrollFacialRequest
     ): Response<EnrollFacialResponse>
+
+    // Verificação facial no acto de marcar ponto — o ERP faz proxy para o
+    // FaceClock (POST /api/v1/biometric/verify) depois de resolver a
+    // identidade a partir do próprio token, nunca do payload. Substitui a
+    // chamada directa app→FaceClock que existia em AssiduidadeApiService.
+    @POST("api/self-service/assiduidade/biometria/facial/verificar")
+    suspend fun verifyFacial(
+        @Header("Authorization") token: String,
+        @Body request: FaceVerifyRequest
+    ): Response<FaceVerifyResponse>
 
     // Consentimento LGPD biométrico de um funcionário (GET/POST por gestor RH).
     @GET("api/rh/funcionarios/{id}/consentimento")

@@ -213,3 +213,12 @@ O ERP passou a ter um Authorization Server OAuth2 real (`/oauth/token`, `/oauth/
 - `requirements.txt`: nova dependência `cryptography` (RS256 no PyJWT precisa dela).
 - Testado: `tests/test_oauth_jwks.py` (verificação local com chave RSA gerada em teste, sem rede), suite completa continua verde.
 - **Ainda por fazer** (fora do âmbito desta secção): app Android e nada mais no FaceClock muda — quem migra para `/oauth/token` é a app e o portal PHP, não o FaceClock (ele é resource server puro, nunca chama `/oauth/token`).
+
+## 12. Verificação facial via proxy do ERP (2026-07-28)
+
+Até aqui, a verificação facial (`POST /biometric/verify`) era a **única** chamada FaceClock que a app Android ainda fazia directamente (`AssiduidadeApiService.verifyFace`), fora do padrão "app→ERP→FaceClock" já usado pelo enrollment (secção 4/8.5). Corrigido para consistência arquitectural:
+
+- **Novo `internal/pkg/faceclock` (Go, ERP)**: cliente HTTP partilhado (`Client.PostAsUser`), extraído de `funcionarios_biometria.go` (que antes tinha `callFaceClockEnroll` inline) — mesmo padrão já usado para o `nexorapay`. `EnrollFacial` passou a usar este cliente.
+- **Novo `POST /api/self-service/assiduidade/biometria/facial/verificar`** (`self-service/handlers/biometria.go:VerificarFacial`): recebe `device_id`/`image_base64`/`geo_lat`/`geo_lng` da app, preenche `user_id` a partir do utilizador autenticado (nunca do payload — mesma protecção do bug corrigido em `POST /clock/register`, secção 8.5) e faz proxy para `POST {FACECLOCK_BASE_URL}/api/v1/biometric/verify`, reenviando o `Authorization` original para o FaceClock validar a identidade via JWKS (secção 11). Devolve a resposta do FaceClock tal-e-qual (`match`, `confidence_score`, `liveness_score`, `reason`).
+- **Android**: `AssiduidadeApiService.kt` eliminado (ficava só com `verifyFace`, agora morto); `ErpApiService.kt` ganhou `verifyFacial()`; `FacialAttendanceFragment.kt` passou a chamar `RetrofitClient.erpApiService.verifyFacial(...)`; `FaceVerifyRequest` perdeu o campo `user_id` (o ERP já não o aceita do cliente). `RetrofitClient.assiduidadeApiService`/`assiduidadeRetrofit` e o `BuildConfig.ASSIDUIDADE_BASE_URL` (build.gradle.kts) removidos — sem mais nenhum consumidor depois desta mudança, a app já não faz **nenhuma** chamada directa ao FaceClock.
+- Verificado: `go build ./...` limpo. Build Kotlin (`compileDebugKotlin`) a validar.

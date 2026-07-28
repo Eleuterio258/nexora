@@ -2588,6 +2588,10 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				// (JWT), nunca pela API Key de device partilhada por todas as
 				// instalações da app.
 				r.Get("/qr/me", rh.GerarQRMe)
+				// Verificação facial no acto de marcar ponto — o ERP faz proxy
+				// para o FaceClock (POST /api/v1/biometric/verify), substituindo
+				// a chamada directa app→FaceClock que existia antes.
+				r.Post("/biometria/facial/verificar", ss.VerificarFacial)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "assiduidade", "justificar"))
