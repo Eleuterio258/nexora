@@ -574,6 +574,33 @@ include dirname(__DIR__) . '/layouts/top.php';
                 </div>
             </div>
 
+            <?php
+            // O backend (ContratarCandidato, passo 10.1) e o
+            // RecrutamentoController já suportavam criar_professor, mas não
+            // havia nada no formulário que o enviasse — nenhuma contratação
+            // feita pela interface chegava a criar a ficha de docente.
+            //
+            // O critério é a vaga, não as permissões de quem contrata: quem faz
+            // a admissão é o recrutador, cujo cargo normalmente não inclui a
+            // Gestão Escolar (o Recrutador do Instituto Politécnico não a tem),
+            // pelo que gatear por canModule('gestao-escolar') escondia a opção
+            // exactamente de quem dela precisa.
+            $areaVaga    = mb_strtolower((string) ($c['vaga_area'] ?? ''));
+            $tituloVaga  = mb_strtolower((string) ($c['vaga_titulo'] ?? ''));
+            $pareceDocente = str_contains($areaVaga, 'docen')
+                || str_contains($tituloVaga, 'professor')
+                || str_contains($tituloVaga, 'docente');
+            if ($pareceDocente || $app->session->canModule('gestao-escolar')):
+            ?>
+            <div class="adm-form-group" style="margin-top:var(--adm-sp-2)">
+                <label class="adm-label" style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:400">
+                    <input type="checkbox" id="ctCriarProfessor">
+                    Registar também como professor na Gestão Escolar
+                </label>
+                <p class="adm-input-hint">Cria a ficha de docente ligada a este funcionário. O acesso da conta passa do ERP para o Portal do Professor.</p>
+            </div>
+            <?php endif; ?>
+
             <div class="adm-form-group" style="margin-top:var(--adm-sp-2)">
                 <label class="adm-label">Autorização de Trabalho (apenas trabalhadores estrangeiros)</label>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--adm-sp-4)">
@@ -746,6 +773,8 @@ async function confirmarContratacao() {
         data_fim: document.getElementById('ctDataFim').value,
         autorizacao_trabalho: document.getElementById('ctAutorizacaoTrabalho').value.trim(),
         data_validade_autorizacao: document.getElementById('ctDataValidadeAutorizacao').value,
+        // Ausente quando o tenant não tem Gestão Escolar — o campo só existe aí.
+        criar_professor: document.getElementById('ctCriarProfessor')?.checked ?? false,
         contacto_emergencia_nome: document.getElementById('ctContactoNome').value.trim(),
         contacto_emergencia_parentesco: document.getElementById('ctContactoParentesco').value.trim(),
         contacto_emergencia_telefone: document.getElementById('ctContactoTelefone').value.trim(),

@@ -193,7 +193,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	})
 
 	r.Get("/ws/chat", func(w http.ResponseWriter, r *http.Request) {
-		ws.ServeWS(wsHub, db, cfg.JWTSecret, w, r)
+		ws.ServeWS(wsHub, db, mw.JWTKeyFunc(cfg.JWTSecret, oauthKeys), w, r)
 	})
 	r.Handle("/socket.io/*", recrutRealtime.Handler())
 
@@ -251,6 +251,9 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 
 			r.Get("/me", auth.Me)
 			r.Get("/me/acesso", auth.ObterAcessoUtilizador)
+			// Troca para outro papel da MESMA pessoa (ver papel.go). O que
+			// autoriza é pessoas.v_pessoa_tipos, não o pedido.
+			r.Post("/papel", auth.TrocarPapel)
 			r.Get("/me/perm-ts", auth.MePermTs)
 			r.Post("/logout", auth.Logout)
 			r.Post("/change-password", auth.ChangePassword)

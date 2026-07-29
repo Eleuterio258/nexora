@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,7 +26,10 @@ type ContrataResult struct {
 	UserID        int64  `json:"user_id"`
 	ContractID    int64  `json:"rh_contract_id"`
 	TeacherID     *int64 `json:"teacher_id,omitempty"`
-	Mensagem      string `json:"mensagem"`
+	// VagaFechada indica que esta contratação preencheu a última posição da
+	// vaga e que ela foi encerrada (recrutamento.vagas.ativa = false).
+	VagaFechada bool   `json:"vaga_fechada"`
+	Mensagem    string `json:"mensagem"`
 }
 
 // ContactoEmergenciaInput dados de contacto de emergência do funcionário.
@@ -126,7 +130,12 @@ func (h *Handler) ContratarCandidato(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN rh.cargos rc ON rc.id = v.cargo_id
 		LEFT JOIN recrutamento.candidatos cd ON cd.id = c.candidato_id
 		WHERE c.id = $1 AND c.tenant_id = $2
-		FOR UPDATE`,
+		-- FOR UPDATE OF c, e não FOR UPDATE: o Postgres recusa bloquear o lado
+		-- anulável de um LEFT JOIN ("FOR UPDATE cannot be applied to the
+		-- nullable side of an outer join", SQLSTATE 0A000). Sem o OF c esta
+		-- query falhava sempre e a contratação devolvia 500 logo no primeiro
+		-- passo. A linha que interessa bloquear é mesmo só a candidatura.
+		FOR UPDATE OF c`,
 		candID, u.TenantID,
 	).Scan(&cand.ID, &cand.Nome, &cand.Email, &cand.Telefone, &cand.Estado, &cand.VagaTitulo,
 		&cand.VagaArea, &cand.VagaCargoID, &cand.VagaCargoNome, &cand.VagaSalarioMin, &cand.VagaSalarioMax,
@@ -220,8 +229,30 @@ func (h *Handler) ContratarCandidato(w http.ResponseWriter, r *http.Request) {
 	// candidato já tinha conta com pessoa associada, é reutilizada.
 	// pessoaID é propagado para rh.funcionarios.pessoa_id no passo 7 e usado
 	// no passo 10 para ligar os contactos de emergência (secção 9).
-	pessoaID, err := pessoas.EnsureUserPessoa(ctx, tx, userID, cand.Nome, nil)
+	//
+	// A identidade civil vai junto: é aqui que os documentos são recolhidos
+	// (o portal de candidaturas não os pede), e sem eles pessoas.pessoas fica
+	// só com o nome — a chave uq_pessoas_documento nunca é preenchida e a
+	// deduplicação nunca funciona. Com o documento, uma pessoa que já exista
+	// no sistema noutro papel é reconhecida em vez de duplicada.
+	ident := pessoas.Identidade{
+		TipoDocumento:   ptrString(body.TipoDocumento),
+		NumeroDocumento: ptrString(body.NumeroDocumento),
+		Nuit:            ptrString(body.Nuit),
+		Nacionalidade:   ptrString(body.Nacionalidade),
+	}
+	if body.DataNascimento != nil && *body.DataNascimento != "" {
+		if d, errData := time.Parse("2006-01-02", *body.DataNascimento); errData == nil {
+			ident.DataNascimento = &d
+		}
+	}
+	pessoaID, err := pessoas.EnsureUserPessoaComIdentidade(ctx, tx, userID, cand.Nome, nil, ident)
 	if err != nil {
+		if errors.Is(err, pessoas.ErrDocumentoNoutraPessoa) {
+			jsonErr(w, "Este documento já pertence a outra pessoa no sistema. "+
+				"Verifica se é um registo duplicado antes de contratar.", http.StatusConflict)
+			return
+		}
 		jsonErr(w, "Erro ao associar pessoa", http.StatusInternalServerError)
 		return
 	}
@@ -240,6 +271,28 @@ func (h *Handler) ContratarCandidato(w http.ResponseWriter, r *http.Request) {
 		userID, u.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro ao associar utilizador ao tenant", http.StatusInternalServerError)
+		return
+	}
+
+	// 4.1. Promover a conta de candidato a funcionário.
+	//
+	// Sem isto a membership ERP acima fica inútil: loginWithCredentials
+	// (auth/handlers/auth.go) despacha pelo users.tipo, não pelas memberships,
+	// portanto a conta continuava a receber um token de candidato com escopo
+	// portal_candidato — e a página de escolha de destino, que filtra por
+	// escopo, só mostrava a área do candidato. Ou seja, quem era contratado
+	// através do recrutamento ficava impedido de entrar no ERP onde acabara de
+	// ser admitido.
+	//
+	// Só promove quem vem de 'candidato': uma conta que já seja aluno,
+	// encarregado ou funcionário de outro tenant mantém o tipo que tem — o
+	// papel de funcionária fica registado na membership e em
+	// pessoas.v_pessoa_tipos, e reescrever o tipo tirar-lhe-ia o acesso ao
+	// portal por onde entra hoje.
+	if _, err := tx.Exec(ctx, `
+		UPDATE auth.users SET tipo = 'funcionario', updated_at = NOW()
+		 WHERE id = $1 AND tipo = 'candidato'`, userID); err != nil {
+		jsonErr(w, "Erro ao promover a conta a funcionário", http.StatusInternalServerError)
 		return
 	}
 
@@ -426,6 +479,34 @@ func (h *Handler) ContratarCandidato(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 11.1. Fechar a vaga quando ficar preenchida.
+	//
+	// Corre DEPOIS do UPDATE acima, para que esta contratação já conte. Uma
+	// vaga pode ter várias posições (num_vagas), por isso só fecha quando o
+	// total de candidaturas em estado 'contratado' atinge esse número — uma
+	// vaga de 3 lugares não fecha à primeira admissão. O `AND v.ativa` torna
+	// isto idempotente e evita reabrir/reescrever vagas já fechadas à mão.
+	var vagaFechada bool
+	if tag, err := tx.Exec(ctx, `
+		UPDATE recrutamento.vagas v
+		   SET ativa = FALSE, updated_at = NOW()
+		  FROM recrutamento.candidaturas c
+		 WHERE c.id = $1
+		   AND c.tenant_id = $2
+		   AND v.id = c.vaga_id
+		   AND v.tenant_id = c.tenant_id
+		   AND v.ativa
+		   AND (
+		        SELECT COUNT(*) FROM recrutamento.candidaturas c2
+		         WHERE c2.vaga_id = v.id AND c2.estado = 'contratado'
+		       ) >= v.num_vagas`,
+		cand.ID, u.TenantID); err != nil {
+		jsonErr(w, "Erro ao fechar a vaga", http.StatusInternalServerError)
+		return
+	} else {
+		vagaFechada = tag.RowsAffected() > 0
+	}
+
 	// 12. Notificar candidato da contratação (dentro da transação — email/SMS)
 	varsExtra := map[string]string{
 		"numero_funcionario": numero,
@@ -474,6 +555,10 @@ func (h *Handler) ContratarCandidato(w http.ResponseWriter, r *http.Request) {
 	}
 	if teacherID != nil {
 		result.Mensagem += fmt.Sprintf(" Professor vinculado à Gestão Escolar (id=%d).", *teacherID)
+	}
+	if vagaFechada {
+		result.VagaFechada = true
+		result.Mensagem += " Vaga preenchida e fechada."
 	}
 	jsonOK(w, result, http.StatusCreated)
 }

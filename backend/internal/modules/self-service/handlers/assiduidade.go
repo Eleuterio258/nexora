@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -9,10 +10,17 @@ import (
 )
 
 type registoPresenca struct {
-	ID            int64      `json:"id"`
-	Data          time.Time  `json:"data"`
-	HoraEntrada   *time.Time `json:"hora_entrada"`
-	HoraSaida     *time.Time `json:"hora_saida"`
+	ID   int64     `json:"id"`
+	Data time.Time `json:"data"`
+	// rh.presencas.hora_entrada/hora_saida são varchar(5) ("08:00"), não
+	// timestamps: têm de ser lidas para *string. Com *time.Time o Scan só
+	// passava enquanto as horas estivessem a NULL (linhas de falta) e falhava
+	// na primeira linha preenchida — e como um Scan falhado aborta a iteração
+	// do pgx, a resposta vinha vazia em vez de "sem essa linha". O frontend
+	// também trata isto como texto (substr($r['hora_entrada'],0,5) em
+	// minha_assiduidade.php).
+	HoraEntrada      *string  `json:"hora_entrada"`
+	HoraSaida        *string  `json:"hora_saida"`
 	HorasTrabalhadas *float64 `json:"horas_trabalhadas"`
 	Tipo          string     `json:"tipo"`
 	Latitude      *float64   `json:"latitude"`
@@ -57,10 +65,16 @@ func (h *Handler) MinhaAssiduidade(w http.ResponseWriter, r *http.Request) {
 	data := []registoPresenca{}
 	for rows.Next() {
 		var p registoPresenca
-		if rows.Scan(&p.ID, &p.Data, &p.HoraEntrada, &p.HoraSaida, &p.HorasTrabalhadas,
-			&p.Tipo, &p.Latitude, &p.Longitude, &p.Observacao) == nil {
-			data = append(data, p)
+		if err := rows.Scan(&p.ID, &p.Data, &p.HoraEntrada, &p.HoraSaida, &p.HorasTrabalhadas,
+			&p.Tipo, &p.Latitude, &p.Longitude, &p.Observacao); err != nil {
+			// Descartar a linha em silêncio dava uma lista vazia indistinguível
+			// de "não há registos" — foi assim que o erro de tipo em
+			// hora_entrada passou despercebido.
+			log.Printf("[self-service] assiduidade func=%d: %v", funcID, err)
+			jsonErr(w, "Erro interno", http.StatusInternalServerError)
+			return
 		}
+		data = append(data, p)
 	}
 	jsonOK(w, data, http.StatusOK)
 }

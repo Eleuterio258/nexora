@@ -52,7 +52,13 @@ type Incoming struct {
 
 // ServeWS faz o upgrade HTTP → WebSocket e inicia as goroutines de I/O.
 // Autentica via query param ?token= (WebSocket não suporta headers custom no browser).
-func ServeWS(hub *Hub, db *pgxpool.Pool, jwtSecret string, w http.ResponseWriter, r *http.Request) {
+//
+// keyFunc tem de aceitar os dois algoritmos em uso (HS256 para contas de
+// portal, RS256 para o ERP) — usar middleware.JWTKeyFunc, a mesma que o
+// RequireAuth usa. Um parse próprio aqui dessincroniza-se do resto da
+// autenticação, que foi o que aconteceu quando este ficheiro aceitava apenas
+// HMAC e o chat deixou de autenticar toda a gente.
+func ServeWS(hub *Hub, db *pgxpool.Pool, keyFunc jwt.Keyfunc, w http.ResponseWriter, r *http.Request) {
 	rawToken := r.URL.Query().Get("token")
 	if rawToken == "" {
 		h := r.Header.Get("Authorization")
@@ -65,12 +71,7 @@ func ServeWS(hub *Hub, db *pgxpool.Pool, jwtSecret string, w http.ResponseWriter
 		return
 	}
 
-	token, err := jwt.Parse(rawToken, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("signing method inválido")
-		}
-		return []byte(jwtSecret), nil
-	})
+	token, err := jwt.Parse(rawToken, keyFunc)
 	if err != nil || !token.Valid {
 		http.Error(w, "token inválido", http.StatusUnauthorized)
 		return

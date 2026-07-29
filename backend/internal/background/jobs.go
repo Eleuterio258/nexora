@@ -486,12 +486,24 @@ func processAbsencesForDate(ctx context.Context, db *pgxpool.Pool, data string) 
 	}
 	diaSemana := fmt.Sprintf("%d", isoWeekday)
 
+	// O horário efectivo é o do funcionário quando ele tem um, senão o padrão
+	// do tenant (rh.horarios_trabalho.padrao, ver migration 20260729000003).
+	// Antes o JOIN era directo por f.horario_id, pelo que quem fosse admitido
+	// sem horário escolhido no formulário simplesmente não era considerado —
+	// nem faltas nem cálculo, e sem qualquer erro visível.
 	rows, err := db.Query(ctx, `
 		SELECT f.id, f.tenant_id
 		  FROM rh.funcionarios f
-		  JOIN rh.horarios_trabalho h ON h.id = f.horario_id
+		  JOIN LATERAL (
+		      SELECT ht.*
+		        FROM rh.horarios_trabalho ht
+		       WHERE ht.tenant_id = f.tenant_id
+		         AND ht.ativo = TRUE
+		         AND (ht.id = f.horario_id OR (f.horario_id IS NULL AND ht.padrao))
+		       ORDER BY (ht.id = f.horario_id) DESC
+		       LIMIT 1
+		  ) h ON TRUE
 		 WHERE f.estado = 'ativo'
-		   AND h.ativo = TRUE
 		   AND f.data_admissao <= $1::date
 		   AND (f.data_saida IS NULL OR f.data_saida >= $1::date)
 		   AND $2 = ANY (SELECT trim(dia) FROM unnest(string_to_array(h.dias_semana, ',')) AS dia)

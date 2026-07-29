@@ -628,6 +628,24 @@
                 <div class="adm-sidebar-uinfo">
                     <div class="adm-sidebar-uname"><?= htmlspecialchars($adminUser) ?></div>
                     <div class="adm-sidebar-urole"><?= htmlspecialchars($userRole) ?></div>
+                    <?php
+                    // Papéis da pessoa (pessoas.v_pessoa_tipos). Só se tiver
+                    // mais do que um: para quem é apenas funcionário, a linha
+                    // do cargo acima já diz tudo e isto seria ruído.
+                    $tiposPessoa = $app->session->tiposActivos();
+                    if (count($tiposPessoa) > 1):
+                        $rotuloTipo = [
+                            'funcionario' => 'Funcionário', 'candidato' => 'Candidato',
+                            'professor'   => 'Professor',   'aluno'     => 'Aluno',
+                            'encarregado' => 'Encarregado', 'cliente'   => 'Cliente',
+                        ];
+                    ?>
+                    <div class="adm-sidebar-utipos" title="Papéis desta pessoa no sistema">
+                        <?php foreach ($tiposPessoa as $t): ?>
+                            <span class="adm-utipo"><?= htmlspecialchars($rotuloTipo[$t] ?? ucfirst($t)) ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <a href="/nexora/logout" class="adm-sidebar-logout" title="Sair">
                     <i class="fa-solid fa-right-from-bracket"></i>

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -272,7 +273,7 @@ func (h *Handler) loginAluno(w http.ResponseWriter, r *http.Request, userID int6
 
 	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, userID)
 
-	jsonOK(w, map[string]interface{}{
+	jsonOK(w, h.comTipos(r.Context(), userID, map[string]interface{}{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 		"token_type":    "Bearer",
@@ -285,7 +286,7 @@ func (h *Handler) loginAluno(w http.ResponseWriter, r *http.Request, userID int6
 			"codigo": codigo,
 			"escopo": escoposPorTipoEscopo("aluno", ""),
 		},
-	}, http.StatusOK)
+	}), http.StatusOK)
 }
 
 func (h *Handler) loginEncarregado(w http.ResponseWriter, r *http.Request, userID int64, nome string) {
@@ -329,7 +330,7 @@ func (h *Handler) loginEncarregado(w http.ResponseWriter, r *http.Request, userI
 
 	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, userID)
 
-	jsonOK(w, map[string]interface{}{
+	jsonOK(w, h.comTipos(r.Context(), userID, map[string]interface{}{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 		"token_type":    "Bearer",
@@ -342,7 +343,7 @@ func (h *Handler) loginEncarregado(w http.ResponseWriter, r *http.Request, userI
 			"tenant_id": tenantID,
 			"escopo":    escoposPorTipoEscopo("encarregado", ""),
 		},
-	}, http.StatusOK)
+	}), http.StatusOK)
 }
 
 func (h *Handler) LoginCandidato(w http.ResponseWriter, r *http.Request, userID int64, nome string) {
@@ -389,7 +390,7 @@ func (h *Handler) LoginCandidato(w http.ResponseWriter, r *http.Request, userID 
 
 	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, userID)
 
-	jsonOK(w, map[string]interface{}{
+	jsonOK(w, h.comTipos(r.Context(), userID, map[string]interface{}{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 		"token_type":    "Bearer",
@@ -403,7 +404,7 @@ func (h *Handler) LoginCandidato(w http.ResponseWriter, r *http.Request, userID 
 			"tenant_id": tenantID,
 			"escopo":    escoposPorTipoEscopo("candidato", ""),
 		},
-	}, http.StatusOK)
+	}), http.StatusOK)
 }
 
 // ── Logout ────────────────────────────────────────────────────────────────────
@@ -513,7 +514,7 @@ func (h *Handler) refreshAluno(w http.ResponseWriter, r *http.Request, userID in
 		return
 	}
 
-	jsonOK(w, map[string]interface{}{
+	jsonOK(w, h.comTipos(r.Context(), userID, map[string]interface{}{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
 		"expires_in":   int(portalJWTExpiry.Seconds()),
@@ -525,7 +526,7 @@ func (h *Handler) refreshAluno(w http.ResponseWriter, r *http.Request, userID in
 			"codigo": codigo,
 			"escopo": escoposPorTipoEscopo("aluno", ""),
 		},
-	}, http.StatusOK)
+	}), http.StatusOK)
 }
 
 func (h *Handler) refreshEncarregado(w http.ResponseWriter, r *http.Request, userID int64) {
@@ -561,7 +562,7 @@ func (h *Handler) refreshEncarregado(w http.ResponseWriter, r *http.Request, use
 		return
 	}
 
-	jsonOK(w, map[string]interface{}{
+	jsonOK(w, h.comTipos(r.Context(), userID, map[string]interface{}{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
 		"expires_in":   int(encarregadoJWTExpiry.Seconds()),
@@ -573,7 +574,7 @@ func (h *Handler) refreshEncarregado(w http.ResponseWriter, r *http.Request, use
 			"tenant_id": tenantID,
 			"escopo":    escoposPorTipoEscopo("encarregado", ""),
 		},
-	}, http.StatusOK)
+	}), http.StatusOK)
 }
 
 func (h *Handler) refreshCandidato(w http.ResponseWriter, r *http.Request, userID int64) {
@@ -612,7 +613,7 @@ func (h *Handler) refreshCandidato(w http.ResponseWriter, r *http.Request, userI
 		return
 	}
 
-	jsonOK(w, map[string]interface{}{
+	jsonOK(w, h.comTipos(r.Context(), userID, map[string]interface{}{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
 		"expires_in":   int(candidatoJWTExpiry.Seconds()),
@@ -625,7 +626,7 @@ func (h *Handler) refreshCandidato(w http.ResponseWriter, r *http.Request, userI
 			"tenant_id": tenantID,
 			"escopo":    escoposPorTipoEscopo("candidato", ""),
 		},
-	}, http.StatusOK)
+	}), http.StatusOK)
 }
 
 // ── Me ────────────────────────────────────────────────────────────────────────
@@ -635,7 +636,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	row := h.db.QueryRow(r.Context(), `
 		SELECT u.id, COALESCE(m.tenant_id, 0), u.nome, u.email, u.telefone,
 		       u.estado, u.email_verificado, u.ultimo_login_em, u.created_at,
-		       COALESCE(NULLIF(m.escopo, ''), 'erp')
+		       COALESCE(NULLIF(m.escopo, ''), 'erp'), u.pessoa_id
 		  FROM users u
 		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
 		 WHERE u.id = $1
@@ -653,13 +654,138 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		UltimoLoginEm   *time.Time `json:"ultimo_login_em"`
 		CreatedAt       time.Time  `json:"created_at"`
 		Escopo          string     `json:"escopo"`
+		// PessoaID é a identidade civil por trás da conta; Tipos são os papéis
+		// que essa pessoa tem nos vários domínios. Uma conta é uma forma de
+		// entrar; a pessoa é quem entra, e pode ser simultaneamente
+		// funcionária, candidata, encarregada e cliente — inclusive em tenants
+		// diferentes. Sem isto, quem consome o /me não tem como saber que o
+		// utilizador que acabou de entrar também é, por exemplo, encarregado de
+		// educação e devia ver esse portal.
+		PessoaID *int64       `json:"pessoa_id"`
+		Tipos    []pessoaTipo `json:"tipos"`
 	}
 	if err := row.Scan(&u.ID, &u.TenantID, &u.Nome, &u.Email, &u.Telefone,
-		&u.Estado, &u.EmailVerificado, &u.UltimoLoginEm, &u.CreatedAt, &u.Escopo); err != nil {
+		&u.Estado, &u.EmailVerificado, &u.UltimoLoginEm, &u.CreatedAt, &u.Escopo, &u.PessoaID); err != nil {
 		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
 		return
 	}
+	u.Tipos = h.tiposDaPessoa(r.Context(), u.PessoaID)
 	jsonOK(w, u, http.StatusOK)
+}
+
+// pessoaTipo é um papel de domínio da pessoa — uma linha de
+// pessoas.v_pessoa_tipos (ver migration 20260729000002).
+type pessoaTipo struct {
+	Tipo string `json:"tipo"`
+	// Escopo é a área a que este papel dá acesso — a mesma nomenclatura dos
+	// escopos emitidos no login. Vai daqui, e não de um mapa repetido no
+	// cliente: quem decide que um candidato entra em portal_candidato é o
+	// backend (escoposPorTipoEscopo), e um mapa paralelo no PHP ou na app
+	// dessincroniza-se assim que um papel novo aparecer.
+	Escopo       string `json:"escopo"`
+	TenantID     int64  `json:"tenant_id"`
+	TenantNome   string `json:"tenant_nome"`
+	ReferenciaID int64  `json:"referencia_id"`
+	Activo       bool   `json:"activo"`
+}
+
+// escopoDoPapel devolve o escopo de acesso de um papel de domínio, no tenant
+// desse papel. escopoVinculo é o escopo da membership activa nesse tenant
+// (vazio se não houver).
+//
+// Para funcionário e professor manda o vínculo: a mesma pessoa pode ser
+// funcionária com escopo 'erp' num tenant e 'escola' noutro, e é isso que
+// determina a área a que chega. Os portais de aluno, encarregado e candidato
+// não dependem do vínculo — o escopo decorre do próprio papel, pela mesma
+// tabela que o login usa (escoposPorTipoEscopo). 'cliente' não tem área
+// própria: fica sem escopo, e quem consome deve tratá-lo como informativo e
+// não como destino.
+func escopoDoPapel(tipo, escopoVinculo string) string {
+	switch tipo {
+	case "funcionario", "professor":
+		if escopoVinculo != "" {
+			return escopoVinculo
+		}
+		if tipo == "professor" {
+			return "portal_professor"
+		}
+		return "erp"
+	case "aluno", "encarregado", "candidato":
+		return escoposPorTipoEscopo(tipo, "")[0]
+	}
+	return ""
+}
+
+// comTipos acrescenta pessoa_id e tipos a uma resposta de login/refresh.
+//
+// Aplica-se a TODOS os caminhos de autenticação, não só ao ERP: uma pessoa
+// entra pelo portal do candidato e pode entretanto já ser funcionária — foi o
+// que aconteceu com a Ana Paulo Machava, contratada enquanto mantinha a sessão
+// de candidata. O `tipo` no topo da resposta continua a dizer por que porta se
+// entrou; `tipos` diz tudo o que essa pessoa é. Também vai nos refresh, porque
+// um papel novo pode aparecer a meio de uma sessão longa (a do candidato dura
+// 30 dias).
+func (h *Handler) comTipos(ctx context.Context, userID int64, resp map[string]interface{}) map[string]interface{} {
+	pessoaID, tipos := h.tiposDoUser(ctx, userID)
+	resp["pessoa_id"] = pessoaID
+	resp["tipos"] = tipos
+	return resp
+}
+
+// tiposDoUser resolve a pessoa de uma conta e devolve os seus papéis de
+// domínio. Usado no login (authcode.go) para que o cliente saiba, logo à
+// entrada, que a pessoa que acabou de autenticar é também encarregada de
+// educação ou aluna noutro tenant — sem ter de fazer uma segunda chamada.
+func (h *Handler) tiposDoUser(ctx context.Context, userID int64) (*int64, []pessoaTipo) {
+	var pessoaID *int64
+	if err := h.db.QueryRow(ctx, `SELECT pessoa_id FROM users WHERE id = $1`, userID).Scan(&pessoaID); err != nil {
+		return nil, []pessoaTipo{}
+	}
+	return pessoaID, h.tiposDaPessoa(ctx, pessoaID)
+}
+
+// tiposDaPessoa lê os papéis de domínio da pessoa. Devolve sempre uma lista
+// (nunca nil) e nunca falha o /me: a conta existir é o que interessa para
+// autenticar, e uma conta sem pessoa associada — ainda há duas — continua a
+// poder entrar.
+func (h *Handler) tiposDaPessoa(ctx context.Context, pessoaID *int64) []pessoaTipo {
+	tipos := []pessoaTipo{}
+	if pessoaID == nil {
+		return tipos
+	}
+	// O escopo do vínculo naquele tenant, quando existe: um funcionário de um
+	// tenant escolar tem escopo 'escola', e um professor 'portal_professor' —
+	// assumir 'erp' para todo o funcionário mandava-os para a área errada.
+	// Cada papel leva o escopo do seu tenant, não um escopo global.
+	rows, err := h.db.Query(ctx, `
+		SELECT vt.tipo, vt.tenant_id, COALESCE(t.nome, ''), vt.referencia_id, vt.activo,
+		       COALESCE((
+		           SELECT NULLIF(m.escopo, '')
+		             FROM auth.memberships m
+		             JOIN auth.users u ON u.id = m.user_id
+		            WHERE u.pessoa_id = vt.pessoa_id
+		              AND m.tenant_id = vt.tenant_id
+		              AND m.ativo
+		            ORDER BY m.principal DESC NULLS LAST, m.id ASC
+		            LIMIT 1
+		       ), '')
+		  FROM pessoas.v_pessoa_tipos vt
+		  LEFT JOIN saas.tenants t ON t.id = vt.tenant_id
+		 WHERE vt.pessoa_id = $1
+		 ORDER BY vt.tenant_id, vt.tipo`, *pessoaID)
+	if err != nil {
+		return tipos
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p pessoaTipo
+		var escopoVinculo string
+		if rows.Scan(&p.Tipo, &p.TenantID, &p.TenantNome, &p.ReferenciaID, &p.Activo, &escopoVinculo) == nil {
+			p.Escopo = escopoDoPapel(p.Tipo, escopoVinculo)
+			tipos = append(tipos, p)
+		}
+	}
+	return tipos
 }
 
 // ── Perm Timestamp ───────────────────────────────────────────────────────────

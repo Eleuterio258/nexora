@@ -370,12 +370,29 @@ func (h *Handler) CriarFuncionario(w http.ResponseWriter, r *http.Request) {
 	// docs/analise-modelo-pessoa-multi-tenant.md secção 9) — este é o
 	// endpoint directo de RH, separado do fluxo de contratação de
 	// candidatos (que já liga desde a Fase 3).
+	// Este endpoint não recolhe tipo/número de documento (só NUIT e data de
+	// nascimento), por isso não dá para deduplicar por documento aqui — mas os
+	// dados que existem passam na mesma para a pessoa, em vez de ficarem só na
+	// cópia em rh.funcionarios.
+	var ident pessoas.Identidade
+	if body.Nuit != nil {
+		ident.Nuit = *body.Nuit
+	}
+	if body.DataNascimento != nil && *body.DataNascimento != "" {
+		if d, errData := time.Parse("2006-01-02", *body.DataNascimento); errData == nil {
+			ident.DataNascimento = &d
+		}
+	}
+
 	var pessoaID int64
 	var pessoaErr error
 	if body.UserID != nil {
-		pessoaID, pessoaErr = pessoas.EnsureUserPessoa(r.Context(), h.db, *body.UserID, body.NomeCompleto, nil)
+		pessoaID, pessoaErr = pessoas.EnsureUserPessoaComIdentidade(r.Context(), h.db, *body.UserID, body.NomeCompleto, nil, ident)
 	} else {
 		pessoaID, pessoaErr = pessoas.EnsurePessoa(r.Context(), h.db, body.NomeCompleto)
+		if pessoaErr == nil {
+			pessoaErr = pessoas.CompletarIdentidade(r.Context(), h.db, pessoaID, ident)
+		}
 	}
 	if pessoaErr == nil {
 		h.db.Exec(r.Context(), `UPDATE rh.funcionarios SET pessoa_id = $1 WHERE id = $2`, pessoaID, id)

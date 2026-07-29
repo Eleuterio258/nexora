@@ -5,7 +5,9 @@ package pessoas
 
 import (
 	"context"
+	"errors"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -27,22 +29,96 @@ type Execer interface {
 //   - caso contrário, cria uma pessoa nova a partir do nome (mesma lógica
 //     do backfill da migration 20260713000001_pessoas_fase1).
 func EnsureUserPessoa(ctx context.Context, tx Execer, userID int64, nome string, pessoaID *int64) (int64, error) {
+	return EnsureUserPessoaComIdentidade(ctx, tx, userID, nome, pessoaID, Identidade{})
+}
+
+// Identidade são os dados que identificam civilmente uma pessoa. O par
+// (TipoDocumento, NumeroDocumento) é a chave de deduplicação — corresponde à
+// restrição única uq_pessoas_documento — e é o que permite reconhecer que o
+// candidato que agora se contrata já existe no sistema como aluno, cliente ou
+// funcionário de outro tenant.
+type Identidade struct {
+	TipoDocumento   string
+	NumeroDocumento string
+	Nuit            string
+	DataNascimento  *time.Time
+	Nacionalidade   string
+}
+
+// temDocumento diz se a identidade traz a chave de deduplicação completa.
+func (i Identidade) temDocumento() bool {
+	return strings.TrimSpace(i.TipoDocumento) != "" && strings.TrimSpace(i.NumeroDocumento) != ""
+}
+
+// ErrDocumentoNoutraPessoa é devolvido quando o documento indicado já pertence
+// a uma pessoa diferente daquela a que a conta está ligada. Significa que o
+// mesmo humano existe duas vezes em pessoas.pessoas: resolver isso é uma fusão
+// de registos, decisão de quem opera, não algo a fazer em silêncio a meio de
+// uma contratação.
+var ErrDocumentoNoutraPessoa = errors.New("documento já pertence a outra pessoa")
+
+// EnsureUserPessoaComIdentidade é o EnsureUserPessoa com os dados civis da
+// pessoa. Além de ligar a conta, faz duas coisas que a versão sem identidade
+// não podia fazer:
+//
+//  1. procura por documento antes de criar — sem isto cada fluxo criava uma
+//     pessoa nova a partir do nome e o mesmo humano acabava espalhado por
+//     várias linhas;
+//  2. completa os campos em falta da pessoa (documento, NUIT, nascimento,
+//     nacionalidade), sem nunca sobrepor valores já preenchidos.
+func EnsureUserPessoaComIdentidade(ctx context.Context, tx Execer, userID int64, nome string, pessoaID *int64, ident Identidade) (int64, error) {
 	var actual *int64
 	if err := tx.QueryRow(ctx, `SELECT pessoa_id FROM auth.users WHERE id = $1`, userID).Scan(&actual); err != nil {
 		return 0, err
 	}
 	if actual != nil {
+		if err := CompletarIdentidade(ctx, tx, *actual, ident); err != nil {
+			return 0, err
+		}
 		return *actual, nil
 	}
 
 	var novoID int64
-	if pessoaID != nil && *pessoaID > 0 {
+	switch {
+	case pessoaID != nil && *pessoaID > 0:
 		novoID = *pessoaID
-	} else {
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO pessoas.pessoas (nome_completo) VALUES ($1)
-			RETURNING id`, nome).Scan(&novoID); err != nil {
+		if err := CompletarIdentidade(ctx, tx, novoID, ident); err != nil {
 			return 0, err
+		}
+
+	default:
+		// Reconhecer antes de criar: se já existe alguém com este documento, é
+		// a mesma pessoa noutro papel.
+		if ident.temDocumento() {
+			var existente int64
+			err := tx.QueryRow(ctx, `
+				SELECT id FROM pessoas.pessoas
+				 WHERE tipo_documento = $1 AND numero_documento = $2`,
+				strings.TrimSpace(ident.TipoDocumento), strings.TrimSpace(ident.NumeroDocumento),
+			).Scan(&existente)
+			switch {
+			case err == nil:
+				novoID = existente
+				if err := CompletarIdentidade(ctx, tx, novoID, ident); err != nil {
+					return 0, err
+				}
+			case errors.Is(err, pgx.ErrNoRows):
+				// segue para a criação
+			default:
+				return 0, err
+			}
+		}
+		if novoID == 0 {
+			if err := tx.QueryRow(ctx, `
+				INSERT INTO pessoas.pessoas
+				    (nome_completo, tipo_documento, numero_documento, nuit, data_nascimento, nacionalidade)
+				VALUES ($1, NULLIF($2,''), NULLIF($3,''), NULLIF($4,''), $5, NULLIF($6,''))
+				RETURNING id`,
+				nome, strings.TrimSpace(ident.TipoDocumento), strings.TrimSpace(ident.NumeroDocumento),
+				strings.TrimSpace(ident.Nuit), ident.DataNascimento, strings.TrimSpace(ident.Nacionalidade),
+			).Scan(&novoID); err != nil {
+				return 0, err
+			}
 		}
 	}
 
@@ -50,6 +126,46 @@ func EnsureUserPessoa(ctx context.Context, tx Execer, userID int64, nome string,
 		return 0, err
 	}
 	return novoID, nil
+}
+
+// CompletarIdentidade preenche os campos civis que a pessoa ainda não tem.
+// Nunca sobrepõe um valor existente (COALESCE sobre a coluna): o registo mais
+// antigo é o que já foi conferido contra documento, e uma contratação não é
+// sítio para o corrigir em silêncio.
+func CompletarIdentidade(ctx context.Context, tx Execer, pessoaID int64, ident Identidade) error {
+	if ident == (Identidade{}) {
+		return nil
+	}
+
+	// Se o documento já está noutra pessoa, escrevê-lo aqui violaria
+	// uq_pessoas_documento — e o que isso indica é um duplicado por fundir.
+	if ident.temDocumento() {
+		var dono int64
+		err := tx.QueryRow(ctx, `
+			SELECT id FROM pessoas.pessoas
+			 WHERE tipo_documento = $1 AND numero_documento = $2`,
+			strings.TrimSpace(ident.TipoDocumento), strings.TrimSpace(ident.NumeroDocumento),
+		).Scan(&dono)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if err == nil && dono != pessoaID {
+			return ErrDocumentoNoutraPessoa
+		}
+	}
+
+	_, err := tx.Exec(ctx, `
+		UPDATE pessoas.pessoas
+		   SET tipo_documento   = COALESCE(tipo_documento,   NULLIF($2,'')),
+		       numero_documento = COALESCE(numero_documento, NULLIF($3,'')),
+		       nuit             = COALESCE(nuit,             NULLIF($4,'')),
+		       data_nascimento  = COALESCE(data_nascimento,  $5),
+		       nacionalidade    = COALESCE(nacionalidade,    NULLIF($6,'')),
+		       updated_at       = NOW()
+		 WHERE id = $1`,
+		pessoaID, strings.TrimSpace(ident.TipoDocumento), strings.TrimSpace(ident.NumeroDocumento),
+		strings.TrimSpace(ident.Nuit), ident.DataNascimento, strings.TrimSpace(ident.Nacionalidade))
+	return err
 }
 
 // EnsurePessoa cria sempre uma pessoa nova a partir do nome, sem conta de

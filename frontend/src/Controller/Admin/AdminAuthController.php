@@ -51,6 +51,34 @@ final readonly class AdminAuthController
         exit;
     }
 
+    /**
+     * /nexora/papel/{tipo} — entra noutro papel da mesma pessoa.
+     *
+     * Quem autoriza é a API (pessoas.v_pessoa_tipos): daqui só se pede. Um
+     * tipo que a pessoa não tenha devolve 403 e volta à escolha de destino.
+     */
+    public function papel(string $tipo): never
+    {
+        if (!$this->session->isAuthenticated()) {
+            header('Location: /nexora/login');
+            exit;
+        }
+
+        $urlDoTipo = [
+            'candidato'   => '/carreira/candidato/area',
+            'aluno'       => '/portal/aluno',
+            'encarregado' => '/portal/encarregado',
+            'funcionario' => '/nexora/',
+        ];
+        if (!isset($urlDoTipo[$tipo]) || !$this->session->trocarPapel($tipo)) {
+            header('Location: /nexora/destino?erro=papel');
+            exit;
+        }
+
+        header('Location: ' . $urlDoTipo[$tipo]);
+        exit;
+    }
+
     public function destino(): void
     {
         if (!$this->session->isAuthenticated()) {
@@ -116,6 +144,46 @@ final readonly class AdminAuthController
                 'ativo' => $this->session->isSuperAdmin(),
             ],
         ];
+
+        // Papéis que a pessoa tem mas para os quais a sessão actual não tem
+        // escopo (pessoas.v_pessoa_tipos). Antes disto a página só mostrava o
+        // que o token já permitia, e uma pessoa que fosse ao mesmo tempo
+        // funcionária e candidata via apenas a porta por onde entrou — a outra
+        // era inalcançável sem alterar o tipo da conta. Estes destinos passam
+        // por /nexora/papel/<tipo>, que troca o token antes de encaminhar.
+        // O escopo de cada papel vem do backend (pessoaTipo.escopo); aqui só
+        // fica o texto que se mostra. Um mapa tipo→escopo do lado do PHP
+        // dessincronizava-se assim que um papel novo aparecesse.
+        $rotulos = [
+            'candidato'   => ['Área do Candidato',     'Acompanhe as suas candidaturas a vagas.',      'briefcase'],
+            'aluno'       => ['Portal do Aluno',       'Área dedicada aos alunos.',                    'graduation'],
+            'encarregado' => ['Portal do Encarregado', 'Área dedicada aos encarregados de educação.',  'users'],
+            'funcionario' => ['ERP',                   'Área restrita para funcionários do ERP.',      'briefcase'],
+            'professor'   => ['Portal do Professor',   'Área dedicada aos professores.',               'chalkboard'],
+        ];
+        $escoposJaActivos = array_column(array_filter($destinos, static fn(array $d): bool => $d['ativo']), 'escopo');
+        foreach ($this->session->tipos() as $papel) {
+            $tipoPessoa = (string) ($papel['tipo'] ?? '');
+            $escopo     = (string) ($papel['escopo'] ?? '');
+            // Sem escopo o papel não tem área própria (é o caso de 'cliente'):
+            // aparece nas etiquetas da barra lateral, mas não é um destino.
+            if (!($papel['activo'] ?? false) || $escopo === '' || !isset($rotulos[$tipoPessoa])) {
+                continue;
+            }
+            if (in_array($escopo, $escoposJaActivos, true)) {
+                continue;
+            }
+            [$titulo, $descricao, $icone] = $rotulos[$tipoPessoa];
+            $destinos[] = [
+                'escopo'    => $escopo,
+                'titulo'    => $titulo,
+                'descricao' => $descricao,
+                'url'       => '/nexora/papel/' . rawurlencode($tipoPessoa),
+                'icone'     => $icone,
+                'ativo'     => true,
+            ];
+            $escoposJaActivos[] = $escopo;
+        }
 
         $destinos = array_values(array_filter($destinos, static fn(array $destino): bool => $destino['ativo']));
 

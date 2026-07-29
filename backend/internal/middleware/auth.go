@@ -45,6 +45,15 @@ func HashToken(token string) string {
 // registada: migrar contas de portal para OAuth2 exigiria resolver primeiro
 // o facto de não terem um "sub" numérico consistente no espaço auth.users,
 // ver oauth_token.go). RequireAuth tem de continuar a aceitar os dois.
+// JWTKeyFunc expõe jwtKeyFunc a quem valida tokens fora do middleware — hoje
+// o WebSocket do chat (internal/ws.ServeWS), que autentica pelo query param
+// ?token= e por isso não passa por RequireAuth. Enquanto tinha o seu próprio
+// parse, só aceitava HMAC, e ficou a devolver 401 em ciclo assim que os
+// access tokens do ERP passaram a ser RS256.
+func JWTKeyFunc(jwtSecret string, oauthKeys *oauthkeys.Provider) jwt.Keyfunc {
+	return jwtKeyFunc(jwtSecret, oauthKeys)
+}
+
 func jwtKeyFunc(jwtSecret string, oauthKeys *oauthkeys.Provider) jwt.Keyfunc {
 	return func(t *jwt.Token) (interface{}, error) {
 		switch t.Method.(type) {

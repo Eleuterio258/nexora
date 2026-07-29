@@ -32,6 +32,11 @@ final class AdminSession
         $_SESSION['nexora_escopos']         = $this->normalizeEscopos($body['escopo'] ?? ($_SESSION['nexora_user']['escopo'] ?? 'erp'));
         $_SESSION['nexora_escopo']          = $this->legacyEscopo($_SESSION['nexora_escopos']);
         $_SESSION['nexora_user']            = $body['user'] ?? [];
+        // Os papéis vêm no topo em todos os caminhos de login; no do ERP vêm
+        // também dentro de "user". Guardados à parte para não depender de por
+        // que porta se entrou.
+        $_SESSION['nexora_tipos']           = $body['tipos'] ?? ($body['user']['tipos'] ?? []);
+        $_SESSION['nexora_pessoa_id']       = $body['pessoa_id'] ?? ($body['user']['pessoa_id'] ?? null);
         $_SESSION['nexora_modulos']         = $body['modulos'] ?? [];
         $_SESSION['nexora_features']        = $body['features'] ?? [];
         if (($_SESSION['nexora_tipo'] ?? '') === 'aluno' && !empty($body['aluno'])) {
@@ -172,6 +177,84 @@ final class AdminSession
     public function user(): array
     {
         return $_SESSION['nexora_user'] ?? [];
+    }
+
+    /**
+     * Papéis de domínio da pessoa autenticada — funcionário, candidato,
+     * professor, aluno, encarregado, cliente — vindos de
+     * pessoas.v_pessoa_tipos no login. A conta diz como se entra; a pessoa
+     * diz quem entrou, e pode ter vários papéis ao mesmo tempo, inclusive em
+     * tenants diferentes.
+     *
+     * @return array<int,array{tipo:string,tenant_id:int,tenant_nome:string,referencia_id:int,activo:bool}>
+     */
+    public function tipos(): array
+    {
+        $tipos = $_SESSION['nexora_tipos'] ?? ($_SESSION['nexora_user']['tipos'] ?? []);
+        return is_array($tipos) ? $tipos : [];
+    }
+
+    /** Só os papéis activos, sem repetir o mesmo tipo em tenants diferentes. */
+    public function tiposActivos(): array
+    {
+        $out = [];
+        foreach ($this->tipos() as $t) {
+            if (($t['activo'] ?? false) && !in_array($t['tipo'] ?? '', $out, true)) {
+                $out[] = $t['tipo'];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Troca para outro papel da mesma pessoa (POST /api/auth/papel).
+     *
+     * Os tokens dos portais são guardados nas chaves próprias de cada um
+     * (PortalCandidatoSession, PortalAlunoSession, PortalEncarregadoController),
+     * deixando a sessão do ERP intacta — é isso que permite voltar a
+     * /nexora/destino e trocar outra vez. O caminho inverso não existiria de
+     * outra forma: um token de portal não é aceite pelo RequireAuth do ERP.
+     */
+    public function trocarPapel(string $tipo): bool
+    {
+        try {
+            $resp = $this->client->call('POST', '/api/auth/papel', ['tipo' => $tipo]);
+        } catch (\Throwable) {
+            return false;
+        }
+        if (($resp['status'] ?? 0) !== 200 || empty($resp['body']['access_token'])) {
+            return false;
+        }
+        $body = $resp['body'];
+
+        switch ($tipo) {
+            case 'candidato':
+                $_SESSION['candidato_token']      = $body['access_token'];
+                $_SESSION['candidato_info']       = $body['candidato'] ?? [];
+                $_SESSION['candidato_expires_at'] = time() + (int) ($body['expires_in'] ?? 2592000);
+                return true;
+            case 'aluno':
+                $_SESSION['portal_aluno_token']      = $body['access_token'];
+                $_SESSION['portal_aluno_info']       = $body['aluno'] ?? [];
+                $_SESSION['portal_aluno_expires_at'] = time() + (int) ($body['expires_in'] ?? 28800);
+                return true;
+            case 'encarregado':
+                $_SESSION['enc_token']      = $body['access_token'];
+                $_SESSION['enc_info']       = $body['encarregado'] ?? [];
+                $_SESSION['enc_expires_at'] = time() + (int) ($body['expires_in'] ?? 28800);
+                return true;
+            case 'funcionario':
+                // Aqui é a própria sessão do ERP que passa a valer.
+                $this->store($body);
+                return true;
+        }
+        return false;
+    }
+
+    public function pessoaId(): ?int
+    {
+        $id = $_SESSION['nexora_pessoa_id'] ?? ($_SESSION['nexora_user']['pessoa_id'] ?? null);
+        return $id === null ? null : (int) $id;
     }
 
     public function isSuperAdmin(): bool

@@ -210,6 +210,9 @@ if (str_starts_with($uri, '/admin')) {
         $app->adminAuth->login();
     } elseif ($path === '/nexora/destino') {
         $app->adminAuth->destino();
+    } elseif (str_starts_with($path, '/nexora/papel/')) {
+        // Troca para outro papel da mesma pessoa (ver AdminAuthController::papel).
+        $app->adminAuth->papel(substr($path, strlen('/nexora/papel/')));
     } elseif ($path === '/nexora/logout') {
         $app->adminAuth->logout();
     } elseif ($path === '/nexora/download') {

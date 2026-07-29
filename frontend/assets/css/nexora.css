@@ -218,6 +218,16 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .adm-sidebar-uinfo { flex: 1; min-width: 0; }
 .adm-sidebar-uname { font-size: var(--adm-text-sm); font-weight: 600; color: var(--adm-white); opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .adm-sidebar-urole { font-size: .7rem; color: rgba(255,255,255,.4); }
+/* Papéis da pessoa (funcionário/aluno/encarregado/...) — só aparecem quando
+   há mais do que um, por isso podem quebrar para uma segunda linha. */
+.adm-sidebar-utipos { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+.adm-utipo {
+    font-size: .6rem; line-height: 1.4;
+    padding: 0 5px; border-radius: 999px;
+    color: rgba(255,255,255,.65);
+    background: rgba(255,255,255,.1);
+    white-space: nowrap;
+}
 .adm-sidebar-logout {
     display: flex; align-items: center; justify-content: center;
     color: rgba(255,255,255,.4);
