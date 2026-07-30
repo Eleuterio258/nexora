@@ -25,18 +25,24 @@ final class AdminSession
 
     public function store(array $body): void
     {
+        // tipo/escopo/pessoa_id/tipos só vêm dentro do objecto próprio de cada
+        // caminho de login (user/aluno/encarregado/candidato) — nunca soltos
+        // no topo da resposta. Exactamente um destes existe por resposta.
+        $conta = $body['user'] ?? $body['aluno'] ?? $body['encarregado'] ?? $body['candidato'] ?? [];
+
         $_SESSION['nexora_access_token']    = $body['access_token'] ?? '';
         $_SESSION['nexora_refresh_token']   = $body['refresh_token'] ?? '';
         $_SESSION['nexora_token_expires_at'] = time() + (int) ($body['expires_in'] ?? 900);
-        $_SESSION['nexora_tipo']            = $body['tipo'] ?? 'funcionario';
-        $_SESSION['nexora_escopos']         = $this->normalizeEscopos($body['escopo'] ?? ($_SESSION['nexora_user']['escopo'] ?? 'erp'));
+        $_SESSION['nexora_tipo']            = $conta['tipo'] ?? 'funcionario';
+        $_SESSION['nexora_escopos']         = $this->normalizeEscopos($conta['escopo'] ?? 'erp');
         $_SESSION['nexora_escopo']          = $this->legacyEscopo($_SESSION['nexora_escopos']);
         $_SESSION['nexora_user']            = $body['user'] ?? [];
-        // Os papéis vêm no topo em todos os caminhos de login; no do ERP vêm
-        // também dentro de "user". Guardados à parte para não depender de por
-        // que porta se entrou.
-        $_SESSION['nexora_tipos']           = $body['tipos'] ?? ($body['user']['tipos'] ?? []);
-        $_SESSION['nexora_pessoa_id']       = $body['pessoa_id'] ?? ($body['user']['pessoa_id'] ?? null);
+        $_SESSION['nexora_tipos']           = $conta['tipos'] ?? [];
+        $_SESSION['nexora_pessoa_id']       = $conta['pessoa_id'] ?? null;
+        // Escopos distintos entre TODOS os papéis activos da pessoa, já
+        // resolvidos pelo backend (ver escoposDaPessoa em auth.go) — só vem no
+        // caminho do ERP, os portais não precisam de saber disto.
+        $_SESSION['nexora_escopos_pessoa']  = $conta['escopos_pessoa'] ?? [];
         $_SESSION['nexora_modulos']         = $body['modulos'] ?? [];
         $_SESSION['nexora_features']        = $body['features'] ?? [];
         if (($_SESSION['nexora_tipo'] ?? '') === 'aluno' && !empty($body['aluno'])) {
@@ -54,8 +60,7 @@ final class AdminSession
             $_SESSION['candidato_info']       = $body['candidato'];
             $_SESSION['candidato_expires_at'] = time() + (int) ($body['expires_in'] ?? 2592000);
         }
-        $escoposRaw = is_array($body['escopo'] ?? null) ? $body['escopo'] : [$body['escopo'] ?? ''];
-        if (in_array('portal_professor', $escoposRaw, true)) {
+        if (in_array('portal_professor', $_SESSION['nexora_escopos'], true)) {
             $_SESSION['prof_token']      = $body['access_token'] ?? '';
             $_SESSION['prof_expires_at'] = time() + (int) ($body['expires_in'] ?? 28800);
         }
@@ -292,9 +297,11 @@ final class AdminSession
         return $this->escopo() === 'escola';
     }
 
+    /** Tem, em simultâneo, um papel activo com escopo 'erp' e outro com 'escola'. */
     public function isBoth(): bool
     {
-        return false;
+        $escopos = $_SESSION['nexora_escopos_pessoa'] ?? [];
+        return in_array('erp', $escopos, true) && in_array('escola', $escopos, true);
     }
 
     public function hasEscopo(string $escopo): bool

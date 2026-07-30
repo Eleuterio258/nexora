@@ -13,10 +13,8 @@ data class ErpLoginResponse(
     val refresh_token: String,
     val token_type: String,
     val expires_in: Int,
-    val tipo: String,
     val user: ErpUser,
     val modulos: List<ErpModuloAcesso> = emptyList(),
-    val escopo: List<String> = emptyList(),
     val features: List<String> = emptyList()
 )
 
@@ -24,6 +22,8 @@ data class ErpUser(
     val id: Long,
     val nome: String,
     val email: String,
+    val tipo: String,
+    val escopo: List<String> = emptyList(),
     val tenant_id: Long? = null,
     val cargo_id: Long? = null,
     val cargo: String? = null

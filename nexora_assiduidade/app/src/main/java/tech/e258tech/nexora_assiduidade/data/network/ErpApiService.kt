@@ -27,6 +27,7 @@ import tech.e258tech.nexora_assiduidade.data.model.AtividadeRequest
 import tech.e258tech.nexora_assiduidade.data.model.Ausencia
 import tech.e258tech.nexora_assiduidade.data.model.ChatMessageRequest
 import tech.e258tech.nexora_assiduidade.data.model.DispositivoErp
+import tech.e258tech.nexora_assiduidade.data.model.Funcionario
 import tech.e258tech.nexora_assiduidade.data.model.FuncionarioDetalhe
 import tech.e258tech.nexora_assiduidade.data.model.FuncionarioListResponse
 import tech.e258tech.nexora_assiduidade.data.model.GenericHardwareEventRequest
@@ -50,6 +51,7 @@ import tech.e258tech.nexora_assiduidade.data.model.PresencaOcorrencia
 import tech.e258tech.nexora_assiduidade.data.model.QRGenerateDeviceRequest
 import tech.e258tech.nexora_assiduidade.data.model.QRValidateDeviceRequest
 import tech.e258tech.nexora_assiduidade.data.model.RelatorioRH
+import tech.e258tech.nexora_assiduidade.data.model.Unidade
 import tech.e258tech.nexora_assiduidade.data.model.chat.Conversation
 import tech.e258tech.nexora_assiduidade.utils.Constants
 import tech.e258tech.nexora_assiduidade.data.model.response.AssiduidadeConfigResponse
@@ -283,6 +285,15 @@ interface ErpApiService {
         @Body request: AgendaItemRequest
     ): Response<Map<String, Long>>
 
+    // Lista simples (sem paginação) de funcionários — usado em pickers (ex.:
+    // Registo Manual). Sem `page`, o ERP devolve array simples em vez do
+    // envelope paginado usado por getFuncionarios().
+    @GET("api/rh/funcionarios")
+    suspend fun getFuncionariosAtivos(
+        @Header("Authorization") token: String,
+        @Query("estado") estado: String = "ativo"
+    ): Response<List<Funcionario>>
+
     // Equipa — lista de funcionários (rh.go:157, ListarFuncionarios)
     @GET("api/rh/funcionarios")
     suspend fun getFuncionarios(
@@ -415,6 +426,13 @@ interface ErpApiService {
         @Header("Authorization") token: String,
         @Path("id") justificacaoId: Long
     ): Response<Unit>
+
+    // Unidades organizacionais do tenant (rh.go:52, ListarUnidades) — usado
+    // pelo picker de "Local/Unidade" do gerador de QR fixo, entre outros.
+    @GET("api/rh/unidades")
+    suspend fun getUnidades(
+        @Header("Authorization") token: String
+    ): Response<List<Unidade>>
 
     // Dispositivos — cadastro real dos leitores biométricos (hardware/handlers/devices.go)
     @GET("api/hardware/devices")

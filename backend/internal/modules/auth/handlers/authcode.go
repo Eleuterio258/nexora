@@ -91,6 +91,7 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 		"id":     u.id,
 		"nome":   u.nome,
 		"email":  u.email,
+		"tipo":   u.tipo,
 		"escopo": escoposPorTipoEscopo(u.tipo, u.escopo),
 	}
 	if funcionarioID != nil {
@@ -99,10 +100,15 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 	// Identidade civil + papéis de domínio da pessoa (ver pessoas.v_pessoa_tipos).
 	// A conta diz como se entra; a pessoa diz quem entrou, e pode ser
 	// simultaneamente funcionária, encarregada e cliente — possivelmente em
-	// tenants diferentes.
+	// tenants diferentes. Só aqui, dentro de "user" — não repetido no topo da
+	// resposta.
 	pessoaID, tipos := h.tiposDoUser(r.Context(), u.id)
 	userObj["pessoa_id"] = pessoaID
 	userObj["tipos"] = tipos
+	// Escopos distintos entre TODOS os papéis activos da pessoa (não só o
+	// desta conta) — permite ao frontend saber, sem inferir nada, se há painel
+	// ERP e painel Escola em simultâneo (ver AdminSession::isBoth()).
+	userObj["escopos_pessoa"] = escoposDaPessoa(tipos)
 	features := []string{}
 	if userAccess != nil {
 		userObj["tenant_id"] = userAccess.TenantID
@@ -115,18 +121,14 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 		userObj["tenant_id"] = u.tenantID
 	}
 
-	// pessoa_id/tipos também no topo, como nos portais: quem consome não devia
-	// ter de saber por que porta entrou para os encontrar.
-	jsonOK(w, h.comTipos(r.Context(), u.id, map[string]interface{}{
+	jsonOK(w, map[string]interface{}{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 		"token_type":    "Bearer",
 		"expires_in":    int(h.cfg.JWTExpiresIn.Seconds()),
-		"tipo":          u.tipo,
-		"escopo":        escoposPorTipoEscopo(u.tipo, u.escopo),
 		"user":          userObj,
 		"features":      features,
-	}), http.StatusOK)
+	}, http.StatusOK)
 }
 
 // logAuthAttempt regista uma tentativa de autenticação delegada.

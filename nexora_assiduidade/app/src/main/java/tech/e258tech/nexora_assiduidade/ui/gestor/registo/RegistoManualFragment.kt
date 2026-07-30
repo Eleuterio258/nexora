@@ -4,8 +4,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.Button
-import android.widget.EditText
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
@@ -32,9 +33,10 @@ import java.util.UUID
  * funcionário (ex.: esqueceu o telemóvel, avaria de dispositivo). Desde
  * 2026-07-13 chama `POST /api/hardware/events/generic` directamente no
  * Nexora ERP (API Key de device embutida no APK) — deixou de passar pelo
- * proxy do FaceClock. O `funcionarioId` introduzido é o ID numérico tal como
- * devolvido por GET /api/rh/funcionarios (ecrã Equipa) — `rh.funcionarios.id`,
- * resolvido para `employee_no` via `HardwareEventMapper.resolveEmployeeCodeById`.
+ * proxy do FaceClock. O funcionário é escolhido num spinner (nome + número),
+ * preenchido a partir de `GET /api/rh/funcionarios?estado=ativo` — o `id`
+ * seleccionado (`rh.funcionarios.id`) é resolvido para `employee_no` via
+ * `HardwareEventMapper.resolveEmployeeCodeById`.
  *
  * Não pede para escolher Entrada/Saída — o ERP decide sozinho (ver
  * `registarEventoAssiduidade`/`inferirTipoEventoCodigo` em
@@ -49,6 +51,9 @@ import java.util.UUID
 class RegistoManualFragment : Fragment() {
 
     private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    private lateinit var spFuncionario: Spinner
+    private var funcionarioIds: List<Long> = emptyList()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -66,14 +71,20 @@ class RegistoManualFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val etEmployeeId = view.findViewById<EditText>(R.id.etEmployeeId)
+        spFuncionario = view.findViewById(R.id.spFuncionario)
         val btnRegister = view.findViewById<Button>(R.id.btnRegister)
         val tvStatus = view.findViewById<TextView>(R.id.tvRegistoStatus)
 
+        view.findViewById<View>(R.id.ivBack).setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
+
+        carregarFuncionarios(tvStatus)
+
         btnRegister.setOnClickListener {
-            val funcionarioId = etEmployeeId.text?.toString()?.trim()
-            if (funcionarioId.isNullOrEmpty()) {
-                tvStatus.text = "Indique o ID do funcionário."
+            val funcionarioId = funcionarioIds.getOrNull(spFuncionario.selectedItemPosition)
+            if (funcionarioId == null) {
+                tvStatus.text = "Não há funcionários disponíveis para seleccionar."
                 return@setOnClickListener
             }
 
@@ -81,7 +92,38 @@ class RegistoManualFragment : Fragment() {
         }
     }
 
-    private fun registar(funcionarioId: String, tvStatus: TextView, btnRegister: Button) {
+    private fun carregarFuncionarios(tvStatus: TextView) {
+        val token = SessionManager(requireContext()).getToken() ?: return
+        uiScope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.erpApiService.getFuncionariosAtivos(ApiUtils.bearerToken(token))
+                }
+                if (!isAdded) return@launch
+                if (!response.isSuccessful) {
+                    tvStatus.text = ApiUtils.errorMessage(response)
+                    return@launch
+                }
+
+                val funcionarios = response.body().orEmpty()
+                funcionarioIds = funcionarios.map { it.id }
+                spFuncionario.adapter = ArrayAdapter(
+                    requireContext(),
+                    android.R.layout.simple_spinner_dropdown_item,
+                    funcionarios.map { f ->
+                        f.numero_funcionario?.let { "${f.nome_completo} (Nº $it)" } ?: f.nome_completo
+                    }
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (!isAdded) return@launch
+                tvStatus.text = "Não foi possível carregar a lista de funcionários."
+            }
+        }
+    }
+
+    private fun registar(funcionarioId: Long, tvStatus: TextView, btnRegister: Button) {
         val token = SessionManager(requireContext()).getToken()
         if (token.isNullOrBlank()) {
             tvStatus.text = "Sessão inválida. Faça login novamente."
@@ -93,14 +135,8 @@ class RegistoManualFragment : Fragment() {
 
         uiScope.launch {
             try {
-                val funcionarioIdLong = funcionarioId.toLongOrNull()
-                if (funcionarioIdLong == null) {
-                    tvStatus.text = "ID do funcionário inválido."
-                    return@launch
-                }
-
                 val employeeCode = withContext(Dispatchers.IO) {
-                    HardwareEventMapper.resolveEmployeeCodeById(funcionarioIdLong)
+                    HardwareEventMapper.resolveEmployeeCodeById(funcionarioId)
                 }
                 if (employeeCode == null) {
                     tvStatus.text = "Funcionário não encontrado no ERP."
@@ -109,7 +145,7 @@ class RegistoManualFragment : Fragment() {
 
                 val request = ClockRegisterRequest(
                     idempotency_key = UUID.randomUUID().toString(),
-                    user_id = funcionarioId,
+                    user_id = funcionarioId.toString(),
                     device_id = "00000000-0000-0000-0000-000000000000",
                     event_type = Constants.EVENT_AUTO,
                     recorded_at = DateTimeUtils.nowForApi(),

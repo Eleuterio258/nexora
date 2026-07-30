@@ -25,14 +25,15 @@ class AuthRemoteDatasourceImpl implements AuthRemoteDatasource {
       );
       final data = response.data!;
 
-      // Determinar role pelo escopo (mais fiável que tipo)
-      final escopos = (data['escopo'] as List?)?.map((e) => e.toString()).toList() ?? [];
-      final role = _resolveRole(escopos, data['tipo']?.toString() ?? '');
-
       // Perfil varia por tipo de utilizador
       final aluno   = data['aluno'] as Map<String, dynamic>?;
       final userMap = data['user']  as Map<String, dynamic>?;
       final profile = aluno ?? userMap ?? const <String, dynamic>{};
+
+      // Determinar role pelo escopo (mais fiável que tipo) — ambos vêm dentro
+      // do objecto do perfil, nunca soltos no topo da resposta.
+      final escopos = (profile['escopo'] as List?)?.map((e) => e.toString()).toList() ?? [];
+      final role = _resolveRole(escopos, profile['tipo']?.toString() ?? '');
 
       final nome          = (profile['nome'] ?? profile['name'] ?? '').toString();
       final id            = (profile['id']   ?? 0).toString();

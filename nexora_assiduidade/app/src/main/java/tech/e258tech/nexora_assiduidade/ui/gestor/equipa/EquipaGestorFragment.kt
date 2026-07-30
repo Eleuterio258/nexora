@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
@@ -50,7 +51,12 @@ class EquipaGestorFragment : Fragment() {
         val recyclerView = view.findViewById<RecyclerView>(R.id.recyclerViewEquipa)
         val tvEmpty = view.findViewById<TextView>(R.id.tvEquipaEmpty)
         val tvConfigurarMetodos = view.findViewById<TextView>(R.id.tvConfigurarMetodos)
+        val progressBar = view.findViewById<ProgressBar>(R.id.progressBar)
         recyclerView.layoutManager = LinearLayoutManager(context)
+
+        view.findViewById<View>(R.id.ivBack).setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
 
         // Só quem pode ver a config de sistema (sistema-configuracao.ver_configuracoes)
         // vê a entrada — evita levar a um ecrã que só vai devolver 403.
@@ -69,15 +75,22 @@ class EquipaGestorFragment : Fragment() {
             return
         }
 
-        loadFuncionarios(recyclerView, tvEmpty, token)
+        loadFuncionarios(recyclerView, tvEmpty, progressBar, token)
     }
 
-    private fun loadFuncionarios(recyclerView: RecyclerView, tvEmpty: TextView, token: String) {
+    private fun loadFuncionarios(recyclerView: RecyclerView, tvEmpty: TextView, progressBar: ProgressBar, token: String) {
+        progressBar.visibility = View.VISIBLE
+        tvEmpty.visibility = View.GONE
+        recyclerView.visibility = View.GONE
+
         uiScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
                     RetrofitClient.erpApiService.getFuncionarios(ApiUtils.bearerToken(token))
                 }
+
+                if (!isAdded) return@launch
+                progressBar.visibility = View.GONE
 
                 if (!response.isSuccessful || response.body() == null) {
                     tvEmpty.visibility = View.VISIBLE
@@ -104,6 +117,7 @@ class EquipaGestorFragment : Fragment() {
                 throw e
             } catch (e: Exception) {
                 if (!isAdded) return@launch
+                progressBar.visibility = View.GONE
                 tvEmpty.visibility = View.VISIBLE
                 tvEmpty.text = "Não foi possível carregar a equipa."
                 recyclerView.visibility = View.GONE

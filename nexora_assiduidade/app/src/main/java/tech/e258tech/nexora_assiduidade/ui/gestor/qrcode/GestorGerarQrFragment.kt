@@ -6,10 +6,12 @@ import android.os.CountDownTimer
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.ProgressBar
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
@@ -38,7 +40,7 @@ class GestorGerarQrFragment : Fragment() {
 
     private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    private lateinit var etLocationId: EditText
+    private lateinit var spUnidade: Spinner
     private lateinit var etDuracao: EditText
     private lateinit var btnGerar: Button
     private lateinit var ivQrCode: ImageView
@@ -47,6 +49,10 @@ class GestorGerarQrFragment : Fragment() {
     private lateinit var tvStatus: TextView
 
     private var countdownTimer: CountDownTimer? = null
+
+    // Posição 0 é sempre "Todas as unidades" (envia location_id=null); as
+    // restantes espelham, por posição, os ids devolvidos por getUnidades().
+    private var unidadeIds: List<Long?> = listOf(null)
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -65,13 +71,20 @@ class GestorGerarQrFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        etLocationId = view.findViewById(R.id.etLocationId)
+        spUnidade = view.findViewById(R.id.spUnidade)
         etDuracao = view.findViewById(R.id.etDuracao)
         btnGerar = view.findViewById(R.id.btnGerar)
         ivQrCode = view.findViewById(R.id.ivQrCode)
         tvCountdown = view.findViewById(R.id.tvCountdown)
         progressBar = view.findViewById(R.id.progressBar)
         tvStatus = view.findViewById(R.id.tvStatus)
+
+        spUnidade.adapter = ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_spinner_dropdown_item,
+            listOf("Todas as unidades")
+        )
+        carregarUnidades()
 
         view.findViewById<View>(R.id.ivBack).setOnClickListener {
             parentFragmentManager.popBackStack()
@@ -82,6 +95,30 @@ class GestorGerarQrFragment : Fragment() {
         }
     }
 
+    private fun carregarUnidades() {
+        val token = SessionManager(requireContext()).getToken() ?: return
+        uiScope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.erpApiService.getUnidades(ApiUtils.bearerToken(token))
+                }
+                if (!isAdded || !response.isSuccessful) return@launch
+
+                val unidades = response.body().orEmpty().filter { it.ativo }
+                unidadeIds = listOf(null) + unidades.map { it.id }
+                spUnidade.adapter = ArrayAdapter(
+                    requireContext(),
+                    android.R.layout.simple_spinner_dropdown_item,
+                    listOf("Todas as unidades") + unidades.map { it.nome }
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Mantém só "Todas as unidades" — o gestor continua a conseguir gerar o QR.
+            }
+        }
+    }
+
     private fun gerarQr() {
         val token = SessionManager(requireContext()).getToken()
         if (token.isNullOrBlank()) {
@@ -89,7 +126,7 @@ class GestorGerarQrFragment : Fragment() {
             return
         }
 
-        val locationId = etLocationId.text?.toString()?.trim()?.takeIf { it.isNotBlank() }
+        val unidadeId = unidadeIds.getOrNull(spUnidade.selectedItemPosition)
         val duracao = etDuracao.text?.toString()?.toIntOrNull() ?: qrDuracaoPadraoSegundos
         if (duracao < 60 || duracao > 300) {
             Toast.makeText(context, "Duração deve estar entre 60 e 300 segundos", Toast.LENGTH_SHORT).show()
@@ -104,7 +141,7 @@ class GestorGerarQrFragment : Fragment() {
                 val response = withContext(Dispatchers.IO) {
                     RetrofitClient.erpApiService.generateQr(
                         ApiUtils.bearerToken(token),
-                        QRGenerateDeviceRequest(location_id = locationId, duracao_segundos = duracao)
+                        QRGenerateDeviceRequest(location_id = unidadeId?.toString(), duracao_segundos = duracao)
                     )
                 }
 

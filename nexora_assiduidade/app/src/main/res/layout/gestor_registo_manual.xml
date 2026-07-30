@@ -11,33 +11,50 @@
         android:layout_height="wrap_content"
         android:padding="16dp">
 
+        <ImageView
+            android:id="@+id/ivBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Voltar"
+            android:padding="8dp"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="@color/text_primary"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
         <TextView
             android:id="@+id/tvRegistoTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:text="Registo Manual"
             android:textColor="@color/text_primary"
             android:textSize="24sp"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toBottomOf="@id/ivBack" />
 
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/tilEmployeeId"
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/tvFuncionarioLabel"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
+            android:text="Funcionário"
+            android:textColor="@color/text_muted"
+            android:textSize="13sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvRegistoTitle" />
+
+        <Spinner
+            android:id="@+id/spFuncionario"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvRegistoTitle">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etEmployeeId"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="ID do Funcionário (ver ecrã Equipa)"
-                android:inputType="number" />
-        </com.google.android.material.textfield.TextInputLayout>
+            app:layout_constraintTop_toBottomOf="@id/tvFuncionarioLabel" />
 
         <TextView
             android:id="@+id/tvAutoDetectHint"
@@ -49,7 +66,7 @@
             android:textSize="13sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tilEmployeeId" />
+            app:layout_constraintTop_toBottomOf="@id/spFuncionario" />
 
         <Button
             android:id="@+id/btnRegister"

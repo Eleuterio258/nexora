@@ -273,20 +273,22 @@ func (h *Handler) loginAluno(w http.ResponseWriter, r *http.Request, userID int6
 
 	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, userID)
 
-	jsonOK(w, h.comTipos(r.Context(), userID, map[string]interface{}{
+	pessoaID, tipos := h.tiposDoUser(r.Context(), userID)
+	jsonOK(w, map[string]interface{}{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 		"token_type":    "Bearer",
 		"expires_in":    int(portalJWTExpiry.Seconds()),
-		"tipo":          "aluno",
-		"escopo":        escoposPorTipoEscopo("aluno", ""),
 		"aluno": map[string]interface{}{
-			"id":     studentID,
-			"nome":   nome,
-			"codigo": codigo,
-			"escopo": escoposPorTipoEscopo("aluno", ""),
+			"id":        studentID,
+			"nome":      nome,
+			"codigo":    codigo,
+			"tipo":      "aluno",
+			"escopo":    escoposPorTipoEscopo("aluno", ""),
+			"pessoa_id": pessoaID,
+			"tipos":     tipos,
 		},
-	}), http.StatusOK)
+	}, http.StatusOK)
 }
 
 func (h *Handler) loginEncarregado(w http.ResponseWriter, r *http.Request, userID int64, nome string) {
@@ -330,20 +332,22 @@ func (h *Handler) loginEncarregado(w http.ResponseWriter, r *http.Request, userI
 
 	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, userID)
 
-	jsonOK(w, h.comTipos(r.Context(), userID, map[string]interface{}{
+	pessoaID, tipos := h.tiposDoUser(r.Context(), userID)
+	jsonOK(w, map[string]interface{}{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 		"token_type":    "Bearer",
 		"expires_in":    int(encarregadoJWTExpiry.Seconds()),
-		"tipo":          "encarregado",
-		"escopo":        escoposPorTipoEscopo("encarregado", ""),
 		"encarregado": map[string]interface{}{
 			"nome":      nome,
 			"email":     email,
 			"tenant_id": tenantID,
+			"tipo":      "encarregado",
 			"escopo":    escoposPorTipoEscopo("encarregado", ""),
+			"pessoa_id": pessoaID,
+			"tipos":     tipos,
 		},
-	}), http.StatusOK)
+	}, http.StatusOK)
 }
 
 func (h *Handler) LoginCandidato(w http.ResponseWriter, r *http.Request, userID int64, nome string) {
@@ -390,21 +394,23 @@ func (h *Handler) LoginCandidato(w http.ResponseWriter, r *http.Request, userID 
 
 	h.db.Exec(r.Context(), `UPDATE users SET ultimo_login_em = NOW() WHERE id = $1`, userID)
 
-	jsonOK(w, h.comTipos(r.Context(), userID, map[string]interface{}{
+	pessoaID, tipos := h.tiposDoUser(r.Context(), userID)
+	jsonOK(w, map[string]interface{}{
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 		"token_type":    "Bearer",
 		"expires_in":    int(candidatoJWTExpiry.Seconds()),
-		"tipo":          "candidato",
-		"escopo":        escoposPorTipoEscopo("candidato", ""),
 		"candidato": map[string]interface{}{
 			"id":        candidatoID,
 			"nome":      nome,
 			"email":     email,
 			"tenant_id": tenantID,
+			"tipo":      "candidato",
 			"escopo":    escoposPorTipoEscopo("candidato", ""),
+			"pessoa_id": pessoaID,
+			"tipos":     tipos,
 		},
-	}), http.StatusOK)
+	}, http.StatusOK)
 }
 
 // ── Logout ────────────────────────────────────────────────────────────────────
@@ -514,19 +520,21 @@ func (h *Handler) refreshAluno(w http.ResponseWriter, r *http.Request, userID in
 		return
 	}
 
-	jsonOK(w, h.comTipos(r.Context(), userID, map[string]interface{}{
+	pessoaID, tipos := h.tiposDoUser(r.Context(), userID)
+	jsonOK(w, map[string]interface{}{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
 		"expires_in":   int(portalJWTExpiry.Seconds()),
-		"tipo":         "aluno",
-		"escopo":       escoposPorTipoEscopo("aluno", ""),
 		"aluno": map[string]interface{}{
-			"id":     studentID,
-			"nome":   nome,
-			"codigo": codigo,
-			"escopo": escoposPorTipoEscopo("aluno", ""),
+			"id":        studentID,
+			"nome":      nome,
+			"codigo":    codigo,
+			"tipo":      "aluno",
+			"escopo":    escoposPorTipoEscopo("aluno", ""),
+			"pessoa_id": pessoaID,
+			"tipos":     tipos,
 		},
-	}), http.StatusOK)
+	}, http.StatusOK)
 }
 
 func (h *Handler) refreshEncarregado(w http.ResponseWriter, r *http.Request, userID int64) {
@@ -562,19 +570,21 @@ func (h *Handler) refreshEncarregado(w http.ResponseWriter, r *http.Request, use
 		return
 	}
 
-	jsonOK(w, h.comTipos(r.Context(), userID, map[string]interface{}{
+	pessoaID, tipos := h.tiposDoUser(r.Context(), userID)
+	jsonOK(w, map[string]interface{}{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
 		"expires_in":   int(encarregadoJWTExpiry.Seconds()),
-		"tipo":         "encarregado",
-		"escopo":       escoposPorTipoEscopo("encarregado", ""),
 		"encarregado": map[string]interface{}{
 			"nome":      nome,
 			"email":     email,
 			"tenant_id": tenantID,
+			"tipo":      "encarregado",
 			"escopo":    escoposPorTipoEscopo("encarregado", ""),
+			"pessoa_id": pessoaID,
+			"tipos":     tipos,
 		},
-	}), http.StatusOK)
+	}, http.StatusOK)
 }
 
 func (h *Handler) refreshCandidato(w http.ResponseWriter, r *http.Request, userID int64) {
@@ -613,20 +623,22 @@ func (h *Handler) refreshCandidato(w http.ResponseWriter, r *http.Request, userI
 		return
 	}
 
-	jsonOK(w, h.comTipos(r.Context(), userID, map[string]interface{}{
+	pessoaID, tipos := h.tiposDoUser(r.Context(), userID)
+	jsonOK(w, map[string]interface{}{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
 		"expires_in":   int(candidatoJWTExpiry.Seconds()),
-		"tipo":         "candidato",
-		"escopo":       escoposPorTipoEscopo("candidato", ""),
 		"candidato": map[string]interface{}{
 			"id":        candidatoID,
 			"nome":      nome,
 			"email":     email,
 			"tenant_id": tenantID,
+			"tipo":      "candidato",
 			"escopo":    escoposPorTipoEscopo("candidato", ""),
+			"pessoa_id": pessoaID,
+			"tipos":     tipos,
 		},
-	}), http.StatusOK)
+	}, http.StatusOK)
 }
 
 // ── Me ────────────────────────────────────────────────────────────────────────
@@ -714,22 +726,6 @@ func escopoDoPapel(tipo, escopoVinculo string) string {
 		return escoposPorTipoEscopo(tipo, "")[0]
 	}
 	return ""
-}
-
-// comTipos acrescenta pessoa_id e tipos a uma resposta de login/refresh.
-//
-// Aplica-se a TODOS os caminhos de autenticação, não só ao ERP: uma pessoa
-// entra pelo portal do candidato e pode entretanto já ser funcionária — foi o
-// que aconteceu com a Ana Paulo Machava, contratada enquanto mantinha a sessão
-// de candidata. O `tipo` no topo da resposta continua a dizer por que porta se
-// entrou; `tipos` diz tudo o que essa pessoa é. Também vai nos refresh, porque
-// um papel novo pode aparecer a meio de uma sessão longa (a do candidato dura
-// 30 dias).
-func (h *Handler) comTipos(ctx context.Context, userID int64, resp map[string]interface{}) map[string]interface{} {
-	pessoaID, tipos := h.tiposDoUser(ctx, userID)
-	resp["pessoa_id"] = pessoaID
-	resp["tipos"] = tipos
-	return resp
 }
 
 // tiposDoUser resolve a pessoa de uma conta e devolve os seus papéis de
@@ -954,6 +950,24 @@ func randomJTI() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil
+}
+
+// escoposDaPessoa devolve os escopos distintos dos papéis activos da pessoa —
+// por exemplo ["erp", "escola"] para quem é funcionária num tenant de negócio
+// e noutro escolar. Usado para decidir se a sessão pode oferecer o atalho
+// directo entre painéis sem passar por /nexora/papel: essa decisão pertence
+// aqui, não a um mapa tipo→escopo replicado no PHP.
+func escoposDaPessoa(tipos []pessoaTipo) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, t := range tipos {
+		if !t.Activo || t.Escopo == "" || seen[t.Escopo] {
+			continue
+		}
+		seen[t.Escopo] = true
+		out = append(out, t.Escopo)
+	}
+	return out
 }
 
 func escoposPorTipoEscopo(tipo, escopo string) []string {
