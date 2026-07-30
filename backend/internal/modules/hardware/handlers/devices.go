@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -44,6 +46,21 @@ type DeviceResponse struct {
 	CreatedAt    time.Time          `json:"created_at"`
 }
 
+// Nota sobre tenant_id em hardware.devices
+//
+// hardware.devices.tenant_id é um empresas.companies.id — garantido pela FK
+// devices_tenant_id_fkey — enquanto AuthUser.TenantID, vindo do JWT, é um
+// saas.tenants.id (auth.memberships.tenant_id referencia saas.tenants
+// directamente). São os dois espaços de IDs descritos em pkg/tenantid, e o
+// processador de eventos traduz de um para o outro com tenantid.ResolveSaas.
+//
+// Comparar os dois directamente — o que estes handlers faziam — não devolvia
+// nada no caso benigno e, no caso mau, atravessava a fronteira do tenant:
+// basta que o saas.tenants.id de um tenant coincida com o companies.id de
+// outro (ex.: saas.tenants 7 = e258tech, mas companies 7 = Instituto
+// Politécnico). Por isso todas as queries a hardware.devices filtram pelas
+// empresas do tenant autenticado — no plural, porque um tenant pode ter mais
+// do que uma empresa.
 func (h *Handler) ListarDispositivos(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 
@@ -51,7 +68,7 @@ func (h *Handler) ListarDispositivos(w http.ResponseWriter, r *http.Request) {
 		SELECT id, tenant_id, branch_id, nome, serial_number, modelo, localizacao, tipo, driver,
 		       COALESCE(ip_permitido::text, '') as ip_permitido, api_key_prefix, ativo, ultimo_uso_em, created_at
 		  FROM hardware.devices
-		 WHERE tenant_id = $1
+		 WHERE tenant_id IN (SELECT id FROM empresas.companies WHERE tenant_id = $1)
 		 ORDER BY created_at DESC`, user.TenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
@@ -84,7 +101,8 @@ func (h *Handler) ObterDispositivo(w http.ResponseWriter, r *http.Request) {
 		SELECT id, tenant_id, branch_id, nome, serial_number, modelo, localizacao, tipo, driver,
 		       COALESCE(ip_permitido::text, '') as ip_permitido, api_key_prefix, ativo, ultimo_uso_em, created_at
 		  FROM hardware.devices
-		 WHERE id = $1 AND tenant_id = $2`, id, user.TenantID,
+		 WHERE id = $1
+		   AND tenant_id IN (SELECT id FROM empresas.companies WHERE tenant_id = $2)`, id, user.TenantID,
 	).Scan(&d.ID, &d.TenantID, &d.BranchID, &d.Nome, &d.SerialNumber, &d.Modelo, &d.Localizacao, &d.Tipo, &d.Driver,
 		&ip, &d.APIKeyPrefix, &d.Ativo, &d.UltimoUsoEm, &d.CreatedAt)
 	if err != nil {
@@ -137,13 +155,26 @@ func (h *Handler) CriarDispositivo(w http.ResponseWriter, r *http.Request) {
 		ip = *body.IPPermitido
 	}
 
+	// tenant_id aqui é um empresas.companies.id (ver a nota acima de
+	// ListarDispositivos). Gravar o user.TenantID do JWT sem traduzir punha o
+	// dispositivo numa empresa arbitrária: no melhor caso inexistente (a FK
+	// rejeitava), no pior a empresa de outro tenant, e então tudo o que esse
+	// dispositivo marcasse era escrito no tenant vizinho, porque o
+	// processador de eventos parte de devices.tenant_id para chegar ao tenant
+	// SaaS.
+	companyID, err := h.empresaDoDispositivo(r.Context(), user.TenantID, body.BranchID)
+	if err != nil {
+		jsonErr(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+
 	var id int64
-	err := h.db.QueryRow(r.Context(), `
+	err = h.db.QueryRow(r.Context(), `
 		INSERT INTO hardware.devices
 		  (tenant_id, branch_id, nome, serial_number, modelo, localizacao, tipo, driver, ip_permitido, api_key_hash, api_key_prefix)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id`,
-		user.TenantID, body.BranchID, body.Nome, body.SerialNumber, modelo,
+		companyID, body.BranchID, body.Nome, body.SerialNumber, modelo,
 		body.Localizacao, tipo, driver, ip, keyHash, prefix,
 	).Scan(&id)
 	if err != nil {
@@ -206,7 +237,8 @@ func (h *Handler) ActualizarDispositivo(w http.ResponseWriter, r *http.Request) 
 		       branch_id = COALESCE($7, branch_id),
 		       ip_permitido = COALESCE($8, ip_permitido),
 		       updated_at = NOW()
-		 WHERE id = $9 AND tenant_id = $10`,
+		 WHERE id = $9
+		   AND tenant_id IN (SELECT id FROM empresas.companies WHERE tenant_id = $10)`,
 		body.Nome, body.SerialNumber, body.Modelo, body.Localizacao, body.Tipo,
 		body.Driver, body.BranchID, ip, id, user.TenantID,
 	)
@@ -238,7 +270,8 @@ func (h *Handler) AlternarEstadoDispositivo(w http.ResponseWriter, r *http.Reque
 
 	_, err := h.db.Exec(r.Context(), `
 		UPDATE hardware.devices SET ativo = $1, updated_at = NOW()
-		 WHERE id = $2 AND tenant_id = $3`,
+		 WHERE id = $2
+		   AND tenant_id IN (SELECT id FROM empresas.companies WHERE tenant_id = $3)`,
 		body.Ativo, id, user.TenantID,
 	)
 	if err != nil {
@@ -256,7 +289,8 @@ func (h *Handler) GerarNovaChave(w http.ResponseWriter, r *http.Request) {
 	_, err := h.db.Exec(r.Context(), `
 		UPDATE hardware.devices
 		   SET api_key_hash = $1, api_key_prefix = $2, updated_at = NOW()
-		 WHERE id = $3 AND tenant_id = $4`,
+		 WHERE id = $3
+		   AND tenant_id IN (SELECT id FROM empresas.companies WHERE tenant_id = $4)`,
 		keyHash, prefix, id, user.TenantID,
 	)
 	if err != nil {
@@ -324,10 +358,16 @@ func (h *Handler) CriarDeviceUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verifica se dispositivo pertence ao tenant.
+	// Verifica se dispositivo pertence ao tenant. O tenant_id gravado em
+	// hardware.device_users é o saas.tenants.id (mesmo espaço de
+	// rh.funcionarios.tenant_id, para onde entity_id aponta), por isso o
+	// INSERT abaixo usa user.TenantID sem tradução; só esta verificação de
+	// posse toca em hardware.devices e precisa das empresas do tenant.
 	var exists bool
 	_ = h.db.QueryRow(r.Context(), `
-		SELECT TRUE FROM hardware.devices WHERE id = $1 AND tenant_id = $2`,
+		SELECT TRUE FROM hardware.devices
+		 WHERE id = $1
+		   AND tenant_id IN (SELECT id FROM empresas.companies WHERE tenant_id = $2)`,
 		deviceID, user.TenantID,
 	).Scan(&exists)
 	if !exists {
@@ -366,6 +406,50 @@ func (h *Handler) RemoverDeviceUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// empresaDoDispositivo escolhe a empresa (empresas.companies.id) em que gravar
+// um dispositivo do tenant autenticado — o valor que vai para
+// hardware.devices.tenant_id.
+//
+// Com branch_id, é a empresa dessa filial, desde que a filial seja do tenant;
+// isto impede de caminho que um dispositivo fique com branch_id de uma empresa
+// e tenant_id de outra. Sem branch_id, a escolha só é inequívoca quando o
+// tenant tem exactamente uma empresa — com várias, quem cria tem de dizer qual,
+// indicando a filial.
+func (h *Handler) empresaDoDispositivo(ctx context.Context, tenantID int64, branchID *int64) (int64, error) {
+	if branchID != nil {
+		var companyID int64
+		err := h.db.QueryRow(ctx, `
+			SELECT b.company_id
+			  FROM empresas.company_branches b
+			  JOIN empresas.companies c ON c.id = b.company_id
+			 WHERE b.id = $1 AND c.tenant_id = $2`, *branchID, tenantID,
+		).Scan(&companyID)
+		if err != nil {
+			return 0, errors.New("branch_id não pertence a nenhuma empresa deste tenant")
+		}
+		return companyID, nil
+	}
+
+	var companyIDs []int64
+	err := h.db.QueryRow(ctx, `
+		SELECT COALESCE(array_agg(id ORDER BY id), '{}')
+		  FROM empresas.companies
+		 WHERE tenant_id = $1`, tenantID,
+	).Scan(&companyIDs)
+	if err != nil {
+		return 0, errors.New("erro ao resolver a empresa do tenant")
+	}
+
+	switch len(companyIDs) {
+	case 0:
+		return 0, errors.New("tenant sem empresa associada")
+	case 1:
+		return companyIDs[0], nil
+	default:
+		return 0, errors.New("tenant com várias empresas: indique branch_id")
+	}
 }
 
 func generateAPIKey() (raw, hash, prefix string) {
