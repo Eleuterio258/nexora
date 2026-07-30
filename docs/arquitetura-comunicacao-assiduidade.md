@@ -250,9 +250,16 @@ Não usar `X-API-Key`.
 
 ### Fase 1 — Criar endpoint JWT-only de ponto
 
-- Criar `POST /api/self-service/assiduidade/ponto` no ERP.
-- Suportar métodos: QR, NFC, PIN, manual.
-- Migrar esses métodos no Android para o novo endpoint.
+- [x] Criar `POST /api/self-service/assiduidade/ponto` no ERP (permissão
+  `assiduidade:marcar_ponto`).
+- [x] **PIN** — o PIN é verificado no mesmo pedido que grava o evento; delegar
+  a verificação a `/api/authcode/pin/verify` deixava um cliente modificado
+  saltá-la.
+- [ ] QR, NFC e manual — continuam em `/api/hardware/events*`. QR e NFC exigem
+  mover para aqui os validadores de token/tag hoje autenticados por API Key;
+  "manual" pelo próprio precisa de uma decisão de política (marcação sem prova
+  nenhuma), por isso o endpoint recusa-o em vez de o aceitar.
+- [ ] Migrar esses métodos no Android para o novo endpoint.
 
 ### Fase 2 — Métodos biométricos via ERP
 

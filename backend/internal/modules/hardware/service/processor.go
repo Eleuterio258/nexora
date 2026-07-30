@@ -170,47 +170,22 @@ var credentialTypeToMetodo = map[string]string{
 // metodoAssiduidadeActivo verifica se um método de assiduidade está permitido
 // para o tenant, segundo a mesma configuração editada em
 // PUT /api/system/configuracao/tenant/feature/rh.assiduidade
-// (sistema-configuracao/handlers/assiduidade.go). Até esta função existir,
-// esse ecrã só tinha efeito real sobre o método Facial — validado dentro do
-// FaceClock, em /biometric/verify — porque os outros 6 métodos (Manual, PIN,
-// QR, NFC, Impressão Digital, Selfie+GPS) falam directamente com este
-// endpoint genérico e nunca passavam por essa validação.
+// (sistema-configuracao/handlers/assiduidade.go). Até esta verificação
+// existir, esse ecrã só tinha efeito real sobre o método Facial — validado
+// dentro do FaceClock, em /biometric/verify — porque os outros 6 métodos
+// (Manual, PIN, QR, NFC, Impressão Digital, Selfie+GPS) falam directamente com
+// este endpoint genérico e nunca passavam por essa validação.
 //
-// Falha aberta (permite) em qualquer caso ambíguo — credential_type sem
-// mapeamento, feature rh.assiduidade inexistente/inactiva para o tenant, ou
-// método sem entrada explícita na configuração — espelhando
-// validar_metodo_assiduidade no FaceClock, para não bloquear
-// dispositivos/tenants antes de existir configuração completa.
+// A decisão em si vive em assiduidade.MetodoActivo (partilhada com o
+// self-service, que marca ponto por JWT); aqui fica só a tradução do
+// credential_type do dispositivo para a chave da configuração — um
+// credential_type sem mapeamento passa, mesma falha aberta do resto.
 func (p *Processor) metodoAssiduidadeActivo(ctx context.Context, tenantID int64, credentialType string) (bool, string) {
 	metodo, ok := credentialTypeToMetodo[credentialType]
 	if !ok {
 		return true, ""
 	}
-
-	var activo bool
-	var configuracao []byte
-	err := p.db.QueryRow(ctx, `
-		SELECT COALESCE(tf.activo, fc.ativo_por_defeito), COALESCE(tf.configuracao, '{}'::jsonb)
-		  FROM saas.feature_catalog fc
-		  LEFT JOIN sistema_configuracao.tenant_feature_flags tf
-		    ON tf.tenant_id = $1 AND tf.codigo = fc.key
-		 WHERE fc.key = 'rh.assiduidade'`, tenantID).
-		Scan(&activo, &configuracao)
-	if err != nil || !activo {
-		return true, ""
-	}
-
-	var cfg struct {
-		Metodos map[string]struct {
-			Ativo *bool `json:"ativo"`
-		} `json:"metodos"`
-	}
-	if err := json.Unmarshal(configuracao, &cfg); err != nil {
-		return true, ""
-	}
-
-	metodoCfg, ok := cfg.Metodos[metodo]
-	if !ok || metodoCfg.Ativo == nil || *metodoCfg.Ativo {
+	if p.assiduidade.MetodoActivo(ctx, tenantID, metodo) {
 		return true, ""
 	}
 	return false, metodo
@@ -231,14 +206,21 @@ func (p *Processor) metodoAssiduidadeActivo(ctx context.Context, tenantID int64,
 // alterna entrada/saída indefinidamente, já não se perde ao 3º evento como
 // no modelo antigo (1ª marcação=entrada, 2ª=saída, 3ª+=perdida).
 func (p *Processor) registarEventoAssiduidade(ctx context.Context, tenantID, deviceID, funcionarioID int64, event *models.NormalizedEvent, eventID int64) (int64, error) {
-	tipoEventoCodigo, err := p.inferirTipoEventoCodigo(ctx, tenantID, funcionarioID, event)
-	if err != nil {
-		return 0, err
-	}
+	tipoEventoCodigo := p.inferirTipoEventoCodigo(ctx, tenantID, funcionarioID, event)
 
+	// metodo tem de ser um codigo existente em rh.metodos_marcacao para o
+	// tenant: resolverMetodoID (assiduidade/eventos.go) devolve erro em
+	// ErrNoRows e aborta o registo, portanto um codigo fora do catalogo perde
+	// o evento em silencio no lado do dispositivo. origem é um campo mais
+	// grosseiro (por que canal chegou) e está limitado pelo CHECK
+	// eventos_assiduidade_origem_check — que não aceita "pin", daí o "app".
 	metodo := "biometria"
 	origem := "biometria"
 	switch event.CredentialType {
+	case "face":
+		metodo = "reconhecimento_facial"
+	case "fingerprint":
+		metodo = "impressao_digital"
 	case "qr":
 		metodo = "qr"
 		origem = "qr"
@@ -249,7 +231,7 @@ func (p *Processor) registarEventoAssiduidade(ctx context.Context, tenantID, dev
 		metodo = "pin"
 		origem = "app"
 	case "geolocation":
-		metodo = "geolocalizacao"
+		metodo = "gps"
 		origem = "gps"
 	case "manual":
 		metodo = "manual"
@@ -280,30 +262,14 @@ func (p *Processor) registarEventoAssiduidade(ctx context.Context, tenantID, dev
 	return ev.ID, nil
 }
 
-func (p *Processor) inferirTipoEventoCodigo(ctx context.Context, tenantID, funcionarioID int64, event *models.NormalizedEvent) (string, error) {
+func (p *Processor) inferirTipoEventoCodigo(ctx context.Context, tenantID, funcionarioID int64, event *models.NormalizedEvent) string {
 	switch event.Direction {
 	case "entry":
-		return "entrada", nil
+		return "entrada"
 	case "exit":
-		return "saida", nil
+		return "saida"
 	}
-
-	var count int
-	err := p.db.QueryRow(ctx, `
-		SELECT COUNT(*)
-		  FROM rh.eventos_assiduidade e
-		  JOIN rh.tipos_evento te ON te.id = e.tipo_evento_id
-		 WHERE e.tenant_id = $1 AND e.funcionario_id = $2
-		   AND e.data_referencia = $3::date AND te.codigo IN ('entrada', 'saida')`,
-		tenantID, funcionarioID, event.EventTime.Format("2006-01-02"),
-	).Scan(&count)
-	if err != nil {
-		return "entrada", nil
-	}
-	if count%2 == 0 {
-		return "entrada", nil
-	}
-	return "saida", nil
+	return p.assiduidade.InferirEntradaOuSaida(ctx, tenantID, funcionarioID, event.EventTime)
 }
 
 func (p *Processor) registarFrequencia(ctx context.Context, tenantID, studentID int64, eventTime time.Time, eventID int64) (int64, error) {

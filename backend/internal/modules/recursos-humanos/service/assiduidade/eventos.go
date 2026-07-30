@@ -199,6 +199,79 @@ func (s *Service) resolverMetodoID(ctx context.Context, tenantID int64, codigo s
 	return id, nil
 }
 
+// MetodoActivo diz se um método de marcação está activo na configuração do
+// tenant — a mesma editada em
+// PUT /api/system/configuracao/tenant/feature/rh.assiduidade
+// (sistema-configuracao/handlers/assiduidade.go). A chave é a da configuração
+// ("pin", "facial", "fingerprint", "qr_code", "nfc", "selfie", "geolocation",
+// "manual"), vocabulário distinto dos códigos de rh.metodos_marcacao que
+// entram em RegistarEventoInput.MetodoCodigo.
+//
+// Vive no serviço, e não em quem marca, por ser a mesma decisão nos dois
+// pontos de entrada de marcações: hardware (Processor.metodoAssiduidadeActivo,
+// dispositivos autenticados por API Key) e self-service (MarcarPonto, o
+// próprio colaborador autenticado por JWT).
+//
+// Falha aberta (permite) em qualquer caso ambíguo — feature rh.assiduidade
+// inexistente/inactiva para o tenant, configuração ilegível, ou método sem
+// entrada explícita — para não bloquear marcações antes de existir
+// configuração completa, espelhando validar_metodo_assiduidade no FaceClock.
+func (s *Service) MetodoActivo(ctx context.Context, tenantID int64, chaveMetodo string) bool {
+	var activo bool
+	var configuracao []byte
+	err := s.db.QueryRow(ctx, `
+		SELECT COALESCE(tf.activo, fc.ativo_por_defeito), COALESCE(tf.configuracao, '{}'::jsonb)
+		  FROM saas.feature_catalog fc
+		  LEFT JOIN sistema_configuracao.tenant_feature_flags tf
+		    ON tf.tenant_id = $1 AND tf.codigo = fc.key
+		 WHERE fc.key = 'rh.assiduidade'`, tenantID).
+		Scan(&activo, &configuracao)
+	if err != nil || !activo {
+		return true
+	}
+
+	var cfg struct {
+		Metodos map[string]struct {
+			Ativo *bool `json:"ativo"`
+		} `json:"metodos"`
+	}
+	if err := json.Unmarshal(configuracao, &cfg); err != nil {
+		return true
+	}
+
+	metodo, ok := cfg.Metodos[chaveMetodo]
+	if !ok || metodo.Ativo == nil {
+		return true
+	}
+	return *metodo.Ativo
+}
+
+// InferirEntradaOuSaida devolve "entrada" ou "saida" para uma marcação em que
+// o cliente não diz a direcção — dispositivos simples que só reportam "houve
+// uma marcação", e a app quando o colaborador carrega num único botão de
+// ponto. Alterna pela paridade dos eventos entrada/saída já registados nesse
+// dia de referência, portanto a mesma marca alterna indefinidamente (a 3ª
+// marcação do dia é entrada, a 4ª saída, etc.).
+//
+// Em caso de falha na contagem devolve "entrada": perder a marcação por não
+// conseguir inferir a direcção seria pior do que gravá-la com o tipo errado,
+// que RH ainda pode corrigir por /api/rh/correcoes.
+func (s *Service) InferirEntradaOuSaida(ctx context.Context, tenantID, funcionarioID int64, dataReferencia time.Time) string {
+	var count int
+	err := s.db.QueryRow(ctx, `
+		SELECT COUNT(*)
+		  FROM rh.eventos_assiduidade e
+		  JOIN rh.tipos_evento te ON te.id = e.tipo_evento_id
+		 WHERE e.tenant_id = $1 AND e.funcionario_id = $2
+		   AND e.data_referencia = $3::date AND te.codigo IN ('entrada', 'saida')`,
+		tenantID, funcionarioID, dataReferencia.Format("2006-01-02"),
+	).Scan(&count)
+	if err != nil || count%2 == 0 {
+		return "entrada"
+	}
+	return "saida"
+}
+
 // validarGeofence reaproveita a mesma fórmula de Haversine já usada em
 // recursos-humanos/handlers/assiduidade_integracao.go para o endpoint
 // consultivo GET /assiduidade/geofence/validar — aqui aplicada de facto no

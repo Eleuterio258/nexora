@@ -2597,6 +2597,14 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Post("/biometria/facial/verificar", ss.VerificarFacial)
 			})
 			r.Group(func(r chi.Router) {
+				r.Use(mw.RequirePermission(db, "assiduidade", "marcar_ponto"))
+				// Marcacao do proprio ponto por PIN, autenticada por JWT --
+				// alternativa a POST /api/hardware/events*, que exige a API Key de
+				// device partilhada por todas as instalacoes da app. Ver MarcarPonto
+				// (self-service/handlers/ponto.go).
+				r.Post("/ponto", ss.MarcarPonto)
+			})
+			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "assiduidade", "justificar"))
 				r.Post("/justificacoes", ss.CriarJustificacao)
 			})

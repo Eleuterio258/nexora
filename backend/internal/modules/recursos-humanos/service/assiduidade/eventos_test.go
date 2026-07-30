@@ -2,6 +2,7 @@ package assiduidade
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -158,5 +159,108 @@ func TestRegistarEvento_EstadoForcadoParaCorrecao(t *testing.T) {
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("expectations not met: %v", err)
+	}
+}
+
+// Um método explicitamente desactivado na configuração do tenant é recusado —
+// é o que dá efeito real ao ecrã de configuração de assiduidade sobre os
+// métodos que não passam pelo FaceClock (PIN, QR, NFC, manual...).
+func TestMetodoActivo_Desactivado(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	svc := NewService(mock)
+
+	mock.ExpectQuery("FROM saas.feature_catalog").
+		WithArgs(int64(1)).
+		WillReturnRows(pgxmock.NewRows([]string{"activo", "configuracao"}).
+			AddRow(true, []byte(`{"metodos":{"pin":{"ativo":false},"qr_code":{"ativo":true}}}`)))
+
+	if svc.MetodoActivo(context.Background(), 1, "pin") {
+		t.Fatal("MetodoActivo = true, want false para um método desactivado")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations not met: %v", err)
+	}
+}
+
+// Falha aberta: um método sem entrada explícita na configuração passa, para
+// não bloquear marcações em tenants cuja configuração ainda não foi editada.
+func TestMetodoActivo_SemEntradaNaConfiguracao(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	svc := NewService(mock)
+
+	mock.ExpectQuery("FROM saas.feature_catalog").
+		WithArgs(int64(1)).
+		WillReturnRows(pgxmock.NewRows([]string{"activo", "configuracao"}).
+			AddRow(true, []byte(`{"metodos":{"facial":{"ativo":true}}}`)))
+
+	if !svc.MetodoActivo(context.Background(), 1, "pin") {
+		t.Fatal("MetodoActivo = false, want true (falha aberta)")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations not met: %v", err)
+	}
+}
+
+// A direcção inferida alterna com a paridade dos eventos do dia: número par de
+// entradas/saídas já registadas -> a próxima marcação é entrada.
+func TestInferirEntradaOuSaida_AlternaPorParidade(t *testing.T) {
+	dia := time.Date(2026, 7, 30, 8, 0, 0, 0, time.UTC)
+
+	casos := []struct {
+		eventosDoDia int
+		querCodigo   string
+	}{
+		{0, "entrada"},
+		{1, "saida"},
+		{2, "entrada"},
+		{3, "saida"},
+	}
+
+	for _, caso := range casos {
+		mock, err := pgxmock.NewPool()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mock.ExpectQuery("SELECT COUNT").
+			WithArgs(int64(1), int64(10), "2026-07-30").
+			WillReturnRows(pgxmock.NewRows([]string{"count"}).AddRow(caso.eventosDoDia))
+
+		got := NewService(mock).InferirEntradaOuSaida(context.Background(), 1, 10, dia)
+		if got != caso.querCodigo {
+			t.Fatalf("com %d eventos no dia: got %q, want %q", caso.eventosDoDia, got, caso.querCodigo)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatalf("expectations not met: %v", err)
+		}
+		mock.Close()
+	}
+}
+
+// Contagem falhada não pode perder a marcação: cai para "entrada", que RH
+// consegue corrigir, em vez de propagar o erro e descartar o evento.
+func TestInferirEntradaOuSaida_ErroCaiParaEntrada(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	mock.ExpectQuery("SELECT COUNT").
+		WillReturnError(errors.New("ligação perdida"))
+
+	got := NewService(mock).InferirEntradaOuSaida(context.Background(), 1, 10, time.Now())
+	if got != "entrada" {
+		t.Fatalf("got %q, want %q", got, "entrada")
 	}
 }

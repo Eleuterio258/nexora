@@ -312,10 +312,40 @@ Headers: X-API-Key: <api_key>
 
 | Cenário | Quem executa | Endpoint | Método HTTP | Identificador |
 |---|---|---|---|---|
-| Funcionário | Funcionário na app | `/api/authcode/pin/validate` → `/api/hardware/events/generic` | POST + POST | `email` + `pin` |
+| Funcionário (recomendado) | Funcionário na app, já autenticado | `/api/self-service/assiduidade/ponto` | POST | JWT + `pin` |
+| Funcionário (legado) | Funcionário na app | `/api/authcode/pin/validate` → `/api/hardware/events/generic` | POST + POST | `email` + `pin` |
 | Gestor/RH | Gestor define PIN | `/api/authcode/admin/set-pin` | POST | `user_id` |
 
-### Validar PIN
+### Marcar ponto por PIN (self-service, JWT)
+
+Caminho preferido: verifica o PIN e grava o evento no mesmo pedido, com a
+identidade de quem marca (JWT), sem a API Key de dispositivo. Exige a permissão
+`assiduidade:marcar_ponto`.
+
+```json
+POST /api/self-service/assiduidade/ponto
+Headers: Authorization: Bearer <jwt>
+
+{
+  "metodo": "pin",
+  "pin": "123456"
+}
+```
+
+Campos opcionais: `tipo_evento_codigo` (`entrada`, `saida`, `intervalo_inicio`,
+`intervalo_fim` — sem ele alterna entrada/saída pela paridade dos eventos do
+dia), `latitude`, `longitude`, `localidade_id`, `observacoes`.
+
+Resposta `201` com o evento gravado (`origem: "app"`, método `pin`). Respostas
+de recusa: `403` PIN incorrecto ou marcação por PIN desactivada no tenant,
+`412` PIN não configurado.
+
+Não há limite ao número de marcações por dia — cada uma fica gravada como
+evento e o emparelhamento entrada→saída (incluindo saídas e regressos a meio
+do dia) é feito por `assiduidade.RecalcularDia` no cálculo do resultado
+diário.
+
+### Validar PIN (login por PIN, legado)
 
 ```json
 POST /api/authcode/pin/validate
