@@ -1,5 +1,6 @@
 package com.terminar.assiduidade.integration;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.terminar.assiduidade.config.AppConfig;
 import com.terminar.assiduidade.exception.AssiduidadeException;
@@ -57,17 +58,49 @@ public class ErpApiClient {
 
     /** POST /api/hardware/events/generic — contrato adapters.GenericPayload do ERP. */
     public void enviarEvento(RegistoPonto registo) {
+        HttpResponse<String> response;
         try {
             String corpo = MAPPER.writeValueAsString(new EventoGenerico(registo));
             HttpRequest request = requestBuilder("/api/hardware/events/generic")
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(corpo))
                 .build();
-            enviar(request);
+            response = enviar(request);
         } catch (AssiduidadeException e) {
             throw e;
         } catch (Exception e) {
             throw new AssiduidadeException("Erro ao construir evento para o ERP", e);
+        }
+        garantirProcessado(response);
+    }
+
+    /**
+     * O ERP aceita o evento (guarda-o em hardware.device_events) mas pode
+     * recusar-se a transformá-lo numa marcação — funcionário não mapeado em
+     * hardware.device_users, funcionário inactivo, método de assiduidade
+     * desligado para o tenant. Nesse caso responde 200 com
+     * {"processed": false, "error": "..."}, e só responde 201 quando a
+     * marcação foi mesmo criada (ver handlers/events.go no ERP).
+     *
+     * Olhar apenas para a família 2xx dava as duas respostas por boas, e o
+     * ErpSyncService marcava como sincronizado um evento que o ERP tinha
+     * recusado — a marcação desaparecia sem rasto. Tratar "processed: false"
+     * como falha devolve o erro do ERP a quem chamou, que o regista e deixa o
+     * registo por sincronizar.
+     */
+    private void garantirProcessado(HttpResponse<String> response) {
+        boolean processado;
+        String erro;
+        try {
+            JsonNode corpo = MAPPER.readTree(response.body());
+            processado = corpo.path("processed").asBoolean(false);
+            erro = corpo.path("error").asText("");
+        } catch (Exception e) {
+            throw new AssiduidadeException("Resposta ilegível do ERP ao registar evento", e);
+        }
+        if (!processado) {
+            throw new AssiduidadeException(
+                "ERP não processou o evento" + (erro.isBlank() ? "" : ": " + erro));
         }
     }
 
@@ -107,17 +140,34 @@ public class ErpApiClient {
             this.credential_type = credencial(registo.getMetodo());
         }
 
+        /**
+         * O vocabulário do ERP é "entry"/"exit"/"unknown" (NormalizedEvent em
+         * models/event.go); "in"/"out" não casava com nenhum caso do
+         * inferirTipoEventoCodigo e o ERP acabava sempre a inferir a direcção
+         * pela paridade dos eventos do dia, ignorando a decisão do terminal.
+         *
+         * As pausas continuam achatadas em entrada/saída porque o contrato
+         * genérico do ERP não tem forma de as distinguir — quem precisar disso
+         * tem de passar por rh.eventos_assiduidade com os códigos
+         * intervalo_inicio/intervalo_fim.
+         */
         private static String direcao(TipoMarcacao tipo) {
             return switch (tipo) {
-                case ENTRADA, FIM_PAUSA -> "in";
-                case SAIDA, INICIO_PAUSA -> "out";
+                case ENTRADA, FIM_PAUSA -> "entry";
+                case SAIDA, INICIO_PAUSA -> "exit";
             };
         }
 
+        /**
+         * Chaves reconhecidas pelo credentialTypeToMetodo do ERP
+         * (service/processor.go). "qrcode" não era uma delas: o evento ficava
+         * gravado como método "biometria" e escapava à verificação de método
+         * activo do tenant, que falha aberta em credential_type desconhecido.
+         */
         private static String credencial(MetodoAutenticacao metodo) {
             return switch (metodo) {
                 case PIN -> "pin";
-                case QR_CODE -> "qrcode";
+                case QR_CODE -> "qr";
                 case FINGERPRINT -> "fingerprint";
                 case NFC -> "nfc";
             };
