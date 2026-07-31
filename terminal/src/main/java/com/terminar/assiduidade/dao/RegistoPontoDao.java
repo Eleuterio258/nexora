@@ -11,15 +11,39 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 public class RegistoPontoDao {
 
+    /** Formato em que o SQLite guarda data_hora — o mesmo do CURRENT_TIMESTAMP. */
+    private static final DateTimeFormatter DATA_HORA = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    /**
+     * data_hora passa a ser escrita explicitamente, em hora local, em vez de
+     * ficar ao cargo do DEFAULT CURRENT_TIMESTAMP da tabela.
+     *
+     * O CURRENT_TIMESTAMP do SQLite é UTC, mas todo o resto da aplicação
+     * trabalha em hora local: PontoService compara o último registo com
+     * LocalDateTime.now() e findUltimoDoDia/findByDia comparam date(data_hora)
+     * com LocalDate.now(). Misturar os dois deslocava tudo pelo offset do fuso
+     * — em Moçambique (UTC+2) a diferença calculada era sempre ~2h a mais, e a
+     * guarda de 10 segundos contra marcações repetidas nunca chegava a
+     * disparar; as consultas por dia divergiam entre as 22h e a meia-noite.
+     *
+     * A conversão para UTC passa a ser feita só na fronteira que precisa dela,
+     * ao enviar o evento para o ERP (ErpApiClient).
+     */
     public RegistoPonto insert(RegistoPonto registo) {
+        if (registo.getDataHora() == null) {
+            registo.setDataHora(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
+        }
         String sql = "INSERT INTO registo_ponto (employee_id, employee_numero, employee_nome, tipo, metodo, "
-            + "observacao) VALUES (?, ?, ?, ?, ?, ?)";
+            + "observacao, data_hora) VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = DatabaseManager.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setLong(1, registo.getEmployeeId());
@@ -28,6 +52,7 @@ public class RegistoPontoDao {
             ps.setString(4, registo.getTipo().name());
             ps.setString(5, registo.getMetodo().name());
             ps.setString(6, registo.getObservacao());
+            ps.setString(7, registo.getDataHora().format(DATA_HORA));
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {
