@@ -111,6 +111,50 @@ func (h *Handler) GerarQRDevice(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusCreated)
 }
 
+// POST /api/hardware/assiduidade/qr/gerar-terminal
+// Modo 2 (QR dinâmico do terminal): o próprio terminal pede um código de curta duração
+// (60s, uso único, sem funcionario_id — o mesmo "QR fixo do gestor" que GerarQRDevice
+// gera, só que aqui é o terminal a pedi-lo directamente, autenticado por X-API-Key em
+// vez de JWT de gestor) e mostra-o no ecrã, renovando a cada ciclo. O funcionário lê
+// esse código com a app Nexo (já sabe quem é, pela sessão) e é a app + servidor que
+// completam a marcação — o terminal não identifica ninguém nem regista nada aqui.
+func (h *Handler) GerarQRTerminal(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	tenantID, err := tenantIDQR(r.Context(), h.db, r, user)
+	if err != nil {
+		jsonErr(w, "Dispositivo sem empresa/tenant associado correctamente", http.StatusUnprocessableEntity)
+		return
+	}
+	device := mw.GetDevice(r)
+
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	token := "qr_" + hex.EncodeToString(b)
+	expiresAt := time.Now().Add(time.Duration(qrDuracaoPadraoSegundos) * time.Second)
+
+	var locationID *string
+	if device != nil {
+		nome := device.Nome
+		locationID = &nome
+	}
+
+	if _, err := h.db.Exec(r.Context(), `
+		INSERT INTO rh.qr_tokens (tenant_id, token, location_id, expires_at)
+		VALUES ($1,$2,$3,$4)`,
+		tenantID, token, locationID, expiresAt); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w, map[string]any{
+		"qr_code":    token,
+		"expires_at": expiresAt,
+	}, http.StatusCreated)
+}
+
 // GET /api/self-service/assiduidade/qr/me
 // Gera um token QR vinculado ao funcionário autenticado. Usado pelo
 // funcionário para mostrar o seu QR pessoal ao gestor.

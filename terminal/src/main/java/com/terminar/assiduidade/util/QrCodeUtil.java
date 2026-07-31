@@ -18,6 +18,7 @@ public class QrCodeUtil {
 
     private static final MultiFormatReader READER = new MultiFormatReader();
 
+    /** Usado pelo ecrã "Ver QR" (QrMostrarPanel) para mostrar o QR estático do funcionário. */
     public BufferedImage gerar(String conteudo, int tamanho) {
         try {
             BitMatrix matrix = new MultiFormatWriter().encode(conteudo, BarcodeFormat.QR_CODE, tamanho, tamanho);

@@ -6,13 +6,13 @@ import com.terminar.assiduidade.config.AppConfig;
 import com.terminar.assiduidade.exception.AssiduidadeException;
 import com.terminar.assiduidade.model.MetodoAutenticacao;
 import com.terminar.assiduidade.model.RegistoPonto;
-import com.terminar.assiduidade.model.TipoMarcacao;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -72,6 +72,40 @@ public class ErpApiClient {
             throw new AssiduidadeException("Erro ao construir evento para o ERP", e);
         }
         garantirProcessado(response);
+    }
+
+    /**
+     * POST /api/hardware/assiduidade/qr/gerar-terminal — Modo 2 (QR dinâmico do terminal,
+     * ver assiduidade_qr.go/GerarQRTerminal no ERP): pede um código de 60s, sem
+     * funcionario_id associado, para o ecrã "Ver QR" (QrMostrarPanel) mostrar e renovar
+     * periodicamente. É a app Nexo do funcionário que lê este código e completa a
+     * marcação directamente com o servidor — o terminal não identifica ninguém aqui.
+     */
+    public String gerarQRTerminal() {
+        HttpResponse<String> response;
+        try {
+            HttpRequest request = requestBuilder("/api/hardware/assiduidade/qr/gerar-terminal")
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("{}"))
+                .build();
+            response = enviar(request);
+        } catch (AssiduidadeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AssiduidadeException("Erro ao pedir QR Code ao ERP", e);
+        }
+        try {
+            JsonNode corpo = MAPPER.readTree(response.body());
+            String qrCode = corpo.path("qr_code").asText(null);
+            if (qrCode == null || qrCode.isBlank()) {
+                throw new AssiduidadeException("Resposta do ERP sem qr_code");
+            }
+            return qrCode;
+        } catch (AssiduidadeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new AssiduidadeException("Resposta ilegível do ERP ao gerar QR Code", e);
+        }
     }
 
     /**
@@ -159,33 +193,24 @@ public class ErpApiClient {
         public final String employee_no;
         public final String event_time;
         public final String event_type = "access_granted";
-        public final String direction;
+        // O terminal não sabe (nem decide) se a marcação é entrada, saída ou
+        // pausa — "unknown" leva o ERP a inferir o papel pela sequência de
+        // marcações do dia (assiduidade.InferirEntradaOuSaida), em vez de o
+        // dispositivo impor uma classificação que só faz sentido vendo o dia
+        // inteiro.
+        public final String direction = "unknown";
         public final String credential_type;
 
         EventoGenerico(RegistoPonto registo) {
             this.employee_no = registo.getEmployeeNumero();
-            this.event_time = registo.getDataHora().atOffset(ZoneOffset.UTC)
+            // registo.getDataHora() é hora local (ver RegistoPontoDao) — tem de converter pelo
+            // fuso do sistema antes de expressar em UTC, não só colar "+00:00" à hora local
+            // (isso desviava o event_time enviado ao ERP pelo offset inteiro do fuso, ex.: 2h
+            // em Moçambique).
+            this.event_time = registo.getDataHora().atZone(ZoneId.systemDefault())
+                .withZoneSameInstant(ZoneOffset.UTC)
                 .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-            this.direction = direcao(registo.getTipo());
             this.credential_type = credencial(registo.getMetodo());
-        }
-
-        /**
-         * O vocabulário do ERP é "entry"/"exit"/"unknown" (NormalizedEvent em
-         * models/event.go); "in"/"out" não casava com nenhum caso do
-         * inferirTipoEventoCodigo e o ERP acabava sempre a inferir a direcção
-         * pela paridade dos eventos do dia, ignorando a decisão do terminal.
-         *
-         * As pausas continuam achatadas em entrada/saída porque o contrato
-         * genérico do ERP não tem forma de as distinguir — quem precisar disso
-         * tem de passar por rh.eventos_assiduidade com os códigos
-         * intervalo_inicio/intervalo_fim.
-         */
-        private static String direcao(TipoMarcacao tipo) {
-            return switch (tipo) {
-                case ENTRADA, FIM_PAUSA -> "entry";
-                case SAIDA, INICIO_PAUSA -> "exit";
-            };
         }
 
         /**

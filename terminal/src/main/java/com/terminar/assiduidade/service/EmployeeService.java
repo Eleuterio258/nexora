@@ -4,7 +4,6 @@ import com.terminar.assiduidade.dao.EmployeeDao;
 import com.terminar.assiduidade.exception.AssiduidadeException;
 import com.terminar.assiduidade.model.Employee;
 import com.terminar.assiduidade.security.PinHasher;
-import com.terminar.assiduidade.security.TotpUtil;
 
 import java.util.List;
 import java.util.UUID;
@@ -13,7 +12,6 @@ public class EmployeeService {
 
     private final EmployeeDao employeeDao = new EmployeeDao();
     private final PinHasher pinHasher = new PinHasher();
-    private final TotpUtil totpUtil = new TotpUtil();
 
     public List<Employee> listar() {
         return employeeDao.findAll();
@@ -54,22 +52,6 @@ public class EmployeeService {
             throw new AssiduidadeException("O PIN deve conter entre 4 e 8 dígitos");
         }
         employee.setPinHash(pinHasher.hash(pin));
-        return employeeDao.save(employee);
-    }
-
-    public Employee regenerarQrToken(Employee employee) {
-        employee.setQrCodeToken(UUID.randomUUID().toString());
-        return employeeDao.save(employee);
-    }
-
-    /** Gera um novo segredo TOTP para o QR dinâmico (invalida qualquer provisionamento anterior). */
-    public Employee gerarSegredoQrDinamico(Employee employee) {
-        employee.setQrTotpSecret(totpUtil.gerarSegredo());
-        return employeeDao.save(employee);
-    }
-
-    public Employee removerQrDinamico(Employee employee) {
-        employee.setQrTotpSecret(null);
         return employeeDao.save(employee);
     }
 

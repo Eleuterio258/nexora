@@ -19,7 +19,6 @@ public class Employee {
     private String departamento;
     private String pinHash;
     private String qrCodeToken;
-    private String qrTotpSecret;
     private String fingerprintTemplate;
     private String nfcUid;
     private boolean ativo;

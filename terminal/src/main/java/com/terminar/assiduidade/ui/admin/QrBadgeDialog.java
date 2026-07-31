@@ -13,12 +13,12 @@ import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
-import javax.swing.SwingConstants;
 import java.awt.Frame;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.io.File;
 
+/** Mostra o QR fixo (Modo 1) do funcionário, para imprimir no crachá ou copiar para a app Nexo. */
 public class QrBadgeDialog extends JDialog {
 
     private final QrCodeUtil qrCodeUtil = new QrCodeUtil();

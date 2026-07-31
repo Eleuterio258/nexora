@@ -17,7 +17,6 @@ public class RegistoPonto {
     private Long employeeId;
     private String employeeNumero;
     private String employeeNome;
-    private TipoMarcacao tipo;
     private MetodoAutenticacao metodo;
     private LocalDateTime dataHora;
     private boolean sincronizado;

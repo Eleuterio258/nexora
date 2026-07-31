@@ -9,9 +9,11 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -81,9 +83,53 @@ public class DatabaseManager {
         }
         stmt.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_employee_nfc_uid ON employee(nfc_uid)");
 
-        if (!columnExists(stmt, "employee", "qr_totp_secret")) {
-            log.info("A adicionar coluna employee.qr_totp_secret a uma base de dados existente.");
-            stmt.execute("ALTER TABLE employee ADD COLUMN qr_totp_secret TEXT");
+        // QR fixo do funcionário (Modo 1) — bases de dados criadas numa versão intermédia
+        // desta app (Modo 2 ainda não existia, "Ver QR" tentou usar geração no ERP) ficaram
+        // sem esta coluna; recuperá-la para o Modo 1 voltar a funcionar.
+        if (!columnExists(stmt, "employee", "qr_code_token")) {
+            log.info("A adicionar coluna employee.qr_code_token a uma base de dados existente.");
+            stmt.execute("ALTER TABLE employee ADD COLUMN qr_code_token TEXT");
+        }
+        stmt.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_employee_qr_code_token ON employee(qr_code_token)");
+        preencherQrCodeTokenEmFalta(stmt);
+
+        // O terminal deixou de classificar a marcação como entrada/saída/pausa — o
+        // ERP passa a interpretar isso a partir da sequência do dia. Bases de dados
+        // criadas antes desta versão ainda têm a coluna "tipo"; removê-la em vez de
+        // a deixar ali morta (SQLite 3.35+, incluído no driver deste projecto,
+        // suporta DROP COLUMN).
+        if (columnExists(stmt, "registo_ponto", "tipo")) {
+            log.info("A remover coluna registo_ponto.tipo de uma base de dados existente.");
+            stmt.execute("ALTER TABLE registo_ponto DROP COLUMN tipo");
+        }
+    }
+
+    /**
+     * "ALTER TABLE ADD COLUMN" não faz backfill — funcionários criados antes da coluna
+     * qr_code_token existir (ou apanhados na janela em que esteve removida) ficam sem QR
+     * fixo nenhum. Sem isto, abrir "Ver QR Code" (admin) para um deles rebentava com o
+     * qr_code_token nulo em vez de mostrar um código válido.
+     */
+    private static void preencherQrCodeTokenEmFalta(Statement stmt) throws SQLException {
+        try (ResultSet rs = stmt.executeQuery(
+                "SELECT id FROM employee WHERE qr_code_token IS NULL OR qr_code_token = ''")) {
+            java.util.List<Long> semToken = new java.util.ArrayList<>();
+            while (rs.next()) {
+                semToken.add(rs.getLong("id"));
+            }
+            if (semToken.isEmpty()) {
+                return;
+            }
+            log.info("A atribuir qr_code_token a {} funcionário(s) sem QR fixo.", semToken.size());
+            try (PreparedStatement ps = stmt.getConnection()
+                    .prepareStatement("UPDATE employee SET qr_code_token = ? WHERE id = ?")) {
+                for (Long id : semToken) {
+                    ps.setString(1, UUID.randomUUID().toString());
+                    ps.setLong(2, id);
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+            }
         }
     }
 

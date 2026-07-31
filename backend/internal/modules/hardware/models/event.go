@@ -5,11 +5,11 @@ import "time"
 // NormalizedEvent representa um evento de hardware já normalizado,
 // independente do fabricante ou protocolo.
 type NormalizedEvent struct {
-	DeviceSerial   string
-	DeviceModel    string
-	EmployeeNo     string
-	EventType      string // access_granted, access_denied, unknown
-	EventTime      time.Time
+	DeviceSerial string
+	DeviceModel  string
+	EmployeeNo   string
+	EventType    string // access_granted, access_denied, unknown
+	EventTime    time.Time
 	Direction      string // entry, exit, unknown
 	CredentialType string // face, card, fingerprint, pin, qr, nfc, manual, geolocation
 	RawPayload     []byte

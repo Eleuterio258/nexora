@@ -23,8 +23,8 @@ public class EmployeeDao {
     }
 
     private Employee insert(Employee employee) {
-        String sql = "INSERT INTO employee (numero, nome, departamento, pin_hash, qr_code_token, qr_totp_secret, "
-                + "fingerprint_template, nfc_uid, ativo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO employee (numero, nome, departamento, pin_hash, qr_code_token, "
+                + "fingerprint_template, nfc_uid, ativo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = DatabaseManager.getConnection(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             bind(ps, employee);
             ps.executeUpdate();
@@ -40,11 +40,11 @@ public class EmployeeDao {
     }
 
     private Employee update(Employee employee) {
-        String sql = "UPDATE employee SET numero=?, nome=?, departamento=?, pin_hash=?, qr_code_token=?, qr_totp_secret=?, "
+        String sql = "UPDATE employee SET numero=?, nome=?, departamento=?, pin_hash=?, qr_code_token=?, "
                 + "fingerprint_template=?, nfc_uid=?, ativo=?, atualizado_em=CURRENT_TIMESTAMP WHERE id=?";
         try (Connection conn = DatabaseManager.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             bind(ps, employee);
-            ps.setLong(10, employee.getId());
+            ps.setLong(9, employee.getId());
             ps.executeUpdate();
             return findById(employee.getId()).orElse(employee);
         } catch (Exception e) {
@@ -58,10 +58,9 @@ public class EmployeeDao {
         ps.setString(3, employee.getDepartamento());
         ps.setString(4, employee.getPinHash());
         ps.setString(5, employee.getQrCodeToken());
-        ps.setString(6, employee.getQrTotpSecret());
-        ps.setString(7, employee.getFingerprintTemplate());
-        ps.setString(8, employee.getNfcUid());
-        ps.setInt(9, employee.isAtivo() ? 1 : 0);
+        ps.setString(6, employee.getFingerprintTemplate());
+        ps.setString(7, employee.getNfcUid());
+        ps.setInt(8, employee.isAtivo() ? 1 : 0);
     }
 
     public Optional<Employee> findById(Long id) {
@@ -116,7 +115,6 @@ public class EmployeeDao {
                 .departamento(rs.getString("departamento"))
                 .pinHash(rs.getString("pin_hash"))
                 .qrCodeToken(rs.getString("qr_code_token"))
-                .qrTotpSecret(rs.getString("qr_totp_secret"))
                 .fingerprintTemplate(rs.getString("fingerprint_template"))
                 .nfcUid(rs.getString("nfc_uid"))
                 .ativo(rs.getInt("ativo") == 1)

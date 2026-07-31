@@ -19,12 +19,14 @@ import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.List;
 
 public class EmployeeManagementPanel extends JPanel {
 
     private static final String[] COLUNAS =
-        {"Número", "Nome", "Departamento", "Activo", "PIN definido", "QR gerado", "QR dinâmico", "Digital", "NFC"};
+        {"Número", "Nome", "Departamento", "Activo", "PIN definido", "QR", "Digital", "NFC"};
 
     private final AssiduidadeFrame frame;
     private final EmployeeService employeeService = new EmployeeService();
@@ -32,6 +34,7 @@ public class EmployeeManagementPanel extends JPanel {
     private final EmployeeTableModel tableModel = new EmployeeTableModel();
     private final JTable table = new JTable(tableModel);
     private final RegistosHojePanel registosHojePanel = new RegistosHojePanel();
+    private final JButton novoButton = new JButton("Novo");
 
     public EmployeeManagementPanel(AssiduidadeFrame frame) {
         this.frame = frame;
@@ -53,43 +56,52 @@ public class EmployeeManagementPanel extends JPanel {
     }
 
     private JPanel criarTabFuncionarios() {
-        JPanel painel = new JPanel(new MigLayout("fill, insets 2", "[grow]", "[]2[grow]"));
+        JPanel painel = new JPanel(new MigLayout("fill, insets 2", "[grow]", "[]2[]4[grow]"));
 
-        JPanel toolbar = new JPanel(new MigLayout("insets 0, gap 2, wrap 4", "[grow, fill]", "[]2[]"));
-        JButton novoButton = new JButton("Novo");
-        JButton editarButton = new JButton("Editar");
-        JButton ativoButton = new JButton("Activo");
-        JButton pinButton = new JButton("PIN");
-        JButton qrButton = new JButton("QR");
-        JButton qrDinamicoButton = new JButton("QR dinâmico");
-        JButton digitalButton = new JButton("Digital");
-        JButton nfcButton = new JButton("NFC");
+        JPanel toolbar = new JPanel(new MigLayout("insets 0, gap 2, wrap 2", "[grow, fill]", "[]2[]"));
         JButton sincronizarErpButton = new JButton("Sincronizar ERP");
         toolbar.add(novoButton);
-        toolbar.add(editarButton);
-        toolbar.add(ativoButton);
-        toolbar.add(pinButton);
-        toolbar.add(qrButton);
-        toolbar.add(qrDinamicoButton);
-        toolbar.add(digitalButton);
-        toolbar.add(nfcButton);
         toolbar.add(sincronizarErpButton);
         painel.add(toolbar, "growx, wrap");
 
+        JLabel dicaLabel = new JLabel("Duplo-clique num funcionário para ver acções (PIN, NFC, Digital, Activo...)");
+        dicaLabel.setFont(dicaLabel.getFont().deriveFont(java.awt.Font.ITALIC, 9f));
+        painel.add(dicaLabel, "wrap");
+
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() != 2) {
+                    return;
+                }
+                int linha = table.rowAtPoint(e.getPoint());
+                if (linha < 0) {
+                    return;
+                }
+                table.setRowSelectionInterval(linha, linha);
+                abrirAcoes();
+            }
+        });
         painel.add(new JScrollPane(table), "grow");
 
         novoButton.addActionListener(e -> criarFuncionario());
-        editarButton.addActionListener(e -> editarFuncionario());
-        ativoButton.addActionListener(e -> alternarAtivo());
-        pinButton.addActionListener(e -> definirPin());
-        qrButton.addActionListener(e -> verQrCode());
-        qrDinamicoButton.addActionListener(e -> gerirQrDinamico());
-        digitalButton.addActionListener(e -> enrolarDigital());
-        nfcButton.addActionListener(e -> associarNfc());
         sincronizarErpButton.addActionListener(e -> sincronizarComErp());
 
         return painel;
+    }
+
+    /** Abre o modal de acções para o funcionário seleccionado (ver EmployeeActionsDialog). */
+    private void abrirAcoes() {
+        Employee employee = funcionarioSelecionado();
+        if (employee == null) {
+            return;
+        }
+        boolean mostrarEditar = !AppConfig.isApiSyncAtivo();
+        new EmployeeActionsDialog(frame, employee, mostrarEditar,
+            this::editarFuncionario, this::alternarAtivo, this::definirPin, this::verQrCode,
+            this::enrolarDigital, this::associarNfc)
+            .setVisible(true);
     }
 
     private Employee funcionarioSelecionado() {
@@ -174,39 +186,6 @@ public class EmployeeManagementPanel extends JPanel {
         new QrBadgeDialog(frame, employee).setVisible(true);
     }
 
-    private void gerirQrDinamico() {
-        Employee employee = funcionarioSelecionado();
-        if (employee == null) {
-            return;
-        }
-        if (employee.getQrTotpSecret() == null || employee.getQrTotpSecret().isBlank()) {
-            employee = employeeService.gerarSegredoQrDinamico(employee);
-            refrescar();
-            new DynamicQrEnrollDialog(frame, employee).setVisible(true);
-            return;
-        }
-        String[] opcoes = {"Ver actual", "Gerar novo", "Remover", "Cancelar"};
-        int escolha = JOptionPane.showOptionDialog(this,
-            "Já existe um QR dinâmico configurado para " + employee.getNome() + ".",
-            "QR dinâmico", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
-            null, opcoes, opcoes[0]);
-        switch (escolha) {
-            case 0 -> new DynamicQrEnrollDialog(frame, employee).setVisible(true);
-            case 1 -> {
-                Employee actualizado = employeeService.gerarSegredoQrDinamico(employee);
-                refrescar();
-                new DynamicQrEnrollDialog(frame, actualizado).setVisible(true);
-            }
-            case 2 -> {
-                employeeService.removerQrDinamico(employee);
-                refrescar();
-            }
-            default -> {
-                // cancelado
-            }
-        }
-    }
-
     private void enrolarDigital() {
         Employee employee = funcionarioSelecionado();
         if (employee == null) {
@@ -270,6 +249,11 @@ public class EmployeeManagementPanel extends JPanel {
     public void refrescar() {
         tableModel.setEmployees(employeeService.listar());
         registosHojePanel.refrescar();
+        // Com a integração ligada, o ERP é autoritativo para nome/número/activo
+        // (ver ErpSyncService) — criar esses campos aqui ficaria sempre substituído
+        // pela próxima sincronização, por isso "Novo" deixa de fazer sentido; "Editar"
+        // é escondido do mesmo modo dentro do EmployeeActionsDialog (ver abrirAcoes).
+        novoButton.setVisible(!AppConfig.isApiSyncAtivo());
     }
 
     private static class EmployeeTableModel extends AbstractTableModel {
@@ -308,10 +292,8 @@ public class EmployeeManagementPanel extends JPanel {
                 case 2 -> employee.getDepartamento();
                 case 3 -> employee.isAtivo() ? "Sim" : "Não";
                 case 4 -> employee.getPinHash() != null ? "Sim" : "Não";
-                case 5 -> employee.getQrCodeToken() != null ? "Sim" : "Não";
-                case 6 -> employee.getQrTotpSecret() != null ? "Sim" : "Não";
-                case 7 -> employee.getFingerprintTemplate() != null ? "Sim" : "Não";
-                case 8 -> employee.getNfcUid() != null ? "Sim" : "Não";
+                case 5 -> employee.getFingerprintTemplate() != null ? "Sim" : "Não";
+                case 6 -> employee.getNfcUid() != null ? "Sim" : "Não";
                 default -> "";
             };
         }

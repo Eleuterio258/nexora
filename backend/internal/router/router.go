@@ -2830,6 +2830,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Get("/assiduidade/consentimentos/activo", rh.ObterConsentimentoActivoDevice)
 			r.Post("/assiduidade/consentimentos/revogar", rh.RevogarConsentimentoDevice)
 			r.Post("/assiduidade/qr/validar", rh.ValidarQRDevice)
+			r.Post("/assiduidade/qr/gerar-terminal", rh.GerarQRTerminal)
 			r.Get("/assiduidade/nfc/validar", rh.ValidarNFCDevice)
 		})
 

@@ -2,8 +2,10 @@ package com.terminar.assiduidade.ui;
 
 import com.terminar.assiduidade.config.AppConfig;
 import com.terminar.assiduidade.dao.ConfiguracaoDao;
+import com.terminar.assiduidade.exception.AssiduidadeException;
 import com.terminar.assiduidade.model.Employee;
 import com.terminar.assiduidade.model.MetodoAutenticacao;
+import com.terminar.assiduidade.service.PontoService;
 import com.terminar.assiduidade.ui.admin.AdminLoginDialog;
 import com.terminar.assiduidade.ui.admin.EmployeeManagementPanel;
 import lombok.extern.slf4j.Slf4j;
@@ -24,23 +26,26 @@ public class AssiduidadeFrame extends JFrame {
 
     public static final String CARD_HOME = "home";
     public static final String CARD_PIN = "pin";
+    public static final String CARD_QR_MENU = "qrMenu";
     public static final String CARD_QR = "qr";
+    public static final String CARD_QR_MOSTRAR = "qrMostrar";
     public static final String CARD_FINGERPRINT = "fingerprint";
     public static final String CARD_NFC = "nfc";
-    public static final String CARD_MARCAR = "marcar";
     public static final String CARD_RESULT = "result";
     public static final String CARD_ADMIN = "admin";
 
     private final CardLayout cardLayout = new CardLayout();
     private final java.awt.Container cards;
     private final java.awt.Dimension kioskSize;
+    private final PontoService pontoService = new PontoService();
 
     private final HomeClockPanel homePanel;
     private final PinAuthPanel pinPanel;
+    private final QrMenuPanel qrMenuPanel;
     private final QrAuthPanel qrPanel;
+    private final QrMostrarPanel qrMostrarPanel;
     private final FingerprintAuthPanel fingerprintPanel;
     private final NfcAuthPanel nfcPanel;
-    private final MarcarPontoPanel marcarPontoPanel;
     private final ResultPanel resultPanel;
     private final EmployeeManagementPanel adminPanel;
 
@@ -56,19 +61,21 @@ public class AssiduidadeFrame extends JFrame {
 
         homePanel = new HomeClockPanel(this);
         pinPanel = new PinAuthPanel(this);
+        qrMenuPanel = new QrMenuPanel(this);
         qrPanel = new QrAuthPanel(this);
+        qrMostrarPanel = new QrMostrarPanel(this);
         fingerprintPanel = new FingerprintAuthPanel(this);
         nfcPanel = new NfcAuthPanel(this);
-        marcarPontoPanel = new MarcarPontoPanel(this);
         resultPanel = new ResultPanel(this);
         adminPanel = new EmployeeManagementPanel(this);
 
         cards.add(homePanel, CARD_HOME);
         cards.add(pinPanel, CARD_PIN);
+        cards.add(qrMenuPanel, CARD_QR_MENU);
         cards.add(qrPanel, CARD_QR);
+        cards.add(qrMostrarPanel, CARD_QR_MOSTRAR);
         cards.add(fingerprintPanel, CARD_FINGERPRINT);
         cards.add(nfcPanel, CARD_NFC);
-        cards.add(marcarPontoPanel, CARD_MARCAR);
         cards.add(resultPanel, CARD_RESULT);
         JScrollPane adminScroll = new JScrollPane(adminPanel);
         adminScroll.setBorder(null);
@@ -113,6 +120,7 @@ public class AssiduidadeFrame extends JFrame {
 
     public void goHome() {
         qrPanel.pararCaptura();
+        qrMostrarPanel.pararCaptura();
         nfcPanel.pararLeitura();
         if (CARD_ADMIN.equals(currentCard)) {
             restoreKioskSize();
@@ -128,10 +136,27 @@ public class AssiduidadeFrame extends JFrame {
         showCard(CARD_PIN);
     }
 
+    /**
+     * Menu com os dois cartões — "Ler QR" (Modo 1: câmara lê o QR fixo do funcionário,
+     * identifica e regista localmente) e "Ver QR" (Modo 2: o terminal mostra o seu
+     * próprio QR dinâmico de 60s, para a app Nexo do funcionário ler e completar a
+     * marcação directamente com o servidor).
+     */
     public void goToQr() {
+        setTitle("QR Code");
+        showCard(CARD_QR_MENU);
+    }
+
+    public void goToQrLer() {
         qrPanel.iniciarCaptura();
         setTitle("Leitura de QR Code");
         showCard(CARD_QR);
+    }
+
+    public void goToQrMostrar() {
+        qrMostrarPanel.iniciar();
+        setTitle("Ver QR Code");
+        showCard(CARD_QR_MOSTRAR);
     }
 
     public void goToFingerprint() {
@@ -146,11 +171,21 @@ public class AssiduidadeFrame extends JFrame {
         showCard(CARD_NFC);
     }
 
+    /**
+     * Regista a marcação imediatamente após a autenticação (PIN/QR/NFC/Digital) ter
+     * sucesso — sem pedir confirmação extra ao funcionário, que já demonstrou a
+     * identidade ao autenticar-se.
+     */
     public void goToMarcarPonto(Employee employee, MetodoAutenticacao metodo) {
         qrPanel.pararCaptura();
+        qrMostrarPanel.pararCaptura();
         nfcPanel.pararLeitura();
-        marcarPontoPanel.exibir(employee, metodo);
-        showCard(CARD_MARCAR);
+        try {
+            pontoService.registarMarcacao(employee, metodo);
+            goToResult(employee.getNome() + " — presença registada com sucesso", true);
+        } catch (AssiduidadeException e) {
+            goToResult(e.getMessage(), false);
+        }
     }
 
     public void goToResult(String mensagem, boolean sucesso) {

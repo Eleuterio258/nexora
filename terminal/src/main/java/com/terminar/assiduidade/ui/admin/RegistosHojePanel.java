@@ -14,7 +14,7 @@ import java.util.List;
 public class RegistosHojePanel extends javax.swing.JPanel {
 
     private static final DateTimeFormatter HORA_FMT = DateTimeFormatter.ofPattern("HH:mm:ss");
-    private static final String[] COLUNAS = {"Hora", "Nº", "Nome", "Tipo", "Método"};
+    private static final String[] COLUNAS = {"Hora", "Nº", "Nome", "Método"};
 
     private final PontoService pontoService = new PontoService();
     private final RegistosTableModel tableModel = new RegistosTableModel();
@@ -64,8 +64,7 @@ public class RegistosHojePanel extends javax.swing.JPanel {
                 case 0 -> r.getDataHora().format(HORA_FMT);
                 case 1 -> r.getEmployeeNumero();
                 case 2 -> r.getEmployeeNome();
-                case 3 -> r.getTipo();
-                case 4 -> r.getMetodo();
+                case 3 -> r.getMetodo();
                 default -> "";
             };
         }
