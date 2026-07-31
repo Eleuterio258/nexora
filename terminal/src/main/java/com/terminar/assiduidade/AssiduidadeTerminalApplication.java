@@ -3,6 +3,7 @@ package com.terminar.assiduidade;
 import com.formdev.flatlaf.FlatDarkLaf;
 import com.terminar.assiduidade.config.AppConfig;
 import com.terminar.assiduidade.dao.ConfiguracaoDao;
+import com.terminar.assiduidade.service.ErpSyncService;
 import com.terminar.assiduidade.ui.AssiduidadeFrame;
 import com.terminar.assiduidade.util.DatabaseManager;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ public class AssiduidadeTerminalApplication {
                 AppConfig.load();
                 DatabaseManager.initialize();
                 aplicarConfiguracaoGuardada();
+                new ErpSyncService().iniciarCicloAutomatico();
                 Runtime.getRuntime().addShutdownHook(
                     new Thread(DatabaseManager::shutdown, "database-shutdown"));
                 UIManager.setLookAndFeel(new FlatDarkLaf());
@@ -41,5 +43,6 @@ public class AssiduidadeTerminalApplication {
         ConfiguracaoDao configuracaoDao = new ConfiguracaoDao();
         configuracaoDao.obter("api.base.url").ifPresent(AppConfig::setApiBaseUrl);
         configuracaoDao.obter("api.device.key").ifPresent(AppConfig::setApiDeviceKey);
+        configuracaoDao.obter("admin.pin").ifPresent(AppConfig::setAdminPin);
     }
 }

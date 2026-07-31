@@ -59,7 +59,7 @@ public class NfcEnrollDialog extends JDialog {
                 if (leitores.isEmpty()) {
                     erro = "Nenhum leitor NFC (PC/SC) encontrado";
                 } else {
-                    uidLido = nfcCardUtil.lerUid(leitores.get(0), 5000);
+                    uidLido = nfcCardUtil.lerUid(nfcCardUtil.escolherLeitor(leitores), 5000);
                     if (uidLido == null) {
                         erro = "Nenhum cartão detectado a tempo";
                     }

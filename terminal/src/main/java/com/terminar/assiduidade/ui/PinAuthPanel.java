@@ -10,6 +10,7 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
+import javax.swing.Timer;
 import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
@@ -29,6 +30,8 @@ import java.util.Optional;
 public class PinAuthPanel extends JPanel {
 
     private static final int PIN_LENGTH = 4;
+    private static final int MAX_TENTATIVAS = 5;
+    private static final long BLOQUEIO_MS = 30_000;
     private static final Color COR_BOTAO = new Color(70, 70, 76);
     private static final Color COR_BOTAO_PRESSIONADO = new Color(90, 90, 96);
 
@@ -36,11 +39,22 @@ public class PinAuthPanel extends JPanel {
     private final AuthService authService = new AuthService();
 
     private final JLabel pinDisplay = new JLabel("", SwingConstants.CENTER);
+    private final JLabel statusLabel = new JLabel(" ", SwingConstants.CENTER);
     private final StringBuilder pinAtual = new StringBuilder();
+
+    /**
+     * Estado de bloqueio por força bruta — não é reposto por {@link #reiniciar()} (chamado
+     * sempre que se entra neste ecrã), senão bastava cancelar e voltar a entrar para reiniciar
+     * as tentativas. Só persiste em memória (não sobrevive a reiniciar a aplicação), o que é
+     * um compromisso aceitável para um kiosk físico.
+     */
+    private int tentativasFalhadas = 0;
+    private long bloqueadoAte = 0;
+    private Timer bloqueioTimer;
 
     public PinAuthPanel(AssiduidadeFrame frame) {
         this.frame = frame;
-        setLayout(new MigLayout("fill, insets 6, gap 2", "[grow, center]", "[]2[]6[]8[grow]"));
+        setLayout(new MigLayout("fill, insets 6, gap 2", "[grow, center]", "[]2[]4[]4[]8[grow]"));
 
         JLabel marca = new JLabel(AppConfig.getCompanyName(), SwingConstants.CENTER);
         marca.setFont(marca.getFont().deriveFont(Font.PLAIN, UiScale.f(13f)));
@@ -67,6 +81,10 @@ public class PinAuthPanel extends JPanel {
             new EmptyBorder(UiScale.px(4), UiScale.px(14), UiScale.px(4), UiScale.px(14))));
         atualizarDisplay();
         add(pinDisplay, "align center, w " + UiScale.px(150) + "!, wrap");
+
+        statusLabel.setFont(statusLabel.getFont().deriveFont(UiScale.f(9f)));
+        statusLabel.setForeground(new Color(210, 90, 90));
+        add(statusLabel, "align center, wrap");
 
         add(criarTeclado(), "align center");
     }
@@ -113,7 +131,7 @@ public class PinAuthPanel extends JPanel {
     }
 
     private void onTecla(String tecla) {
-        if (pinAtual.length() >= PIN_LENGTH) {
+        if (emBloqueio() || pinAtual.length() >= PIN_LENGTH) {
             return;
         }
         pinAtual.append(tecla);
@@ -121,6 +139,10 @@ public class PinAuthPanel extends JPanel {
         if (pinAtual.length() == PIN_LENGTH) {
             confirmar();
         }
+    }
+
+    private boolean emBloqueio() {
+        return System.currentTimeMillis() < bloqueadoAte;
     }
 
     private void atualizarDisplay() {
@@ -136,16 +158,51 @@ public class PinAuthPanel extends JPanel {
 
     private void confirmar() {
         Optional<Employee> employee = authService.authenticateByPin(pinAtual.toString());
+        pinAtual.setLength(0);
+        atualizarDisplay();
         if (employee.isPresent()) {
+            tentativasFalhadas = 0;
             frame.goToMarcarPonto(employee.get(), MetodoAutenticacao.PIN);
-        } else {
-            pinAtual.setLength(0);
-            atualizarDisplay();
+            return;
         }
+        tentativasFalhadas++;
+        if (tentativasFalhadas >= MAX_TENTATIVAS) {
+            iniciarBloqueio();
+        }
+    }
+
+    private void iniciarBloqueio() {
+        bloqueadoAte = System.currentTimeMillis() + BLOQUEIO_MS;
+        if (bloqueioTimer != null) {
+            bloqueioTimer.stop();
+        }
+        bloqueioTimer = new Timer(500, e -> atualizarBloqueio());
+        bloqueioTimer.start();
+        atualizarBloqueio();
+    }
+
+    private void atualizarBloqueio() {
+        long restanteMs = bloqueadoAte - System.currentTimeMillis();
+        if (restanteMs <= 0) {
+            statusLabel.setText(" ");
+            tentativasFalhadas = 0;
+            bloqueioTimer.stop();
+            return;
+        }
+        statusLabel.setText("Demasiadas tentativas — aguarde " + (restanteMs / 1000 + 1) + "s");
     }
 
     public void reiniciar() {
         pinAtual.setLength(0);
         atualizarDisplay();
+        if (emBloqueio()) {
+            atualizarBloqueio();
+            if (bloqueioTimer == null || !bloqueioTimer.isRunning()) {
+                bloqueioTimer = new Timer(500, e -> atualizarBloqueio());
+                bloqueioTimer.start();
+            }
+        } else {
+            statusLabel.setText(" ");
+        }
     }
 }

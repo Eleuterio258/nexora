@@ -11,6 +11,9 @@ import java.util.Properties;
 @Getter
 public class AppConfig {
 
+    /** Valor de fábrica de admin.pin — enquanto não for trocado, o acesso ao admin força a troca. */
+    public static final String ADMIN_PIN_OMISSAO = "0000";
+
     private static final Properties props = new Properties();
 
     private static String databaseUrl;
@@ -23,8 +26,11 @@ public class AppConfig {
     private static int qrCodeSize;
     private static int screenWidth;
     private static int screenHeight;
+    private static int adminScreenWidth;
+    private static int adminScreenHeight;
     private static String apiBaseUrl;
     private static String apiDeviceKey;
+    private static int erpSyncIntervalSeconds;
 
     public static void load() throws IOException {
         try (InputStream is = AppConfig.class.getResourceAsStream("/application.properties")) {
@@ -37,13 +43,16 @@ public class AppConfig {
         fingerprintSimulation = Boolean.parseBoolean(get("fingerprint.simulation", "true"));
         sessionTimeoutSeconds = Integer.parseInt(get("session.timeout.seconds", "30"));
         companyName = get("app.company", "Nexora");
-        adminPin = get("admin.pin", "0000");
+        adminPin = get("admin.pin", ADMIN_PIN_OMISSAO);
         webcamDefaultIndex = Integer.parseInt(get("webcam.default.index", "0"));
         qrCodeSize = Integer.parseInt(get("qrcode.size", "300"));
         screenWidth = Integer.parseInt(get("screen.width", "400"));
         screenHeight = Integer.parseInt(get("screen.height", "200"));
+        adminScreenWidth = Integer.parseInt(get("admin.screen.width", "1000"));
+        adminScreenHeight = Integer.parseInt(get("admin.screen.height", "650"));
         apiBaseUrl = get("api.base.url", "");
         apiDeviceKey = get("api.device.key", "");
+        erpSyncIntervalSeconds = Integer.parseInt(get("erp.sync.interval.seconds", "300"));
         log.info("Configuração carregada: db={}, simulação={}, timeout={}, ecrã={}x{}",
             databaseUrl, fingerprintSimulation, sessionTimeoutSeconds, screenWidth, screenHeight);
     }
@@ -70,11 +79,17 @@ public class AppConfig {
     public static int getQrCodeSize() { return qrCodeSize; }
     public static int getScreenWidth() { return screenWidth; }
     public static int getScreenHeight() { return screenHeight; }
+    public static int getAdminScreenWidth() { return adminScreenWidth; }
+    public static int getAdminScreenHeight() { return adminScreenHeight; }
     public static String getApiBaseUrl() { return apiBaseUrl; }
     public static String getApiDeviceKey() { return apiDeviceKey; }
+    public static int getErpSyncIntervalSeconds() { return erpSyncIntervalSeconds; }
 
     /** Usado pelo ecrã "Configurações" do admin — tem efeito imediato, sem reiniciar a app. */
     public static void setApiBaseUrl(String value) { apiBaseUrl = value == null ? "" : value.trim(); }
 
     public static void setApiDeviceKey(String value) { apiDeviceKey = value == null ? "" : value.trim(); }
+
+    /** Usado pelo ecrã de admin para forçar a troca do PIN por omissão. */
+    public static void setAdminPin(String value) { adminPin = value; }
 }

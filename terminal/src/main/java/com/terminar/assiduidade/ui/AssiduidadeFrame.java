@@ -1,6 +1,7 @@
 package com.terminar.assiduidade.ui;
 
 import com.terminar.assiduidade.config.AppConfig;
+import com.terminar.assiduidade.dao.ConfiguracaoDao;
 import com.terminar.assiduidade.model.Employee;
 import com.terminar.assiduidade.model.MetodoAutenticacao;
 import com.terminar.assiduidade.ui.admin.AdminLoginDialog;
@@ -8,11 +9,15 @@ import com.terminar.assiduidade.ui.admin.EmployeeManagementPanel;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
 import javax.swing.Timer;
 import java.awt.AWTEvent;
 import java.awt.CardLayout;
 import java.awt.Toolkit;
+
+import static com.terminar.assiduidade.config.AppConfig.ADMIN_PIN_OMISSAO;
 
 @Slf4j
 public class AssiduidadeFrame extends JFrame {
@@ -28,6 +33,7 @@ public class AssiduidadeFrame extends JFrame {
 
     private final CardLayout cardLayout = new CardLayout();
     private final java.awt.Container cards;
+    private final java.awt.Dimension kioskSize;
 
     private final HomeClockPanel homePanel;
     private final PinAuthPanel pinPanel;
@@ -72,6 +78,7 @@ public class AssiduidadeFrame extends JFrame {
         pack();
         setResizable(false);
         setLocationRelativeTo(null);
+        kioskSize = getSize();
 
         inactivityTimer = new Timer(AppConfig.getSessionTimeoutSeconds() * 1000, e -> goHome());
         inactivityTimer.setRepeats(false);
@@ -107,6 +114,9 @@ public class AssiduidadeFrame extends JFrame {
     public void goHome() {
         qrPanel.pararCaptura();
         nfcPanel.pararLeitura();
+        if (CARD_ADMIN.equals(currentCard)) {
+            restoreKioskSize();
+        }
         homePanel.refrescar();
         setTitle(AppConfig.getAppTitle());
         showCard(CARD_HOME);
@@ -151,9 +161,62 @@ public class AssiduidadeFrame extends JFrame {
     public void goToAdminGated() {
         AdminLoginDialog dialog = new AdminLoginDialog(this);
         dialog.setVisible(true);
-        if (dialog.isAutenticado()) {
-            adminPanel.refrescar();
-            showCard(CARD_ADMIN);
+        if (!dialog.isAutenticado()) {
+            return;
         }
+        if (ADMIN_PIN_OMISSAO.equals(AppConfig.getAdminPin()) && !forcarTrocaPinAdmin()) {
+            return;
+        }
+        adminPanel.refrescar();
+        resizeForAdmin();
+        showCard(CARD_ADMIN);
+    }
+
+    /**
+     * O PIN de admin de fábrica ({@link AppConfig#ADMIN_PIN_OMISSAO}) é público (está no
+     * README/application.properties) — aceitá-lo indefinidamente anula qualquer protecção
+     * contra força bruta no {@link com.terminar.assiduidade.ui.admin.AdminLoginDialog}. Devolve
+     * false se o utilizador cancelar, negando o acesso a essa entrada no admin.
+     */
+    private boolean forcarTrocaPinAdmin() {
+        while (true) {
+            JPasswordField pin1 = new JPasswordField();
+            JPasswordField pin2 = new JPasswordField();
+            Object[] mensagem = {
+                "O PIN de administração ainda é o de fábrica (" + ADMIN_PIN_OMISSAO + ").\n"
+                    + "Defina um novo PIN antes de continuar:",
+                "Novo PIN (mín. 4 dígitos):", pin1, "Confirmar PIN:", pin2
+            };
+            int opcao = JOptionPane.showConfirmDialog(this, mensagem, "Trocar PIN de administração",
+                JOptionPane.OK_CANCEL_OPTION);
+            if (opcao != JOptionPane.OK_OPTION) {
+                return false;
+            }
+            String p1 = new String(pin1.getPassword());
+            String p2 = new String(pin2.getPassword());
+            if (p1.length() < 4 || !p1.equals(p2) || ADMIN_PIN_OMISSAO.equals(p1)) {
+                JOptionPane.showMessageDialog(this,
+                    "PIN inválido — tem de ter pelo menos 4 dígitos, coincidir na confirmação e "
+                        + "não pode ser " + ADMIN_PIN_OMISSAO + ".",
+                    "Erro", JOptionPane.ERROR_MESSAGE);
+                continue;
+            }
+            new ConfiguracaoDao().guardar("admin.pin", p1);
+            AppConfig.setAdminPin(p1);
+            log.info("PIN de administração trocado (deixou de ser o de fábrica)");
+            return true;
+        }
+    }
+
+    private void resizeForAdmin() {
+        setResizable(true);
+        setSize(AppConfig.getAdminScreenWidth(), AppConfig.getAdminScreenHeight());
+        setLocationRelativeTo(null);
+    }
+
+    private void restoreKioskSize() {
+        setResizable(false);
+        setSize(kioskSize);
+        setLocationRelativeTo(null);
     }
 }

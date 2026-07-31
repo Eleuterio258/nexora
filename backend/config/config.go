@@ -53,13 +53,11 @@ type Config struct {
 	NexoraPayAPIKey         string
 	NexoraPayServiceAccount string
 
-	// SMTP — envio de emails transaccionais
-	SMTPHost     string
-	SMTPPort     int
-	SMTPUser     string
-	SMTPPassword string
-	SMTPFrom     string
-	SMTPFromName string
+	// Email transaccional — API nativa do AWS SES; credenciais AWS pela
+	// cadeia standard do SDK (env vars/role IAM), não configuradas aqui.
+	SESRegion   string
+	SESFrom     string
+	SESFromName string
 
 	// Object Storage (local ou minio)
 	StorageProvider  string
@@ -213,12 +211,9 @@ func Load() *Config {
 		NexoraPayAPIKey:         env("NEXORA_PAY_API_KEY", ""),
 		NexoraPayServiceAccount: env("NEXORA_PAY_SERVICE_ACCOUNT", "gestao-escolar"),
 
-		SMTPHost:     env("SMTP_HOST", ""),
-		SMTPPort:     int(envInt("SMTP_PORT", 587)),
-		SMTPUser:     env("SMTP_USER", ""),
-		SMTPPassword: env("SMTP_PASSWORD", ""),
-		SMTPFrom:     env("SMTP_FROM", ""),
-		SMTPFromName: env("SMTP_FROM_NAME", "Nexora ERP"),
+		SESRegion:   env("SES_REGION", "us-east-1"),
+		SESFrom:     env("SES_FROM", ""),
+		SESFromName: env("SES_FROM_NAME", "Nexora ERP"),
 
 		StorageProvider:  env("STORAGE_PROVIDER", "minio"),
 		StorageLocalDir:  env("STORAGE_LOCAL_DIR", "./uploads"),

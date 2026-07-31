@@ -30,6 +30,12 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET:-nexoraerp}
       MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
       MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      # Email transaccional via AWS SES (API nativa, não SMTP).
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      SES_REGION: ${SES_REGION:-us-east-1}
+      SES_FROM: ${SES_FROM:-noreply@e258tech.tech}
+      SES_FROM_NAME: ${SES_FROM_NAME:-Nexora ERP}
       # Multi-tenant do recrutamento — sem RECRUITMENT_TENANT_ID o código usa
       # o default 1, um tenant que não existe nesta instalação.
       RECRUITMENT_TENANT_ID: ${RECRUITMENT_TENANT_ID:-7}

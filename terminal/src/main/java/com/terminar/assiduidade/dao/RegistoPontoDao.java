@@ -79,6 +79,22 @@ public class RegistoPontoDao {
         }
     }
 
+    /** Registos ainda não confirmados no ERP — candidatos a reenvio periódico. */
+    public List<RegistoPonto> findNaoSincronizados() {
+        String sql = "SELECT * FROM registo_ponto WHERE sincronizado = 0 ORDER BY data_hora";
+        List<RegistoPonto> result = new ArrayList<>();
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                result.add(map(rs));
+            }
+            return result;
+        } catch (Exception e) {
+            throw new AssiduidadeException("Erro ao listar registos não sincronizados", e);
+        }
+    }
+
     public List<RegistoPonto> findByDia(LocalDate dia) {
         String sql = "SELECT * FROM registo_ponto WHERE date(data_hora) = date(?) ORDER BY data_hora DESC";
         List<RegistoPonto> result = new ArrayList<>();

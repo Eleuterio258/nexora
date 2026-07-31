@@ -2,6 +2,7 @@ package com.terminar.assiduidade.util;
 
 import javax.smartcardio.Card;
 import javax.smartcardio.CardChannel;
+import javax.smartcardio.CardException;
 import javax.smartcardio.CardTerminal;
 import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
@@ -11,16 +12,43 @@ import java.util.List;
 /**
  * Leitura de cartões NFC/contactless via PC/SC (javax.smartcardio, incluído no JDK — sem
  * dependência extra). Funciona com qualquer leitor compatível PC/SC (ex.: ACR122U e
- * equivalentes). O comando "FF CA 00 00 00" é a pseudo-APDU standard PC/SC Parte 10 para obter
- * o UID de um cartão contactless.
+ * equivalentes — no Windows precisa do driver PC/SC da ACS instalado, para o leitor aparecer
+ * como "ACS ACR122U PICC Interface" nos leitores do sistema). O comando "FF CA 00 00 00" é a
+ * pseudo-APDU standard PC/SC Parte 10 para obter o UID de um cartão contactless.
  */
 public class NfcCardUtil {
 
     private static final byte[] APDU_GET_UID = {(byte) 0xFF, (byte) 0xCA, 0x00, 0x00, 0x00};
+    private static final String NOME_PREFERIDO = "ACR122";
 
-    /** Lista os leitores PC/SC disponíveis. Lança excepção se o subsistema PC/SC não existir. */
+    /**
+     * Lista os leitores PC/SC disponíveis. Devolve lista vazia quando o serviço de smart card
+     * está activo mas não tem nenhum leitor registado (SCARD_E_NO_READERS_AVAILABLE — situação
+     * normal, ex.: ACR122U ainda sem driver instalado), tal como quando a lista vem vazia sem
+     * erro. Lança excepção só se o subsistema PC/SC em si não existir/estiver inacessível.
+     */
     public List<CardTerminal> listarLeitores() throws Exception {
-        return TerminalFactory.getDefault().terminals().list();
+        try {
+            return TerminalFactory.getDefault().terminals().list();
+        } catch (CardException e) {
+            if (e.getCause() != null && e.getCause().getMessage() != null
+                && e.getCause().getMessage().contains("SCARD_E_NO_READERS_AVAILABLE")) {
+                return List.of();
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Escolhe o leitor a usar quando há mais do que um PC/SC ligado (ex.: leitor interno do
+     * portátil + ACR122U USB): dá preferência ao ACR122U pelo nome, caindo para o primeiro
+     * leitor da lista se não houver nenhum com esse nome.
+     */
+    public CardTerminal escolherLeitor(List<CardTerminal> leitores) {
+        return leitores.stream()
+            .filter(t -> t.getName().toUpperCase().contains(NOME_PREFERIDO))
+            .findFirst()
+            .orElse(leitores.get(0));
     }
 
     /**

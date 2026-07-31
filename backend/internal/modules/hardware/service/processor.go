@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -100,8 +101,8 @@ func (p *Processor) processEntity(ctx context.Context, tenantID, deviceID int64,
 		return ProcessResult{ErrorMessage: "dispositivo sem empresa/tenant associado correctamente"}
 	}
 
-	if activo, metodo := p.metodoAssiduidadeActivo(ctx, saasTenantID, event.CredentialType); !activo {
-		return ProcessResult{ErrorMessage: fmt.Sprintf("Método de assiduidade '%s' não permitido para este tenant.", metodo)}
+	if activo, motivo := p.metodoAssiduidadeActivo(ctx, saasTenantID, event.CredentialType); !activo {
+		return ProcessResult{ErrorMessage: motivo}
 	}
 
 	var mapping struct {
@@ -178,17 +179,27 @@ var credentialTypeToMetodo = map[string]string{
 //
 // A decisão em si vive em assiduidade.MetodoActivo (partilhada com o
 // self-service, que marca ponto por JWT); aqui fica só a tradução do
-// credential_type do dispositivo para a chave da configuração — um
-// credential_type sem mapeamento passa, mesma falha aberta do resto.
+// credential_type do dispositivo para a chave da configuração.
+//
+// Um credential_type sem mapeamento falha fechado (rejeita o evento) — os 7
+// tipos suportados (facial/fingerprint/qr/nfc/pin/geolocation/manual) cobrem
+// tudo o que os adapters actuais (generic_rest, zkteco, hikvision) produzem;
+// um valor fora deste conjunto só pode vir de um adapter novo ainda sem
+// mapeamento aqui ou de um pedido malformado, e nesse caso não há como saber
+// se o método corresponde a algo que o tenant desactivou. O evento fica
+// gravado em hardware.device_events (para auditoria/reprocessamento manual),
+// só não vira marcação de assiduidade.
 func (p *Processor) metodoAssiduidadeActivo(ctx context.Context, tenantID int64, credentialType string) (bool, string) {
 	metodo, ok := credentialTypeToMetodo[credentialType]
 	if !ok {
-		return true, ""
+		log.Printf("[hardware] credential_type %q sem mapeamento em credentialTypeToMetodo (tenant %d) — "+
+			"a rejeitar o evento (falha fechada)", credentialType, tenantID)
+		return false, fmt.Sprintf("credential_type '%s' desconhecido", credentialType)
 	}
 	if p.assiduidade.MetodoActivo(ctx, tenantID, metodo) {
 		return true, ""
 	}
-	return false, metodo
+	return false, fmt.Sprintf("Método de assiduidade '%s' não permitido para este tenant.", metodo)
 }
 
 // registarEventoAssiduidade grava o evento numa das duas famílias

@@ -109,7 +109,7 @@ func runInterval(ctx context.Context, name string, interval time.Duration, fn fu
 
 // dispatchNotifications lê mensagens pendentes e envia por email ou SMS.
 // Até 3 tentativas por mensagem; após isso marca como 'falhou'.
-func dispatchNotifications(db *pgxpool.Pool, mailer *smtpMailer, sms smsSender) {
+func dispatchNotifications(db *pgxpool.Pool, mailer *sesMailer, sms smsSender) {
 	if !mailer.enabled() && sms == nil {
 		return
 	}

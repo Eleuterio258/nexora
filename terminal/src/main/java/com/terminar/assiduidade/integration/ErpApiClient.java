@@ -104,6 +104,9 @@ public class ErpApiClient {
         }
     }
 
+    private static final int MAX_TENTATIVAS = 3;
+    private static final long BACKOFF_INICIAL_MS = 1000;
+
     private HttpRequest.Builder requestBuilder(String caminho) {
         return HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + caminho))
@@ -111,17 +114,44 @@ public class ErpApiClient {
             .header("X-API-Key", deviceKey);
     }
 
+    /**
+     * Repete até {@value #MAX_TENTATIVAS} vezes com backoff a duplicar (1s, 2s), para cobrir
+     * falhas de rede transitórias (timeout, ligação recusada) sem depender só do reenvio
+     * periódico do ErpSyncService, que só corre minutos depois. Repetir é seguro mesmo para
+     * POST /events porque o ERP é idempotente por event_hash (ver processor.go no backend).
+     * Erros 4xx (chave inválida, payload rejeitado) não são repetidos — tentar de novo não
+     * muda o resultado.
+     */
     private HttpResponse<String> enviar(HttpRequest request) {
-        try {
-            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() / 100 != 2) {
-                throw new AssiduidadeException("ERP devolveu " + response.statusCode() + ": " + response.body());
+        AssiduidadeException falhaFinal = null;
+        long esperaMs = BACKOFF_INICIAL_MS;
+        for (int tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+            if (tentativa > 1) {
+                aguardar(esperaMs);
+                esperaMs *= 2;
             }
-            return response;
-        } catch (AssiduidadeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new AssiduidadeException("Erro de comunicação com o ERP", e);
+            try {
+                HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() / 100 == 2) {
+                    return response;
+                }
+                falhaFinal = new AssiduidadeException("ERP devolveu " + response.statusCode() + ": " + response.body());
+                if (response.statusCode() / 100 == 4) {
+                    break;
+                }
+            } catch (Exception e) {
+                falhaFinal = new AssiduidadeException("Erro de comunicação com o ERP", e);
+            }
+        }
+        throw falhaFinal;
+    }
+
+    private void aguardar(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssiduidadeException("Interrompido a aguardar novo envio ao ERP", e);
         }
     }
 
