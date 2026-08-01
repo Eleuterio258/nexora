@@ -76,6 +76,112 @@ func (h *Handler) CriarEvento(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, ev, http.StatusCreated)
 }
 
+// tiposEventoManual são os tipos que um gestor/RH pode marcar manualmente
+// para um funcionário através de POST /api/rh/assiduidade/ponto.
+var tiposEventoManual = map[string]bool{
+	"entrada":          true,
+	"saida":            true,
+	"intervalo_inicio": true,
+	"intervalo_fim":    true,
+}
+
+// MarcarPontoGestor permite a um gestor ou RH marcar o ponto manualmente em
+// nome de um funcionário — POST /api/rh/assiduidade/ponto. Segue o mesmo
+// padrão do self-service: o tipo de evento é opcional e, quando omitido, o
+// backend infere entrada/saída pela paridade dos eventos do dia.
+type MarcarPontoGestorRequest struct {
+	FuncionarioID    int64    `json:"funcionario_id"`
+	Data             string   `json:"data"`
+	Hora             string   `json:"hora"`
+	TipoEventoCodigo string   `json:"tipo_evento_codigo"`
+	Latitude         *float64 `json:"latitude"`
+	Longitude        *float64 `json:"longitude"`
+	LocalidadeID     *int64   `json:"localidade_id"`
+	Observacoes      *string  `json:"observacoes"`
+}
+
+// MarcarPontoGestor regista um evento de assiduidade manual para um funcionário
+// específico. Requer permissão para gerir o funcionário alvo.
+func (h *Handler) MarcarPontoGestor(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+
+	var body MarcarPontoGestorRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonErr(w, "corpo do pedido inválido", http.StatusBadRequest)
+		return
+	}
+	if body.FuncionarioID == 0 {
+		jsonErr(w, "funcionario_id é obrigatório", http.StatusBadRequest)
+		return
+	}
+	if body.Data == "" {
+		jsonErr(w, "data é obrigatória (formato YYYY-MM-DD)", http.StatusBadRequest)
+		return
+	}
+	if body.TipoEventoCodigo != "" && !tiposEventoManual[body.TipoEventoCodigo] {
+		jsonErr(w, "tipo_evento_codigo não permitido em marcações manuais", http.StatusBadRequest)
+		return
+	}
+	if !h.podeGerirFuncionario(r, body.FuncionarioID) {
+		jsonErr(w, "Sem permissão para registar eventos deste funcionário", http.StatusForbidden)
+		return
+	}
+
+	dataReferencia, err := time.Parse("2006-01-02", body.Data)
+	if err != nil {
+		jsonErr(w, "data inválida (formato esperado: YYYY-MM-DD)", http.StatusBadRequest)
+		return
+	}
+
+	agora := time.Now()
+	hora := body.Hora
+	if hora == "" {
+		hora = agora.Format("15:04")
+	}
+	ocorridoEmStr := body.Data + " " + hora
+	ocorridoEm, err := time.ParseInLocation("2006-01-02 15:04", ocorridoEmStr, agora.Location())
+	if err != nil {
+		jsonErr(w, "hora inválida (formato esperado: HH:MM)", http.StatusBadRequest)
+		return
+	}
+
+	tipoEvento := body.TipoEventoCodigo
+	if tipoEvento == "" {
+		tipoEvento = h.assiduidade.InferirEntradaOuSaida(r.Context(), user.TenantID, body.FuncionarioID, ocorridoEm)
+	}
+
+	metodo := "manual"
+	origem := "manual"
+	registadoPor := user.ID
+	ip := r.RemoteAddr
+	ua := r.UserAgent()
+
+	ev, err := h.assiduidade.RegistarEvento(r.Context(), user.TenantID, assiduidade.RegistarEventoInput{
+		FuncionarioID:    body.FuncionarioID,
+		TipoEventoCodigo: tipoEvento,
+		MetodoCodigo:     &metodo,
+		OcorridoEm:       ocorridoEm,
+		DataReferencia:   &dataReferencia,
+		Origem:           origem,
+		Latitude:         body.Latitude,
+		Longitude:        body.Longitude,
+		LocalidadeID:     body.LocalidadeID,
+		RegistadoPor:     &registadoPor,
+		Observacoes:      body.Observacoes,
+		IPOrigem:         &ip,
+		UserAgent:        &ua,
+	})
+	if err != nil {
+		if err == assiduidade.ErrTipoEventoDesconhecido {
+			jsonErr(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		jsonErr(w, "Erro interno ao registar evento", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, ev, http.StatusCreated)
+}
+
 // ListarEventosFuncionario lista os eventos de assiduidade de um funcionário
 // num intervalo de datas — GET /api/rh/funcionarios/{id}/eventos?data_inicio=&data_fim=.
 func (h *Handler) ListarEventosFuncionario(w http.ResponseWriter, r *http.Request) {

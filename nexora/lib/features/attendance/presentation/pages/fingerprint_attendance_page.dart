@@ -5,7 +5,6 @@ import 'package:local_auth/local_auth.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/attendance_method.dart';
-import '../../domain/entities/attendance_status.dart';
 import '../bloc/attendance_bloc.dart';
 import '../bloc/attendance_event.dart';
 import '../bloc/attendance_state.dart';
@@ -35,7 +34,6 @@ class _FingerprintAttendanceViewState
   final LocalAuthentication _localAuth = LocalAuthentication();
   bool? _canCheckBiometrics;
   List<BiometricType>? _availableBiometrics;
-  AttendanceType _selectedType = AttendanceType.entrada;
 
   @override
   void initState() {
@@ -80,7 +78,7 @@ class _FingerprintAttendanceViewState
 
     try {
       final authenticated = await _localAuth.authenticate(
-        localizedReason: 'Confirma a tua identidade para registar a presença.',
+        localizedReason: 'Confirma a tua identidade para marcar o ponto.',
         options: const AuthenticationOptions(
           useErrorDialogs: true,
           stickyAuth: true,
@@ -92,9 +90,8 @@ class _FingerprintAttendanceViewState
 
       if (authenticated) {
         context.read<AttendanceBloc>().add(
-              RegisterAttendance(
+              const RegisterAttendance(
                 method: AttendanceMethod.fingerprint,
-                type: _selectedType,
               ),
             );
       }
@@ -177,28 +174,9 @@ class _FingerprintAttendanceViewState
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'Utiliza a biometria do dispositivo para registar a presença.',
+                  'Utiliza a biometria do dispositivo para marcar o ponto. O tipo de evento será determinado automaticamente.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.textMuted),
-                ),
-                const SizedBox(height: 24),
-                SegmentedButton<AttendanceType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: AttendanceType.entrada,
-                      label: Text('Entrada'),
-                      icon: Icon(Icons.login),
-                    ),
-                    ButtonSegment(
-                      value: AttendanceType.saida,
-                      label: Text('Saída'),
-                      icon: Icon(Icons.logout),
-                    ),
-                  ],
-                  selected: {_selectedType},
-                  onSelectionChanged: (selected) {
-                    setState(() => _selectedType = selected.first);
-                  },
                 ),
                 const SizedBox(height: 32),
                 if (_canCheckBiometrics == false)
@@ -211,7 +189,7 @@ class _FingerprintAttendanceViewState
                   FilledButton.icon(
                     onPressed: () => _authenticate(context),
                     icon: const Icon(Icons.fingerprint),
-                    label: const Text('Autenticar e registar'),
+                    label: const Text('Autenticar e marcar ponto'),
                   ),
               ],
             ),

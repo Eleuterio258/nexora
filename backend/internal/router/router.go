@@ -2068,6 +2068,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequirePermission(db, "recursos-humanos", "gerir_funcionarios"))
 			r.Post("/eventos", rh.CriarEvento)
+			r.Post("/assiduidade/ponto", rh.MarcarPontoGestor)
 		})
 		// QR Code fixo do gestor — gera o token que os funcionários leem para se
 		// marcarem sozinhos. Precisa de saber QUEM está
@@ -2830,6 +2831,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Get("/assiduidade/consentimentos/activo", rh.ObterConsentimentoActivoDevice)
 			r.Post("/assiduidade/consentimentos/revogar", rh.RevogarConsentimentoDevice)
 			r.Post("/assiduidade/qr/validar", rh.ValidarQRDevice)
+			r.Post("/assiduidade/qr/registar", rh.RegistarQRDevice)
 			r.Post("/assiduidade/qr/gerar-terminal", rh.GerarQRTerminal)
 			r.Get("/assiduidade/nfc/validar", rh.ValidarNFCDevice)
 		})

@@ -1,0 +1,1281 @@
+# Endpoints do Sistema Nexora
+
+Lista completa de endpoints extraída automaticamente do backend Go (`backend/internal/router/router.go`).
+
+> **Total de endpoints únicos encontrados: 1071**
+
+## `/api/aprovacoes`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/aprovacoes/flows` |
+| `POST` | `/api/aprovacoes/flows` |
+| `GET` | `/api/aprovacoes/flows/{id}` |
+| `PUT` | `/api/aprovacoes/flows/{id}` |
+| `DELETE` | `/api/aprovacoes/flows/{id}` |
+| `GET` | `/api/aprovacoes/requests` |
+| `GET` | `/api/aprovacoes/requests/pendentes-meu-cargo` |
+| `GET` | `/api/aprovacoes/requests/{id}` |
+| `POST` | `/api/aprovacoes/requests/{id}/decidir` |
+| `POST` | `/api/aprovacoes/requests/{id}/cancelar` |
+## `/api/assinatura-digital`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/assinatura-digital/documentos/` |
+| `GET` | `/api/assinatura-digital/documentos/{id}` |
+| `GET` | `/api/assinatura-digital/documentos/{id}/download` |
+| `GET` | `/api/assinatura-digital/documentos/{id}/original/download` |
+| `GET` | `/api/assinatura-digital/documentos/{id}/versoes` |
+| `GET` | `/api/assinatura-digital/documentos/{id}/versoes/{versaoId}/download` |
+| `GET` | `/api/assinatura-digital/documentos/{id}/evidencias` |
+| `GET` | `/api/assinatura-digital/documentos/{id}/validacao` |
+| `POST` | `/api/assinatura-digital/documentos/{id}/revalidar` |
+| `POST` | `/api/assinatura-digital/documentos/` |
+| `POST` | `/api/assinatura-digital/documentos/{id}/enviar` |
+| `POST` | `/api/assinatura-digital/documentos/{id}/cancelar` |
+| `POST` | `/api/assinatura-digital/documentos/{id}/signatarios` |
+| `DELETE` | `/api/assinatura-digital/documentos/{id}/signatarios/{sigId}` |
+| `POST` | `/api/assinatura-digital/documentos/{id}/assinar` |
+| `POST` | `/api/assinatura-digital/documentos/{id}/signatarios/{sigId}/recusar` |
+| `GET` | `/api/assinatura-digital/convites/{token}` |
+| `POST` | `/api/assinatura-digital/convites/{token}/otp/enviar` |
+| `POST` | `/api/assinatura-digital/convites/{token}/otp/validar` |
+| `POST` | `/api/assinatura-digital/convites/{token}/assinar` |
+| `POST` | `/api/assinatura-digital/convites/{token}/recusar` |
+| `GET` | `/api/assinatura-digital/convites/{token}/preview` |
+| `POST` | `/api/assinatura-digital/webhooks/{provider}` |
+## `/api/assinaturas`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/assinaturas/planos/` |
+| `POST` | `/api/assinaturas/planos/` |
+| `PUT` | `/api/assinaturas/planos/{id}` |
+| `GET` | `/api/assinaturas/subscriptions/` |
+| `GET` | `/api/assinaturas/subscriptions/{id}/facturas` |
+| `GET` | `/api/assinaturas/subscriptions/{id}/utilizacao` |
+| `POST` | `/api/assinaturas/subscriptions/` |
+| `POST` | `/api/assinaturas/subscriptions/{id}/cancelar` |
+| `POST` | `/api/assinaturas/subscriptions/{id}/renovar` |
+## `/api/audit-logs`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/audit-logs/` |
+| `GET` | `/api/audit-logs/{id}` |
+| `POST` | `/api/audit-logs/` |
+## `/api/auth`
+
+| Método | Endpoint |
+|---|---|
+| `POST` | `/api/auth/login` |
+| `POST` | `/api/auth/refresh` |
+| `POST` | `/api/auth/forgot-password` |
+| `POST` | `/api/auth/reset-password` |
+| `POST` | `/api/auth/verify-email` |
+| `GET` | `/api/auth/me` |
+| `GET` | `/api/auth/me/acesso` |
+| `POST` | `/api/auth/papel` |
+| `GET` | `/api/auth/me/perm-ts` |
+| `POST` | `/api/auth/logout` |
+| `POST` | `/api/auth/change-password` |
+| `POST` | `/api/auth/push-token` |
+| `POST` | `/api/auth/reauth` |
+| `GET` | `/api/auth/utilizadores/` |
+| `POST` | `/api/auth/utilizadores/` |
+| `GET` | `/api/auth/utilizadores/{id}` |
+| `PUT` | `/api/auth/utilizadores/{id}` |
+| `POST` | `/api/auth/utilizadores/{id}/activar` |
+| `POST` | `/api/auth/utilizadores/{id}/bloquear` |
+| `POST` | `/api/auth/utilizadores/{id}/desactivar` |
+| `PUT` | `/api/auth/utilizadores/{id}/cargo` |
+| `PUT` | `/api/auth/utilizadores/{id}/tipo` |
+| `POST` | `/api/auth/utilizadores/{id}/reset-password` |
+| `GET` | `/api/auth/utilizadores/{id}/permissoes` |
+| `PUT` | `/api/auth/utilizadores/{id}/permissoes` |
+| `GET` | `/api/auth/historico-login` |
+| `GET` | `/api/auth/cargos/` |
+| `POST` | `/api/auth/cargos/` |
+| `GET` | `/api/auth/cargos/{id}` |
+| `PUT` | `/api/auth/cargos/{id}` |
+| `POST` | `/api/auth/cargos/{id}/activar` |
+| `POST` | `/api/auth/cargos/{id}/desactivar` |
+| `GET` | `/api/auth/cargos/{id}/permissoes` |
+| `PUT` | `/api/auth/cargos/{id}/permissoes` |
+| `GET` | `/api/auth/sessoes/` |
+| `POST` | `/api/auth/sessoes/{id}/revogar` |
+| `POST` | `/api/auth/sessoes/revogar-todas` |
+## `/api/authcode`
+
+| Método | Endpoint |
+|---|---|
+| `POST` | `/api/authcode/pin/validate` |
+| `POST` | `/api/authcode/totp/validate` |
+| `POST` | `/api/authcode/totp/setup` |
+| `POST` | `/api/authcode/pin/verify` |
+| `POST` | `/api/authcode/totp/verify` |
+| `POST` | `/api/authcode/admin/set-pin` |
+## `/api/centros-custo`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/centros-custo/cost-centers/` |
+| `GET` | `/api/centros-custo/cost-centers/{id}` |
+| `POST` | `/api/centros-custo/cost-centers/` |
+| `PUT` | `/api/centros-custo/cost-centers/{id}` |
+| `DELETE` | `/api/centros-custo/cost-centers/{id}` |
+| `GET` | `/api/centros-custo/budgets/vs-realizado` |
+| `GET` | `/api/centros-custo/budgets/` |
+| `POST` | `/api/centros-custo/budgets/` |
+| `PUT` | `/api/centros-custo/budgets/{id}` |
+| `DELETE` | `/api/centros-custo/budgets/{id}` |
+| `GET` | `/api/centros-custo/allocations/` |
+| `GET` | `/api/centros-custo/allocations/{id}` |
+| `POST` | `/api/centros-custo/allocations/` |
+## `/api/clientes`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/clientes/grupos` |
+| `POST` | `/api/clientes/grupos` |
+| `GET` | `/api/clientes/grupos/{id}` |
+| `PUT` | `/api/clientes/grupos/{id}` |
+| `GET` | `/api/clientes/tags` |
+| `POST` | `/api/clientes/tags` |
+| `GET` | `/api/clientes/reports/{report:top-clientes|saldos-devedores|credito-utilizado|sem-actividade}` |
+| `GET` | `/api/clientes/` |
+| `GET` | `/api/clientes/{id}` |
+| `GET` | `/api/clientes/{id}/contactos` |
+| `GET` | `/api/clientes/{id}/enderecos` |
+| `GET` | `/api/clientes/{id}/documentos` |
+| `GET` | `/api/clientes/{id}/limite-credito` |
+| `GET` | `/api/clientes/{id}/credito` |
+| `GET` | `/api/clientes/{id}/saldo` |
+| `GET` | `/api/clientes/{id}/pagamentos` |
+| `GET` | `/api/clientes/{id}/notas` |
+| `GET` | `/api/clientes/{id}/historico` |
+| `GET` | `/api/clientes/{id}/descontos` |
+| `POST` | `/api/clientes/` |
+| `PUT` | `/api/clientes/{id}` |
+| `POST` | `/api/clientes/{id}/activar` |
+| `POST` | `/api/clientes/{id}/bloquear` |
+| `POST` | `/api/clientes/{id}/desbloquear` |
+| `POST` | `/api/clientes/{id}/contactos` |
+| `PUT` | `/api/clientes/{id}/contactos/{contactoId}` |
+| `POST` | `/api/clientes/{id}/enderecos` |
+| `PUT` | `/api/clientes/{id}/enderecos/{endId}` |
+| `POST` | `/api/clientes/{id}/documentos` |
+| `POST` | `/api/clientes/{id}/limite-credito` |
+| `PUT` | `/api/clientes/{id}/credito` |
+| `POST` | `/api/clientes/{id}/pagamentos` |
+| `POST` | `/api/clientes/{id}/notas` |
+| `POST` | `/api/clientes/{id}/tags` |
+| `POST` | `/api/clientes/{id}/descontos` |
+| `PUT` | `/api/clientes/{id}/descontos/{desc_id}` |
+| `DELETE` | `/api/clientes/{id}/contactos/{contactoId}` |
+| `DELETE` | `/api/clientes/{id}/enderecos/{endId}` |
+| `DELETE` | `/api/clientes/{id}/documentos/{doc_id}` |
+| `DELETE` | `/api/clientes/{id}/tags/{tag_id}` |
+| `DELETE` | `/api/clientes/{id}/descontos/{desc_id}` |
+## `/api/companies`
+
+| Método | Endpoint |
+|---|---|
+| `POST` | `/api/companies/` |
+| `GET` | `/api/companies/` |
+| `GET` | `/api/companies/{id}` |
+| `GET` | `/api/companies/{id}/settings` |
+| `GET` | `/api/companies/{id}/branches` |
+| `GET` | `/api/companies/{id}/branches/{branchId}` |
+| `GET` | `/api/companies/{id}/tax-info` |
+| `GET` | `/api/companies/{id}/banks` |
+| `GET` | `/api/companies/{id}/contacts` |
+| `GET` | `/api/companies/{id}/addresses` |
+| `GET` | `/api/companies/{id}/licenses` |
+| `GET` | `/api/companies/{id}/users` |
+| `PUT` | `/api/companies/{id}` |
+| `POST` | `/api/companies/{id}/settings` |
+| `POST` | `/api/companies/{id}/tax-info` |
+| `PUT` | `/api/companies/{id}/tax-info` |
+| `POST` | `/api/companies/{id}/banks` |
+| `POST` | `/api/companies/{id}/contacts` |
+| `POST` | `/api/companies/{id}/addresses` |
+| `POST` | `/api/companies/{id}/branches` |
+| `PUT` | `/api/companies/{id}/branches/{branchId}` |
+| `POST` | `/api/companies/{id}/licenses` |
+| `POST` | `/api/companies/{id}/users` |
+| `DELETE` | `/api/companies/{id}/users/{userId}` |
+| `POST` | `/api/companies/documents/{id}/enviar-para-assinatura` |
+## `/api/compras`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/compras/purchase-requests` |
+| `GET` | `/api/compras/purchase-orders` |
+| `GET` | `/api/compras/purchase-receipts` |
+| `GET` | `/api/compras/purchase-returns` |
+| `GET` | `/api/compras/purchase-invoices` |
+| `GET` | `/api/compras/purchase-payments` |
+| `POST` | `/api/compras/purchase-requests` |
+| `POST` | `/api/compras/purchase-request-items` |
+| `POST` | `/api/compras/purchase-orders` |
+| `POST` | `/api/compras/purchase-order-items` |
+| `POST` | `/api/compras/purchase-orders/{id}/enviar-para-assinatura` |
+| `POST` | `/api/compras/purchase-receipts` |
+| `POST` | `/api/compras/purchase-receipt-items` |
+| `POST` | `/api/compras/purchase-returns` |
+| `POST` | `/api/compras/purchase-return-items` |
+| `POST` | `/api/compras/purchase-invoices` |
+| `POST` | `/api/compras/purchase-invoice-items` |
+| `POST` | `/api/compras/purchase-payments` |
+| `POST` | `/api/compras/purchase-payment-items` |
+## `/api/contabilidade`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/contabilidade/account-types/` |
+| `GET` | `/api/contabilidade/account-types/{id}` |
+| `POST` | `/api/contabilidade/account-types/` |
+| `PUT` | `/api/contabilidade/account-types/{id}` |
+| `DELETE` | `/api/contabilidade/account-types/{id}` |
+| `GET` | `/api/contabilidade/accounts/` |
+| `GET` | `/api/contabilidade/accounts/{id}` |
+| `POST` | `/api/contabilidade/accounts/` |
+| `PUT` | `/api/contabilidade/accounts/{id}` |
+| `DELETE` | `/api/contabilidade/accounts/{id}` |
+| `GET` | `/api/contabilidade/tax-groups/` |
+| `POST` | `/api/contabilidade/tax-groups/` |
+| `PUT` | `/api/contabilidade/tax-groups/{id}` |
+| `GET` | `/api/contabilidade/taxes/` |
+| `GET` | `/api/contabilidade/taxes/{id}` |
+| `POST` | `/api/contabilidade/taxes/` |
+| `PUT` | `/api/contabilidade/taxes/{id}` |
+| `POST` | `/api/contabilidade/taxes/{id}/rules` |
+| `GET` | `/api/contabilidade/tax-transactions/` |
+| `GET` | `/api/contabilidade/tax-transactions/{id}` |
+| `POST` | `/api/contabilidade/tax-transactions/` |
+| `GET` | `/api/contabilidade/journals/` |
+| `POST` | `/api/contabilidade/journals/` |
+| `PUT` | `/api/contabilidade/journals/{id}` |
+| `GET` | `/api/contabilidade/journal-entries/` |
+| `GET` | `/api/contabilidade/journal-entries/{id}` |
+| `POST` | `/api/contabilidade/journal-entries/` |
+| `PUT` | `/api/contabilidade/journal-entries/{id}` |
+| `POST` | `/api/contabilidade/journal-entries/{id}/lines` |
+| `DELETE` | `/api/contabilidade/journal-entries/{id}` |
+| `GET` | `/api/contabilidade/fiscal-years/` |
+| `GET` | `/api/contabilidade/fiscal-years/{id}` |
+| `POST` | `/api/contabilidade/fiscal-years/` |
+| `PUT` | `/api/contabilidade/fiscal-years/{id}` |
+| `POST` | `/api/contabilidade/fiscal-years/{id}/fechar` |
+| `GET` | `/api/contabilidade/fiscal-periods/` |
+| `GET` | `/api/contabilidade/fiscal-periods/{id}` |
+| `POST` | `/api/contabilidade/fiscal-periods/` |
+| `POST` | `/api/contabilidade/fiscal-periods/{id}/abrir` |
+| `POST` | `/api/contabilidade/fiscal-periods/{id}/fechar` |
+| `GET` | `/api/contabilidade/fixed-assets/` |
+| `GET` | `/api/contabilidade/fixed-assets/{id}` |
+| `GET` | `/api/contabilidade/fixed-assets/{id}/schedule` |
+| `POST` | `/api/contabilidade/fixed-assets/` |
+| `PUT` | `/api/contabilidade/fixed-assets/{id}` |
+| `POST` | `/api/contabilidade/fixed-assets/{id}/alienar` |
+| `GET` | `/api/contabilidade/depreciation/` |
+| `GET` | `/api/contabilidade/depreciation/{id}` |
+| `POST` | `/api/contabilidade/depreciation/processar` |
+| `POST` | `/api/contabilidade/depreciation/{id}/cancelar` |
+| `GET` | `/api/contabilidade/budgets/vs-realizado` |
+| `GET` | `/api/contabilidade/budgets/` |
+| `POST` | `/api/contabilidade/budgets/` |
+| `PUT` | `/api/contabilidade/budgets/{id}` |
+| `DELETE` | `/api/contabilidade/budgets/{id}` |
+| `GET` | `/api/contabilidade/period-closings/` |
+| `GET` | `/api/contabilidade/period-closings/{id}` |
+| `POST` | `/api/contabilidade/period-closings/` |
+| `POST` | `/api/contabilidade/period-closings/{id}/verificar` |
+| `POST` | `/api/contabilidade/period-closings/{id}/encerrar` |
+| `POST` | `/api/contabilidade/period-closings/{id}/reabrir` |
+| `GET` | `/api/contabilidade/reports/trial-balance` |
+| `GET` | `/api/contabilidade/reports/balance-sheet` |
+| `GET` | `/api/contabilidade/reports/income-statement` |
+| `GET` | `/api/contabilidade/reports/general-ledger` |
+| `GET` | `/api/contabilidade/reports/depreciation-summary` |
+| `GET` | `/api/contabilidade/reports/budget-execution` |
+| `GET` | `/api/contabilidade/reports/` |
+| `GET` | `/api/contabilidade/reports/{id}` |
+| `POST` | `/api/contabilidade/reports/generate` |
+| `POST` | `/api/contabilidade/reports/{id}/enviar-para-assinatura` |
+## `/api/crm`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/crm/leads/` |
+| `GET` | `/api/crm/leads/{id}` |
+| `POST` | `/api/crm/leads/` |
+| `PUT` | `/api/crm/leads/{id}` |
+| `PUT` | `/api/crm/leads/{id}/estado` |
+| `POST` | `/api/crm/leads/{id}/converter` |
+| `DELETE` | `/api/crm/leads/{id}` |
+| `GET` | `/api/crm/oportunidades/` |
+| `GET` | `/api/crm/oportunidades/{id}` |
+| `POST` | `/api/crm/oportunidades/` |
+| `PUT` | `/api/crm/oportunidades/{id}` |
+| `PUT` | `/api/crm/oportunidades/{id}/estagio` |
+| `POST` | `/api/crm/oportunidades/{id}/perder` |
+| `DELETE` | `/api/crm/oportunidades/{id}` |
+| `GET` | `/api/crm/atividades/` |
+| `GET` | `/api/crm/atividades/{id}` |
+| `POST` | `/api/crm/atividades/` |
+| `PUT` | `/api/crm/atividades/{id}` |
+| `POST` | `/api/crm/atividades/{id}/concluir` |
+| `DELETE` | `/api/crm/atividades/{id}` |
+## `/api/delivery-drivers`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/delivery-drivers` |
+| `POST` | `/api/delivery-drivers` |
+## `/api/delivery-logs`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/delivery-logs` |
+## `/api/delivery-routes`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/delivery-routes` |
+| `POST` | `/api/delivery-routes` |
+## `/api/delivery-tracking`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/delivery-tracking` |
+| `POST` | `/api/delivery-tracking` |
+## `/api/delivery-vehicles`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/delivery-vehicles` |
+| `POST` | `/api/delivery-vehicles` |
+## `/api/escolar`
+
+| Método | Endpoint |
+|---|---|
+| `POST` | `/api/escolar/payments/callback` |
+| `GET` | `/api/escolar/years` |
+| `GET` | `/api/escolar/years/{id}` |
+| `GET` | `/api/escolar/terms` |
+| `GET` | `/api/escolar/classes` |
+| `GET` | `/api/escolar/classes/{id}` |
+| `GET` | `/api/escolar/subjects` |
+| `GET` | `/api/escolar/subjects/{id}` |
+| `GET` | `/api/escolar/students` |
+| `GET` | `/api/escolar/students/{id}` |
+| `GET` | `/api/escolar/enrollments` |
+| `GET` | `/api/escolar/enrollments/{id}` |
+| `GET` | `/api/escolar/student-roles` |
+| `GET` | `/api/escolar/teacher-roles` |
+| `GET` | `/api/escolar/cargo-permissoes` |
+| `GET` | `/api/escolar/attendance` |
+| `GET` | `/api/escolar/attendance/{id}` |
+| `GET` | `/api/escolar/grades` |
+| `GET` | `/api/escolar/grades/{id}` |
+| `GET` | `/api/escolar/grade-items` |
+| `GET` | `/api/escolar/fee-plans` |
+| `GET` | `/api/escolar/fee-plans/{id}` |
+| `GET` | `/api/escolar/student-invoices` |
+| `GET` | `/api/escolar/student-invoices/{id}` |
+| `GET` | `/api/escolar/payments/{id}` |
+| `GET` | `/api/escolar/payments/{id}/receipt` |
+| `GET` | `/api/escolar/library/books` |
+| `GET` | `/api/escolar/library/loans` |
+| `GET` | `/api/escolar/messages` |
+| `GET` | `/api/escolar/notificacoes` |
+| `GET` | `/api/escolar/teachers` |
+| `GET` | `/api/escolar/teachers/{id}` |
+| `GET` | `/api/escolar/levels` |
+| `GET` | `/api/escolar/levels/{id}` |
+| `GET` | `/api/escolar/cycles` |
+| `GET` | `/api/escolar/cycles/{id}` |
+| `GET` | `/api/escolar/series` |
+| `GET` | `/api/escolar/series/{id}` |
+| `GET` | `/api/escolar/courses` |
+| `GET` | `/api/escolar/courses/{id}` |
+| `GET` | `/api/escolar/course-subjects` |
+| `GET` | `/api/escolar/course-subjects/{id}` |
+| `GET` | `/api/escolar/course-subjects/{id}/terms` |
+| `GET` | `/api/escolar/dashboard` |
+| `GET` | `/api/escolar/dashboard/direction` |
+| `GET` | `/api/escolar/reports/academic-summary` |
+| `GET` | `/api/escolar/reports/financial-summary` |
+| `GET` | `/api/escolar/reports/delinquency` |
+| `GET` | `/api/escolar/report-cards/{student_id}` |
+| `POST` | `/api/escolar/years` |
+| `PUT` | `/api/escolar/years/{id}` |
+| `POST` | `/api/escolar/years/{id}/activar` |
+| `POST` | `/api/escolar/years/{id}/close` |
+| `POST` | `/api/escolar/years/{id}/terms` |
+| `PUT` | `/api/escolar/terms/{id}` |
+| `DELETE` | `/api/escolar/terms/{id}` |
+| `POST` | `/api/escolar/classes` |
+| `PUT` | `/api/escolar/classes/{id}` |
+| `POST` | `/api/escolar/classes/{id}/assign-teacher` |
+| `POST` | `/api/escolar/subjects` |
+| `PUT` | `/api/escolar/subjects/{id}` |
+| `DELETE` | `/api/escolar/subjects/{id}` |
+| `POST` | `/api/escolar/teacher-assignments` |
+| `POST` | `/api/escolar/student-roles` |
+| `PUT` | `/api/escolar/student-roles/{id}` |
+| `POST` | `/api/escolar/student-roles/{id}/revoke` |
+| `POST` | `/api/escolar/teacher-roles` |
+| `PUT` | `/api/escolar/teacher-roles/{id}` |
+| `POST` | `/api/escolar/teacher-roles/{id}/revoke` |
+| `POST` | `/api/escolar/teachers` |
+| `PUT` | `/api/escolar/teachers/{id}` |
+| `DELETE` | `/api/escolar/teachers/{id}` |
+| `GET` | `/api/escolar/teachers/{id}/rh-link` |
+| `POST` | `/api/escolar/teachers/{id}/rh-link` |
+| `POST` | `/api/escolar/levels` |
+| `PUT` | `/api/escolar/levels/{id}` |
+| `DELETE` | `/api/escolar/levels/{id}` |
+| `POST` | `/api/escolar/cycles` |
+| `PUT` | `/api/escolar/cycles/{id}` |
+| `DELETE` | `/api/escolar/cycles/{id}` |
+| `POST` | `/api/escolar/series` |
+| `PUT` | `/api/escolar/series/{id}` |
+| `DELETE` | `/api/escolar/series/{id}` |
+| `POST` | `/api/escolar/courses` |
+| `PUT` | `/api/escolar/courses/{id}` |
+| `DELETE` | `/api/escolar/courses/{id}` |
+| `POST` | `/api/escolar/course-subjects` |
+| `PUT` | `/api/escolar/course-subjects/{id}` |
+| `DELETE` | `/api/escolar/course-subjects/{id}` |
+| `POST` | `/api/escolar/course-subjects/{id}/terms` |
+| `PUT` | `/api/escolar/course-subjects/{id}/terms/{termId}` |
+| `DELETE` | `/api/escolar/course-subjects/{id}/terms/{termId}` |
+| `POST` | `/api/escolar/students` |
+| `PUT` | `/api/escolar/students/{id}` |
+| `POST` | `/api/escolar/students/{id}/guardians` |
+| `GET` | `/api/escolar/students/{id}/client-link` |
+| `POST` | `/api/escolar/students/{id}/client-link` |
+| `POST` | `/api/escolar/enrollments` |
+| `POST` | `/api/escolar/enrollments/{id}/transfer` |
+| `POST` | `/api/escolar/enrollments/{id}/cancel` |
+| `POST` | `/api/escolar/enrollments/{id}/enviar-para-assinatura` |
+| `POST` | `/api/escolar/attendance` |
+| `PUT` | `/api/escolar/attendance/{id}` |
+| `POST` | `/api/escolar/grade-items` |
+| `POST` | `/api/escolar/grade-items/{id}/publish` |
+| `POST` | `/api/escolar/grades` |
+| `PUT` | `/api/escolar/grades/{id}` |
+| `POST` | `/api/escolar/fee-plans` |
+| `POST` | `/api/escolar/fee-plans/{id}/generate` |
+| `POST` | `/api/escolar/student-invoices` |
+| `POST` | `/api/escolar/student-invoices/{id}/emit` |
+| `POST` | `/api/escolar/student-invoices/{id}/discount` |
+| `POST` | `/api/escolar/payments` |
+| `GET` | `/api/escolar/config/financial` |
+| `POST` | `/api/escolar/config/financial` |
+| `POST` | `/api/escolar/library/books` |
+| `POST` | `/api/escolar/library/loans` |
+| `POST` | `/api/escolar/library/loans/{id}/return` |
+| `POST` | `/api/escolar/messages` |
+| `POST` | `/api/escolar/messages/{id}/publish` |
+| `GET` | `/api/escolar/time-slots` |
+| `POST` | `/api/escolar/time-slots` |
+| `GET` | `/api/escolar/timetables/class/{class_id}` |
+| `GET` | `/api/escolar/timetables/teacher/{teacher_id}` |
+| `POST` | `/api/escolar/timetables` |
+| `PUT` | `/api/escolar/timetables/{id}` |
+| `DELETE` | `/api/escolar/timetables/{id}` |
+| `GET` | `/api/escolar/calendar-event-types` |
+| `POST` | `/api/escolar/calendar-event-types` |
+| `GET` | `/api/escolar/calendar-events` |
+| `GET` | `/api/escolar/calendar-events/{id}` |
+| `POST` | `/api/escolar/calendar-events` |
+| `PUT` | `/api/escolar/calendar-events/{id}` |
+| `DELETE` | `/api/escolar/calendar-events/{id}` |
+| `GET` | `/api/escolar/incident-types` |
+| `POST` | `/api/escolar/incident-types` |
+| `GET` | `/api/escolar/incidents` |
+| `GET` | `/api/escolar/incidents/{id}` |
+| `POST` | `/api/escolar/incidents` |
+| `PUT` | `/api/escolar/incidents/{id}` |
+| `POST` | `/api/escolar/incidents/{id}/anexos` |
+| `GET` | `/api/escolar/incidents/{id}/anexos/{idx}/download` |
+| `DELETE` | `/api/escolar/incidents/{id}/anexos/{idx}` |
+| `POST` | `/api/escolar/sanctions` |
+| `POST` | `/api/escolar/merits` |
+| `GET` | `/api/escolar/tasks` |
+| `POST` | `/api/escolar/tasks` |
+| `GET` | `/api/escolar/tasks/{id}` |
+| `GET` | `/api/escolar/portal/alunos` |
+| `GET` | `/api/escolar/portal/sessions` |
+| `POST` | `/api/escolar/classes/{id}/portal/invite-all` |
+| `GET` | `/api/escolar/students/{id}/portal/status` |
+| `POST` | `/api/escolar/students/{id}/portal/activate` |
+| `POST` | `/api/escolar/students/{id}/portal/deactivate` |
+| `POST` | `/api/escolar/students/{id}/portal/invite` |
+| `POST` | `/api/escolar/students/{id}/portal/reset-senha` |
+| `POST` | `/api/escolar/student-invoices/{id}/cancel` |
+| `POST` | `/api/escolar/student-invoices/{id}/parcelas` |
+| `GET` | `/api/escolar/student-invoices/{id}/parcelas` |
+| `GET` | `/api/escolar/bolsas` |
+| `POST` | `/api/escolar/bolsas` |
+| `DELETE` | `/api/escolar/bolsas/{id}` |
+| `GET` | `/api/escolar/relatorios/aging` |
+| `POST` | `/api/escolar/encarregados/convidar` |
+| `POST` | `/api/escolar/encarregados/reset-senha` |
+## `/api/faturacao`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/faturacao/quotes` |
+| `GET` | `/api/faturacao/quotes/{id}` |
+| `GET` | `/api/faturacao/orders` |
+| `GET` | `/api/faturacao/invoices` |
+| `GET` | `/api/faturacao/invoices/{id}` |
+| `GET` | `/api/faturacao/receipts` |
+| `GET` | `/api/faturacao/credit-notes` |
+| `GET` | `/api/faturacao/series` |
+| `POST` | `/api/faturacao/series` |
+| `POST` | `/api/faturacao/series/{id}/activar` |
+| `POST` | `/api/faturacao/series/{id}/desactivar` |
+| `POST` | `/api/faturacao/quotes` |
+| `POST` | `/api/faturacao/quotes/{id}/enviar` |
+| `POST` | `/api/faturacao/quotes/{id}/aprovar` |
+| `POST` | `/api/faturacao/quotes/{id}/rejeitar` |
+| `POST` | `/api/faturacao/quotes/{id}/items` |
+| `DELETE` | `/api/faturacao/quotes/{id}/items/{itemId}` |
+| `POST` | `/api/faturacao/orders` |
+| `POST` | `/api/faturacao/orders/{id}/confirmar` |
+| `POST` | `/api/faturacao/orders/{id}/cancelar` |
+| `POST` | `/api/faturacao/invoices` |
+| `POST` | `/api/faturacao/invoices/{id}/items` |
+| `POST` | `/api/faturacao/invoices/{id}/emitir` |
+| `POST` | `/api/faturacao/invoices/{id}/enviar-para-assinatura` |
+| `POST` | `/api/faturacao/invoices/{id}/cancelar` |
+| `POST` | `/api/faturacao/credit-notes` |
+| `POST` | `/api/faturacao/credit-notes/{id}/enviar-para-assinatura` |
+| `POST` | `/api/faturacao/receipts` |
+## `/api/financeiro`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/financeiro/cash-flow` |
+| `GET` | `/api/financeiro/categorias/` |
+| `POST` | `/api/financeiro/categorias/` |
+| `GET` | `/api/financeiro/metodos-pagamento/` |
+| `POST` | `/api/financeiro/metodos-pagamento/` |
+| `GET` | `/api/financeiro/contas-receber/` |
+| `POST` | `/api/financeiro/contas-receber/` |
+| `POST` | `/api/financeiro/contas-receber/{id}/pagamento` |
+| `GET` | `/api/financeiro/contas-pagar/` |
+| `POST` | `/api/financeiro/contas-pagar/` |
+| `POST` | `/api/financeiro/contas-pagar/{id}/pagamento` |
+## `/api/hardware`
+
+| Método | Endpoint |
+|---|---|
+| `POST` | `/api/hardware/events` |
+| `POST` | `/api/hardware/events/generic` |
+| `POST` | `/api/hardware/events/zkteco` |
+| `POST` | `/api/hardware/events/batch` |
+| `GET` | `/api/hardware/ping` |
+| `GET` | `/api/hardware/assiduidade/config` |
+| `GET` | `/api/hardware/assiduidade/funcionarios` |
+| `GET` | `/api/hardware/assiduidade/funcionarios/{id}` |
+| `GET` | `/api/hardware/assiduidade/geofence/validar` |
+| `POST` | `/api/hardware/assiduidade/consentimentos` |
+| `GET` | `/api/hardware/assiduidade/consentimentos` |
+| `GET` | `/api/hardware/assiduidade/consentimentos/activo` |
+| `POST` | `/api/hardware/assiduidade/consentimentos/revogar` |
+| `POST` | `/api/hardware/assiduidade/qr/validar` |
+| `POST` | `/api/hardware/assiduidade/qr/gerar-terminal` |
+| `GET` | `/api/hardware/assiduidade/nfc/validar` |
+| `GET` | `/api/hardware/drivers` |
+## `/api/impostos`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/impostos/regimes` |
+| `GET` | `/api/impostos/isencoes` |
+| `GET` | `/api/impostos/retencoes` |
+| `GET` | `/api/impostos/retencoes/{id}/transaccoes` |
+| `GET` | `/api/impostos/declaracoes` |
+| `GET` | `/api/impostos/declaracoes/{id}` |
+| `GET` | `/api/impostos/declaracoes/{id}/linhas` |
+| `GET` | `/api/impostos/certificados` |
+| `GET` | `/api/impostos/certificados/{id}/download` |
+| `POST` | `/api/impostos/regimes` |
+| `POST` | `/api/impostos/isencoes` |
+| `PUT` | `/api/impostos/isencoes/{id}` |
+| `DELETE` | `/api/impostos/isencoes/{id}` |
+| `POST` | `/api/impostos/retencoes` |
+| `POST` | `/api/impostos/declaracoes` |
+| `POST` | `/api/impostos/declaracoes/{id}/submeter` |
+| `POST` | `/api/impostos/certificados` |
+| `POST` | `/api/impostos/certificados/{id}/upload` |
+## `/api/multi-moeda`
+
+| Método | Endpoint |
+|---|---|
+| `POST` | `/api/multi-moeda/converter` |
+| `GET` | `/api/multi-moeda/moedas/` |
+| `POST` | `/api/multi-moeda/moedas/` |
+| `GET` | `/api/multi-moeda/taxas-cambio/` |
+| `POST` | `/api/multi-moeda/taxas-cambio/` |
+| `GET` | `/api/multi-moeda/tenant-moedas/` |
+| `POST` | `/api/multi-moeda/tenant-moedas/` |
+| `DELETE` | `/api/multi-moeda/tenant-moedas/{id}` |
+## `/api/notificacoes`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/notificacoes/canais/` |
+| `POST` | `/api/notificacoes/canais/` |
+| `GET` | `/api/notificacoes/templates/` |
+| `POST` | `/api/notificacoes/templates/` |
+| `PUT` | `/api/notificacoes/templates/{id}` |
+| `GET` | `/api/notificacoes/mensagens/` |
+| `POST` | `/api/notificacoes/mensagens/` |
+## `/api/pedido-ferias`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/pedido-ferias/` |
+| `GET` | `/api/pedido-ferias/tipos` |
+| `POST` | `/api/pedido-ferias/` |
+| `POST` | `/api/pedido-ferias/{id}/cancelar` |
+## `/api/pessoas`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/pessoas/{id}/relacoes` |
+## `/api/portal`
+
+| Método | Endpoint |
+|---|---|
+| `POST` | `/api/portal/aluno/definir-senha` |
+| `POST` | `/api/portal/aluno/logout` |
+| `GET` | `/api/portal/aluno/me` |
+| `POST` | `/api/portal/aluno/alterar-senha` |
+| `GET` | `/api/portal/aluno/me/boletim` |
+| `GET` | `/api/portal/aluno/me/notas` |
+| `GET` | `/api/portal/aluno/me/cobrancas` |
+| `GET` | `/api/portal/aluno/me/cobrancas/{id}/recibo` |
+| `GET` | `/api/portal/aluno/me/horario` |
+| `GET` | `/api/portal/aluno/me/mensagens` |
+| `GET` | `/api/portal/aluno/me/eventos` |
+| `GET` | `/api/portal/aluno/me/presencas` |
+| `POST` | `/api/portal/aluno/me/turma/presencas` |
+| `GET` | `/api/portal/aluno/me/ocorrencias` |
+| `GET` | `/api/portal/aluno/me/biblioteca` |
+| `POST` | `/api/portal/aluno/me/cobrancas/{id}/pagar` |
+| `GET` | `/api/portal/aluno/me/cobrancas/{id}/pagamento/{gtid}` |
+| `GET` | `/api/portal/aluno/me/dashboard` |
+| `GET` | `/api/portal/aluno/me/turma` |
+| `GET` | `/api/portal/aluno/me/noticias` |
+| `PUT` | `/api/portal/aluno/me` |
+| `POST` | `/api/portal/aluno/me/presencas/{id}/justificar` |
+| `POST` | `/api/portal/professor/logout` |
+| `POST` | `/api/portal/professor/alterar-senha` |
+| `GET` | `/api/portal/professor/me` |
+| `GET` | `/api/portal/professor/me/dashboard` |
+| `GET` | `/api/portal/professor/me/turmas` |
+| `GET` | `/api/portal/professor/me/turmas/{id}` |
+| `GET` | `/api/portal/professor/me/turmas/{id}/alunos` |
+| `GET` | `/api/portal/professor/me/horario` |
+| `GET` | `/api/portal/professor/me/presencas` |
+| `POST` | `/api/portal/professor/me/presencas` |
+| `GET` | `/api/portal/professor/me/turmas/{id}/cargo-permissoes` |
+| `POST` | `/api/portal/professor/me/turmas/{id}/cargo-permissoes` |
+| `DELETE` | `/api/portal/professor/me/turmas/{id}/cargo-permissoes/{permId}` |
+| `GET` | `/api/portal/professor/me/notas` |
+| `POST` | `/api/portal/professor/me/notas` |
+| `GET` | `/api/portal/professor/me/comunicacao` |
+| `POST` | `/api/portal/encarregado/definir-senha` |
+| `POST` | `/api/portal/encarregado/logout` |
+| `GET` | `/api/portal/encarregado/me` |
+| `POST` | `/api/portal/encarregado/alterar-senha` |
+| `GET` | `/api/portal/encarregado/me/educandos/{id}/boletim` |
+| `GET` | `/api/portal/encarregado/me/educandos/{id}/cobrancas` |
+| `GET` | `/api/portal/encarregado/me/educandos/{id}/presencas` |
+| `GET` | `/api/portal/encarregado/me/educandos/{id}/ocorrencias` |
+## `/api/pos`
+
+| Método | Endpoint |
+|---|---|
+| `POST` | `/api/pos/login` |
+| `POST` | `/api/pos/refresh` |
+| `GET` | `/api/pos/produtos` |
+| `GET` | `/api/pos/sessoes/` |
+| `POST` | `/api/pos/sessoes/` |
+| `GET` | `/api/pos/sessoes/atual` |
+| `POST` | `/api/pos/sessoes/{id}/fechar` |
+| `POST` | `/api/pos/pagamentos/iniciar` |
+| `GET` | `/api/pos/pagamentos/{gatewayTxnId}/status` |
+| `GET` | `/api/pos/terminais/` |
+| `POST` | `/api/pos/terminais/` |
+| `POST` | `/api/pos/terminais/{id}/activar` |
+| `POST` | `/api/pos/terminais/{id}/desactivar` |
+| `GET` | `/api/pos/catalogo/` |
+| `POST` | `/api/pos/catalogo/` |
+| `DELETE` | `/api/pos/catalogo/{id}` |
+| `GET` | `/api/pos/descontos/` |
+| `POST` | `/api/pos/descontos/` |
+| `PUT` | `/api/pos/descontos/{id}` |
+| `DELETE` | `/api/pos/descontos/{id}` |
+## `/api/produtos`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/produtos/categorias` |
+| `POST` | `/api/produtos/categorias` |
+| `GET` | `/api/produtos/categorias/{id}` |
+| `PUT` | `/api/produtos/categorias/{id}` |
+| `DELETE` | `/api/produtos/categorias/{id}` |
+| `GET` | `/api/produtos/marcas` |
+| `POST` | `/api/produtos/marcas` |
+| `GET` | `/api/produtos/marcas/{id}` |
+| `PUT` | `/api/produtos/marcas/{id}` |
+| `GET` | `/api/produtos/unidades` |
+| `POST` | `/api/produtos/unidades` |
+| `PUT` | `/api/produtos/unidades/{id}` |
+| `GET` | `/api/produtos/atributos` |
+| `POST` | `/api/produtos/atributos` |
+| `PUT` | `/api/produtos/atributos/{id}` |
+| `GET` | `/api/produtos/tags` |
+| `POST` | `/api/produtos/tags` |
+| `GET` | `/api/produtos/reports/mais-vendidos` |
+| `GET` | `/api/produtos/reports/sem-movimentos` |
+| `GET` | `/api/produtos/reports/stock-critico` |
+| `GET` | `/api/produtos/reports/margem` |
+| `GET` | `/api/produtos/` |
+| `GET` | `/api/produtos/{id}` |
+| `GET` | `/api/produtos/{id}/variantes` |
+| `GET` | `/api/produtos/{id}/imagens` |
+| `GET` | `/api/produtos/{id}/precos` |
+| `GET` | `/api/produtos/{id}/descontos` |
+| `GET` | `/api/produtos/{id}/codigos-barras` |
+| `GET` | `/api/produtos/{id}/componentes` |
+| `GET` | `/api/produtos/{id}/stock` |
+| `GET` | `/api/produtos/{id}/stock/alertas` |
+| `POST` | `/api/produtos/` |
+| `PUT` | `/api/produtos/{id}` |
+| `POST` | `/api/produtos/{id}/activar` |
+| `POST` | `/api/produtos/{id}/desactivar` |
+| `POST` | `/api/produtos/{id}/variantes` |
+| `PUT` | `/api/produtos/{id}/variantes/{var_id}` |
+| `POST` | `/api/produtos/{id}/imagens` |
+| `PUT` | `/api/produtos/{id}/imagens/{img_id}` |
+| `POST` | `/api/produtos/{id}/precos` |
+| `PUT` | `/api/produtos/{id}/precos/{preco_id}` |
+| `POST` | `/api/produtos/{id}/descontos` |
+| `PUT` | `/api/produtos/{id}/descontos/{desc_id}` |
+| `POST` | `/api/produtos/{id}/codigos-barras` |
+| `POST` | `/api/produtos/{id}/componentes` |
+| `PUT` | `/api/produtos/{id}/componentes/{comp_id}` |
+| `POST` | `/api/produtos/{id}/tags` |
+| `DELETE` | `/api/produtos/{id}/variantes/{var_id}` |
+| `DELETE` | `/api/produtos/{id}/imagens/{img_id}` |
+| `DELETE` | `/api/produtos/{id}/descontos/{desc_id}` |
+| `DELETE` | `/api/produtos/{id}/codigos-barras/{cb_id}` |
+| `DELETE` | `/api/produtos/{id}/componentes/{comp_id}` |
+| `DELETE` | `/api/produtos/{id}/tags/{tag_id}` |
+## `/api/public`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/public/assinatura-digital/verificar/{hash}` |
+| `GET` | `/api/public/recrutamento/vagas` |
+| `GET` | `/api/public/recrutamento/vagas/abertas` |
+| `GET` | `/api/public/recrutamento/vagas/{id}` |
+| `GET` | `/api/public/recrutamento/campos-custom` |
+| `POST` | `/api/public/recrutamento/candidaturas` |
+| `GET` | `/api/public/recrutamento/candidaturas/{codigo}` |
+| `POST` | `/api/public/recrutamento/candidatos/registar` |
+| `POST` | `/api/public/recrutamento/candidatos/logout` |
+| `POST` | `/api/public/recrutamento/contacto` |
+| `GET` | `/api/public/recrutamento/candidatos/perfil` |
+| `PUT` | `/api/public/recrutamento/candidatos/perfil` |
+| `GET` | `/api/public/recrutamento/candidatos/candidaturas` |
+| `GET` | `/api/public/recrutamento/candidatos/conversas` |
+| `GET` | `/api/public/recrutamento/candidatos/candidaturas/{id}/mensagens` |
+| `POST` | `/api/public/recrutamento/candidatos/candidaturas/{id}/mensagens` |
+| `POST` | `/api/public/recrutamento/candidatos/push-token` |
+| `GET` | `/api/public/recrutamento/candidatos/experiencias` |
+| `POST` | `/api/public/recrutamento/candidatos/experiencias` |
+| `PUT` | `/api/public/recrutamento/candidatos/experiencias/{id}` |
+| `DELETE` | `/api/public/recrutamento/candidatos/experiencias/{id}` |
+| `GET` | `/api/public/recrutamento/candidatos/formacoes` |
+| `POST` | `/api/public/recrutamento/candidatos/formacoes` |
+| `PUT` | `/api/public/recrutamento/candidatos/formacoes/{id}` |
+| `DELETE` | `/api/public/recrutamento/candidatos/formacoes/{id}` |
+| `GET` | `/api/public/recrutamento/candidatos/notificacoes` |
+| `PUT` | `/api/public/recrutamento/candidatos/notificacoes/lidas` |
+| `PUT` | `/api/public/recrutamento/candidatos/notificacoes/{id}/lida` |
+## `/api/recrutamento`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/recrutamento/dashboard` |
+| `GET` | `/api/recrutamento/vagas/` |
+| `GET` | `/api/recrutamento/vagas/{id}` |
+| `POST` | `/api/recrutamento/vagas/` |
+| `PUT` | `/api/recrutamento/vagas/{id}` |
+| `DELETE` | `/api/recrutamento/vagas/{id}` |
+| `POST` | `/api/recrutamento/vagas/{id}/activar` |
+| `POST` | `/api/recrutamento/vagas/{id}/desactivar` |
+| `GET` | `/api/recrutamento/candidaturas/` |
+| `GET` | `/api/recrutamento/candidaturas/{id}` |
+| `GET` | `/api/recrutamento/candidaturas/{id}/cv` |
+| `GET` | `/api/recrutamento/candidaturas/{id}/carta` |
+| `PUT` | `/api/recrutamento/candidaturas/{id}/estado` |
+| `POST` | `/api/recrutamento/candidaturas/{id}/avaliar` |
+| `POST` | `/api/recrutamento/candidaturas/{id}/entrevista` |
+| `POST` | `/api/recrutamento/candidaturas/{id}/notas` |
+| `POST` | `/api/recrutamento/candidaturas/{id}/contratar` |
+| `POST` | `/api/recrutamento/candidaturas/{id}/enviar-para-assinatura` |
+| `GET` | `/api/recrutamento/contactos/` |
+| `POST` | `/api/recrutamento/contactos/{id}/lido` |
+| `GET` | `/api/recrutamento/vagas/{vagaID}/campos/` |
+| `POST` | `/api/recrutamento/vagas/{vagaID}/campos/` |
+| `PUT` | `/api/recrutamento/vagas/{vagaID}/campos/{campoID}` |
+| `DELETE` | `/api/recrutamento/vagas/{vagaID}/campos/{campoID}` |
+| `GET` | `/api/recrutamento/campos-custom/` |
+| `POST` | `/api/recrutamento/campos-custom/` |
+| `PUT` | `/api/recrutamento/campos-custom/{id}` |
+| `DELETE` | `/api/recrutamento/campos-custom/{id}` |
+| `GET` | `/api/recrutamento/config-notificacoes/` |
+| `PUT` | `/api/recrutamento/config-notificacoes/` |
+## `/api/rh`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/rh/relatorios` |
+| `GET` | `/api/rh/presencas` |
+| `GET` | `/api/rh/unidades/` |
+| `GET` | `/api/rh/unidades/{id}` |
+| `GET` | `/api/rh/unidades/{id}/filhos` |
+| `GET` | `/api/rh/unidades/{id}/subarvore` |
+| `GET` | `/api/rh/unidades/{id}/caminho` |
+| `GET` | `/api/rh/unidades/{id}/funcionarios` |
+| `GET` | `/api/rh/unidades/{id}/funcionarios/todos` |
+| `POST` | `/api/rh/unidades/` |
+| `PUT` | `/api/rh/unidades/{id}` |
+| `DELETE` | `/api/rh/unidades/{id}` |
+| `POST` | `/api/rh/unidades/{id}/mover` |
+| `GET` | `/api/rh/configuracoes` |
+| `GET` | `/api/rh/irps-escaloes` |
+| `POST` | `/api/rh/configuracoes` |
+| `POST` | `/api/rh/irps-escaloes` |
+| `POST` | `/api/rh/irps-escaloes/seed-mozambique-2024` |
+| `PUT` | `/api/rh/irps-escaloes/{id}` |
+| `DELETE` | `/api/rh/irps-escaloes/{id}` |
+| `GET` | `/api/rh/funcionarios/` |
+| `GET` | `/api/rh/funcionarios/proximo-numero` |
+| `GET` | `/api/rh/funcionarios/{id}` |
+| `GET` | `/api/rh/funcionarios/{id}/nfc-tags` |
+| `GET` | `/api/rh/funcionarios/{id}/consentimento` |
+| `GET` | `/api/rh/funcionarios/{id}/recibos-vencimento` |
+| `POST` | `/api/rh/funcionarios/` |
+| `PUT` | `/api/rh/funcionarios/{id}` |
+| `POST` | `/api/rh/funcionarios/{id}/desligar` |
+| `POST` | `/api/rh/funcionarios/{id}/nfc-tags` |
+| `DELETE` | `/api/rh/funcionarios/nfc-tags/{id}` |
+| `POST` | `/api/rh/funcionarios/{id}/biometria/facial/enroll` |
+| `POST` | `/api/rh/funcionarios/{id}/consentimento` |
+| `GET` | `/api/rh/funcionarios/{id}/historico-salarial` |
+| `GET` | `/api/rh/funcionarios/{id}/componentes-salariais` |
+| `POST` | `/api/rh/funcionarios/{id}/historico-salarial` |
+| `POST` | `/api/rh/funcionarios/{id}/componentes-salariais` |
+| `DELETE` | `/api/rh/funcionarios/{id}/componentes-salariais/{componenteId}` |
+| `GET` | `/api/rh/funcionarios/{id}/adiantamentos` |
+| `POST` | `/api/rh/funcionarios/{id}/adiantamentos` |
+| `GET` | `/api/rh/funcionarios/{id}/emprestimos` |
+| `POST` | `/api/rh/funcionarios/{id}/emprestimos` |
+| `POST` | `/api/rh/funcionarios/adiantamentos/{id}/cancelar` |
+| `POST` | `/api/rh/funcionarios/emprestimos/{id}/cancelar` |
+| `GET` | `/api/rh/funcionarios/{id}/beneficios` |
+| `POST` | `/api/rh/funcionarios/{id}/beneficios` |
+| `DELETE` | `/api/rh/funcionarios/{id}/beneficios/{beneficioId}` |
+| `GET` | `/api/rh/funcionarios/{id}/presencas` |
+| `GET` | `/api/rh/funcionarios/{id}/saldos-ausencia` |
+| `GET` | `/api/rh/funcionarios/{id}/eventos` |
+| `GET` | `/api/rh/funcionarios/{id}/resultados` |
+| `POST` | `/api/rh/funcionarios/{id}/presencas` |
+| `DELETE` | `/api/rh/funcionarios/{id}/presencas/{presencaId}` |
+| `POST` | `/api/rh/funcionarios/{id}/saldos-ausencia` |
+| `POST` | `/api/rh/funcionarios/{id}/recalcular` |
+| `GET` | `/api/rh/funcionarios/{id}/processos-disciplinares` |
+| `POST` | `/api/rh/funcionarios/{id}/processos-disciplinares` |
+| `PUT` | `/api/rh/funcionarios/{id}/processos-disciplinares/{registoId}` |
+| `DELETE` | `/api/rh/funcionarios/{id}/processos-disciplinares/{registoId}` |
+| `GET` | `/api/rh/funcionarios/{id}/formacoes` |
+| `POST` | `/api/rh/funcionarios/{id}/formacoes` |
+| `PUT` | `/api/rh/funcionarios/{id}/formacoes/{registoId}` |
+| `DELETE` | `/api/rh/funcionarios/{id}/formacoes/{registoId}` |
+| `POST` | `/api/rh/funcionarios/{id}/formacoes/{registoId}/upload` |
+| `GET` | `/api/rh/funcionarios/{id}/formacoes/{registoId}/download` |
+| `GET` | `/api/rh/contratos/` |
+| `GET` | `/api/rh/contratos/{id}` |
+| `GET` | `/api/rh/contratos/{id}/download` |
+| `GET` | `/api/rh/contratos/{id}/pdf` |
+| `POST` | `/api/rh/contratos/` |
+| `PUT` | `/api/rh/contratos/{id}` |
+| `POST` | `/api/rh/contratos/{id}/renovar` |
+| `POST` | `/api/rh/contratos/{id}/rescindir` |
+| `POST` | `/api/rh/contratos/{id}/upload` |
+| `POST` | `/api/rh/contratos/{id}/pdf` |
+| `POST` | `/api/rh/contratos/{id}/enviar-para-assinatura` |
+| `GET` | `/api/rh/ausencias/` |
+| `POST` | `/api/rh/ausencias/` |
+| `POST` | `/api/rh/ausencias/{id}/aprovar` |
+| `POST` | `/api/rh/ausencias/{id}/rejeitar` |
+| `POST` | `/api/rh/ausencias/{id}/gozar` |
+| `POST` | `/api/rh/ausencias/{id}/cancelar` |
+| `GET` | `/api/rh/correcoes-ponto/` |
+| `POST` | `/api/rh/correcoes-ponto/{id}/aprovar` |
+| `POST` | `/api/rh/correcoes-ponto/{id}/rejeitar` |
+| `GET` | `/api/rh/tipos-evento/` |
+| `POST` | `/api/rh/tipos-evento/` |
+| `PUT` | `/api/rh/tipos-evento/{id}` |
+| `DELETE` | `/api/rh/tipos-evento/{id}` |
+| `GET` | `/api/rh/metodos-marcacao/` |
+| `POST` | `/api/rh/metodos-marcacao/` |
+| `PUT` | `/api/rh/metodos-marcacao/{id}` |
+| `DELETE` | `/api/rh/metodos-marcacao/{id}` |
+| `GET` | `/api/rh/tipos-regra/` |
+| `GET` | `/api/rh/regras/` |
+| `POST` | `/api/rh/regras/` |
+| `PUT` | `/api/rh/regras/{id}` |
+| `DELETE` | `/api/rh/regras/{id}` |
+| `POST` | `/api/rh/eventos` |
+| `POST` | `/api/rh/assiduidade/qr/gerar` |
+| `POST` | `/api/rh/correcoes/` |
+| `GET` | `/api/rh/correcoes/` |
+| `POST` | `/api/rh/correcoes/{id}/aprovar` |
+| `POST` | `/api/rh/correcoes/{id}/rejeitar` |
+| `GET` | `/api/rh/justificacoes/` |
+| `POST` | `/api/rh/justificacoes/{id}/aprovar` |
+| `POST` | `/api/rh/justificacoes/{id}/rejeitar` |
+| `GET` | `/api/rh/tipos-ausencia/` |
+| `POST` | `/api/rh/tipos-ausencia/` |
+| `PUT` | `/api/rh/tipos-ausencia/{id}` |
+| `DELETE` | `/api/rh/tipos-ausencia/{id}` |
+| `GET` | `/api/rh/avaliacoes/` |
+| `POST` | `/api/rh/avaliacoes/` |
+| `POST` | `/api/rh/avaliacoes/{id}/submeter` |
+| `POST` | `/api/rh/avaliacoes/{id}/aprovar` |
+| `GET` | `/api/rh/criterios-avaliacao/` |
+| `POST` | `/api/rh/criterios-avaliacao/` |
+| `PUT` | `/api/rh/criterios-avaliacao/{id}` |
+| `DELETE` | `/api/rh/criterios-avaliacao/{id}` |
+| `GET` | `/api/rh/periodos/` |
+| `POST` | `/api/rh/periodos/` |
+| `PUT` | `/api/rh/periodos/{id}` |
+| `GET` | `/api/rh/cargos/` |
+| `POST` | `/api/rh/cargos/` |
+| `PUT` | `/api/rh/cargos/{id}` |
+| `DELETE` | `/api/rh/cargos/{id}` |
+| `GET` | `/api/rh/horarios/` |
+| `POST` | `/api/rh/horarios/` |
+| `PUT` | `/api/rh/horarios/{id}` |
+| `DELETE` | `/api/rh/horarios/{id}` |
+| `GET` | `/api/rh/componentes-salariais/` |
+| `POST` | `/api/rh/componentes-salariais/` |
+| `PUT` | `/api/rh/componentes-salariais/{id}` |
+| `DELETE` | `/api/rh/componentes-salariais/{id}` |
+| `GET` | `/api/rh/beneficios/` |
+| `POST` | `/api/rh/beneficios/` |
+| `PUT` | `/api/rh/beneficios/{id}` |
+| `DELETE` | `/api/rh/beneficios/{id}` |
+| `GET` | `/api/rh/formacoes/` |
+| `POST` | `/api/rh/formacoes/` |
+| `PUT` | `/api/rh/formacoes/{id}` |
+| `DELETE` | `/api/rh/formacoes/{id}` |
+| `GET` | `/api/rh/folhas-pagamento/` |
+| `GET` | `/api/rh/folhas-pagamento/{id}` |
+| `POST` | `/api/rh/folhas-pagamento/` |
+| `POST` | `/api/rh/folhas-pagamento/{id}/processar` |
+| `POST` | `/api/rh/folhas-pagamento/{id}/pagar` |
+| `POST` | `/api/rh/folhas-pagamento/{id}/cancelar` |
+| `GET` | `/api/rh/recibos-vencimento/{id}` |
+| `GET` | `/api/rh/recibos-vencimento/{id}/pdf` |
+| `POST` | `/api/rh/recibos-vencimento/{id}/pdf` |
+| `POST` | `/api/rh/contactos-emergencia/` |
+| `DELETE` | `/api/rh/contactos-emergencia/{id}` |
+| `GET` | `/api/rh/documentos/{id}/download` |
+| `POST` | `/api/rh/documentos/` |
+| `POST` | `/api/rh/documentos/{id}/upload` |
+| `DELETE` | `/api/rh/documentos/{id}` |
+## `/api/seguranca`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/seguranca/mfa-enrollments` |
+| `GET` | `/api/seguranca/politicas/` |
+| `POST` | `/api/seguranca/politicas/` |
+| `PUT` | `/api/seguranca/politicas/{id}` |
+| `GET` | `/api/seguranca/ip-allowlist/` |
+| `POST` | `/api/seguranca/ip-allowlist/` |
+| `DELETE` | `/api/seguranca/ip-allowlist/{id}` |
+## `/api/self-service`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/self-service/home` |
+| `POST` | `/api/self-service/notificacoes/lida` |
+| `POST` | `/api/self-service/comunicados/lido` |
+| `GET` | `/api/self-service/chat/conversas` |
+| `GET` | `/api/self-service/chat/conversas/{id}/mensagens` |
+| `POST` | `/api/self-service/chat/conversas` |
+| `POST` | `/api/self-service/chat/conversas/{id}/mensagens` |
+| `GET` | `/api/self-service/assiduidade/` |
+| `GET` | `/api/self-service/assiduidade/resumo` |
+| `GET` | `/api/self-service/assiduidade/metodos` |
+| `GET` | `/api/self-service/assiduidade/justificacoes` |
+| `GET` | `/api/self-service/assiduidade/qr/me` |
+| `POST` | `/api/self-service/assiduidade/biometria/facial/verificar` |
+| `POST` | `/api/self-service/assiduidade/ponto` |
+| `POST` | `/api/self-service/assiduidade/justificacoes` |
+| `POST` | `/api/self-service/assiduidade/correcoes` |
+| `GET` | `/api/self-service/assiduidade/correcoes` |
+| `POST` | `/api/self-service/assiduidade/correcoes/{id}/cancelar` |
+| `GET` | `/api/self-service/recibos/` |
+| `GET` | `/api/self-service/recibos/{id}` |
+| `GET` | `/api/self-service/recibos/{id}/pdf` |
+| `POST` | `/api/self-service/recibos/{id}/pdf` |
+| `GET` | `/api/self-service/perfil/` |
+| `GET` | `/api/self-service/perfil/documentos` |
+| `PUT` | `/api/self-service/perfil/` |
+| `POST` | `/api/self-service/perfil/senha` |
+## `/api/shipments`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/shipments` |
+| `POST` | `/api/shipments` |
+## `/api/stock`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/stock/warehouses` |
+| `GET` | `/api/stock/warehouses/{id}` |
+| `GET` | `/api/stock/warehouses/{id}/locations` |
+| `GET` | `/api/stock/items` |
+| `GET` | `/api/stock/items/{id}` |
+| `GET` | `/api/stock/movements` |
+| `GET` | `/api/stock/movements/{id}` |
+| `GET` | `/api/stock/adjustments` |
+| `GET` | `/api/stock/adjustments/{id}` |
+| `GET` | `/api/stock/transfers` |
+| `GET` | `/api/stock/transfers/{id}` |
+| `GET` | `/api/stock/reservations` |
+| `GET` | `/api/stock/reservations/{id}` |
+| `GET` | `/api/stock/batches/a-expirar` |
+| `GET` | `/api/stock/batches` |
+| `GET` | `/api/stock/batches/{id}` |
+| `GET` | `/api/stock/serials` |
+| `GET` | `/api/stock/serials/{serial}` |
+| `GET` | `/api/stock/counts` |
+| `GET` | `/api/stock/counts/{id}` |
+| `GET` | `/api/stock/alerts` |
+| `GET` | `/api/stock/reports/position` |
+| `GET` | `/api/stock/reports/movements-summary` |
+| `GET` | `/api/stock/reports/low-stock` |
+| `GET` | `/api/stock/reports/expiring-batches` |
+| `GET` | `/api/stock/reports/count-divergences` |
+| `GET` | `/api/stock/reports/valuation` |
+| `POST` | `/api/stock/warehouses` |
+| `PUT` | `/api/stock/warehouses/{id}` |
+| `POST` | `/api/stock/warehouses/{id}/activar` |
+| `POST` | `/api/stock/warehouses/{id}/desactivar` |
+| `POST` | `/api/stock/warehouses/{id}/locations` |
+| `PUT` | `/api/stock/warehouses/{id}/locations/{loc_id}` |
+| `DELETE` | `/api/stock/warehouses/{id}/locations/{loc_id}` |
+| `POST` | `/api/stock/items` |
+| `PUT` | `/api/stock/items/{id}/minimos` |
+| `POST` | `/api/stock/movements` |
+| `POST` | `/api/stock/adjustments` |
+| `POST` | `/api/stock/transfers` |
+| `POST` | `/api/stock/transfers/{id}/confirmar` |
+| `POST` | `/api/stock/transfers/{id}/receber` |
+| `POST` | `/api/stock/transfers/{id}/cancelar` |
+| `POST` | `/api/stock/reservations` |
+| `POST` | `/api/stock/reservations/{id}/liberar` |
+| `POST` | `/api/stock/reservations/{id}/consumir` |
+| `POST` | `/api/stock/batches` |
+| `PUT` | `/api/stock/batches/{id}` |
+| `POST` | `/api/stock/serials` |
+| `PUT` | `/api/stock/serials/{id}/status` |
+| `POST` | `/api/stock/counts` |
+| `POST` | `/api/stock/counts/{id}/items` |
+| `PUT` | `/api/stock/counts/{id}/items/{item_id}` |
+| `POST` | `/api/stock/counts/{id}/fechar` |
+| `POST` | `/api/stock/counts/{id}/cancelar` |
+| `POST` | `/api/stock/alerts/{id}/resolver` |
+| `POST` | `/api/stock/alerts/{id}/ignorar` |
+## `/api/superadmin`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/superadmin/dashboard` |
+| `GET` | `/api/superadmin/utilizadores` |
+| `GET` | `/api/superadmin/ip-allowlist/` |
+| `POST` | `/api/superadmin/ip-allowlist/` |
+| `DELETE` | `/api/superadmin/ip-allowlist/{id}` |
+| `GET` | `/api/superadmin/tenants/` |
+| `POST` | `/api/superadmin/tenants/` |
+| `GET` | `/api/superadmin/tenants/{id}` |
+| `PUT` | `/api/superadmin/tenants/{id}` |
+| `DELETE` | `/api/superadmin/tenants/{id}` |
+| `POST` | `/api/superadmin/tenants/{id}/suspender` |
+| `POST` | `/api/superadmin/tenants/{id}/reativar` |
+| `POST` | `/api/superadmin/tenants/{id}/inativar` |
+| `POST` | `/api/superadmin/tenants/{id}/cargos-padrao` |
+| `GET` | `/api/superadmin/tenants/{tenantId}/funcionarios/proximo-numero` |
+| `POST` | `/api/superadmin/tenants/{tenantId}/funcionarios` |
+| `GET` | `/api/superadmin/plans/` |
+| `POST` | `/api/superadmin/plans/` |
+| `GET` | `/api/superadmin/plans/{id}` |
+| `PUT` | `/api/superadmin/plans/{id}` |
+| `DELETE` | `/api/superadmin/plans/{id}` |
+| `GET` | `/api/superadmin/plans/{id}/modules` |
+| `PUT` | `/api/superadmin/plans/{id}/modules` |
+| `GET` | `/api/superadmin/modules/disponiveis` |
+| `GET` | `/api/superadmin/modules/tenants/{tenantId}` |
+| `POST` | `/api/superadmin/modules/tenants/{tenantId}/{modulo}` |
+| `POST` | `/api/superadmin/modules/tenants/{tenantId}/reset` |
+| `GET` | `/api/superadmin/modules/dependencies` |
+| `POST` | `/api/superadmin/modules/dependencies` |
+| `DELETE` | `/api/superadmin/modules/dependencies/{modulo}/{requires}` |
+| `GET` | `/api/superadmin/features/catalog` |
+| `GET` | `/api/superadmin/features/tenants/{tenantId}` |
+| `POST` | `/api/superadmin/features/tenants/{tenantId}/{key}` |
+| `DELETE` | `/api/superadmin/features/tenants/{tenantId}/{key}` |
+| `GET` | `/api/superadmin/settings/` |
+| `PUT` | `/api/superadmin/settings/` |
+## `/api/system`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/system/settings` |
+| `GET` | `/api/system/currencies` |
+| `GET` | `/api/system/exchange-rates` |
+| `GET` | `/api/system/countries` |
+| `GET` | `/api/system/cities` |
+| `GET` | `/api/system/languages` |
+| `GET` | `/api/system/email-templates` |
+| `GET` | `/api/system/sms-templates` |
+| `GET` | `/api/system/logs` |
+| `GET` | `/api/system/integrations` |
+| `GET` | `/api/system/api-logs` |
+| `GET` | `/api/system/configuracao/tenant/feature/rh.assiduidade` |
+| `POST` | `/api/system/settings` |
+| `POST` | `/api/system/currencies` |
+| `POST` | `/api/system/exchange-rates` |
+| `POST` | `/api/system/countries` |
+| `POST` | `/api/system/cities` |
+| `POST` | `/api/system/languages` |
+| `PUT` | `/api/system/configuracao/tenant/feature/rh.assiduidade` |
+| `POST` | `/api/system/email-templates` |
+| `POST` | `/api/system/sms-templates` |
+| `POST` | `/api/system/integrations` |
+## `/api/tarefas`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/tarefas/quadros/` |
+| `POST` | `/api/tarefas/quadros/` |
+| `GET` | `/api/tarefas/quadros/{id}/` |
+| `PUT` | `/api/tarefas/quadros/{id}/` |
+| `DELETE` | `/api/tarefas/quadros/{id}/` |
+| `POST` | `/api/tarefas/quadros/{id}/arquivar` |
+| `POST` | `/api/tarefas/quadros/{id}/listas` |
+| `PUT` | `/api/tarefas/listas/{id}/` |
+| `DELETE` | `/api/tarefas/listas/{id}/` |
+| `POST` | `/api/tarefas/listas/{id}/reordenar` |
+| `POST` | `/api/tarefas/listas/{id}/cartoes` |
+| `GET` | `/api/tarefas/cartoes/{id}/` |
+| `PUT` | `/api/tarefas/cartoes/{id}/` |
+| `PUT` | `/api/tarefas/cartoes/{id}/mover` |
+| `POST` | `/api/tarefas/cartoes/{id}/concluir` |
+| `DELETE` | `/api/tarefas/cartoes/{id}/` |
+## `/api/tesouraria`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/tesouraria/contas-bancarias` |
+| `GET` | `/api/tesouraria/caixas` |
+| `GET` | `/api/tesouraria/movimentos` |
+| `GET` | `/api/tesouraria/reconciliacoes` |
+| `POST` | `/api/tesouraria/contas-bancarias` |
+| `POST` | `/api/tesouraria/caixas` |
+| `POST` | `/api/tesouraria/movimentos` |
+| `POST` | `/api/tesouraria/reconciliacoes` |
+| `POST` | `/api/tesouraria/reconciliacoes/{id}/fechar` |
+| `POST` | `/api/tesouraria/reconciliacoes/{id}/enviar-para-assinatura` |
+## `/api/utilizadores`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/api/utilizadores/perfis/{userId}` |
+| `POST` | `/api/utilizadores/perfis` |
+| `PUT` | `/api/utilizadores/perfis/{userId}` |
+## `/assinar`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/assinar/{token}` |
+## `/candidaturas`
+
+| Método | Endpoint |
+|---|---|
+| `POST` | `/candidaturas` |
+| `GET` | `/candidaturas/{codigo}` |
+## `/health`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/health` |
+## `/oauth`
+
+| Método | Endpoint |
+|---|---|
+| `POST` | `/oauth/token` |
+| `GET` | `/oauth/authorize` |
+| `POST` | `/oauth/authorize` |
+| `GET` | `/oauth/jwks` |
+## `/socket.io`
+
+| Método | Endpoint |
+|---|---|
+| `HANDLE` | `/socket.io/*` |
+## `/vagas`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/vagas` |
+| `GET` | `/vagas/abertas` |
+| `GET` | `/vagas/{id}` |
+## `/verificar-assinatura`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/verificar-assinatura` |
+## `/ws`
+
+| Método | Endpoint |
+|---|---|
+| `GET` | `/ws/chat` |
+
+---
+
+## Notas
+
+- Base URL do ERP Nexora: `http://localhost:8080` (ou conforme deploy).
+- Base URL do FaceClock: `http://localhost:8000` (endpoints `/api/v1/*`, `/health`, `/ready`, `/metrics`).
+- Autenticação: Bearer token JWT ou OAuth2 access token.

@@ -11,6 +11,7 @@ class AttendanceRegistrationResponseModel {
   final String? recordedAt;
   final double? geoLat;
   final double? geoLng;
+  final String? estado;
 
   const AttendanceRegistrationResponseModel({
     required this.success,
@@ -21,6 +22,7 @@ class AttendanceRegistrationResponseModel {
     this.recordedAt,
     this.geoLat,
     this.geoLng,
+    this.estado,
   });
 
   factory AttendanceRegistrationResponseModel.fromJson(
@@ -28,14 +30,23 @@ class AttendanceRegistrationResponseModel {
   ) {
     return AttendanceRegistrationResponseModel(
       success: json['success'] == true || json['sucesso'] == true,
-      recordId: json['record_id']?.toString() ?? json['id']?.toString(),
-      message: json['message']?.toString() ?? json['mensagem']?.toString(),
-      type: json['type']?.toString() ?? json['tipo']?.toString(),
-      method: json['method']?.toString() ?? json['metodo']?.toString(),
-      recordedAt:
-          json['recorded_at']?.toString() ?? json['data_hora']?.toString(),
-      geoLat: _toDouble(json['geo_lat'] ?? json['geo_lat']),
-      geoLng: _toDouble(json['geo_lng'] ?? json['geo_lng']),
+      recordId: json['record_id']?.toString() ??
+          json['id']?.toString(),
+      message: json['message']?.toString() ??
+          json['mensagem']?.toString() ??
+          json['detail']?.toString(),
+      type: json['tipo_evento_codigo']?.toString() ??
+          json['type']?.toString() ??
+          json['tipo']?.toString(),
+      method: json['metodo_codigo']?.toString() ??
+          json['method']?.toString() ??
+          json['metodo']?.toString(),
+      recordedAt: json['ocorrido_em']?.toString() ??
+          json['recorded_at']?.toString() ??
+          json['data_hora']?.toString(),
+      geoLat: _toDouble(json['latitude'] ?? json['geo_lat']),
+      geoLng: _toDouble(json['longitude'] ?? json['geo_lng']),
+      estado: json['estado']?.toString(),
     );
   }
 
@@ -53,7 +64,7 @@ class AttendanceRegistrationResponseModel {
           : DateTime.now(),
       geoLat: geoLat,
       geoLng: geoLng,
-      status: success ? 'ok' : 'erro',
+      status: estado ?? (success ? 'ok' : 'erro'),
       message: message,
     );
   }

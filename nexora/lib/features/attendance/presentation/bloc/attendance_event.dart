@@ -26,14 +26,14 @@ class LoadTodayAttendanceStatus extends AttendanceEvent {
 
 class RegisterAttendance extends AttendanceEvent {
   final AttendanceMethod method;
-  final AttendanceType type;
+  final AttendanceType? type;
   final double? geoLat;
   final double? geoLng;
   final Map<String, dynamic>? payload;
 
   const RegisterAttendance({
     required this.method,
-    required this.type,
+    this.type,
     this.geoLat,
     this.geoLng,
     this.payload,

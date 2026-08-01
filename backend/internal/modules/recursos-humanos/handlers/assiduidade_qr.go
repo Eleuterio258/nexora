@@ -5,10 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
 	mw "nexora/internal/middleware"
+	"nexora/internal/modules/recursos-humanos/service/assiduidade"
+	"nexora/internal/modules/recursos-humanos/service/funcionario"
 	"nexora/internal/pkg/tenantid"
 )
 
@@ -265,4 +269,95 @@ func (h *Handler) ValidarQRDevice(w http.ResponseWriter, r *http.Request) {
 		"funcionario_id": funcionarioID,
 		"employee_no":    employeeNo,
 	}, http.StatusOK)
+}
+
+// POST /api/hardware/assiduidade/qr/registar
+// Modo 1 (QR pessoal do funcionário): o terminal lê o QR Code do funcionário,
+// valida-o e regista o ponto num único passo. O QR token deve estar vinculado
+// a um funcionario_id (gerado por GET /api/self-service/assiduidade/qr/me).
+func (h *Handler) RegistarQRDevice(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	tenantID, err := tenantIDQR(r.Context(), h.db, r, user)
+	if err != nil {
+		jsonErr(w, "Dispositivo sem empresa/tenant associado correctamente", http.StatusUnprocessableEntity)
+		return
+	}
+
+	var body struct {
+		QRCode           string `json:"qr_code"`
+		TipoEventoCodigo string `json:"tipo_evento_codigo"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.QRCode == "" {
+		jsonErr(w, "qr_code é obrigatório", http.StatusBadRequest)
+		return
+	}
+
+	qr, err := h.assiduidade.ValidarEUsarQRToken(r.Context(), tenantID, body.QRCode)
+	if err != nil {
+		switch {
+		case errors.Is(err, assiduidade.ErrQRExpirado):
+			jsonErr(w, "QR Code expirado", http.StatusBadRequest)
+		case errors.Is(err, assiduidade.ErrQRUsado):
+			jsonErr(w, "QR Code já utilizado", http.StatusBadRequest)
+		default:
+			jsonErr(w, "QR Code inválido", http.StatusBadRequest)
+		}
+		return
+	}
+	if qr.FuncionarioID == nil {
+		jsonErr(w, "QR Code de terminal não pode ser usado neste endpoint", http.StatusBadRequest)
+		return
+	}
+
+	colab, err := funcionario.NewService(h.db).PorID(r.Context(), tenantID, *qr.FuncionarioID)
+	if err != nil {
+		jsonErr(w, "Funcionário não encontrado", http.StatusNotFound)
+		return
+	}
+	if err := colab.VerificarAtivo(); err != nil {
+		jsonErr(w, "Funcionário inativo", http.StatusForbidden)
+		return
+	}
+
+	agora := time.Now()
+	tipoEvento := body.TipoEventoCodigo
+	if tipoEvento == "" {
+		tipoEvento = h.assiduidade.InferirEntradaOuSaida(r.Context(), tenantID, colab.ID, agora)
+	}
+	if !tiposEventoManual[tipoEvento] {
+		jsonErr(w, "tipo_evento_codigo não permitido em marcações por QR", http.StatusBadRequest)
+		return
+	}
+
+	metodo := "qr"
+	origem := "qr"
+	observacoes := fmt.Sprintf("QR lido por terminal | location_id=%s", valueOrEmpty(qr.LocationID))
+
+	ev, err := h.assiduidade.RegistarEvento(r.Context(), tenantID, assiduidade.RegistarEventoInput{
+		FuncionarioID:    colab.ID,
+		TipoEventoCodigo: tipoEvento,
+		MetodoCodigo:     &metodo,
+		OcorridoEm:       agora,
+		DataReferencia:   &agora,
+		Origem:           origem,
+		QRTokenID:        &qr.TokenID,
+		Observacoes:      &observacoes,
+	})
+	if err != nil {
+		if errors.Is(err, assiduidade.ErrTipoEventoDesconhecido) {
+			jsonErr(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		jsonErr(w, "Erro ao registar o ponto", http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w, ev, http.StatusCreated)
+}
+
+func valueOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

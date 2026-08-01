@@ -7,7 +7,6 @@ import 'package:nfc_manager/nfc_manager.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/attendance_method.dart';
-import '../../domain/entities/attendance_status.dart';
 import '../bloc/attendance_bloc.dart';
 import '../bloc/attendance_event.dart';
 import '../bloc/attendance_state.dart';
@@ -34,7 +33,6 @@ class _NfcAttendanceView extends StatefulWidget {
 class _NfcAttendanceViewState extends State<_NfcAttendanceView> {
   bool _isAvailable = false;
   bool _isReading = false;
-  AttendanceType _selectedType = AttendanceType.entrada;
 
   @override
   void initState() {
@@ -100,7 +98,6 @@ class _NfcAttendanceViewState extends State<_NfcAttendanceView> {
         context.read<AttendanceBloc>().add(
               RegisterAttendance(
                 method: AttendanceMethod.nfc,
-                type: _selectedType,
                 payload: {'nfc_tag_id': tagId},
               ),
             );
@@ -201,28 +198,9 @@ class _NfcAttendanceViewState extends State<_NfcAttendanceView> {
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'Aproxima o cartão ou dispositivo NFC do telemóvel para registar a presença.',
+                  'Aproxima o cartão ou dispositivo NFC do telemóvel para marcar o ponto. O tipo de evento será determinado automaticamente.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.textMuted),
-                ),
-                const SizedBox(height: 24),
-                SegmentedButton<AttendanceType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: AttendanceType.entrada,
-                      label: Text('Entrada'),
-                      icon: Icon(Icons.login),
-                    ),
-                    ButtonSegment(
-                      value: AttendanceType.saida,
-                      label: Text('Saída'),
-                      icon: Icon(Icons.logout),
-                    ),
-                  ],
-                  selected: {_selectedType},
-                  onSelectionChanged: (selected) {
-                    setState(() => _selectedType = selected.first);
-                  },
                 ),
                 const SizedBox(height: 32),
                 if (!_isAvailable)

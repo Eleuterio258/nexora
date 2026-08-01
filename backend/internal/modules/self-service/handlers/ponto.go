@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"time"
@@ -20,18 +21,25 @@ import (
 // POST /api/rh/eventos, protegido por recursos-humanos:gerir_funcionarios.
 type MarcarPontoRequest struct {
 	// metodo é a chave da configuração do tenant (rh.assiduidade.metodos).
-	// Por omissão "pin" — o único método que este endpoint sabe provar
-	// sozinho; ver o comentário de MarcarPonto.
+	// Por omissão "pin".
 	Metodo string `json:"metodo"`
-	PIN    string `json:"pin"`
+	// PIN é obrigatório apenas quando metodo == "pin". A prova de presença
+	// é verificada no mesmo pedido que grava o evento para não poder ser
+	// saltada por um cliente modificado.
+	PIN string `json:"pin"`
 	// tipo_evento_codigo é opcional: sem ele, entrada/saída alternam pela
 	// paridade dos eventos do dia (assiduidade.InferirEntradaOuSaida), que é
 	// o comportamento de um único botão "marcar ponto" na app.
-	TipoEventoCodigo string   `json:"tipo_evento_codigo"`
+	TipoEventoCodigo string `json:"tipo_evento_codigo"`
 	Latitude         *float64 `json:"latitude"`
 	Longitude        *float64 `json:"longitude"`
 	LocalidadeID     *int64   `json:"localidade_id"`
 	Observacoes      *string  `json:"observacoes"`
+	// Dados extra trazidos pelo método escolhido (ex.: qr_code, nfc_tag_id,
+	// image_base64). Não são validados pelo ERP nesta fase: a app já fez a
+	// prova local (biometria do dispositivo, leitura do QR/NFC, selfie) e
+	// estes dados ficam em observacoes para auditoria.
+	Dados map[string]any `json:"dados"`
 }
 
 // tiposEventoSelfService são os únicos tipos que um colaborador pode marcar
@@ -45,24 +53,42 @@ var tiposEventoSelfService = map[string]bool{
 	"intervalo_fim":    true,
 }
 
-// MarcarPonto regista o ponto do próprio colaborador autenticado por JWT —
-// Fase 1 do roadmap em docs/arquitetura-comunicacao-assiduidade.md §10. Até
-// aqui, marcar ponto pela app passava sempre por POST /api/hardware/events*,
-// autenticado pela API Key de device embutida no APK: uma credencial de
-// máquina, igual em todas as instalações, que identifica o telefone e não a
-// pessoa. Com este endpoint a marcação passa a ser feita com a identidade de
-// quem a faz, e a permissão assiduidade:marcar_ponto (semeada em
-// 20260728000004) ganha finalmente uma rota que a consome.
+// metodoSelfService descreve como um método vindo da app é mapeado para o
+// catálogo rh.metodos_marcacao e para a coluna origem.
+type metodoSelfService struct {
+	ChaveConfig string // chave usada em rh.assiduidade.configuracao.metodos
+	Codigo      string // codigo em rh.metodos_marcacao
+	Origem      string // valor da coluna origem (limitado pelo CHECK)
+	RequerPIN   bool
+}
+
+// metodosSelfService mapeia os valores de "metodo" que a app envia para os
+// códigos internos do ERP. Deve estar sincronizado com AttendanceMethod no
+// Flutter (nexora/lib/features/attendance/domain/entities/attendance_method.dart).
 //
-// O PIN é verificado aqui, e não delegado a POST /api/authcode/pin/verify,
-// porque esse endpoint só devolve um veredicto ao cliente: um cliente
-// modificado saltava-o e marcava o ponto na mesma. A prova de presença tem de
-// acontecer no mesmo pedido que grava o evento.
+// O método "manual" foi propositadamente excluído: marcações manuais são
+// operações de gestor/RH e devem usar POST /api/rh/assiduidade/ponto.
+var metodosSelfService = map[string]metodoSelfService{
+	"pin":         {ChaveConfig: "pin", Codigo: "pin", Origem: "app", RequerPIN: true},
+	"qr_code":     {ChaveConfig: "qr_code", Codigo: "qr", Origem: "qr", RequerPIN: false},
+	"nfc":         {ChaveConfig: "nfc", Codigo: "nfc", Origem: "nfc", RequerPIN: false},
+	"selfie_gps":  {ChaveConfig: "selfie", Codigo: "selfie", Origem: "selfie", RequerPIN: false},
+	"facial":      {ChaveConfig: "facial", Codigo: "reconhecimento_facial", Origem: "reconhecimento_facial", RequerPIN: false},
+	"fingerprint": {ChaveConfig: "fingerprint", Codigo: "impressao_digital", Origem: "impressao_digital", RequerPIN: false},
+}
+
+// MarcarPonto regista o ponto do próprio colaborador autenticado por JWT.
 //
-// Os métodos que dependem de segredos ou hardware de terceiros ficam fora:
-// facial e digital continuam a passar pelo FaceClock (VerificarFacial), QR e
-// NFC pelos validadores de device. Um pedido com outro método é recusado em
-// vez de aceite sem prova nenhuma.
+// O PIN, quando usado, é verificado aqui, e não delegado a
+// POST /api/authcode/pin/verify, porque esse endpoint só devolve um veredicto
+// ao cliente: um cliente modificado saltava-o e marcava o ponto na mesma. A
+// prova de presença tem de acontecer no mesmo pedido que grava o evento.
+//
+// Os restantes métodos (manual, QR, NFC, selfie+GPS, facial, fingerprint) são
+// aceites como declaração do colaborador autenticado: a app fez a prova local
+// (leitura do cartão/QR, biometria do dispositivo, selfie) e os dados extra
+// ficam em observacoes para auditoria. O ERP valida apenas se o método está
+// activo para o tenant e se o tipo de evento é permitido em self-service.
 func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 
@@ -74,14 +100,13 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 	if body.Metodo == "" {
 		body.Metodo = "pin"
 	}
-	if body.Metodo != "pin" {
-		jsonErr(w, "Este endpoint só aceita o método 'pin'", http.StatusBadRequest)
+
+	cfg, ok := metodosSelfService[body.Metodo]
+	if !ok {
+		jsonErr(w, fmt.Sprintf("Método de marcação '%s' não suportado", body.Metodo), http.StatusBadRequest)
 		return
 	}
-	if body.PIN == "" {
-		jsonErr(w, "pin é obrigatório", http.StatusBadRequest)
-		return
-	}
+
 	if body.TipoEventoCodigo != "" && !tiposEventoSelfService[body.TipoEventoCodigo] {
 		jsonErr(w, "tipo_evento_codigo não permitido em marcações próprias", http.StatusBadRequest)
 		return
@@ -102,18 +127,55 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 	}
 
 	svc := assiduidade.NewService(h.db)
-	if !svc.MetodoActivo(r.Context(), user.TenantID, "pin") {
-		jsonErr(w, "Marcação por PIN desactivada para esta empresa", http.StatusForbidden)
+	if !svc.MetodoActivo(r.Context(), user.TenantID, cfg.ChaveConfig) {
+		jsonErr(w, fmt.Sprintf("Marcação por '%s' desactivada para esta empresa", body.Metodo), http.StatusForbidden)
 		return
 	}
 
-	switch h.verificarPIN(r, user.ID, body.PIN) {
-	case pinNaoConfigurado:
-		jsonErr(w, "PIN não configurado — peça a RH para definir o seu PIN", http.StatusPreconditionFailed)
-		return
-	case pinIncorrecto:
-		jsonErr(w, "PIN incorrecto", http.StatusForbidden)
-		return
+	var qrTokenID *int64
+	var qrLocationID *string
+
+	if body.Metodo == "qr_code" {
+		qrCode, _ := body.Dados["qr_code"].(string)
+		if qrCode == "" {
+			jsonErr(w, "qr_code é obrigatório para marcação por QR", http.StatusBadRequest)
+			return
+		}
+
+		qr, err := svc.ValidarEUsarQRToken(r.Context(), user.TenantID, qrCode)
+		if err != nil {
+			switch {
+			case errors.Is(err, assiduidade.ErrQRExpirado):
+				jsonErr(w, "QR Code expirado", http.StatusBadRequest)
+			case errors.Is(err, assiduidade.ErrQRUsado):
+				jsonErr(w, "QR Code já utilizado", http.StatusBadRequest)
+			default:
+				jsonErr(w, "QR Code inválido", http.StatusBadRequest)
+			}
+			return
+		}
+		if qr.FuncionarioID != nil {
+			jsonErr(w, "QR Code pessoal não pode ser usado para marcação por terminal", http.StatusBadRequest)
+			return
+		}
+
+		qrTokenID = &qr.TokenID
+		qrLocationID = qr.LocationID
+	}
+
+	if cfg.RequerPIN {
+		if body.PIN == "" {
+			jsonErr(w, "pin é obrigatório", http.StatusBadRequest)
+			return
+		}
+		switch h.verificarPIN(r, user.ID, body.PIN) {
+		case pinNaoConfigurado:
+			jsonErr(w, "PIN não configurado — peça a RH para definir o seu PIN", http.StatusPreconditionFailed)
+			return
+		case pinIncorrecto:
+			jsonErr(w, "PIN incorrecto", http.StatusForbidden)
+			return
+		}
 	}
 
 	// Sem limite ao número de marcações do dia: cada toque é um facto que fica
@@ -128,15 +190,30 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 		tipoEvento = svc.InferirEntradaOuSaida(r.Context(), user.TenantID, colab.ID, agora)
 	}
 
-	metodo := "pin"
-	// origem é o canal por onde a marcação chegou, e está limitada pelo CHECK
-	// eventos_assiduidade_origem_check — que não aceita "pin"; o método fica
-	// em metodo_id. Mesmo par (metodo=pin, origem=app) que o processor de
-	// hardware usa para as marcações por PIN vindas do terminal.
-	origem := "app"
+	origem := cfg.Origem
+	metodo := cfg.Codigo
 	registadoPor := user.ID
 	ip := ipDoPedido(r)
 	ua := r.UserAgent()
+	observacoes := body.Observacoes
+	if len(body.Dados) > 0 || qrLocationID != nil {
+		extras := []string{}
+		if len(body.Dados) > 0 {
+			extras = append(extras, fmt.Sprintf("dados=%+v", body.Dados))
+		}
+		if qrLocationID != nil && *qrLocationID != "" {
+			extras = append(extras, fmt.Sprintf("location_id=%s", *qrLocationID))
+		}
+		merged := ""
+		if observacoes != nil && *observacoes != "" {
+			merged = *observacoes + " | "
+		}
+		merged += extras[0]
+		for i := 1; i < len(extras); i++ {
+			merged += " | " + extras[i]
+		}
+		observacoes = &merged
+	}
 
 	ev, err := svc.RegistarEvento(r.Context(), user.TenantID, assiduidade.RegistarEventoInput{
 		FuncionarioID:    colab.ID,
@@ -144,11 +221,12 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 		MetodoCodigo:     &metodo,
 		OcorridoEm:       agora,
 		Origem:           origem,
+		QRTokenID:        qrTokenID,
 		Latitude:         body.Latitude,
 		Longitude:        body.Longitude,
 		LocalidadeID:     body.LocalidadeID,
 		RegistadoPor:     &registadoPor,
-		Observacoes:      body.Observacoes,
+		Observacoes:      observacoes,
 		IPOrigem:         &ip,
 		UserAgent:        &ua,
 	})

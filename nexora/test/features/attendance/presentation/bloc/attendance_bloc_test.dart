@@ -33,7 +33,6 @@ void main() {
   setUpAll(() {
     registerFallbackValue(const RegisterAttendanceParams(
       method: AttendanceMethod.manual,
-      type: AttendanceType.entrada,
     ));
   });
   late AttendanceBloc bloc;
@@ -74,7 +73,6 @@ void main() {
       build: () => bloc,
       act: (bloc) => bloc.add(const RegisterAttendance(
         method: AttendanceMethod.manual,
-        type: AttendanceType.entrada,
       )),
       expect: () => [
         AttendanceLoading(),
@@ -83,7 +81,6 @@ void main() {
       verify: (_) {
         verify(() => registerAttendanceUseCase(const RegisterAttendanceParams(
               method: AttendanceMethod.manual,
-              type: AttendanceType.entrada,
             ))).called(1);
       },
     );
@@ -97,7 +94,6 @@ void main() {
       build: () => bloc,
       act: (bloc) => bloc.add(const RegisterAttendance(
         method: AttendanceMethod.manual,
-        type: AttendanceType.entrada,
       )),
       expect: () => [
         AttendanceLoading(),

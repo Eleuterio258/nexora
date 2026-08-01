@@ -21,7 +21,6 @@ void main() {
 
   const tParams = RegisterAttendanceParams(
     method: AttendanceMethod.manual,
-    type: AttendanceType.entrada,
   );
 
   final tRecord = AttendanceRecordEntity(

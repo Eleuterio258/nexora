@@ -15,7 +15,7 @@ abstract class AttendanceRemoteDataSource {
   Future<AttendanceRegistrationResponseModel> registerAttendance({
     required String deviceId,
     required String method,
-    required String type,
+    String? type,
     double? geoLat,
     double? geoLng,
     Map<String, dynamic>? payload,
@@ -75,22 +75,39 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   Future<AttendanceRegistrationResponseModel> registerAttendance({
     required String deviceId,
     required String method,
-    required String type,
+    String? type,
     double? geoLat,
     double? geoLng,
     Map<String, dynamic>? payload,
   }) async {
     try {
+      final extraDados = Map<String, dynamic>.from(payload ?? {});
+      extraDados.remove('pin');
+      extraDados.remove('observacoes');
+
+      final data = <String, dynamic>{
+        'metodo': method,
+        'pin': payload?['pin'] ?? '',
+        'latitude': geoLat,
+        'longitude': geoLng,
+      };
+
+      if (type != null && type.isNotEmpty) {
+        data['tipo_evento_codigo'] = type;
+      }
+
+      final observacoes = payload?['observacoes'];
+      if (observacoes != null) {
+        data['observacoes'] = observacoes;
+      }
+
+      if (extraDados.isNotEmpty) {
+        data['dados'] = extraDados;
+      }
+
       final response = await restClient.auth().post<Map<String, dynamic>>(
-        '/api/self-service/assiduidade/registar',
-        data: {
-          'device_id': deviceId,
-          'method': method,
-          'type': type,
-          'geo_lat': geoLat,
-          'geo_lng': geoLng,
-          'payload': ?payload,
-        },
+        '/api/self-service/assiduidade/ponto',
+        data: data,
       );
 
       return AttendanceRegistrationResponseModel.fromJson(

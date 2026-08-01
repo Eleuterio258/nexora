@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../attendance/presentation/pages/facial_attendance_page.dart';
 import '../../../attendance/presentation/pages/fingerprint_attendance_page.dart';
-import '../../../attendance/presentation/pages/manual_attendance_page.dart';
 import '../../../attendance/presentation/pages/nfc_attendance_page.dart';
 import '../../../attendance/presentation/pages/pin_attendance_page.dart';
 import '../../../attendance/presentation/pages/qr_attendance_page.dart';
@@ -23,7 +22,6 @@ class _MetodoRegisto {
 }
 
 const _metodosRegisto = [
-  _MetodoRegisto(Icons.checklist_outlined, 'Manual'),
   _MetodoRegisto(Icons.qr_code, 'QR Code'),
   _MetodoRegisto(Icons.face_outlined, 'Facial'),
   _MetodoRegisto(Icons.location_on_outlined, 'Selfie + GPS'),
@@ -48,7 +46,6 @@ class HomePage extends StatelessWidget {
 
   void _openAttendanceMethod(BuildContext context, String label) {
     final page = switch (label) {
-      'Manual' => const ManualAttendancePage(),
       'QR Code' => const QrAttendancePage(),
       'Facial' => const FacialAttendancePage(),
       'Selfie + GPS' => const SelfieGpsAttendancePage(),

@@ -8,14 +8,14 @@ import '../entities/attendance_status.dart';
 
 class RegisterAttendanceParams extends Equatable {
   final AttendanceMethod method;
-  final AttendanceType type;
+  final AttendanceType? type;
   final double? geoLat;
   final double? geoLng;
   final Map<String, dynamic>? payload;
 
   const RegisterAttendanceParams({
     required this.method,
-    required this.type,
+    this.type,
     this.geoLat,
     this.geoLng,
     this.payload,

@@ -5,7 +5,6 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/attendance_method.dart';
-import '../../domain/entities/attendance_status.dart';
 import '../bloc/attendance_bloc.dart';
 import '../bloc/attendance_event.dart';
 import '../bloc/attendance_state.dart';
@@ -31,7 +30,6 @@ class _QrAttendanceView extends StatefulWidget {
 
 class _QrAttendanceViewState extends State<_QrAttendanceView> {
   bool _scanned = false;
-  AttendanceType _selectedType = AttendanceType.entrada;
 
   void _onDetect(BarcodeCapture capture, BuildContext context) {
     if (_scanned) return;
@@ -45,7 +43,6 @@ class _QrAttendanceViewState extends State<_QrAttendanceView> {
     context.read<AttendanceBloc>().add(
           RegisterAttendance(
             method: AttendanceMethod.qrCode,
-            type: _selectedType,
             payload: {'qr_code': code},
           ),
         );
@@ -82,9 +79,13 @@ class _QrAttendanceViewState extends State<_QrAttendanceView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      record.status == 'ok' ? Icons.check_circle_outline : Icons.error_outline,
+                      record.status == 'ok'
+                          ? Icons.check_circle_outline
+                          : Icons.error_outline,
                       size: 64,
-                      color: record.status == 'ok' ? AppColors.green : AppColors.red,
+                      color: record.status == 'ok'
+                          ? AppColors.green
+                          : AppColors.red,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -107,35 +108,12 @@ class _QrAttendanceViewState extends State<_QrAttendanceView> {
 
           return Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Aponta a câmara para o QR code para registar a presença.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.textMuted),
-                    ),
-                    const SizedBox(height: 12),
-                    SegmentedButton<AttendanceType>(
-                      segments: const [
-                        ButtonSegment(
-                          value: AttendanceType.entrada,
-                          label: Text('Entrada'),
-                          icon: Icon(Icons.login),
-                        ),
-                        ButtonSegment(
-                          value: AttendanceType.saida,
-                          label: Text('Saída'),
-                          icon: Icon(Icons.logout),
-                        ),
-                      ],
-                      selected: {_selectedType},
-                      onSelectionChanged: (selected) {
-                        setState(() => _selectedType = selected.first);
-                      },
-                    ),
-                  ],
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Aponta a câmara para o QR code para marcar o ponto. O tipo de evento será determinado automaticamente.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textMuted),
                 ),
               ),
               Expanded(

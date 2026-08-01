@@ -12,7 +12,6 @@ import 'package:geolocator/geolocator.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/attendance_method.dart';
-import '../../domain/entities/attendance_status.dart';
 import '../bloc/attendance_bloc.dart';
 import '../bloc/attendance_event.dart';
 import '../bloc/attendance_state.dart';
@@ -43,7 +42,6 @@ class _SelfieGpsAttendanceViewState extends State<_SelfieGpsAttendanceView>
   CameraDescription? _frontCamera;
   bool _isCapturing = false;
   String? _locationError;
-  AttendanceType _selectedType = AttendanceType.entrada;
 
   @override
   void initState() {
@@ -164,7 +162,6 @@ class _SelfieGpsAttendanceViewState extends State<_SelfieGpsAttendanceView>
       context.read<AttendanceBloc>().add(
             RegisterAttendance(
               method: AttendanceMethod.selfieGps,
-              type: _selectedType,
               geoLat: position?.latitude,
               geoLng: position?.longitude,
               payload: {'image_base64': base64Image},
@@ -240,35 +237,12 @@ class _SelfieGpsAttendanceViewState extends State<_SelfieGpsAttendanceView>
 
           return Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Tira uma selfie. A localização GPS será anexada ao registo.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.textMuted),
-                    ),
-                    const SizedBox(height: 12),
-                    SegmentedButton<AttendanceType>(
-                      segments: const [
-                        ButtonSegment(
-                          value: AttendanceType.entrada,
-                          label: Text('Entrada'),
-                          icon: Icon(Icons.login),
-                        ),
-                        ButtonSegment(
-                          value: AttendanceType.saida,
-                          label: Text('Saída'),
-                          icon: Icon(Icons.logout),
-                        ),
-                      ],
-                      selected: {_selectedType},
-                      onSelectionChanged: (selected) {
-                        setState(() => _selectedType = selected.first);
-                      },
-                    ),
-                  ],
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Tira uma selfie. A localização GPS será anexada ao registo e o tipo de evento será determinado automaticamente.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textMuted),
                 ),
               ),
               Expanded(
@@ -312,7 +286,7 @@ class _SelfieGpsAttendanceViewState extends State<_SelfieGpsAttendanceView>
                         ? () => _captureAndSubmit(context)
                         : null,
                     icon: const Icon(Icons.camera_alt),
-                    label: const Text('Capturar e registar'),
+                    label: const Text('Capturar e marcar ponto'),
                   ),
                 ),
               ),

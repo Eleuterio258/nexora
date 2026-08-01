@@ -27,7 +27,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       final result = await remoteDataSource.registerAttendance(
         deviceId: await _deviceId(),
         method: params.method.value,
-        type: params.type.value,
+        type: params.type?.value,
         geoLat: params.geoLat,
         geoLng: params.geoLng,
         payload: params.payload,

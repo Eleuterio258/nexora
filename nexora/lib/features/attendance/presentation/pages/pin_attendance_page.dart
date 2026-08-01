@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/attendance_method.dart';
-import '../../domain/entities/attendance_status.dart';
 import '../bloc/attendance_bloc.dart';
 import '../bloc/attendance_event.dart';
 import '../bloc/attendance_state.dart';
@@ -30,7 +29,6 @@ class _PinAttendanceView extends StatefulWidget {
 
 class _PinAttendanceViewState extends State<_PinAttendanceView> {
   String _pin = '';
-  AttendanceType _selectedType = AttendanceType.entrada;
 
   void _onDigit(String digit) {
     if (_pin.length < 6) {
@@ -55,7 +53,6 @@ class _PinAttendanceViewState extends State<_PinAttendanceView> {
     context.read<AttendanceBloc>().add(
           RegisterAttendance(
             method: AttendanceMethod.pin,
-            type: _selectedType,
             payload: {'pin': _pin},
           ),
         );
@@ -87,9 +84,13 @@ class _PinAttendanceViewState extends State<_PinAttendanceView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      record.status == 'ok' ? Icons.check_circle_outline : Icons.error_outline,
+                      record.status == 'ok'
+                          ? Icons.check_circle_outline
+                          : Icons.error_outline,
                       size: 64,
-                      color: record.status == 'ok' ? AppColors.green : AppColors.red,
+                      color: record.status == 'ok'
+                          ? AppColors.green
+                          : AppColors.red,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -103,7 +104,9 @@ class _PinAttendanceViewState extends State<_PinAttendanceView> {
                     FilledButton(
                       onPressed: () {
                         setState(() => _pin = '');
-                        context.read<AttendanceBloc>().add(const ResetAttendanceResult());
+                        context
+                            .read<AttendanceBloc>()
+                            .add(const ResetAttendanceResult());
                       },
                       child: const Text('Novo registo'),
                     ),
@@ -118,39 +121,23 @@ class _PinAttendanceViewState extends State<_PinAttendanceView> {
             child: Column(
               children: [
                 const Text(
-                  'Insere o teu PIN para registar a presença.',
+                  'Insere o teu PIN para marcar o ponto. O sistema determina automaticamente se é entrada ou saída.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppColors.textMuted),
-                ),
-                const SizedBox(height: 16),
-                SegmentedButton<AttendanceType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: AttendanceType.entrada,
-                      label: Text('Entrada'),
-                      icon: Icon(Icons.login),
-                    ),
-                    ButtonSegment(
-                      value: AttendanceType.saida,
-                      label: Text('Saída'),
-                      icon: Icon(Icons.logout),
-                    ),
-                  ],
-                  selected: {_selectedType},
-                  onSelectionChanged: (selected) {
-                    setState(() => _selectedType = selected.first);
-                  },
                 ),
                 const SizedBox(height: 24),
                 _PinDots(pin: _pin),
                 const SizedBox(height: 24),
-                Expanded(child: _PinPad(onDigit: _onDigit, onBackspace: _onBackspace)),
+                Expanded(
+                    child: _PinPad(
+                        onDigit: _onDigit, onBackspace: _onBackspace)),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _pin.length >= 4 ? () => _onSubmit(context) : null,
-                    child: const Text('Confirmar'),
+                    onPressed:
+                        _pin.length >= 4 ? () => _onSubmit(context) : null,
+                    child: const Text('Marcar ponto'),
                   ),
                 ),
               ],
@@ -248,7 +235,8 @@ class _PinKey extends StatelessWidget {
           child: child ??
               Text(
                 label!,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
         ),
       ),
