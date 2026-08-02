@@ -1,17 +1,24 @@
 package handlers
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 
 	mw "nexora/internal/middleware"
 	"nexora/internal/modules/recursos-humanos/service/assiduidade"
 	"nexora/internal/modules/recursos-humanos/service/funcionario"
+	"nexora/internal/storage"
 )
 
 // MarcarPontoRequest é o payload de POST /api/self-service/assiduidade/ponto.
@@ -30,7 +37,7 @@ type MarcarPontoRequest struct {
 	// tipo_evento_codigo é opcional: sem ele, entrada/saída alternam pela
 	// paridade dos eventos do dia (assiduidade.InferirEntradaOuSaida), que é
 	// o comportamento de um único botão "marcar ponto" na app.
-	TipoEventoCodigo string `json:"tipo_evento_codigo"`
+	TipoEventoCodigo string   `json:"tipo_evento_codigo"`
 	Latitude         *float64 `json:"latitude"`
 	Longitude        *float64 `json:"longitude"`
 	LocalidadeID     *int64   `json:"localidade_id"`
@@ -73,6 +80,7 @@ var metodosSelfService = map[string]metodoSelfService{
 	"qr_code":     {ChaveConfig: "qr_code", Codigo: "qr", Origem: "qr", RequerPIN: false},
 	"nfc":         {ChaveConfig: "nfc", Codigo: "nfc", Origem: "nfc", RequerPIN: false},
 	"selfie_gps":  {ChaveConfig: "selfie", Codigo: "selfie", Origem: "selfie", RequerPIN: false},
+	"selfie":      {ChaveConfig: "selfie", Codigo: "selfie", Origem: "selfie", RequerPIN: false},
 	"facial":      {ChaveConfig: "facial", Codigo: "reconhecimento_facial", Origem: "reconhecimento_facial", RequerPIN: false},
 	"fingerprint": {ChaveConfig: "fingerprint", Codigo: "impressao_digital", Origem: "impressao_digital", RequerPIN: false},
 }
@@ -87,8 +95,8 @@ var metodosSelfService = map[string]metodoSelfService{
 // Os restantes métodos (manual, QR, NFC, selfie+GPS, facial, fingerprint) são
 // aceites como declaração do colaborador autenticado: a app fez a prova local
 // (leitura do cartão/QR, biometria do dispositivo, selfie) e os dados extra
-// ficam em observacoes para auditoria. O ERP valida apenas se o método está
-// activo para o tenant e se o tipo de evento é permitido em self-service.
+// ficam em observacoes para auditoria. QR e NFC são ainda validados contra os
+// registos activos do tenant antes de o evento ser criado.
 func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 
@@ -132,8 +140,71 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// O contrato móvel agrupa as provas do método em `dados`. Promover as
+	// coordenadas para os campos persistidos e transformar a data URL da
+	// selfie numa URL real do storage antes de criar o evento.
+	if body.Latitude == nil {
+		if latitude, ok := body.Dados["latitude"].(float64); ok {
+			body.Latitude = &latitude
+		}
+	}
+	if body.Longitude == nil {
+		if longitude, ok := body.Dados["longitude"].(float64); ok {
+			body.Longitude = &longitude
+		}
+	}
+
+	var fotoURL *string
+	if rawFoto, ok := body.Dados["foto_url"].(string); ok && rawFoto != "" {
+		foto, err := h.prepararFotoSelfie(r.Context(), user.TenantID, user.ID, rawFoto)
+		if err != nil {
+			jsonErr(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		fotoURL = &foto
+		body.Dados["foto_url"] = foto
+	}
+	if cfg.ChaveConfig == "selfie" {
+		if body.Latitude == nil || body.Longitude == nil {
+			jsonErr(w, "latitude e longitude são obrigatórias para selfie", http.StatusBadRequest)
+			return
+		}
+		if fotoURL == nil {
+			jsonErr(w, "foto_url é obrigatória para selfie", http.StatusBadRequest)
+			return
+		}
+	}
+
 	var qrTokenID *int64
 	var qrLocationID *string
+	var nfcTagID *int64
+
+	if body.Metodo == "nfc" {
+		tagUID, _ := body.Dados["nfc_tag_id"].(string)
+		tagUID = strings.ToUpper(strings.TrimSpace(tagUID))
+		if tagUID == "" {
+			jsonErr(w, "nfc_tag_id é obrigatório para marcação por NFC", http.StatusBadRequest)
+			return
+		}
+
+		var id int64
+		err := h.db.QueryRow(r.Context(), `
+			SELECT id
+			  FROM rh.nfc_tags
+			 WHERE tenant_id=$1 AND funcionario_id=$2
+			   AND UPPER(tag_uid)=$3 AND activo=true`,
+			user.TenantID, colab.ID, tagUID).Scan(&id)
+		if errors.Is(err, pgx.ErrNoRows) {
+			jsonErr(w, "Cartão NFC inválido ou não associado ao funcionário", http.StatusBadRequest)
+			return
+		}
+		if err != nil {
+			jsonErr(w, "Erro ao validar o cartão NFC", http.StatusInternalServerError)
+			return
+		}
+		nfcTagID = &id
+		body.Dados["nfc_tag_id"] = tagUID
+	}
 
 	if body.Metodo == "qr_code" {
 		qrCode, _ := body.Dados["qr_code"].(string)
@@ -222,9 +293,11 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 		OcorridoEm:       agora,
 		Origem:           origem,
 		QRTokenID:        qrTokenID,
+		NFCTagID:         nfcTagID,
 		Latitude:         body.Latitude,
 		Longitude:        body.Longitude,
 		LocalidadeID:     body.LocalidadeID,
+		FotoURL:          fotoURL,
 		RegistadoPor:     &registadoPor,
 		Observacoes:      observacoes,
 		IPOrigem:         &ip,
@@ -243,6 +316,63 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 	// responsabilidade de assiduidade.RecalcularDia, chamado pelo job em
 	// background/jobs.go, tal como para os eventos vindos de hardware.
 	jsonOK(w, ev, http.StatusCreated)
+}
+
+const maxSelfieBytes = 5 << 20
+
+// prepararFotoSelfie aceita uma URL HTTPS já publicada ou uma data URL
+// JPEG/PNG enviada pela app. A segunda opção é guardada no provider configurado
+// e substituída pela URL pública devolvida pelo storage.
+func (h *Handler) prepararFotoSelfie(ctx context.Context, tenantID, userID int64, raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(raw, "https://") || strings.HasPrefix(raw, "http://") {
+		parsed, err := url.ParseRequestURI(raw)
+		if err != nil || parsed.Host == "" {
+			return "", errors.New("foto_url inválida")
+		}
+		return raw, nil
+	}
+
+	contentType := "image/jpeg"
+	ext := ".jpg"
+	prefix := "data:image/jpeg;base64,"
+	if strings.HasPrefix(raw, "data:image/png;base64,") {
+		contentType = "image/png"
+		ext = ".png"
+		prefix = "data:image/png;base64,"
+	}
+	if !strings.HasPrefix(raw, prefix) {
+		return "", errors.New("foto_url deve ser uma URL HTTP(S) ou imagem JPEG/PNG")
+	}
+
+	encoded := strings.TrimPrefix(raw, prefix)
+	if len(encoded) > (maxSelfieBytes*4/3)+4 {
+		return "", errors.New("selfie excede o limite de 5 MB")
+	}
+	data, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil || len(data) == 0 {
+		return "", errors.New("selfie inválida")
+	}
+	if len(data) > maxSelfieBytes {
+		return "", errors.New("selfie excede o limite de 5 MB")
+	}
+	if detected := http.DetectContentType(data); detected != contentType {
+		return "", errors.New("conteúdo da selfie inválido")
+	}
+
+	digest := sha256.Sum256(data)
+	key := storage.JoinPath(
+		"uploads",
+		fmt.Sprintf("tenant-%d", tenantID),
+		"assiduidade",
+		"selfies",
+		fmt.Sprintf("%d-%x%s", userID, digest[:12], ext),
+	)
+	storedURL, err := h.storage.Put(ctx, key, data, contentType)
+	if err != nil {
+		return "", errors.New("não foi possível guardar a selfie")
+	}
+	return storedURL, nil
 }
 
 type resultadoPIN int

@@ -47,16 +47,19 @@ class MaisFragment : Fragment() {
         val temVerDispositivos = PermissionUtils.has(sessionManager, "hardware", "ver_dispositivos")
         val temVerFuncionarios = PermissionUtils.has(sessionManager, "recursos-humanos", "ver_funcionarios")
         val temVerConfiguracoes = PermissionUtils.has(sessionManager, "sistema-configuracao", "ver_configuracoes")
+        val temRegistoManual = PermissionUtils.has(sessionManager, "recursos-humanos", "gerir_funcionarios")
 
         val cardDispositivos = view.findViewById<CardView>(R.id.cardDispositivos)
         val cardOcorrencias = view.findViewById<CardView>(R.id.cardOcorrencias)
         val cardAlertas = view.findViewById<CardView>(R.id.cardAlertas)
         val cardConfig = view.findViewById<CardView>(R.id.cardConfig)
+        val cardRegistoManual = view.findViewById<CardView>(R.id.cardRegistoManual)
 
         cardDispositivos.visibility = if (temVerDispositivos) View.VISIBLE else View.GONE
         cardOcorrencias.visibility = if (temVerFuncionarios) View.VISIBLE else View.GONE
         cardAlertas.visibility = if (temVerFuncionarios) View.VISIBLE else View.GONE
         cardConfig.visibility = if (temVerConfiguracoes) View.VISIBLE else View.GONE
+        cardRegistoManual.visibility = if (temRegistoManual) View.VISIBLE else View.GONE
 
         cardDispositivos.setOnClickListener {
             (activity as? LoginActivity)?.pushFragment(DispositivosFragment())
@@ -67,7 +70,7 @@ class MaisFragment : Fragment() {
         cardAlertas.setOnClickListener {
             (activity as? LoginActivity)?.pushFragment(AlertasFragment())
         }
-        view.findViewById<CardView>(R.id.cardRegistoManual).setOnClickListener {
+        cardRegistoManual.setOnClickListener {
             (activity as? LoginActivity)?.pushFragment(RegistoManualFragment())
         }
         view.findViewById<CardView>(R.id.cardQrCode).setOnClickListener {

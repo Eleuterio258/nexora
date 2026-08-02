@@ -45,6 +45,10 @@ import tech.e258tech.nexora_assiduidade.data.model.OportunidadePerderRequest
 import tech.e258tech.nexora_assiduidade.data.model.OportunidadeRequest
 import tech.e258tech.nexora_assiduidade.data.model.PinValidateRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarLidaRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoGestorRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoSelfServiceRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoNfcSelfServiceRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoQrSelfServiceRequest
 import tech.e258tech.nexora_assiduidade.data.model.PinVerifyRequest
 import tech.e258tech.nexora_assiduidade.data.model.TotpVerifyRequest
 import tech.e258tech.nexora_assiduidade.data.model.PresencaOcorrencia
@@ -333,10 +337,9 @@ interface ErpApiService {
 
     // Enrollment facial de um funcionário, feito por gestor RH.
     // O ERP faz proxy para o FaceClock após validar consentimento LGPD e configuração do tenant.
-    @POST("api/rh/funcionarios/{id}/biometria/facial/enroll")
+    @POST("api/rh/funcionarios/biometria/facial/enroll")
     suspend fun enrollFacialFuncionario(
         @Header("Authorization") token: String,
-        @Path("id") funcionarioId: Long,
         @Body request: EnrollFacialRequest
     ): Response<EnrollFacialResponse>
 
@@ -350,18 +353,27 @@ interface ErpApiService {
         @Body request: FaceVerifyRequest
     ): Response<FaceVerifyResponse>
 
+    // Criação manual de evento de assiduidade por gestor/RH — exige a permissão
+    // "recursos-humanos:gerir_funcionarios" (router.go:2069). O ERP decide
+    // entrada/saída sozinho quando tipo_evento_codigo é omitido/null, e valida se
+    // o utilizador pode gerir o funcionário alvo (hierarquia ou permissão).
+    @POST("api/rh/eventos")
+    suspend fun criarEventoAssiduidade(
+        @Header("Authorization") token: String,
+        @Body request: MarcarPontoGestorRequest
+    ): Response<EventoAssiduidadeResponse>
+
     // Consentimento LGPD biométrico de um funcionário (GET/POST por gestor RH).
-    @GET("api/rh/funcionarios/{id}/consentimento")
+    @GET("api/rh/funcionarios/consentimento")
     suspend fun getConsentimentoFuncionario(
         @Header("Authorization") token: String,
-        @Path("id") funcionarioId: Long
+        @Query("id") funcionarioId: Long
     ): Response<ConsentimentoLGPD>
 
-    @POST("api/rh/funcionarios/{id}/consentimento")
+    @POST("api/rh/funcionarios/consentimento")
     suspend fun criarConsentimentoFuncionario(
         @Header("Authorization") token: String,
-        @Path("id") funcionarioId: Long,
-        @Body request: ConsentimentoLGPDRequest = ConsentimentoLGPDRequest()
+        @Body request: ConsentimentoLGPDRequest
     ): Response<Map<String, Long>>
 
     // Configuração dos métodos de assiduidade activos para o tenant
@@ -388,6 +400,24 @@ interface ErpApiService {
     suspend fun getMetodosAssiduidade(
         @Header("Authorization") token: String
     ): Response<AssiduidadeConfigResponse>
+
+    @POST("api/self-service/assiduidade/ponto")
+    suspend fun marcarPontoSelfService(
+        @Header("Authorization") token: String,
+        @Body request: MarcarPontoSelfServiceRequest
+    ): Response<EventoAssiduidadeResponse>
+
+    @POST("api/self-service/assiduidade/ponto")
+    suspend fun marcarPontoNfcSelfService(
+        @Header("Authorization") token: String,
+        @Body request: MarcarPontoNfcSelfServiceRequest
+    ): Response<EventoAssiduidadeResponse>
+
+    @POST("api/self-service/assiduidade/ponto")
+    suspend fun marcarPontoQrSelfService(
+        @Header("Authorization") token: String,
+        @Body request: MarcarPontoQrSelfServiceRequest
+    ): Response<EventoAssiduidadeResponse>
 
     // Pedidos de férias/ausências (rh.go:1090, ListarAusencias)
     @GET("api/rh/ausencias")

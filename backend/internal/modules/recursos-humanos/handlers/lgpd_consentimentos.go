@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-
 	mw "nexora/internal/middleware"
 )
 
@@ -184,12 +182,11 @@ func (h *Handler) ListarConsentimentosDevice(w http.ResponseWriter, r *http.Requ
 
 // ── Endpoints para gestores (autenticação JWT) ───────────────────────────────
 
-// GET /api/rh/funcionarios/{id}/consentimento
+// GET /api/rh/funcionarios/consentimento?id={funcionario_id}
 // Devolve o consentimento LGPD biométrico activo do funcionário.
 func (h *Handler) ObterConsentimentoFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	funcionarioIDStr := chi.URLParam(r, "id")
-	funcionarioID, err := strconv.ParseInt(funcionarioIDStr, 10, 64)
+	funcionarioID, err := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
 	if err != nil || funcionarioID <= 0 {
 		jsonErr(w, "ID de funcionário inválido", http.StatusBadRequest)
 		return
@@ -209,27 +206,27 @@ func (h *Handler) ObterConsentimentoFuncionario(w http.ResponseWriter, r *http.R
 	jsonOK(w, c, http.StatusOK)
 }
 
-// POST /api/rh/funcionarios/{id}/consentimento
+// POST /api/rh/funcionarios/consentimento
 // Regista um consentimento LGPD biométrico para o funcionário (por um gestor).
 func (h *Handler) CriarConsentimentoFuncionario(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
-	funcionarioIDStr := chi.URLParam(r, "id")
-	funcionarioID, err := strconv.ParseInt(funcionarioIDStr, 10, 64)
-	if err != nil || funcionarioID <= 0 {
+
+	var body struct {
+		FuncionarioID int64  `json:"funcionario_id"`
+		TermoVersao   string `json:"termo_versao"`
+		TermoHash     string `json:"termo_hash"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonErr(w, "Body inválido", http.StatusBadRequest)
+		return
+	}
+	funcionarioID := body.FuncionarioID
+	if funcionarioID <= 0 {
 		jsonErr(w, "ID de funcionário inválido", http.StatusBadRequest)
 		return
 	}
 	if !h.podeGerirFuncionario(r, funcionarioID) {
 		jsonErr(w, "Sem permissão para gerir este funcionário", http.StatusForbidden)
-		return
-	}
-
-	var body struct {
-		TermoVersao string `json:"termo_versao"`
-		TermoHash   string `json:"termo_hash"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, "Body inválido", http.StatusBadRequest)
 		return
 	}
 	if body.TermoVersao == "" {
@@ -241,7 +238,7 @@ func (h *Handler) CriarConsentimentoFuncionario(w http.ResponseWriter, r *http.R
 
 	// Verifica se o funcionário existe no tenant
 	var existe int
-	err = h.db.QueryRow(r.Context(),
+	err := h.db.QueryRow(r.Context(),
 		`SELECT 1 FROM rh.funcionarios WHERE id=$1 AND tenant_id=$2`,
 		funcionarioID, user.TenantID).Scan(&existe)
 	if err != nil {

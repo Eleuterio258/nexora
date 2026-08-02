@@ -14,7 +14,6 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.google.zxing.BarcodeFormat
 import com.journeyapps.barcodescanner.BarcodeEncoder
-import java.time.Instant
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +24,7 @@ import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
+import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
@@ -116,12 +116,9 @@ class MeuQrCodeFragment : Fragment() {
 
                 ivQrCode.setImageBitmap(bitmap)
 
-                val expiresAt = try {
-                    Instant.parse(body.expires_at)
-                } catch (_: Exception) {
-                    Instant.now().plusSeconds(60)
-                }
-                startCountdown(expiresAt)
+                val expiresAtMillis = DateTimeUtils.parseIsoUtcToMillis(body.expires_at)
+                    ?: (System.currentTimeMillis() + 60_000L)
+                startCountdown(expiresAtMillis)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -133,9 +130,9 @@ class MeuQrCodeFragment : Fragment() {
         }
     }
 
-    private fun startCountdown(expiresAt: Instant) {
+    private fun startCountdown(expiresAtMillis: Long) {
         countdownTimer?.cancel()
-        val remaining = expiresAt.toEpochMilli() - System.currentTimeMillis()
+        val remaining = expiresAtMillis - System.currentTimeMillis()
         if (remaining <= 0) {
             tvCountdown.text = "Expirado"
             return

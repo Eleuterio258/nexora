@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 /**
  * Consentimento LGPD biométrico activo de um funcionário.
- * GET /api/rh/funcionarios/{id}/consentimento
+ * GET /api/rh/funcionarios/consentimento?id={funcionario_id}
  */
 data class ConsentimentoLGPD(
     val id: Long,
@@ -24,9 +24,11 @@ data class ConsentimentoLGPD(
 
 /**
  * Payload para criação/registo de consentimento LGPD biométrico.
- * POST /api/rh/funcionarios/{id}/consentimento
+ * POST /api/rh/funcionarios/consentimento
  */
 data class ConsentimentoLGPDRequest(
+    @SerializedName("funcionario_id")
+    val funcionarioId: Long,
     @SerializedName("termo_versao")
     val termoVersao: String = "v1",
     @SerializedName("termo_hash")

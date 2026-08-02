@@ -17,8 +17,6 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import com.google.zxing.BarcodeFormat
 import com.journeyapps.barcodescanner.BarcodeEncoder
-import java.time.Instant
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +29,7 @@ import tech.e258tech.nexora_assiduidade.R
 import tech.e258tech.nexora_assiduidade.data.model.QRGenerateDeviceRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
+import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
@@ -171,12 +170,9 @@ class GestorGerarQrFragment : Fragment() {
                 tvCountdown.visibility = View.VISIBLE
                 tvStatus.text = "QR Code gerado. Válido por $duracao segundos."
 
-                val expiresAt = try {
-                    Instant.parse(body.expires_at)
-                } catch (_: Exception) {
-                    Instant.now().plusSeconds(duracao.toLong())
-                }
-                startCountdown(expiresAt)
+                val expiresAtMillis = DateTimeUtils.parseIsoUtcToMillis(body.expires_at)
+                    ?: (System.currentTimeMillis() + duracao * 1000L)
+                startCountdown(expiresAtMillis)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -188,9 +184,9 @@ class GestorGerarQrFragment : Fragment() {
         }
     }
 
-    private fun startCountdown(expiresAt: Instant) {
+    private fun startCountdown(expiresAtMillis: Long) {
         countdownTimer?.cancel()
-        val remaining = expiresAt.toEpochMilli() - System.currentTimeMillis()
+        val remaining = expiresAtMillis - System.currentTimeMillis()
         if (remaining <= 0) {
             tvCountdown.text = "Expirado"
             return

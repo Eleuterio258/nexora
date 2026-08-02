@@ -5,5 +5,6 @@ package tech.e258tech.nexora_assiduidade.data.model
  * O enrollment é feito pelo gestor RH via ERP, que depois delega no FaceClock.
  */
 data class EnrollFacialRequest(
+    val funcionario_id: Long,
     val captures: List<CaptureImage>
 )

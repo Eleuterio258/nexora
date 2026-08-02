@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
 	"nexora/internal/pkg/faceclock"
 )
@@ -18,7 +17,8 @@ type CaptureImage struct {
 
 // EnrollFacialRequest é o payload para cadastro de biometria facial.
 type EnrollFacialRequest struct {
-	Captures []CaptureImage `json:"captures"`
+	FuncionarioID int64          `json:"funcionario_id"`
+	Captures      []CaptureImage `json:"captures"`
 }
 
 // FaceClockEnrollRequest é o formato esperado pelo FaceClock.
@@ -52,9 +52,13 @@ func (h *Handler) EnrollFacial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	funcionarioIDStr := chi.URLParam(r, "id")
-	var funcionarioID int64
-	if _, err := fmt.Sscan(funcionarioIDStr, &funcionarioID); err != nil || funcionarioID <= 0 {
+	var body EnrollFacialRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		jsonErr(w, "Payload inválido", http.StatusBadRequest)
+		return
+	}
+	funcionarioID := body.FuncionarioID
+	if funcionarioID <= 0 {
 		jsonErr(w, "ID do funcionário inválido", http.StatusBadRequest)
 		return
 	}
@@ -63,11 +67,6 @@ func (h *Handler) EnrollFacial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body EnrollFacialRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, "Payload inválido", http.StatusBadRequest)
-		return
-	}
 	if len(body.Captures) < 3 {
 		jsonErr(w, "São necessárias pelo menos 3 capturas faciais", http.StatusBadRequest)
 		return

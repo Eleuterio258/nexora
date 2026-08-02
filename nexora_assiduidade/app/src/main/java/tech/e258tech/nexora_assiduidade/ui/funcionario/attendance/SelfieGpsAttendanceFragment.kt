@@ -24,7 +24,7 @@ import androidx.fragment.app.Fragment
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import java.io.ByteArrayOutputStream
-import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,10 +33,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
-import tech.e258tech.nexora_assiduidade.data.repository.AttendanceRepository
-import tech.e258tech.nexora_assiduidade.utils.Constants
-import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoSelfServiceRequest
+import tech.e258tech.nexora_assiduidade.data.model.SelfiePontoDados
+import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
+import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
@@ -54,7 +54,6 @@ class SelfieGpsAttendanceFragment : Fragment() {
     private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private lateinit var sessionManager: SessionManager
-    private lateinit var attendanceRepository: AttendanceRepository
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     private lateinit var btnCaptureSelfie: Button
@@ -112,7 +111,6 @@ class SelfieGpsAttendanceFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         sessionManager = SessionManager(requireContext())
-        attendanceRepository = AttendanceRepository(requireContext())
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
 
         btnCaptureSelfie = view.findViewById(R.id.btnCaptureSelfie)
@@ -172,12 +170,11 @@ class SelfieGpsAttendanceFragment : Fragment() {
     }
 
     private fun validateLocationAndRegister() {
-        val userId = sessionManager.getUserId()
         val token = sessionManager.getToken()
         val location = currentLocation
         val selfie = lastSelfieBase64
 
-        if (userId.isNullOrBlank() || token.isNullOrBlank()) {
+        if (token.isNullOrBlank()) {
             setLoading(false)
             Toast.makeText(context, "Sessao invalida. Faca login novamente.", Toast.LENGTH_LONG).show()
             return
@@ -196,47 +193,39 @@ class SelfieGpsAttendanceFragment : Fragment() {
         }
 
         uiScope.launch {
-            // Sem unidade seleccionada nao ha geofencing real a validar (ver
-            // nota na classe) — mantem-se permissivo, tal como o proxy do
-            // FaceClock fazia quando unit_id vinha vazio.
-            val request = ClockRegisterRequest(
-                idempotency_key = UUID.randomUUID().toString(),
-                user_id = userId,
-                device_id = sessionManager.getOrCreateDeviceId(),
-                event_type = Constants.EVENT_AUTO,
-                recorded_at = DateTimeUtils.nowForApi(),
-                source = Constants.SOURCE_GEOLOCATION,
-                geo_lat = location.latitude,
-                geo_lng = location.longitude,
-                image_base64 = selfie
-            )
+            try {
+                val request = MarcarPontoSelfServiceRequest(
+                    metodo = "selfie",
+                    dados = SelfiePontoDados(
+                        latitude = location.latitude,
+                        longitude = location.longitude,
+                        foto_url = "data:image/jpeg;base64,$selfie"
+                    )
+                )
 
-            val registerResult = withContext(Dispatchers.IO) {
-                attendanceRepository.registerClock(request)
-            }
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.erpApiService.marcarPontoSelfService(
+                        ApiUtils.bearerToken(token),
+                        request
+                    )
+                }
 
-            setLoading(false)
-
-            when (registerResult) {
-                is AttendanceRepository.RegisterResult.Success -> {
+                if (response.isSuccessful) {
                     Toast.makeText(
                         context,
-                        "Registo de presença realizado com sucesso.",
+                        "Registo por selfie realizado com sucesso.",
                         Toast.LENGTH_SHORT
                     ).show()
                     parentFragmentManager.popBackStack()
+                } else {
+                    Toast.makeText(context, ApiUtils.errorMessage(response), Toast.LENGTH_LONG).show()
                 }
-                is AttendanceRepository.RegisterResult.SavedOffline -> {
-                    Toast.makeText(
-                        context,
-                        "Sem internet. Registo guardado e sera sincronizado automaticamente.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    parentFragmentManager.popBackStack()
-                }
-                is AttendanceRepository.RegisterResult.Error -> {
-                    Toast.makeText(context, registerResult.message, Toast.LENGTH_LONG).show()
-                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Toast.makeText(context, "Falha ao comunicar com o ERP.", Toast.LENGTH_LONG).show()
+            } finally {
+                if (isAdded) setLoading(false)
             }
         }
     }

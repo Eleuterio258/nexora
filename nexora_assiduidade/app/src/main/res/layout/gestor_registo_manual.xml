@@ -4,86 +4,206 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/surface_bg"
+    android:clipToPadding="false"
     android:fillViewport="true">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="16dp">
+        android:paddingStart="20dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="32dp">
 
-        <ImageView
-            android:id="@+id/ivBack"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:clickable="true"
-            android:focusable="true"
-            android:contentDescription="Voltar"
-            android:padding="8dp"
-            android:src="@drawable/ic_arrow_back"
-            app:tint="@color/text_primary"
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/backCard"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="0dp"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintTop_toTopOf="parent"
+            app:strokeColor="@color/border"
+            app:strokeWidth="1dp">
+
+            <ImageView
+                android:id="@+id/ivBack"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:contentDescription="Voltar"
+                android:focusable="true"
+                android:padding="11dp"
+                android:src="@drawable/ic_arrow_back"
+                app:tint="@color/text_primary" />
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
             android:id="@+id/tvRegistoTitle"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Registo Manual"
+            android:layout_marginTop="28dp"
+            android:text="Registo manual"
             android:textColor="@color/text_primary"
-            android:textSize="24sp"
+            android:textSize="28sp"
             android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/ivBack" />
+            app:layout_constraintTop_toBottomOf="@id/backCard" />
 
         <TextView
-            android:id="@+id/tvFuncionarioLabel"
-            android:layout_width="wrap_content"
+            android:id="@+id/tvRegistoSubtitle"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Funcionário"
+            android:layout_marginTop="8dp"
+            android:lineSpacingExtra="2dp"
+            android:text="Registe uma entrada ou saída em nome de um funcionário."
             android:textColor="@color/text_muted"
-            android:textSize="13sp"
+            android:textSize="15sp"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/tvRegistoTitle" />
 
-        <Spinner
-            android:id="@+id/spFuncionario"
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/formCard"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="1dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvFuncionarioLabel" />
+            app:layout_constraintTop_toBottomOf="@id/tvRegistoSubtitle"
+            app:strokeColor="@color/border"
+            app:strokeWidth="1dp">
 
-        <TextView
-            android:id="@+id/tvAutoDetectHint"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Entrada ou saída são detectadas automaticamente pelo ERP, consoante o que já estiver registado hoje para este funcionário — não é preciso escolher."
-            android:textColor="@color/text_muted"
-            android:textSize="13sp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/spFuncionario" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
 
-        <Button
+                <TextView
+                    android:id="@+id/tvFuncionarioLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Funcionário"
+                    android:textAllCaps="true"
+                    android:textColor="@color/text_muted"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="10dp"
+                    app:cardBackgroundColor="@color/surface_bg"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="0dp"
+                    app:strokeColor="@color/border_strong"
+                    app:strokeWidth="1dp">
+
+                    <Spinner
+                        android:id="@+id/spFuncionario"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="24dp"
+                    android:layout_marginBottom="22dp"
+                    android:background="@color/border" />
+
+                <TextView
+                    android:id="@+id/tvEventTypeLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tipo de evento"
+                    android:textAllCaps="true"
+                    android:textColor="@color/text_muted"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Defina explicitamente o movimento a registar."
+                    android:textColor="@color/text_muted"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/rgEventType"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    app:selectionRequired="false"
+                    app:singleSelection="true">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/rbEntry"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:text="Entrada"
+                        android:textAllCaps="false"
+                        android:textStyle="bold"
+                        app:cornerRadius="14dp"
+                        app:strokeColor="@color/green_border" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/rbExit"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="52dp"
+                        android:layout_weight="1"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:text="Saída"
+                        android:textAllCaps="false"
+                        android:textStyle="bold"
+                        app:cornerRadius="14dp"
+                        app:strokeColor="@color/green_border" />
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btnRegister"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="56dp"
             android:layout_marginTop="24dp"
-            android:text="Registrar Ponto"
+            android:backgroundTint="@color/brand_accent"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:text="Confirmar registo"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:cornerRadius="16dp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvAutoDetectHint" />
+            app:layout_constraintTop_toBottomOf="@id/formCard" />
 
         <TextView
             android:id="@+id/tvRegistoStatus"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="14dp"
+            android:gravity="center"
             android:textColor="@color/text_muted"
+            android:textSize="13sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/btnRegister" />

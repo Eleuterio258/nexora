@@ -1892,7 +1892,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Get("/proximo-numero", rh.ProximoNumeroFuncionario)
 				r.Get("/{id}", rh.ObterFuncionario)
 				r.Get("/{id}/nfc-tags", rh.ListarNFCTags)
-				r.Get("/{id}/consentimento", rh.ObterConsentimentoFuncionario)
+				r.Get("/consentimento", rh.ObterConsentimentoFuncionario)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "recursos-humanos", "ver_recibos"))
@@ -1905,8 +1905,8 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Post("/{id}/desligar", rh.DesligarFuncionario)
 				r.Post("/{id}/nfc-tags", rh.CriarNFCTag)
 				r.Delete("/nfc-tags/{id}", rh.RemoverNFCTag)
-				r.Post("/{id}/biometria/facial/enroll", rh.EnrollFacial)
-				r.Post("/{id}/consentimento", rh.CriarConsentimentoFuncionario)
+				r.Post("/biometria/facial/enroll", rh.EnrollFacial)
+				r.Post("/consentimento", rh.CriarConsentimentoFuncionario)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "recursos-humanos", "ver_salarios"))

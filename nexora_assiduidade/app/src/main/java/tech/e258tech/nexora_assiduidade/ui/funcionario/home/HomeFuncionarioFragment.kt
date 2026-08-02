@@ -28,13 +28,14 @@ import tech.e258tech.nexora_assiduidade.ui.funcionario.agenda.AgendaFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.agenda.AgendaItemDetailFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.FacialAttendanceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.FingerprintAttendanceFragment
-import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.ManualAttendanceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.NfcAttendanceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.PinAttendanceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.QrCodeAttendanceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.SelfieGpsAttendanceFragment
+import tech.e258tech.nexora_assiduidade.ui.gestor.registo.RegistoManualFragment
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
+import tech.e258tech.nexora_assiduidade.utils.PermissionUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -126,7 +127,12 @@ class HomeFuncionarioFragment : Fragment() {
         cardNfc = view.findViewById(R.id.cardNfc)
         cardFingerprint = view.findViewById(R.id.cardFingerprint)
 
-        cardManual.setOnClickListener { openFragment(ManualAttendanceFragment()) }
+        // Método manual na Home abre o registo de gestor (marcar em nome de
+        // outro funcionário) e só é visível para gestores com permissão.
+        val podeMarcarManual = PermissionUtils.has(sessionManager, "recursos-humanos", "gerir_funcionarios")
+        cardManual.visibility = if (podeMarcarManual) View.VISIBLE else View.GONE
+
+        cardManual.setOnClickListener { openFragment(RegistoManualFragment()) }
         cardQrCode.setOnClickListener { openFragment(QrCodeAttendanceFragment()) }
         cardFacial.setOnClickListener { openFragment(FacialAttendanceFragment()) }
         cardSelfieGps.setOnClickListener { openFragment(SelfieGpsAttendanceFragment()) }
@@ -206,8 +212,9 @@ class HomeFuncionarioFragment : Fragment() {
 
                 val metodos = body.configuracao?.metodos.orEmpty()
                 fun ativo(chave: String) = metodos[chave]?.ativo ?: true
+                val podeMarcarManual = PermissionUtils.has(sessionManager, "recursos-humanos", "gerir_funcionarios")
 
-                cardManual.visibility = if (ativo("manual")) View.VISIBLE else View.GONE
+                cardManual.visibility = if (ativo("manual") && podeMarcarManual) View.VISIBLE else View.GONE
                 cardQrCode.visibility = if (ativo("qr_code")) View.VISIBLE else View.GONE
                 cardFacial.visibility = if (ativo("facial")) View.VISIBLE else View.GONE
                 cardSelfieGps.visibility = if (ativo("selfie")) View.VISIBLE else View.GONE

@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Nexora Assiduidade</string>
-    
+
     <!-- Funcionario -->
     <string name="agenda">Agenda</string>
     <string name="pesquisar_agenda">Pesquisar agenda…</string>
@@ -15,4 +15,19 @@
     <string name="conversas">Conversas</string>
     <string name="pesquisar_conversa">Pesquisar conversa…</string>
     <string name="nenhuma_conversa">Nenhuma conversa ainda</string>
+
+    <!-- Registo manual de assiduidade -->
+    <string name="manual_attendance_back_content_description">Voltar</string>
+    <string name="manual_attendance_title">Registo manual</string>
+    <string name="manual_attendance_subtitle">Escolha o movimento que pretende registar agora.</string>
+    <string name="manual_attendance_event_type_label">Tipo de evento</string>
+    <string name="manual_attendance_event_type_hint">Esta escolha será enviada exatamente como selecionada.</string>
+    <string name="manual_attendance_entry">Entrada</string>
+    <string name="manual_attendance_exit">Saída</string>
+    <string name="manual_attendance_confirm">Confirmar registo</string>
+    <string name="manual_attendance_no_permission">Não tem permissão para registar assiduidade manualmente.</string>
+    <string name="manual_attendance_select_type_error">Seleccione o tipo de evento: Entrada ou Saída.</string>
+    <string name="manual_attendance_invalid_session">Sessão inválida. Faça login novamente.</string>
+    <string name="manual_attendance_success">Registo de presença realizado com sucesso.</string>
+    <string name="manual_attendance_saved_offline">Sem internet. Registo guardado e será sincronizado automaticamente.</string>
 </resources>

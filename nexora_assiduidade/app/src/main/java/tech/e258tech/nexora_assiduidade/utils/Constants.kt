@@ -24,9 +24,11 @@ object Constants {
      * pela paridade dos eventos já registados no dia (ver
      * registarEventoAssiduidade/inferirTipoEventoCodigo em
      * backend/internal/modules/hardware/service/processor.go). Todos os
-     * métodos de registo do funcionário usam isto — deixaram de pedir para
-     * escolher Entrada/Saída. */
+     * métodos automáticos de registo do funcionário usam isto. O registo
+     * manual permite escolher explicitamente Entrada ou Saída. */
     const val EVENT_AUTO = "AUTO"
+    const val EVENT_ENTRY = "ENTRY"
+    const val EVENT_EXIT = "EXIT"
     const val SOURCE_MANUAL = "MANUAL"
     const val SOURCE_PIN = "PIN"
     const val SOURCE_FINGERPRINT = "FINGERPRINT"

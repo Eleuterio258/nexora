@@ -5,8 +5,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import com.google.android.material.button.MaterialButtonToggleGroup
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,8 +21,15 @@ import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
 import tech.e258tech.nexora_assiduidade.data.repository.AttendanceRepository
 import tech.e258tech.nexora_assiduidade.utils.Constants
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
+import tech.e258tech.nexora_assiduidade.utils.PermissionUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
+/**
+ * Registo manual do próprio ponto. A partir de agora este método é reservado a
+ * gestores com permissão `recursos-humanos:gerir_funcionarios` — a app já
+ * esconde o card na Home, e a verificação defensiva aqui impede abertura
+ * directa ou chamadas via deep-link.
+ */
 class ManualAttendanceFragment : Fragment() {
 
     private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -43,36 +52,57 @@ class ManualAttendanceFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         val btnRegister = view.findViewById<Button>(R.id.btnRegister)
+        val rgEventType = view.findViewById<MaterialButtonToggleGroup>(R.id.rgEventType)
+        val tvStatus = view.findViewById<TextView>(R.id.tvManualStatus)
         val sessionManager = SessionManager(requireContext())
         attendanceRepository = AttendanceRepository(requireContext())
 
+        view.findViewById<View>(R.id.ivBack).setOnClickListener {
+            parentFragmentManager.popBackStack()
+        }
+
+        if (!PermissionUtils.has(sessionManager, "recursos-humanos", "gerir_funcionarios")) {
+            tvStatus.text = getString(R.string.manual_attendance_no_permission)
+            rgEventType.isEnabled = false
+            view.findViewById<View>(R.id.rbEntry).isEnabled = false
+            view.findViewById<View>(R.id.rbExit).isEnabled = false
+            btnRegister.isEnabled = false
+            return
+        }
+
         btnRegister.setOnClickListener {
+            val eventType = when (rgEventType.checkedButtonId) {
+                R.id.rbEntry -> Constants.EVENT_ENTRY
+                R.id.rbExit -> Constants.EVENT_EXIT
+                else -> {
+                    tvStatus.text = getString(R.string.manual_attendance_select_type_error)
+                    return@setOnClickListener
+                }
+            }
+
             val userId = sessionManager.getUserId()
             if (userId.isNullOrBlank()) {
-                Toast.makeText(context, "Sessao invalida. Faca login novamente.", Toast.LENGTH_LONG)
+                Toast.makeText(context, R.string.manual_attendance_invalid_session, Toast.LENGTH_LONG)
                     .show()
                 return@setOnClickListener
             }
 
             btnRegister.isEnabled = false
-            registerClock(sessionManager, userId, btnRegister)
-        }
-
-        view.findViewById<View>(R.id.ivBack).setOnClickListener {
-            parentFragmentManager.popBackStack()
+            registerClock(sessionManager, userId, eventType, btnRegister)
         }
     }
 
     private fun registerClock(
         sessionManager: SessionManager,
         userId: String,
+        eventType: String,
         button: Button
     ) {
         val request = ClockRegisterRequest(
             idempotency_key = UUID.randomUUID().toString(),
             user_id = userId,
             device_id = sessionManager.getOrCreateDeviceId(),
-            event_type = Constants.EVENT_AUTO,
+            event_type = eventType,
             recorded_at = DateTimeUtils.nowForApi(),
             source = Constants.SOURCE_MANUAL
         )
@@ -88,7 +118,7 @@ class ManualAttendanceFragment : Fragment() {
                 is AttendanceRepository.RegisterResult.Success -> {
                     Toast.makeText(
                         context,
-                        "Registo de presença realizado com sucesso.",
+                        R.string.manual_attendance_success,
                         Toast.LENGTH_SHORT
                     ).show()
                     parentFragmentManager.popBackStack()
@@ -96,7 +126,7 @@ class ManualAttendanceFragment : Fragment() {
                 is AttendanceRepository.RegisterResult.SavedOffline -> {
                     Toast.makeText(
                         context,
-                        "Sem internet. Registo guardado e sera sincronizado automaticamente.",
+                        R.string.manual_attendance_saved_offline,
                         Toast.LENGTH_LONG
                     ).show()
                     parentFragmentManager.popBackStack()

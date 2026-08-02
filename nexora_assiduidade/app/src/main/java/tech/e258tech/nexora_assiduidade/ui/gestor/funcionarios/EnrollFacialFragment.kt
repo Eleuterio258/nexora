@@ -234,8 +234,7 @@ class EnrollFacialFragment : Fragment() {
                 val response = withContext(Dispatchers.IO) {
                     RetrofitClient.erpApiService.criarConsentimentoFuncionario(
                         ApiUtils.bearerToken(token),
-                        funcionarioId,
-                        ConsentimentoLGPDRequest()
+                        ConsentimentoLGPDRequest(funcionarioId = funcionarioId)
                     )
                 }
                 if (response.isSuccessful) {
@@ -420,6 +419,7 @@ class EnrollFacialFragment : Fragment() {
         }
 
         val request = EnrollFacialRequest(
+            funcionario_id = funcionarioId,
             captures = captures.map { CaptureImage(bitmapToBase64(it)) }
         )
 
@@ -430,7 +430,6 @@ class EnrollFacialFragment : Fragment() {
                 val response = withContext(Dispatchers.IO) {
                     RetrofitClient.erpApiService.enrollFacialFuncionario(
                         ApiUtils.bearerToken(token),
-                        funcionarioId,
                         request
                     )
                 }

@@ -5,47 +5,45 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.nfc.NfcAdapter
 import android.nfc.Tag
-import android.nfc.tech.Ndef
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import tech.e258tech.nexora_assiduidade.BuildConfig
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoNfcSelfServiceRequest
+import tech.e258tech.nexora_assiduidade.data.model.NfcPontoDados
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
-import tech.e258tech.nexora_assiduidade.data.repository.AttendanceRepository
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
-import tech.e258tech.nexora_assiduidade.utils.Constants
-import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
  * Tela de registo de presenca por cartao NFC.
  *
- * Aguarda a descoberta de uma tag NFC, extrai o identificador e valida
- * directamente no Nexora ERP (`GET /api/hardware/assiduidade/nfc/validar`,
- * API Key de device) desde 2026-07-13 — deixou de passar pelo proxy do
- * FaceClock. Se valido, regista o ponto.
+ * Aguarda a descoberta de uma tag NFC e envia o identificador para
+ * `POST /api/self-service/assiduidade/ponto`, autenticado pelo colaborador.
+ * O ERP valida se a tag está activa e pertence ao próprio utilizador antes
+ * de criar o evento.
  */
 class NfcAttendanceFragment : Fragment() {
 
     private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private lateinit var sessionManager: SessionManager
-    private lateinit var attendanceRepository: AttendanceRepository
 
     private lateinit var tvNfcInfo: TextView
+    private lateinit var progressBar: ProgressBar
+    private var isLoading = false
 
     private var nfcAdapter: NfcAdapter? = null
     private var pendingIntent: PendingIntent? = null
@@ -73,9 +71,9 @@ class NfcAttendanceFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         sessionManager = SessionManager(requireContext())
-        attendanceRepository = AttendanceRepository(requireContext())
 
         tvNfcInfo = view.findViewById(R.id.tvNfcInfo)
+        progressBar = view.findViewById(R.id.progressBar)
 
         view.findViewById<View>(R.id.ivBack).setOnClickListener {
             parentFragmentManager.popBackStack()
@@ -126,31 +124,16 @@ class NfcAttendanceFragment : Fragment() {
             val tag: Tag? = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
             if (tag != null) {
                 val nfcId = tag.id?.joinToString("") { "%02X".format(it) } ?: return
-                val ndefPayload = readNdefPayload(tag)
-                validateNfcAndRegister(nfcId, ndefPayload)
+                validateNfcAndRegister(nfcId)
             }
         }
     }
 
-    private fun readNdefPayload(tag: Tag): String? {
-        return try {
-            val ndef = Ndef.get(tag) ?: return null
-            ndef.connect()
-            val record = ndef.ndefMessage?.records?.firstOrNull()
-            val payload = record?.payload?.let { bytes ->
-                String(bytes, Charsets.UTF_8)
-            }
-            ndef.close()
-            payload
-        } catch (_: Exception) {
-            null
-        }
-    }
+    private fun validateNfcAndRegister(nfcId: String) {
+        if (isLoading) return
 
-    private fun validateNfcAndRegister(nfcId: String, payload: String?) {
-        val userId = sessionManager.getUserId()
         val token = sessionManager.getToken()
-        if (userId.isNullOrBlank() || token.isNullOrBlank()) {
+        if (token.isNullOrBlank()) {
             Toast.makeText(context, "Sessao invalida. Faca login novamente.", Toast.LENGTH_LONG).show()
             return
         }
@@ -159,68 +142,38 @@ class NfcAttendanceFragment : Fragment() {
         tvNfcInfo.text = "A validar cartao NFC..."
 
         uiScope.launch {
-            val validateResult: Pair<Boolean, String?> = withContext(Dispatchers.IO) {
-                try {
-                    val response = RetrofitClient.erpApiService.validateNfcDevice(
-                        BuildConfig.DEVICE_API_KEY,
-                        tagUid = payload ?: nfcId
+            try {
+                val request = MarcarPontoNfcSelfServiceRequest(
+                    dados = NfcPontoDados(nfc_tag_id = nfcId)
+                )
+                val response = withContext(Dispatchers.IO) {
+                    RetrofitClient.erpApiService.marcarPontoNfcSelfService(
+                        ApiUtils.bearerToken(token),
+                        request
                     )
-                    if (response.isSuccessful && response.body() != null) {
-                        val body = response.body()!!
-                        body.valid to body.reason
-                    } else {
-                        false to ApiUtils.errorMessage(response)
-                    }
-                } catch (e: Exception) {
-                    false to (e.message ?: "Erro na validacao NFC")
                 }
-            }
 
-            val valid = validateResult.first
-            val message = validateResult.second
-
-            if (!valid) {
-                setLoading(false)
-                tvNfcInfo.text = "Cartao NFC invalido."
-                Toast.makeText(context, message ?: "Cartao NFC invalido.", Toast.LENGTH_LONG).show()
-                return@launch
-            }
-
-            val request = ClockRegisterRequest(
-                idempotency_key = UUID.randomUUID().toString(),
-                user_id = userId,
-                device_id = sessionManager.getOrCreateDeviceId(),
-                event_type = Constants.EVENT_AUTO,
-                recorded_at = DateTimeUtils.nowForApi(),
-                source = Constants.SOURCE_NFC
-            )
-
-            val registerResult = withContext(Dispatchers.IO) {
-                attendanceRepository.registerClock(request)
-            }
-
-            setLoading(false)
-
-            when (registerResult) {
-                is AttendanceRepository.RegisterResult.Success -> {
+                if (response.isSuccessful) {
                     tvNfcInfo.text = "Registo de presença realizado com sucesso."
                     Toast.makeText(context, "Registo de presença realizado com sucesso.", Toast.LENGTH_SHORT).show()
                     parentFragmentManager.popBackStack()
+                } else {
+                    tvNfcInfo.text = "Não foi possível validar o cartão."
+                    Toast.makeText(context, ApiUtils.errorMessage(response), Toast.LENGTH_LONG).show()
                 }
-                is AttendanceRepository.RegisterResult.SavedOffline -> {
-                    tvNfcInfo.text = "Sem internet. Registo guardado."
-                    Toast.makeText(context, "Sem internet. Registo guardado e sera sincronizado automaticamente.", Toast.LENGTH_LONG).show()
-                    parentFragmentManager.popBackStack()
-                }
-                is AttendanceRepository.RegisterResult.Error -> {
-                    tvNfcInfo.text = registerResult.message
-                    Toast.makeText(context, registerResult.message, Toast.LENGTH_LONG).show()
-                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                tvNfcInfo.text = "Falha ao comunicar com o ERP. Tente novamente."
+                Toast.makeText(context, "Falha ao comunicar com o ERP.", Toast.LENGTH_LONG).show()
+            } finally {
+                if (isAdded) setLoading(false)
             }
         }
     }
 
     private fun setLoading(isLoading: Boolean) {
-        // Nenhum botao de accao directa; o estado e apresentado no tvNfcInfo.
+        this.isLoading = isLoading
+        progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
     }
 }

@@ -16,7 +16,27 @@ object DateTimeUtils {
     private val dateTimeFormatter: SimpleDateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
     private val localDateTimeFormatter: SimpleDateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.getDefault())
 
+    private val timeShortFormatter: SimpleDateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+    private val apiUtcFormatter: SimpleDateFormat =
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+
     fun nowForApi(): String = apiFormatter.format(Date())
+
+    /** Data/hora actual em UTC no formato ISO 8601 (usado em eventos de assiduidade via /api/rh/eventos). */
+    fun nowUtcForApi(): String = apiUtcFormatter.format(Date())
+
+    /** Converte uma string ISO 8601 UTC (ex.: `2026-08-02T08:21:14Z`) para epoch millis. */
+    fun parseIsoUtcToMillis(value: String): Long? = try {
+        apiUtcFormatter.parse(value)?.time
+    } catch (_: ParseException) {
+        null
+    }
+
+    /** Hora actual no formato HH:MM (usado em marcações manuais via /api/rh/eventos). */
+    fun currentTimeShortForApi(): String = timeShortFormatter.format(Date())
 
     /** Data de hoje no formato YYYY-MM-DD (campo `data DATE` do ERP, ex.: justificações). */
     fun todayForApi(): String = apiDateFormatter.format(Date())

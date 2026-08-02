@@ -10,6 +10,7 @@ import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import com.google.android.material.button.MaterialButtonToggleGroup
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,36 +18,25 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import tech.e258tech.nexora_assiduidade.BuildConfig
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoGestorRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
-import tech.e258tech.nexora_assiduidade.utils.Constants
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
-import tech.e258tech.nexora_assiduidade.utils.HardwareEventMapper
+import tech.e258tech.nexora_assiduidade.utils.PermissionUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
-import java.util.UUID
 
 /**
  * Registo Manual de Assiduidade — o gestor marca ponto em nome de um
- * funcionário (ex.: esqueceu o telemóvel, avaria de dispositivo). Desde
- * 2026-07-13 chama `POST /api/hardware/events/generic` directamente no
- * Nexora ERP (API Key de device embutida no APK) — deixou de passar pelo
- * proxy do FaceClock. O funcionário é escolhido num spinner (nome + número),
- * preenchido a partir de `GET /api/rh/funcionarios?estado=ativo` — o `id`
- * seleccionado (`rh.funcionarios.id`) é resolvido para `employee_no` via
- * `HardwareEventMapper.resolveEmployeeCodeById`.
+ * funcionário (ex.: esqueceu o telemóvel, avaria de dispositivo).
  *
- * Não pede para escolher Entrada/Saída — o ERP decide sozinho (ver
- * `registarEventoAssiduidade`/`inferirTipoEventoCodigo` em
- * backend/internal/modules/hardware/service/processor.go): grava em
- * rh.eventos_assiduidade, usando event.Direction quando o adapter o souber
- * indicar ou, na ausência disso, alternando entrada/saída pela paridade dos
- * eventos já registados nesse dia — já não perde marcações a partir da 3ª
- * como a lógica antiga baseada em rh.presencas perdia. O `event_type`
- * enviado aqui não influencia esse cálculo, é só metadado do log bruto
- * (hardware.device_events).
+ * Este ecrã só deve ser acessível a utilizadores com a permissão
+ * `recursos-humanos:gerir_funcionarios` (validada também no backend em
+ * `podeGerirFuncionario`). A navegação já a esconde em [ModulesFragment] e
+ * [MaisFragment]; a verificação defensiva aqui impede abertura directa.
+ *
+ * Envia `POST /api/rh/eventos` autenticado pelo token do utilizador, com o
+ * tipo de evento (`entrada` ou `saida`) escolhido explicitamente.
  */
 class RegistoManualFragment : Fragment() {
 
@@ -73,22 +63,42 @@ class RegistoManualFragment : Fragment() {
 
         spFuncionario = view.findViewById(R.id.spFuncionario)
         val btnRegister = view.findViewById<Button>(R.id.btnRegister)
+        val rgEventType = view.findViewById<MaterialButtonToggleGroup>(R.id.rgEventType)
         val tvStatus = view.findViewById<TextView>(R.id.tvRegistoStatus)
+        val sessionManager = SessionManager(requireContext())
 
         view.findViewById<View>(R.id.ivBack).setOnClickListener {
             parentFragmentManager.popBackStack()
         }
 
+        if (!PermissionUtils.has(sessionManager, "recursos-humanos", "gerir_funcionarios")) {
+            tvStatus.text = "Não tem permissão para registar assiduidade manualmente."
+            spFuncionario.isEnabled = false
+            view.findViewById<View>(R.id.rbEntry).isEnabled = false
+            view.findViewById<View>(R.id.rbExit).isEnabled = false
+            btnRegister.isEnabled = false
+            return
+        }
+
         carregarFuncionarios(tvStatus)
 
         btnRegister.setOnClickListener {
+            val tipoEventoCodigo = when (rgEventType.checkedButtonId) {
+                R.id.rbEntry -> "entrada"
+                R.id.rbExit -> "saida"
+                else -> {
+                    tvStatus.text = "Seleccione o tipo de evento: Entrada ou Saída."
+                    return@setOnClickListener
+                }
+            }
+
             val funcionarioId = funcionarioIds.getOrNull(spFuncionario.selectedItemPosition)
             if (funcionarioId == null) {
                 tvStatus.text = "Não há funcionários disponíveis para seleccionar."
                 return@setOnClickListener
             }
 
-            registar(funcionarioId, tvStatus, btnRegister)
+            registar(funcionarioId, tipoEventoCodigo, tvStatus, btnRegister, sessionManager)
         }
     }
 
@@ -123,8 +133,14 @@ class RegistoManualFragment : Fragment() {
         }
     }
 
-    private fun registar(funcionarioId: Long, tvStatus: TextView, btnRegister: Button) {
-        val token = SessionManager(requireContext()).getToken()
+    private fun registar(
+        funcionarioId: Long,
+        tipoEventoCodigo: String,
+        tvStatus: TextView,
+        btnRegister: Button,
+        sessionManager: SessionManager
+    ) {
+        val token = sessionManager.getToken()
         if (token.isNullOrBlank()) {
             tvStatus.text = "Sessão inválida. Faça login novamente."
             return
@@ -135,25 +151,20 @@ class RegistoManualFragment : Fragment() {
 
         uiScope.launch {
             try {
-                val employeeCode = withContext(Dispatchers.IO) {
-                    HardwareEventMapper.resolveEmployeeCodeById(funcionarioId)
-                }
-                if (employeeCode == null) {
-                    tvStatus.text = "Funcionário não encontrado no ERP."
-                    return@launch
-                }
-
-                val request = ClockRegisterRequest(
-                    idempotency_key = UUID.randomUUID().toString(),
-                    user_id = funcionarioId.toString(),
-                    device_id = "00000000-0000-0000-0000-000000000000",
-                    event_type = Constants.EVENT_AUTO,
-                    recorded_at = DateTimeUtils.nowForApi(),
-                    source = "MANUAL",
+                val request = MarcarPontoGestorRequest(
+                    funcionario_id = funcionarioId,
+                    tipo_evento_codigo = tipoEventoCodigo,
+                    metodo_codigo = "manual",
+                    origem = "app",
+                    data_referencia = DateTimeUtils.todayForApi(),
+                    ocorrido_em = DateTimeUtils.nowUtcForApi(),
+                    observacoes = "Registo manual via app"
                 )
-                val eventRequest = HardwareEventMapper.toGenericHardwareEvent(request, employeeCode)
                 val response = withContext(Dispatchers.IO) {
-                    RetrofitClient.erpApiService.registerEventDevice(BuildConfig.DEVICE_API_KEY, eventRequest)
+                    RetrofitClient.erpApiService.criarEventoAssiduidade(
+                        ApiUtils.bearerToken(token),
+                        request
+                    )
                 }
 
                 tvStatus.text = if (response.isSuccessful) {

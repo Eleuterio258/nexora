@@ -24,10 +24,10 @@ object HardwareEventMapper {
     private const val DEVICE_SERIAL = "nexora-assiduidade-mobile"
 
     private val directionByEventType = mapOf(
-        "ENTRY" to "in",
-        "BREAK_END" to "in",
-        "EXIT" to "out",
-        "BREAK_START" to "out"
+        "ENTRY" to "entry",
+        "BREAK_END" to "entry",
+        "EXIT" to "exit",
+        "BREAK_START" to "exit"
     )
 
     private val credentialTypeBySource = mapOf(
