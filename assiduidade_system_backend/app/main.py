@@ -16,6 +16,7 @@ from app.limiter import limiter
 from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.routers import audit, biometric, fingerprint, liveness, monitoring
+from app.services.biometric import warmup_biometric_models
 
 
 logger = logging.getLogger("faceclock.api")
@@ -30,6 +31,8 @@ async def lifespan(app_instance: FastAPI):
     logger.info("Database: %s", settings.database_url)
     logger.info("Docs: %s", settings.docs_url)
     settings.assert_production_secrets()
+    if settings.environment == "production":
+        warmup_biometric_models()
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("Database schema ensured.")

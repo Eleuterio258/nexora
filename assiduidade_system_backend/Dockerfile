@@ -2,6 +2,10 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Cache partilhado entre o build e o utilizador de runtime. Sem isto o
+# facenet-pytorch tenta descarregar os pesos VGGFace2 no primeiro pedido.
+ENV TORCH_HOME=/app/.cache/torch
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -15,6 +19,11 @@ RUN pip install --no-cache-dir \
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Incorpora os pesos na imagem. O serviço não depende de internet nem de um
+# cache em /root quando processa a primeira captura em produção.
+RUN mkdir -p "$TORCH_HOME" && \
+    python -c "from facenet_pytorch import InceptionResnetV1; InceptionResnetV1(pretrained='vggface2').eval(); print('FaceNet VGGFace2 weights cached')"
 
 COPY . .
 COPY entrypoint.sh /entrypoint.sh

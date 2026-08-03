@@ -43,9 +43,8 @@ type MarcarPontoRequest struct {
 	LocalidadeID     *int64   `json:"localidade_id"`
 	Observacoes      *string  `json:"observacoes"`
 	// Dados extra trazidos pelo método escolhido (ex.: qr_code, nfc_tag_id,
-	// image_base64). Não são validados pelo ERP nesta fase: a app já fez a
-	// prova local (biometria do dispositivo, leitura do QR/NFC, selfie) e
-	// estes dados ficam em observacoes para auditoria.
+	// image_base64). A prova facial é validada e consumida pelo ERP no mesmo
+	// pedido; os restantes dados ficam em observações para auditoria.
 	Dados map[string]any `json:"dados"`
 }
 
@@ -92,11 +91,9 @@ var metodosSelfService = map[string]metodoSelfService{
 // ao cliente: um cliente modificado saltava-o e marcava o ponto na mesma. A
 // prova de presença tem de acontecer no mesmo pedido que grava o evento.
 //
-// Os restantes métodos (manual, QR, NFC, selfie+GPS, facial, fingerprint) são
-// aceites como declaração do colaborador autenticado: a app fez a prova local
-// (leitura do cartão/QR, biometria do dispositivo, selfie) e os dados extra
-// ficam em observacoes para auditoria. QR e NFC são ainda validados contra os
-// registos activos do tenant antes de o evento ser criado.
+// Facial exige um comprovativo assinado e de uso único emitido pelo FaceClock.
+// QR e NFC são validados contra os registos activos do tenant. Os restantes
+// métodos mantêm as provas específicas documentadas em cada bloco abaixo.
 func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 
@@ -254,6 +251,32 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 	// (agruparPorTipoPar), que junta entrada→saída por ordem cronológica e
 	// ignora o que não fecha par. Recusar marcações próximas aqui só perderia
 	// eventos reais — várias saídas e regressos no mesmo dia são normais.
+	if body.Metodo == "facial" {
+		verificationToken, _ := body.Dados["verification_token"].(string)
+		clientDeviceID, _ := body.Dados["device_id"].(string)
+		claims, err := h.consumeFacialVerification(
+			r.Context(), verificationToken, user.ID, user.TenantID, clientDeviceID,
+		)
+		if err != nil {
+			switch {
+			case errors.Is(err, errFacialProofMissing):
+				jsonErr(w, "verification_token e device_id sao obrigatorios para marcacao facial", http.StatusBadRequest)
+			case errors.Is(err, errFacialProofUsed):
+				jsonErr(w, "Comprovativo facial ja utilizado", http.StatusConflict)
+			case errors.Is(err, errFacialProofInvalid):
+				jsonErr(w, "Comprovativo facial invalido ou expirado", http.StatusForbidden)
+			default:
+				jsonErr(w, "Erro ao validar comprovativo facial", http.StatusInternalServerError)
+			}
+			return
+		}
+		// Nao persistir o JWT em observacoes. Somente os scores autenticados.
+		delete(body.Dados, "verification_token")
+		body.Dados["device_id"] = clientDeviceID
+		body.Dados["confidence_score"] = claims.ConfidenceScore
+		body.Dados["liveness_score"] = claims.LivenessScore
+	}
+
 	agora := time.Now()
 
 	tipoEvento := body.TipoEventoCodigo

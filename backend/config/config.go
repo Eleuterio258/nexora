@@ -121,6 +121,9 @@ type Config struct {
 	// FaceClock — gateway de biometria facial/digital (assiduidade_system_backend).
 	// Usado pelo ERP para enrollment biométrico iniciado por gestores RH.
 	FaceClockBaseURL string
+	// FacialVerificationSecret valida os comprovativos HS256 emitidos pelo
+	// FaceClock depois de um match. Deve ser exclusivo desta integracao.
+	FacialVerificationSecret string
 
 	// Authorization Server OAuth2 — chave(s) RS256 que assinam os access
 	// tokens emitidos por /oauth/token. Ver internal/modules/auth/oauthkeys.
@@ -138,10 +141,11 @@ type Config struct {
 // mantidos como constantes para AssertProductionSecrets() os comparar sem
 // depender de duplicar as strings.
 const (
-	defaultJWTSecret        = "change-me-secret"
-	defaultJWTRefreshSecret = "change-me-refresh-secret"
-	defaultMinioAccessKey   = "histories"
-	defaultMinioSecretKey   = "histories"
+	defaultJWTSecret                = "change-me-secret"
+	defaultJWTRefreshSecret         = "change-me-refresh-secret"
+	defaultMinioAccessKey           = "histories"
+	defaultMinioSecretKey           = "histories"
+	defaultFacialVerificationSecret = "change-me-facial-verification-secret"
 )
 
 // AssertProductionSecrets falha o arranque (log.Fatal, chamado pelo caller)
@@ -168,6 +172,9 @@ func (c *Config) AssertProductionSecrets() error {
 	}
 	if c.MinioSecretKey == defaultMinioSecretKey {
 		bad = append(bad, "MINIO_SECRET_KEY")
+	}
+	if c.FacialVerificationSecret == "" || c.FacialVerificationSecret == defaultFacialVerificationSecret {
+		bad = append(bad, "FACIAL_VERIFICATION_SECRET")
 	}
 	if len(bad) > 0 {
 		return fmt.Errorf("ENVIRONMENT=production exige segredos reais para: %s (valores por omissão do repositório não são seguros)", strings.Join(bad, ", "))
@@ -255,7 +262,8 @@ func Load() *Config {
 		SignatureCARootsPEM:         env("SIGNATURE_CA_ROOTS_PEM", ""),
 		SignatureCAIntermediatesPEM: env("SIGNATURE_CA_INTERMEDIATES_PEM", ""),
 
-		FaceClockBaseURL: env("FACECLOCK_BASE_URL", "https://asseduidade.e258tech.tech"),
+		FaceClockBaseURL:         env("FACECLOCK_BASE_URL", "https://asseduidade.e258tech.tech"),
+		FacialVerificationSecret: env("FACIAL_VERIFICATION_SECRET", defaultFacialVerificationSecret),
 
 		OAuthSigningKeysDir:    env("OAUTH_SIGNING_KEYS_DIR", "./data/oauth-keys"),
 		OAuthAllowGeneratedKey: envBool("OAUTH_ALLOW_GENERATED_KEY", false),

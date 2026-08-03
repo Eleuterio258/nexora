@@ -5,6 +5,16 @@ data class MarcarPontoSelfServiceRequest(
     val dados: SelfiePontoDados
 )
 
+data class MarcarPontoFacialSelfServiceRequest(
+    val metodo: String = "facial",
+    val dados: FacialPontoDados
+)
+
+data class FacialPontoDados(
+    val verification_token: String,
+    val device_id: String
+)
+
 data class SelfiePontoDados(
     val latitude: Double,
     val longitude: Double,

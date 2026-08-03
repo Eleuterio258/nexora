@@ -6,6 +6,7 @@ services:
     container_name: nexora-api
     restart: unless-stopped
     environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
       # Vem inteiro do .env: o host é `postgres` (não `nexora-db`) e traz o
       # search_path com os 25 schemas — sem ele as queries não resolvem.
       DATABASE_URL: ${DATABASE_URL}
@@ -13,6 +14,7 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      FACIAL_VERIFICATION_SECRET: ${FACIAL_VERIFICATION_SECRET}
       PORT: 8080
       CORS_ORIGIN: ${CORS_ORIGIN:-https://nexora.e258tech.tech}
       UPLOADS_DIR: ./uploads

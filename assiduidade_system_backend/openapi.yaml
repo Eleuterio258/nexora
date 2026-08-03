@@ -866,6 +866,12 @@ components:
           - type: string
           - type: 'null'
           title: Reason
+        verification_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Verification Token
+          description: Comprovativo assinado, curto e de uso único; presente apenas quando match=true.
       type: object
       required:
       - match

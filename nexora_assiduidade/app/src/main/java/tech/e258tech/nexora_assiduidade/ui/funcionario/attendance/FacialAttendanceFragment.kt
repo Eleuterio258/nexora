@@ -28,7 +28,6 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import java.io.ByteArrayOutputStream
-import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
@@ -38,14 +37,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
 import tech.e258tech.nexora_assiduidade.data.model.FaceVerifyRequest
+import tech.e258tech.nexora_assiduidade.data.model.FacialPontoDados
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoFacialSelfServiceRequest
 import tech.e258tech.nexora_assiduidade.data.model.response.FaceVerifyResponse
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
-import tech.e258tech.nexora_assiduidade.data.repository.AttendanceRepository
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
-import tech.e258tech.nexora_assiduidade.utils.Constants
-import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
 import tech.e258tech.nexora_assiduidade.utils.FaceDetectorHelper
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
@@ -65,7 +62,6 @@ class FacialAttendanceFragment : Fragment() {
     private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private lateinit var sessionManager: SessionManager
-    private lateinit var attendanceRepository: AttendanceRepository
 
     private lateinit var btnCapture: Button
     private lateinit var progressBar: ProgressBar
@@ -117,7 +113,6 @@ class FacialAttendanceFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         sessionManager = SessionManager(requireContext())
-        attendanceRepository = AttendanceRepository(requireContext())
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         btnCapture = view.findViewById(R.id.btnCapture)
@@ -292,7 +287,7 @@ class FacialAttendanceFragment : Fragment() {
         lastCapturedBase64 = bitmapToBase64(bitmap)
 
         stopCamera()
-        verifyAndRegister(Constants.EVENT_AUTO)
+        verifyAndRegister()
     }
 
     private fun stopCamera() {
@@ -302,7 +297,7 @@ class FacialAttendanceFragment : Fragment() {
         faceDetectorHelper = null
     }
 
-    private fun verifyAndRegister(eventType: String) {
+    private fun verifyAndRegister() {
         val userId = sessionManager.getUserId()
         val token = sessionManager.getToken()
         val imageBase64 = lastCapturedBase64
@@ -354,43 +349,45 @@ class FacialAttendanceFragment : Fragment() {
                 return@launch
             }
 
-            val request = ClockRegisterRequest(
-                idempotency_key = UUID.randomUUID().toString(),
-                user_id = userId,
-                device_id = sessionManager.getOrCreateDeviceId(),
-                event_type = eventType,
-                recorded_at = DateTimeUtils.nowForApi(),
-                source = Constants.SOURCE_FACIAL,
-                confidence_score = verifyResponse.confidence_score,
-                liveness_score = verifyResponse.liveness_score
-            )
+            val verificationToken = verifyResponse.verification_token
+            if (verificationToken.isNullOrBlank()) {
+                setLoading(false)
+                Toast.makeText(
+                    context,
+                    "O servidor não devolveu o comprovativo da verificação facial.",
+                    Toast.LENGTH_LONG
+                ).show()
+                return@launch
+            }
 
-            val registerResult = withContext(Dispatchers.IO) {
-                attendanceRepository.registerClock(request)
+            val clientDeviceId = sessionManager.getOrCreateDeviceId()
+            val registerResponse = withContext(Dispatchers.IO) {
+                RetrofitClient.erpApiService.marcarPontoFacialSelfService(
+                    ApiUtils.bearerToken(token),
+                    MarcarPontoFacialSelfServiceRequest(
+                        dados = FacialPontoDados(
+                            verification_token = verificationToken,
+                            device_id = clientDeviceId
+                        )
+                    )
+                )
             }
 
             setLoading(false)
 
-            when (registerResult) {
-                is AttendanceRepository.RegisterResult.Success -> {
-                    Toast.makeText(
-                        context,
-                        "Registo de presença realizado com sucesso.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    parentFragmentManager.popBackStack()
-                }
-                is AttendanceRepository.RegisterResult.SavedOffline -> {
-                    Toast.makeText(
-                        context,
-                        "Sem internet. Registo guardado e sera sincronizado automaticamente.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    parentFragmentManager.popBackStack()
-                }
-                is AttendanceRepository.RegisterResult.Error -> {
-                    Toast.makeText(context, registerResult.message, Toast.LENGTH_LONG).show()
-                }
+            if (registerResponse.isSuccessful && registerResponse.body() != null) {
+                Toast.makeText(
+                    context,
+                    "Registo de presença realizado com sucesso.",
+                    Toast.LENGTH_SHORT
+                ).show()
+                parentFragmentManager.popBackStack()
+            } else {
+                Toast.makeText(
+                    context,
+                    ApiUtils.errorMessage(registerResponse),
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }

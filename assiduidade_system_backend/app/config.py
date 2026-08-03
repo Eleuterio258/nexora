@@ -7,6 +7,7 @@ load_dotenv()
 
 DEFAULT_JWT_SECRET_KEY = "change-me-in-production"
 DEFAULT_BIOMETRIC_ENCRYPTION_KEY = "change-me-in-production-biometric-key-32bytes"
+DEFAULT_FACIAL_VERIFICATION_SECRET = "change-me-facial-verification-secret"
 
 
 class Settings:
@@ -26,6 +27,12 @@ class Settings:
     )
     biometric_match_threshold: float = float(
         os.getenv("BIOMETRIC_MATCH_THRESHOLD", "0.85")
+    )
+    facial_verification_secret: str = os.getenv(
+        "FACIAL_VERIFICATION_SECRET", DEFAULT_FACIAL_VERIFICATION_SECRET
+    )
+    facial_verification_ttl_seconds: int = int(
+        os.getenv("FACIAL_VERIFICATION_TTL_SECONDS", "90")
     )
     seed_data_on_startup: bool = os.getenv("SEED_DATA_ON_STARTUP", "false").lower() == "true"
     docs_url: str = os.getenv("DOCS_URL", "/docs")
@@ -104,6 +111,11 @@ class Settings:
                 "BIOMETRIC_ENCRYPTION_KEY nao configurado (ou igual ao default versionado) "
                 "com ENVIRONMENT=production. Defina uma chave forte e unica de 32 bytes "
                 "antes de arrancar."
+            )
+        if self.facial_verification_secret == DEFAULT_FACIAL_VERIFICATION_SECRET:
+            raise RuntimeError(
+                "FACIAL_VERIFICATION_SECRET nao configurado (ou igual ao default versionado) "
+                "com ENVIRONMENT=production. Use o mesmo segredo forte configurado no Nexora ERP."
             )
 
 

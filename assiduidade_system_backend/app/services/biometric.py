@@ -26,6 +26,7 @@ import binascii
 import json
 import logging
 import math
+import os
 from pathlib import Path
 
 import cv2
@@ -96,9 +97,22 @@ def _get_facenet() -> "InceptionResnetV1":
     if _facenet_model is None:
         if not FACENET_AVAILABLE:
             raise RuntimeError("facenet-pytorch nao instalado")
-        _facenet_model = InceptionResnetV1(pretrained="vggface2").eval()
+        try:
+            _facenet_model = InceptionResnetV1(pretrained="vggface2").eval()
+        except (OSError, RuntimeError) as exc:
+            log.exception(
+                "Falha ao carregar os pesos FaceNet VGGFace2 (TORCH_HOME=%s)",
+                os.getenv("TORCH_HOME", "<default>"),
+            )
+            raise RuntimeError("facenet_model_unavailable") from exc
         log.info("FaceNet InceptionResnetV1 (VGGFace2) carregado.")
     return _facenet_model
+
+
+def warmup_biometric_models() -> None:
+    """Carrega detector e FaceNet no arranque; produção nunca falha no 1.º pedido."""
+    _get_face_detector()
+    _get_facenet()
 
 
 # ─── Utilidades de imagem ─────────────────────────────────────────────────────

@@ -22,6 +22,7 @@ from app.services.biometric import (
     estimate_liveness,
     serialize_embedding,
 )
+from app.security.facial_verification import issue_facial_verification_token
 from app.utils import utc_now
 
 
@@ -63,6 +64,12 @@ def enroll_biometric(
                 status_code=400,
                 detail=f"Captura {idx + 1} invalida: {exc}.",
             ) from None
+        except RuntimeError as exc:
+            biometric_metrics.record_enroll_failure()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Modelo biometrico indisponivel no servidor.",
+            ) from exc
         except Exception as exc:
             biometric_metrics.record_enroll_failure()
             raise HTTPException(
@@ -146,6 +153,11 @@ async def verify_biometric(
             timestamp=utc_now(),
             reason="invalid_base64",
         )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Modelo biometrico indisponivel no servidor.",
+        ) from exc
 
     if quality_reason or quality_score < settings.biometric_quality_threshold:
         return VerifyResponse(
@@ -197,6 +209,17 @@ async def verify_biometric(
         reason = "match_below_threshold"
         biometric_metrics.record_verify_rejection(reason, confidence_score, liveness_score)
 
+    verification_token = None
+    verification_tenant_id = active_template.tenant_id or actor.tenant_id
+    if is_match and verification_tenant_id:
+        verification_token = issue_facial_verification_token(
+            tenant_id=str(verification_tenant_id),
+            user_id=erp_user_id,
+            device_id=str(payload.device_id),
+            confidence_score=confidence_score,
+            liveness_score=liveness_score,
+        )
+
     return VerifyResponse(
         match=is_match,
         user_id=payload.user_id,
@@ -204,4 +227,5 @@ async def verify_biometric(
         liveness_score=liveness_score,
         timestamp=utc_now(),
         reason=None if is_match else "match_below_threshold",
+        verification_token=verification_token,
     )

@@ -22,3 +22,4 @@ class VerifyResponse(ORMBaseModel):
     liveness_score: float
     timestamp: datetime
     reason: str | None = None
+    verification_token: str | None = None

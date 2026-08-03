@@ -13,6 +13,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:admin@pg:5432/faceclock}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-}
+      FACIAL_VERIFICATION_SECRET: ${FACIAL_VERIFICATION_SECRET:-change-me-facial-verification-secret}
+      FACIAL_VERIFICATION_TTL_SECONDS: ${FACIAL_VERIFICATION_TTL_SECONDS:-90}
       # Sem isto, QUALQUER Bearer token falha a validação em
       # app/deps.py:_validate_local_jwt (via app/oauth_jwks.py, que deriva
       # ERP_JWKS_URL = ERP_BASE_URL + "/oauth/jwks" por omissão) — partia

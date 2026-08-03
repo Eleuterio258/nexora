@@ -47,6 +47,7 @@ import tech.e258tech.nexora_assiduidade.data.model.PinValidateRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarLidaRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoGestorRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoSelfServiceRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoFacialSelfServiceRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoNfcSelfServiceRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoQrSelfServiceRequest
 import tech.e258tech.nexora_assiduidade.data.model.PinVerifyRequest
@@ -405,6 +406,12 @@ interface ErpApiService {
     suspend fun marcarPontoSelfService(
         @Header("Authorization") token: String,
         @Body request: MarcarPontoSelfServiceRequest
+    ): Response<EventoAssiduidadeResponse>
+
+    @POST("api/self-service/assiduidade/ponto")
+    suspend fun marcarPontoFacialSelfService(
+        @Header("Authorization") token: String,
+        @Body request: MarcarPontoFacialSelfServiceRequest
     ): Response<EventoAssiduidadeResponse>
 
     @POST("api/self-service/assiduidade/ponto")

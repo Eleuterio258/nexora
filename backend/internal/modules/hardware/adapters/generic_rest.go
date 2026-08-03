@@ -65,6 +65,13 @@ func (a *GenericRESTAdapter) ParseEvent(r *http.Request) (*models.NormalizedEven
 	if credentialType == "" {
 		credentialType = "unknown"
 	}
+	// A app movel usava este adapter com uma API key embutida no APK e podia
+	// declarar "face" sem provar que o FaceClock reconheceu o utilizador.
+	// Marcacoes faciais moveis passam agora exclusivamente pelo self-service,
+	// onde o JWT curto do FaceClock e validado e consumido no mesmo pedido.
+	if credentialType == "face" {
+		return nil, errors.New("credential_type 'face' nao e permitido no endpoint generico; use o fluxo facial self-service")
+	}
 
 	raw, _ := json.Marshal(payload)
 
