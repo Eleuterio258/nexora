@@ -50,6 +50,12 @@ class Settings:
     # /oauth/token. erp_token_audience tem de bater com a claim "aud" que o
     # ERP emite (OAUTH_AUDIENCE no backend Go, default "nexora-api").
     erp_token_audience: str = os.getenv("ERP_TOKEN_AUDIENCE", "nexora-api")
+    image_download_timeout_seconds: int = int(
+        os.getenv("IMAGE_DOWNLOAD_TIMEOUT_SECONDS", "10")
+    )
+    image_download_max_bytes: int = int(
+        os.getenv("IMAGE_DOWNLOAD_MAX_BYTES", "10485760")
+    )
 
     @property
     def erp_jwks_url(self) -> str:

@@ -38,13 +38,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.CaptureImage
 import tech.e258tech.nexora_assiduidade.data.model.ConsentimentoLGPDRequest
-import tech.e258tech.nexora_assiduidade.data.model.EnrollFacialRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.FaceOverlayView
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.FaceDetectorHelper
+import tech.e258tech.nexora_assiduidade.utils.ImageUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
@@ -418,19 +417,23 @@ class EnrollFacialFragment : Fragment() {
             return
         }
 
-        val request = EnrollFacialRequest(
-            funcionario_id = funcionarioId,
-            captures = captures.map { CaptureImage(bitmapToBase64(it)) }
-        )
+        val captureParts = captures.mapIndexed { index, bitmap ->
+            ImageUtils.bitmapToMultipartPart(
+                bitmap = bitmap,
+                formField = "captures",
+                fileName = "capture_${index}.jpg"
+            )
+        }
 
         setLoading(true)
 
         uiScope.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
-                    RetrofitClient.erpApiService.enrollFacialFuncionario(
+                    RetrofitClient.erpApiService.enrollFacialFuncionarioMultipart(
                         ApiUtils.bearerToken(token),
-                        request
+                        ImageUtils.textToRequestBody(funcionarioId.toString()),
+                        captureParts
                     )
                 }
 

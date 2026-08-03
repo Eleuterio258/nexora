@@ -4,18 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	mw "nexora/internal/middleware"
 	"nexora/internal/pkg/faceclock"
+	"nexora/internal/storage"
 )
 
-// CaptureImage representa uma captura facial em base64.
+// CaptureImage representa uma captura facial: base64 (legacy) ou URL MinIO.
 type CaptureImage struct {
-	ImageBase64 string `json:"image_base64"`
+	ImageBase64 string `json:"image_base64,omitempty"`
+	ImageURL    string `json:"image_url,omitempty"`
 }
 
-// EnrollFacialRequest é o payload para cadastro de biometria facial.
+// EnrollFacialRequest é o payload JSON legacy para cadastro de biometria facial.
 type EnrollFacialRequest struct {
 	FuncionarioID int64          `json:"funcionario_id"`
 	Captures      []CaptureImage `json:"captures"`
@@ -40,11 +47,13 @@ type EnrollFacialResponse struct {
 // Permissão: recursos-humanos:gerir_funcionarios
 //
 // Fluxo:
-//  1. Verifica se o funcionário existe e pertence ao tenant do gestor.
-//  2. Verifica se existe consentimento LGPD ativo para biometria.
-//  3. Verifica se o método "facial" está activo na configuração do tenant.
-//  4. Envia as capturas para o FaceClock (/api/v1/biometric/enroll).
-//  5. Devolve o resultado do enrollment.
+//  1. Aceita JSON legacy (capturas em base64) ou multipart/form-data (capturas como ficheiros).
+//  2. Para multipart, faz upload das capturas para MinIO e envia image_url ao FaceClock.
+//  3. Verifica se o funcionário existe e pertence ao tenant do gestor.
+//  4. Verifica se existe consentimento LGPD ativo para biometria.
+//  5. Verifica se o método "facial" está activo na configuração do tenant.
+//  6. Envia as capturas para o FaceClock (/api/v1/biometric/enroll).
+//  7. Devolve o resultado do enrollment.
 func (h *Handler) EnrollFacial(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	if user == nil {
@@ -52,12 +61,26 @@ func (h *Handler) EnrollFacial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body EnrollFacialRequest
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		jsonErr(w, "Payload inválido", http.StatusBadRequest)
-		return
+	var funcionarioID int64
+	var captures []CaptureImage
+
+	if strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
+		var err error
+		funcionarioID, captures, err = h.parseEnrollMultipart(r, w)
+		if err != nil {
+			jsonErr(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	} else {
+		var body EnrollFacialRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			jsonErr(w, "Payload inválido", http.StatusBadRequest)
+			return
+		}
+		funcionarioID = body.FuncionarioID
+		captures = body.Captures
 	}
-	funcionarioID := body.FuncionarioID
+
 	if funcionarioID <= 0 {
 		jsonErr(w, "ID do funcionário inválido", http.StatusBadRequest)
 		return
@@ -67,7 +90,7 @@ func (h *Handler) EnrollFacial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(body.Captures) < 3 {
+	if len(captures) < 3 {
 		jsonErr(w, "São necessárias pelo menos 3 capturas faciais", http.StatusBadRequest)
 		return
 	}
@@ -121,7 +144,7 @@ func (h *Handler) EnrollFacial(w http.ResponseWriter, r *http.Request) {
 
 	faceClockReq := FaceClockEnrollRequest{
 		UserID:   fmt.Sprintf("%d", erpUserID),
-		Captures: body.Captures,
+		Captures: captures,
 	}
 	client := faceclock.NewClient(h.cfg.FaceClockBaseURL)
 	faceClockResp, statusCode, err := client.PostAsUser(r.Context(), "/api/v1/biometric/enroll", authHeader, faceClockReq)
@@ -135,6 +158,76 @@ func (h *Handler) EnrollFacial(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, faceClockResp, http.StatusCreated)
+}
+
+// parseEnrollMultipart processa um pedido multipart/form-data de enrollment
+// facial, fazendo upload de cada captura para MinIO e devolvendo as URLs.
+func (h *Handler) parseEnrollMultipart(r *http.Request, w http.ResponseWriter) (int64, []CaptureImage, error) {
+	const maxBytes = 30 * 1024 * 1024 // 30 MB
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes+1024)
+	if err := r.ParseMultipartForm(maxBytes); err != nil {
+		return 0, nil, fmt.Errorf("falha ao processar multipart: %v", err)
+	}
+
+	funcionarioID, err := strconv.ParseInt(r.FormValue("funcionario_id"), 10, 64)
+	if err != nil || funcionarioID <= 0 {
+		return 0, nil, fmt.Errorf("funcionario_id inválido")
+	}
+
+	files := r.MultipartForm.File["captures"]
+	if len(files) < 3 {
+		return 0, nil, fmt.Errorf("São necessárias pelo menos 3 capturas faciais")
+	}
+
+	user := mw.GetUser(r)
+	ctx := r.Context()
+	now := time.Now().UTC().UnixMilli()
+	captures := make([]CaptureImage, 0, len(files))
+
+	for i, header := range files {
+		file, err := header.Open()
+		if err != nil {
+			return 0, nil, fmt.Errorf("erro ao abrir captura %d: %v", i+1, err)
+		}
+		data, err := io.ReadAll(file)
+		file.Close()
+		if err != nil {
+			return 0, nil, fmt.Errorf("erro ao ler captura %d: %v", i+1, err)
+		}
+		if len(data) == 0 {
+			return 0, nil, fmt.Errorf("captura %d está vazia", i+1)
+		}
+
+		contentType := header.Header.Get("Content-Type")
+		if contentType == "" {
+			contentType = http.DetectContentType(data)
+		}
+		if !strings.HasPrefix(contentType, "image/") {
+			return 0, nil, fmt.Errorf("captura %d não é uma imagem", i+1)
+		}
+
+		exts, _ := mime.ExtensionsByType(contentType)
+		ext := ".jpg"
+		if len(exts) > 0 {
+			ext = exts[0]
+		}
+
+		key := storage.JoinPath(
+			"uploads",
+			fmt.Sprintf("tenant-%d", user.TenantID),
+			"biometria",
+			"enroll",
+			fmt.Sprintf("func-%d", funcionarioID),
+			fmt.Sprintf("%d-%d-%d%s", now, i, header.Size, ext),
+		)
+		url, err := h.storage.Put(ctx, key, data, contentType)
+		if err != nil {
+			return 0, nil, fmt.Errorf("erro ao guardar captura %d: %v", i+1, err)
+		}
+		captures = append(captures, CaptureImage{ImageURL: url})
+	}
+
+	return funcionarioID, captures, nil
 }
 
 // metodoFacialAtivo verifica se o método "facial" está activo na configuração

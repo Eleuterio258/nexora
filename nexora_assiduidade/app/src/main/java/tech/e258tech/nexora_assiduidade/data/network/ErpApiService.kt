@@ -1,5 +1,7 @@
 package tech.e258tech.nexora_assiduidade.data.network
 
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.Body
@@ -8,8 +10,10 @@ import retrofit2.http.Field
 import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 import tech.e258tech.nexora_assiduidade.data.model.AdminSetPinRequest
@@ -344,6 +348,15 @@ interface ErpApiService {
         @Body request: EnrollFacialRequest
     ): Response<EnrollFacialResponse>
 
+    // Enrollment facial via multipart/form-data (novo fluxo MinIO).
+    @Multipart
+    @POST("api/rh/funcionarios/biometria/facial/enroll")
+    suspend fun enrollFacialFuncionarioMultipart(
+        @Header("Authorization") token: String,
+        @Part("funcionario_id") funcionarioId: RequestBody,
+        @Part captures: List<MultipartBody.Part>
+    ): Response<EnrollFacialResponse>
+
     // Verificação facial no acto de marcar ponto — o ERP faz proxy para o
     // FaceClock (POST /api/v1/biometric/verify) depois de resolver a
     // identidade a partir do próprio token, nunca do payload. Substitui a
@@ -352,6 +365,17 @@ interface ErpApiService {
     suspend fun verifyFacial(
         @Header("Authorization") token: String,
         @Body request: FaceVerifyRequest
+    ): Response<FaceVerifyResponse>
+
+    // Verificação facial via multipart/form-data (novo fluxo MinIO).
+    @Multipart
+    @POST("api/self-service/assiduidade/biometria/facial/verificar")
+    suspend fun verifyFacialMultipart(
+        @Header("Authorization") token: String,
+        @Part("device_id") deviceId: RequestBody,
+        @Part image: MultipartBody.Part,
+        @Part("geo_lat") geoLat: RequestBody? = null,
+        @Part("geo_lng") geoLng: RequestBody? = null
     ): Response<FaceVerifyResponse>
 
     // Criação manual de evento de assiduidade por gestor/RH — exige a permissão

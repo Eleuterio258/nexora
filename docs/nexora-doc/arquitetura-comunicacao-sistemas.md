@@ -290,6 +290,63 @@ Priorização sugerida:
 
 A comunicação atual está **aceitável para um MVP**, mas **não está pronta para produção em grande escala**. O problema maior não é a topologia hub-and-spoke em si, mas os detalhes de implementação: latência desnecessária, dependência total do ERP, chaves embarcadas e dualidade de modelos. As melhorias mais valiosas são reduzir o caminho da verificação facial, proteger as chaves de device e consolidar o modelo de dados de assiduidade.
 
+## 13. Análise de erros nos backends
+
+> `go build ./...` e `python -m compileall` passaram sem erros de compilação. Os problemas abaixo são de segurança, lógica e gestão de erros.
+
+### 13.1 Backend Go (`backend/`)
+
+#### Críticos
+
+| # | Arquivo | Linha | Problema | Impacto |
+|---|---------|-------|----------|---------|
+| 1 | `internal/modules/hardware/adapters/generic_rest.go` | 111–112 | `ParseEvent` consome o body antes do HMAC; depois `ValidateAuth` tenta relê-lo, obtendo EOF. | Webhooks podem ser aceitos sem assinatura válida; eventos de hardware falsificáveis. |
+| 2 | `config/config.go` | 188–199 | Connection string e password do PostgreSQL hardcoded (`postgres/admin` em IP público). | Vazamento de credenciais de produção. |
+| 3 | `config/config.go` | 143–148, 266 | Segredos default versionados (`JWT_SECRET`, `JWT_REFRESH_SECRET`, `MINIO_*`, `FACIAL_VERIFICATION_SECRET`). | Tokens forjáveis se envs não forem sobrescritas. |
+
+#### Altos
+
+| # | Arquivo | Linha | Problema | Impacto |
+|---|---------|-------|----------|---------|
+| 4 | `config/config.go` | 214 | `IDHashSalt` reutiliza `JWT_SECRET` default. | IDs ofuscados em URLs podem ser desofuscados. |
+| 5 | `internal/modules/self-service/handlers/ponto.go` | 415–425 | `verificarPIN` trata qualquer erro de DB como “PIN não configurado” (HTTP 412). | Mascara falhas operacionais; pode permitir enumerar PIN. |
+| 6 | `internal/modules/self-service/handlers/ponto.go` | 234–246 | Ausência de rate-limit no PIN. | Brute-force de 6 dígitos sem contramedidas. |
+
+#### Médios
+
+| # | Arquivo | Linha | Problema | Impacto |
+|---|---------|-------|----------|---------|
+| 7 | `internal/ws/client.go` | 80–81 | Type assertions `claims["sub"].(float64)` sem `ok`. | Panic no WebSocket com token malformado. |
+| 8 | `internal/modules/self-service/handlers/perfil.go`, `chat.go`, `aprovacoes/handlers/requests.go`, `gestao-produtos/handlers/produtos.go` | várias | Erros de `Exec`/`QueryRow` ignorados em updates críticos. | Cliente recebe sucesso enquanto operação falhou. |
+| 9 | `internal/modules/recrutamento/handlers/contratar.go` | 91 | Comparação de erro por string `"EOF"`. | Body inválido pode passar. |
+| 10 | `internal/ws/client.go` | 119–122, 259 | Goroutines WebSocket sem WaitGroup/recovery. | Instabilidade no chat/notificações. |
+
+### 13.2 Backend Python (`assiduidade_system_backend/`)
+
+#### Altos
+
+| # | Arquivo | Linha | Problema | Impacto |
+|---|---------|-------|----------|---------|
+| 1 | `app/main.py` | 74–81 | CORS `allow_origins=["*"]` + `allow_credentials=True`. | CSRF/clickjacking de requests autenticados. |
+| 2 | `app/services/biometric.py` | 391–414 | `estimate_liveness` é puramente heurístico (FFT/variância). | Fácilmente burlado por foto/tela/vídeo; `/biometric/verify` não exige desafio de liveness. |
+| 3 | `app/main.py` | 105–121 | `general_exception_handler` retorna `error_type` no corpo. | Vaza detalhes internos e mascarar erros. |
+| 4 | `app/config.py` | 8–10 | Segredos default versionados. | Chaves públicas em dev/staging. |
+| 5 | `app/security/encryption.py` | 41–47, 62–63 | Chave derivada por SHA-256 + modo legado em claro. | Reduz entropia e permite armazenamento sem cifra. |
+
+#### Médios
+
+| # | Arquivo | Linha | Problema | Impacto |
+|---|---------|-------|----------|---------|
+| 6 | `app/services/liveness_challenge.py` | 110 | `_challenges` é dicionário global em memória. | Não funciona com múltiplas réplicas; replay possível. |
+| 7 | `app/services/attendance_validation.py` | 18–19, 81–82 | Cache ERP em memória + fail-open se ERP indisponível. | Configuração desatualizada; métodos desativados passam. |
+| 8 | `app/routers/fingerprint.py` | 150–162 | `identify_fingerprint` compara strings byte-a-byte. | Não é matching biométrico real. |
+| 9 | `app/main.py` | 31, 108–113 | Logs incluem `DATABASE_URL` e detalhes de exceções. | Vazamento de credenciais/informação interna. |
+| 10 | `tests/test_api.py` | 177–179 | Monkeypatch no router não funciona. | Testes usam pipeline real ou falham silenciosamente. |
+
+### 13.3 Conclusão da análise de erros
+
+Os riscos mais graves estão no **backend Go**: validação HMAC de webhook quebrada, credenciais e segredos default hardcoded. No **Python**, o maior problema é a **falta de liveness real** e **CORS permissivo com credenciais**. Em ambos, há segredos default versionados e gestão de erros deficiente em caminhos críticos.
+
 ---
 
 *Gerado em: 2026-08-03*

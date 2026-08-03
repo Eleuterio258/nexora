@@ -52,10 +52,17 @@ def enroll_biometric(
     approved_quality_scores: list[float] = []
     for idx, capture in enumerate(payload.captures):
         try:
-            quality_score, quality_reason = assess_capture_quality(capture.image_base64)
-            embedding = build_embedding(capture.image_base64)
+            quality_score, quality_reason = assess_capture_quality(
+                image_base64=capture.image_base64,
+                image_url=capture.image_url,
+            )
+            embedding = build_embedding(
+                image_base64=capture.image_base64,
+                image_url=capture.image_url,
+            )
             liveness_score = estimate_liveness(
-                capture.image_base64,
+                image_base64=capture.image_base64,
+                image_url=capture.image_url,
                 quality_score=quality_score,
             )
         except ValueError as exc:
@@ -141,9 +148,19 @@ async def verify_biometric(
     require_self_or_manager(actor, erp_user_id)
 
     try:
-        quality_score, quality_reason = assess_capture_quality(payload.image_base64)
-        probe_embedding = build_embedding(payload.image_base64)
-        liveness_score = estimate_liveness(payload.image_base64, quality_score=quality_score)
+        quality_score, quality_reason = assess_capture_quality(
+            image_base64=payload.image_base64,
+            image_url=payload.image_url,
+        )
+        probe_embedding = build_embedding(
+            image_base64=payload.image_base64,
+            image_url=payload.image_url,
+        )
+        liveness_score = estimate_liveness(
+            image_base64=payload.image_base64,
+            image_url=payload.image_url,
+            quality_score=quality_score,
+        )
     except ValueError:
         return VerifyResponse(
             match=False,
@@ -151,7 +168,7 @@ async def verify_biometric(
             confidence_score=0.0,
             liveness_score=0.0,
             timestamp=utc_now(),
-            reason="invalid_base64",
+            reason="invalid_image",
         )
     except RuntimeError as exc:
         raise HTTPException(

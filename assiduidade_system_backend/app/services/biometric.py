@@ -30,8 +30,10 @@ import os
 from pathlib import Path
 
 import cv2
+import httpx
 import numpy as np
 
+from app.config import settings
 from app.security import get_biometric_encryption
 
 log = logging.getLogger(__name__)
@@ -124,13 +126,44 @@ def _decode_base64(image_base64: str) -> bytes:
         raise ValueError("invalid_base64") from exc
 
 
+def _download_image(image_url: str) -> bytes:
+    try:
+        with httpx.Client(timeout=settings.image_download_timeout_seconds) as client:
+            response = client.get(image_url)
+            response.raise_for_status()
+            data = response.content
+            if len(data) > settings.image_download_max_bytes:
+                raise ValueError("image_too_large")
+            return data
+    except httpx.HTTPError as exc:
+        log.warning("Falha ao descarregar imagem de %s: %s", image_url, exc)
+        raise ValueError("image_download_failed") from exc
+
+
+def _resolve_image_bytes(image_base64: str | None, image_url: str | None) -> bytes:
+    if image_url:
+        return _download_image(image_url)
+    if image_base64:
+        return _decode_base64(image_base64)
+    raise ValueError("no_image_source")
+
+
+def _bytes_to_numpy(image_bytes: bytes) -> "np.ndarray | None":
+    """Decodifica bytes de imagem (JPEG/PNG) para array OpenCV (BGR)."""
+    try:
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        return img
+    except Exception:
+        return None
+
+
+# Mantido para compatibilidade com chamadas legadas.
 def _base64_to_numpy(image_base64: str) -> "np.ndarray | None":
     """Decodifica base64 para array OpenCV (BGR)."""
     try:
         raw = _decode_base64(image_base64)
-        nparr = np.frombuffer(raw, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        return img
+        return _bytes_to_numpy(raw)
     except Exception:
         return None
 
@@ -312,7 +345,10 @@ def _has_face_landmarks(img_rgb: "np.ndarray") -> tuple[bool, list[dict]]:
     return True, landmarks_info
 
 
-def assess_capture_quality(image_base64: str) -> tuple[float, "str | None"]:
+def assess_capture_quality(
+    image_base64: str | None = None,
+    image_url: str | None = None,
+) -> tuple[float, "str | None"]:
     """
     Avalia qualidade da captura:
     - Detecao de face (MediaPipe)
@@ -320,7 +356,13 @@ def assess_capture_quality(image_base64: str) -> tuple[float, "str | None"]:
     - Iluminacao via histograma
     - Tamanho relativo do rosto
     """
-    img = _base64_to_numpy(image_base64)
+    try:
+        image_bytes = _resolve_image_bytes(image_base64, image_url)
+    except ValueError as exc:
+        log.warning("Falha ao obter bytes da imagem: %s", exc)
+        return 0.0, "invalid_image"
+
+    img = _bytes_to_numpy(image_bytes)
     if img is None:
         return 0.0, "invalid_image"
 
@@ -388,14 +430,24 @@ def _compute_face_size_score(img_rgb: "np.ndarray") -> float:
     return round(max(scores), 4)
 
 
-def estimate_liveness(image_base64: str, quality_score: "float | None" = None) -> float:
+def estimate_liveness(
+    image_base64: str | None = None,
+    image_url: str | None = None,
+    quality_score: "float | None" = None,
+) -> float:
     """
     Estima liveness com metricas anti-spoofing:
     - Textura (variancia de gradientes)
     - Frequencia (FFT — reais vs. telas)
     - Variancia de cor (pele real vs. reproducao)
     """
-    img = _base64_to_numpy(image_base64)
+    try:
+        image_bytes = _resolve_image_bytes(image_base64, image_url)
+    except ValueError as exc:
+        log.warning("Falha ao obter bytes da imagem: %s", exc)
+        return 0.0
+
+    img = _bytes_to_numpy(image_bytes)
     if img is None:
         return 0.0
 
@@ -444,21 +496,35 @@ def _compute_color_variance_score(img_bgr: "np.ndarray") -> float:
     return min(combined / 100.0, 1.0)
 
 
-def build_embedding(image_base64: str) -> list[float]:
+def build_embedding(
+    image_base64: str | None = None,
+    image_url: str | None = None,
+) -> list[float]:
     """
     Pipeline completo de 3 etapas:
-      1. MediaPipe BlazeFace  → detetar rosto + keypoints dos olhos
-      2. Alinhamento          → normalizar rotacao/escala (160x160)
-      3. FaceNet ResNetV1     → embedding 512-dim normalizado
+      1. MediaPipe BlazeFace  -> detetar rosto + keypoints dos olhos
+      2. Alinhamento          -> normalizar rotacao/escala (160x160)
+      3. FaceNet ResNetV1     -> embedding 512-dim normalizado
     """
+    # Seed deterministico para embedding simulado (fallback quando facenet nao
+    # esta disponivel). Preferimos base64, se existir; senao usamos o URL.
+    seed_source = image_base64 if image_base64 else (image_url or "")
+
     if not FACENET_AVAILABLE:
         log.warning("Utilizando EMBEDDING SIMULADO (facenet-pytorch nao instalado)")
         import random
-        seed = len(image_base64) % 1000
+
+        seed = len(seed_source) % 1000
         rng = random.Random(seed)
         return _normalize_vector([rng.uniform(-1, 1) for _ in range(EMBEDDING_DIM)])
 
-    img = _base64_to_numpy(image_base64)
+    try:
+        image_bytes = _resolve_image_bytes(image_base64, image_url)
+    except ValueError as exc:
+        log.warning("Falha ao obter bytes da imagem: %s", exc)
+        raise ValueError("invalid_image") from exc
+
+    img = _bytes_to_numpy(image_bytes)
     if img is None:
         raise ValueError("invalid_image")
 

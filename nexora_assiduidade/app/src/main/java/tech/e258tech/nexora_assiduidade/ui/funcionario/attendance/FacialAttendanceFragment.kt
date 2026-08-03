@@ -37,13 +37,13 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.FaceVerifyRequest
 import tech.e258tech.nexora_assiduidade.data.model.FacialPontoDados
 import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoFacialSelfServiceRequest
 import tech.e258tech.nexora_assiduidade.data.model.response.FaceVerifyResponse
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.FaceDetectorHelper
+import tech.e258tech.nexora_assiduidade.utils.ImageUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
@@ -300,9 +300,9 @@ class FacialAttendanceFragment : Fragment() {
     private fun verifyAndRegister() {
         val userId = sessionManager.getUserId()
         val token = sessionManager.getToken()
-        val imageBase64 = lastCapturedBase64
+        val bitmap = lastAnalyzedBitmap
 
-        if (userId.isNullOrBlank() || token.isNullOrBlank() || imageBase64.isNullOrBlank()) {
+        if (userId.isNullOrBlank() || token.isNullOrBlank() || bitmap == null) {
             Toast.makeText(context, "Dados insuficientes para verificacao.", Toast.LENGTH_LONG)
                 .show()
             return
@@ -313,12 +313,16 @@ class FacialAttendanceFragment : Fragment() {
         uiScope.launch {
             val verifyPair: Pair<FaceVerifyResponse?, String?> = withContext(Dispatchers.IO) {
                 try {
-                    val response = RetrofitClient.erpApiService.verifyFacial(
+                    val deviceId = sessionManager.getOrCreateDeviceId()
+                    val imagePart = ImageUtils.bitmapToMultipartPart(
+                        bitmap = bitmap,
+                        formField = "image",
+                        fileName = "selfie.jpg"
+                    )
+                    val response = RetrofitClient.erpApiService.verifyFacialMultipart(
                         ApiUtils.bearerToken(token),
-                        FaceVerifyRequest(
-                            device_id = sessionManager.getOrCreateDeviceId(),
-                            image_base64 = imageBase64
-                        )
+                        ImageUtils.textToRequestBody(deviceId),
+                        imagePart
                     )
                     if (response.isSuccessful && response.body() != null) {
                         response.body()!! to null
@@ -367,7 +371,8 @@ class FacialAttendanceFragment : Fragment() {
                     MarcarPontoFacialSelfServiceRequest(
                         dados = FacialPontoDados(
                             verification_token = verificationToken,
-                            device_id = clientDeviceId
+                            device_id = clientDeviceId,
+                            foto_url = verifyResponse.foto_url
                         )
                     )
                 )

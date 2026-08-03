@@ -12,7 +12,8 @@ data class MarcarPontoFacialSelfServiceRequest(
 
 data class FacialPontoDados(
     val verification_token: String,
-    val device_id: String
+    val device_id: String,
+    val foto_url: String? = null
 )
 
 data class SelfiePontoDados(

@@ -1,0 +1,413 @@
+{
+  "info": {
+    "name": "Nexora - Assiduidade por Biometria (Multipart + MinIO)",
+    "description": "Coleção Postman para testar login OAuth2, enrollment facial e verificação facial via multipart/form-data (novo fluxo MinIO). Mantém exemplos JSON legacy para compatibilidade.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. OAuth2 Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "grant_type",
+              "value": "password"
+            },
+            {
+              "key": "username",
+              "value": "{{email}}"
+            },
+            {
+              "key": "password",
+              "value": "{{password}}"
+            },
+            {
+              "key": "client_id",
+              "value": "{{client_id}}"
+            },
+            {
+              "key": "client_secret",
+              "value": "{{client_secret}}"
+            }
+          ]
+        },
+        "url": "{{erp_base_url}}/oauth/token",
+        "description": "Autenticação OAuth2. Retorna access_token (JWT RS256), refresh_token, token_type, expires_in e scope."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.access_token) {",
+              "    pm.collectionVariables.set('access_token', jsonData.access_token);",
+              "    pm.collectionVariables.set('refresh_token', jsonData.refresh_token);",
+              "    console.log('Access token guardado.');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. ERP - Enroll Facial (multipart/MinIO)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "funcionario_id",
+              "value": "{{funcionario_id}}",
+              "type": "text"
+            },
+            {
+              "key": "captures",
+              "type": "file",
+              "src": "{{foto1_path}}"
+            },
+            {
+              "key": "captures",
+              "type": "file",
+              "src": "{{foto2_path}}"
+            },
+            {
+              "key": "captures",
+              "type": "file",
+              "src": "{{foto3_path}}"
+            }
+          ]
+        },
+        "url": "{{erp_base_url}}/api/rh/funcionarios/biometria/facial/enroll",
+        "description": "Novo fluxo: o ERP recebe imagens via multipart, faz upload para MinIO e envia image_url ao FaceClock."
+      }
+    },
+    {
+      "name": "2b. ERP - Enroll Facial (JSON legacy)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"funcionario_id\": {{funcionario_id}},\n  \"captures\": [\n    { \"image_base64\": \"{{foto1_base64}}\" },\n    { \"image_base64\": \"{{foto2_base64}}\" },\n    { \"image_base64\": \"{{foto3_base64}}\" }\n  ]\n}"
+        },
+        "url": "{{erp_base_url}}/api/rh/funcionarios/biometria/facial/enroll",
+        "description": "Fluxo legacy: envia capturas em base64. Ainda suportado durante a transição."
+      }
+    },
+    {
+      "name": "3. ERP - Verificar Rosto (multipart/MinIO)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "device_id",
+              "value": "{{device_id}}",
+              "type": "text"
+            },
+            {
+              "key": "image",
+              "type": "file",
+              "src": "{{selfie_path}}"
+            }
+          ]
+        },
+        "url": "{{erp_base_url}}/api/self-service/assiduidade/biometria/facial/verificar",
+        "description": "Novo fluxo: o ERP recebe a selfie via multipart, faz upload para MinIO e envia image_url ao FaceClock. Guarda foto_url devolvida para usar no POST /ponto."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.verification_token) {",
+              "    pm.collectionVariables.set('verification_token', jsonData.verification_token);",
+              "}",
+              "if (jsonData.foto_url) {",
+              "    pm.collectionVariables.set('foto_url', jsonData.foto_url);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3b. ERP - Verificar Rosto (JSON legacy)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"device_id\": \"{{device_id}}\",\n  \"image_base64\": \"{{selfie_base64}}\"\n}"
+        },
+        "url": "{{erp_base_url}}/api/self-service/assiduidade/biometria/facial/verificar",
+        "description": "Fluxo legacy: envia selfie em base64. Ainda suportado durante a transição."
+      }
+    },
+    {
+      "name": "4. ERP - Marcar Ponto Facial",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"metodo\": \"facial\",\n  \"dados\": {\n    \"verification_token\": \"{{verification_token}}\",\n    \"device_id\": \"{{device_id}}\",\n    \"foto_url\": \"{{foto_url}}\"\n  }\n}"
+        },
+        "url": "{{erp_base_url}}/api/self-service/assiduidade/ponto",
+        "description": "Regista o ponto usando verification_token e foto_url (MinIO) devolvidos pelo endpoint de verificação."
+      }
+    },
+    {
+      "name": "5. FaceClock - Enroll Facial (directo, URL)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"captures\": [\n    { \"image_url\": \"{{foto1_url}}\" },\n    { \"image_url\": \"{{foto2_url}}\" },\n    { \"image_url\": \"{{foto3_url}}\" }\n  ]\n}"
+        },
+        "url": "{{faceclock_base_url}}/api/v1/biometric/enroll",
+        "description": "Chamada directa ao FaceClock usando image_url (após upload pelo ERP para MinIO)."
+      }
+    },
+    {
+      "name": "6. FaceClock - Verificar Rosto (directo, URL)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"device_id\": \"{{device_id}}\",\n  \"image_url\": \"{{selfie_url}}\"\n}"
+        },
+        "url": "{{faceclock_base_url}}/api/v1/biometric/verify",
+        "description": "Chamada directa ao FaceClock usando image_url."
+      }
+    },
+    {
+      "name": "7. FaceClock - Enroll Digital (directo)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"finger_type\": \"right_thumb\",\n  \"template_base64\": \"{{template_base64}}\"\n}"
+        },
+        "url": "{{faceclock_base_url}}/api/v1/fingerprint/enroll",
+        "description": "Atenção: identificação digital no FaceClock ainda é placeholder (comparação byte-a-byte). Não usar em produção sem SDK real."
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "erp_base_url",
+      "value": "https://api.nexora.e258tech.tech",
+      "type": "string"
+    },
+    {
+      "key": "faceclock_base_url",
+      "value": "https://asseduidade.e258tech.tech",
+      "type": "string"
+    },
+    {
+      "key": "email",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "client_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "client_secret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "funcionario_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "device_id",
+      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "verification_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "foto_url",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "foto1_path",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "foto2_path",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "foto3_path",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "selfie_path",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "foto1_base64",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "foto2_base64",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "foto3_base64",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "selfie_base64",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "foto1_url",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "foto2_url",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "foto3_url",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "selfie_url",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "template_base64",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

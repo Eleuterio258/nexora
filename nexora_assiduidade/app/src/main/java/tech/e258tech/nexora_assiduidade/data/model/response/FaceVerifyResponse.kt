@@ -7,5 +7,6 @@ data class FaceVerifyResponse(
     val liveness_score: Double?,
     val timestamp: String?,
     val reason: String?,
-    val verification_token: String?
+    val verification_token: String?,
+    val foto_url: String? = null
 )
