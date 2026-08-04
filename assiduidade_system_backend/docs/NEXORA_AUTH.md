@@ -2,13 +2,15 @@
 
 > **Versão:** 1.0.0  
 > **Data:** 2026-08-04  
-> **Escopo:** Autenticação serviço-a-serviço para endpoints de integração do FaceClock.
+> **Escopo:** Autenticação unificada do FaceClock via Nexora HMAC.
 
 ---
 
 ## 1. Visão Geral
 
-A autenticação Nexora usa **HMAC-SHA256** com credenciais de acesso:
+O FaceClock usa exclusivamente **Nexora HMAC-SHA256** para autenticar todos os pedidos protegidos. As autenticações anteriores (JWT/Bearer e headers de confiança do gateway) foram removidas.
+
+Cada integração/terminal usa credenciais:
 
 - `NEXORA_ACCESS_KEY_ID` — identificador público.
 - `NEXORA_SECRET_ACCESS_KEY` — chave secreta usada apenas localmente para assinar.
@@ -165,6 +167,7 @@ Consulte `ANALISE-PROTOCOLO-NEXORA-AUTH.md` para exemplos completos em **Go, Jav
 | `DELETE` | `/api/v1/fingerprint/enroll/{user_id}` | `fingerprint:delete` |
 | `POST` | `/api/v1/liveness/challenge` | `liveness:challenge` |
 | `POST` | `/api/v1/liveness/verify` | `liveness:verify` |
+| `GET` | `/api/v1/audit/logs` | `audit:read` |
 
 ### Rotas públicas
 
@@ -173,12 +176,6 @@ Consulte `ANALISE-PROTOCOLO-NEXORA-AUTH.md` para exemplos completos em **Go, Jav
 | `GET` | `/health` |
 | `GET` | `/ready` |
 | `GET` | `/metrics` |
-
-### Rotas com autenticação humana (mantidas)
-
-| Método | Path | Autenticação |
-|---|---|---|
-| `GET` | `/api/v1/audit/logs` | `Authorization: Bearer` |
 
 ---
 
@@ -190,20 +187,21 @@ Consulte `ANALISE-PROTOCOLO-NEXORA-AUTH.md` para exemplos completos em **Go, Jav
 |---|---|
 | `app/models.py` | Adicionado `ApiCredential` |
 | `alembic/versions/7ea9ac864a65_add_api_credentials.py` | Criado |
-| `app/config.py` | Adicionadas variáveis Nexora/Redis |
+| `app/config.py` | Adicionadas variáveis Nexora/Redis; removidas variáveis JWT/OAuth |
 | `app/security/nexora_auth.py` | Refatorado para HMAC com BD + Redis |
 | `app/security/__init__.py` | Exporta `NexoraAuth`, `require_nexora_signature` |
 | `app/security/encryption.py` | Corrigido `encrypt_text`/`decrypt_text` com base64 |
 | `app/services/api_credentials.py` | Criado |
 | `app/redis_client.py` | Criado |
 | `app/limiter.py` | Rate limit por access key + IP |
-| `app/deps.py` | Permite role `SYSTEM` |
+| `app/deps.py` | Permite role `SYSTEM`; removida dependência JWT |
 | `app/routers/biometric.py` | Protegido com Nexora HMAC |
 | `app/routers/fingerprint.py` | Protegido com Nexora HMAC |
 | `app/routers/liveness.py` | Protegido com Nexora HMAC |
-| `requirements.txt` | Adicionado `redis`, `fakeredis` |
+| `app/oauth_jwks.py` | **Removido** |
+| `requirements.txt` | Adicionado `redis`, `fakeredis`; removidas libs JWT |
 | `.env.example` | Atualizado |
-| `docker-compose.yml` | Adicionado serviço Redis |
+| `docker-compose.yml` | Adicionado serviço Redis; removidas variáveis JWT/gateway |
 
 ### SDK
 
@@ -226,6 +224,7 @@ Consulte `ANALISE-PROTOCOLO-NEXORA-AUTH.md` para exemplos completos em **Go, Jav
 | `tests/test_api.py` | Reescrito para usar HMAC |
 | `tests/test_api_credentials.py` | Criado |
 | `tests/test_nexora_auth.py` | Criado |
+| `tests/test_oauth_jwks.py` | **Removido** |
 
 ---
 
@@ -235,17 +234,16 @@ Consulte `ANALISE-PROTOCOLO-NEXORA-AUTH.md` para exemplos completos em **Go, Jav
 platform win32 -- Python 3.14.2, pytest-8.4.2, pluggy-1.6.0
 rootdir: D:\projecto\e-258tech\2026\factPro\assiduidade_system_backend
 plugins: anyio-4.14.1, cov-5.0.0
-collected 49 items
+collected 41 items
 
-nexora_sdk\tests\test_signer.py ....
-tests\test_api.py ..........
-tests\test_api_credentials.py .......
-tests\test_encryption.py ............
-tests\test_facial_verification.py .
-tests\test_nexora_auth.py .......
-tests\test_oauth_jwks.py ........
+nexora_sdk	ests	est_signer.py ....
+tests	est_api.py ..........
+tests	est_api_credentials.py .......
+tests	est_encryption.py ...........
+tests	est_facial_verification.py .
+tests	est_nexora_auth.py .......
 
-======================= 49 passed, 7 warnings in 17.07s =======================
+======================= 41 passed, 7 warnings in 17.07s =======================
 ```
 
 ---

@@ -20,8 +20,6 @@ services:
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-production}
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:admin@pg:5432/faceclock}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production}
-      GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-}
       FACIAL_VERIFICATION_SECRET: ${FACIAL_VERIFICATION_SECRET:-change-me-facial-verification-secret}
       FACIAL_VERIFICATION_TTL_SECONDS: ${FACIAL_VERIFICATION_TTL_SECONDS:-90}
       ERP_BASE_URL: ${ERP_BASE_URL:-https://api.nexora.e258tech.tech}

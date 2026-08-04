@@ -1,9 +1,6 @@
 """
 Validação de métodos de assiduidade contra a configuração por tenant
-(rh.assiduidade) do Nexora ERP — Fase 3 da integração.
-
-Ver proposta-arquitetura-assiduidade-erp.md secção 9.6 e
-CONTRATO-INTEGRACAO-ERP.md.
+(rh.assiduidade) do Nexora ERP.
 """
 
 import time

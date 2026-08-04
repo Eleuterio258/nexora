@@ -218,21 +218,27 @@ class TestAccessControlHMAC:
 
 
 # ============================================================
-# TESTES: Auditoria (proxy ERP) — mantém Bearer
+# TESTES: Auditoria (proxy ERP) — protegido por Nexora HMAC
 # ============================================================
 class TestAuditLogsProxy:
-    def test_audit_logs_requires_authorization(self, client):
+    def test_audit_logs_requires_hmac(self, client, fake_redis):
         response = client.get("/api/v1/audit/logs")
         assert response.status_code == 401
 
-    def test_audit_logs_proxies_to_erp(self, client, monkeypatch):
+    def test_audit_logs_proxies_to_erp(self, client, db_session, fake_redis, system_credential, monkeypatch):
         from app import erp_client as erp_client_module
 
-        async def fake_list_audit_logs(authorization, **kwargs):
-            assert authorization == "Bearer tok123"
+        async def fake_list_audit_logs(**kwargs):
             return {"data": [], "meta": {"total": 0, "page": 1, "limit": 50}}
 
+        # Garantir permissão audit:read
+        cred, secret = system_credential
+        cred.permissions = ["audit:read"]
+        db_session.commit()
+
         monkeypatch.setattr(erp_client_module.erp_client, "list_audit_logs", fake_list_audit_logs)
-        response = client.get("/api/v1/audit/logs", headers={"Authorization": "Bearer tok123"})
+
+        headers, _ = _sign(secret, cred.access_key_id, "GET", "/api/v1/audit/logs")
+        response = client.get("/api/v1/audit/logs", headers=headers)
         assert response.status_code == 200
         assert response.json() == {"data": [], "meta": {"total": 0, "page": 1, "limit": 50}}

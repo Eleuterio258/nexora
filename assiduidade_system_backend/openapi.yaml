@@ -13,46 +13,46 @@ paths:
       summary: Enroll Biometric
       operationId: enroll_biometric_api_v1_biometric_enroll_post
       parameters:
-      - name: Authorization
+      - name: X-Nexora-Access-Key
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: Authorization
-      - name: X-Auth-User-Id
+          title: X-Nexora-Access-Key
+      - name: X-Nexora-Timestamp
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Id
-      - name: X-Auth-User-Role
+          title: X-Nexora-Timestamp
+      - name: X-Nexora-Nonce
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Role
-      - name: X-Auth-Tenant-Id
+          title: X-Nexora-Nonce
+      - name: X-Nexora-Content-SHA256
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-Tenant-Id
-      - name: X-Gateway-Secret
+          title: X-Nexora-Content-Sha256
+      - name: X-Nexora-Signature
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Gateway-Secret
+          title: X-Nexora-Signature
       requestBody:
         required: true
         content:
@@ -72,6 +72,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - NexoraHMAC: []
   /api/v1/biometric/verify:
     post:
       tags:
@@ -79,46 +81,46 @@ paths:
       summary: Verify Biometric
       operationId: verify_biometric_api_v1_biometric_verify_post
       parameters:
-      - name: Authorization
+      - name: X-Nexora-Access-Key
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: Authorization
-      - name: X-Auth-User-Id
+          title: X-Nexora-Access-Key
+      - name: X-Nexora-Timestamp
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Id
-      - name: X-Auth-User-Role
+          title: X-Nexora-Timestamp
+      - name: X-Nexora-Nonce
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Role
-      - name: X-Auth-Tenant-Id
+          title: X-Nexora-Nonce
+      - name: X-Nexora-Content-SHA256
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-Tenant-Id
-      - name: X-Gateway-Secret
+          title: X-Nexora-Content-Sha256
+      - name: X-Nexora-Signature
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Gateway-Secret
+          title: X-Nexora-Signature
       requestBody:
         required: true
         content:
@@ -138,6 +140,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - NexoraHMAC: []
   /api/v1/liveness/challenge:
     post:
       tags:
@@ -146,46 +150,46 @@ paths:
       description: Gera um desafio de prova de vida para o utilizador (válido 45s).
       operationId: request_liveness_challenge_api_v1_liveness_challenge_post
       parameters:
-      - name: Authorization
+      - name: X-Nexora-Access-Key
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: Authorization
-      - name: X-Auth-User-Id
+          title: X-Nexora-Access-Key
+      - name: X-Nexora-Timestamp
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Id
-      - name: X-Auth-User-Role
+          title: X-Nexora-Timestamp
+      - name: X-Nexora-Nonce
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Role
-      - name: X-Auth-Tenant-Id
+          title: X-Nexora-Nonce
+      - name: X-Nexora-Content-SHA256
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-Tenant-Id
-      - name: X-Gateway-Secret
+          title: X-Nexora-Content-Sha256
+      - name: X-Nexora-Signature
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Gateway-Secret
+          title: X-Nexora-Signature
       requestBody:
         required: true
         content:
@@ -208,6 +212,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - NexoraHMAC: []
   /api/v1/liveness/verify:
     post:
       tags:
@@ -217,46 +223,46 @@ paths:
         local.
       operationId: verify_liveness_challenge_api_v1_liveness_verify_post
       parameters:
-      - name: Authorization
+      - name: X-Nexora-Access-Key
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: Authorization
-      - name: X-Auth-User-Id
+          title: X-Nexora-Access-Key
+      - name: X-Nexora-Timestamp
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Id
-      - name: X-Auth-User-Role
+          title: X-Nexora-Timestamp
+      - name: X-Nexora-Nonce
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Role
-      - name: X-Auth-Tenant-Id
+          title: X-Nexora-Nonce
+      - name: X-Nexora-Content-SHA256
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-Tenant-Id
-      - name: X-Gateway-Secret
+          title: X-Nexora-Content-Sha256
+      - name: X-Nexora-Signature
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Gateway-Secret
+          title: X-Nexora-Signature
       requestBody:
         required: true
         content:
@@ -278,54 +284,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - NexoraHMAC: []
   /api/v1/fingerprint/enroll:
     post:
       tags:
       - Fingerprint
       summary: Enroll Fingerprint
-      description: Regista um template de impressão digital para um utilizador.
+      description: Regista ou actualiza um template de impressão digital para um utilizador.
       operationId: enroll_fingerprint_api_v1_fingerprint_enroll_post
       parameters:
-      - name: Authorization
+      - name: X-Nexora-Access-Key
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: Authorization
-      - name: X-Auth-User-Id
+          title: X-Nexora-Access-Key
+      - name: X-Nexora-Timestamp
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Id
-      - name: X-Auth-User-Role
+          title: X-Nexora-Timestamp
+      - name: X-Nexora-Nonce
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Role
-      - name: X-Auth-Tenant-Id
+          title: X-Nexora-Nonce
+      - name: X-Nexora-Content-SHA256
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-Tenant-Id
-      - name: X-Gateway-Secret
+          title: X-Nexora-Content-Sha256
+      - name: X-Nexora-Signature
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Gateway-Secret
+          title: X-Nexora-Signature
       requestBody:
         required: true
         content:
@@ -333,18 +341,20 @@ paths:
             schema:
               $ref: '#/components/schemas/FingerprintEnrollRequest'
       responses:
-        '200':
+        '201':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/FingerprintResponse'
+                $ref: '#/components/schemas/FingerprintEnrollResponse'
         '422':
           description: Validation Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - NexoraHMAC: []
   /api/v1/fingerprint/identify:
     post:
       tags:
@@ -361,46 +371,46 @@ paths:
         fornecido pelo SDK do leitor.'
       operationId: identify_fingerprint_api_v1_fingerprint_identify_post
       parameters:
-      - name: Authorization
+      - name: X-Nexora-Access-Key
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: Authorization
-      - name: X-Auth-User-Id
+          title: X-Nexora-Access-Key
+      - name: X-Nexora-Timestamp
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Id
-      - name: X-Auth-User-Role
+          title: X-Nexora-Timestamp
+      - name: X-Nexora-Nonce
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Role
-      - name: X-Auth-Tenant-Id
+          title: X-Nexora-Nonce
+      - name: X-Nexora-Content-SHA256
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-Tenant-Id
-      - name: X-Gateway-Secret
+          title: X-Nexora-Content-Sha256
+      - name: X-Nexora-Signature
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Gateway-Secret
+          title: X-Nexora-Signature
       requestBody:
         required: true
         content:
@@ -420,6 +430,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - NexoraHMAC: []
   /api/v1/fingerprint/enroll/{user_id}:
     delete:
       tags:
@@ -442,46 +454,46 @@ paths:
           - type: string
           - type: 'null'
           title: Finger Type
-      - name: Authorization
+      - name: X-Nexora-Access-Key
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: Authorization
-      - name: X-Auth-User-Id
+          title: X-Nexora-Access-Key
+      - name: X-Nexora-Timestamp
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Id
-      - name: X-Auth-User-Role
+          title: X-Nexora-Timestamp
+      - name: X-Nexora-Nonce
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-User-Role
-      - name: X-Auth-Tenant-Id
+          title: X-Nexora-Nonce
+      - name: X-Nexora-Content-SHA256
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Auth-Tenant-Id
-      - name: X-Gateway-Secret
+          title: X-Nexora-Content-Sha256
+      - name: X-Nexora-Signature
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: X-Gateway-Secret
+          title: X-Nexora-Signature
       responses:
         '200':
           description: Successful Response
@@ -498,6 +510,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - NexoraHMAC: []
   /api/v1/audit/logs:
     get:
       tags:
@@ -506,9 +520,7 @@ paths:
       description: 'Logs de auditoria, delegado no Nexora ERP (`GET /api/audit-logs`).
 
 
-        O ERP é quem decide quem pode ver auditoria (`auditoria:ver_logs`, via
-
-        `RequirePermission`) — não há verificação de papel adicional aqui.'
+        Autenticado por Nexora HMAC. O ERP é quem decide quem pode ver auditoria.'
       operationId: list_audit_logs_api_v1_audit_logs_get
       parameters:
       - name: modulo
@@ -570,14 +582,46 @@ paths:
             minimum: 1
           - type: 'null'
           title: Limit
-      - name: Authorization
+      - name: X-Nexora-Access-Key
         in: header
         required: false
         schema:
           anyOf:
           - type: string
           - type: 'null'
-          title: Authorization
+          title: X-Nexora-Access-Key
+      - name: X-Nexora-Timestamp
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Nexora-Timestamp
+      - name: X-Nexora-Nonce
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Nexora-Nonce
+      - name: X-Nexora-Content-SHA256
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Nexora-Content-Sha256
+      - name: X-Nexora-Signature
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Nexora-Signature
       responses:
         '200':
           description: Successful Response
@@ -593,6 +637,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - NexoraHMAC: []
   /metrics:
     get:
       tags:
@@ -640,16 +686,21 @@ components:
     CaptureInput:
       properties:
         image_base64:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           title: Image Base64
+        image_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Image Url
         angle:
           anyOf:
           - type: string
           - type: 'null'
           title: Angle
       type: object
-      required:
-      - image_base64
       title: CaptureInput
     EnrollRequest:
       properties:
@@ -694,6 +745,11 @@ components:
         user_id:
           type: string
           title: User Id
+        erp_funcionario_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Erp Funcionario Id
         finger_type:
           type: string
           title: Finger Type
@@ -706,6 +762,29 @@ components:
       - user_id
       - template_base64
       title: FingerprintEnrollRequest
+    FingerprintEnrollResponse:
+      properties:
+        success:
+          type: boolean
+          title: Success
+        template_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Template Id
+        user_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: User Id
+        message:
+          type: string
+          title: Message
+      type: object
+      required:
+      - success
+      - message
+      title: FingerprintEnrollResponse
     FingerprintResponse:
       properties:
         success:
@@ -823,8 +902,15 @@ components:
           format: uuid
           title: Device Id
         image_base64:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           title: Image Base64
+        image_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Image Url
         geo_lat:
           anyOf:
           - type: number
@@ -839,7 +925,6 @@ components:
       required:
       - user_id
       - device_id
-      - image_base64
       title: VerifyRequest
     VerifyResponse:
       properties:
@@ -871,7 +956,6 @@ components:
           - type: string
           - type: 'null'
           title: Verification Token
-          description: Comprovativo assinado, curto e de uso único; presente apenas quando match=true.
       type: object
       required:
       - match
@@ -879,3 +963,11 @@ components:
       - liveness_score
       - timestamp
       title: VerifyResponse
+  securitySchemes:
+    NexoraHMAC:
+      type: apiKey
+      in: header
+      name: X-Nexora-Signature
+      description: Assinatura HMAC-SHA256 da mensagem canónica. Requer também os headers
+        X-Nexora-Access-Key, X-Nexora-Timestamp, X-Nexora-Nonce e X-Nexora-Content-SHA256.
+        Consulte docs/NEXORA_AUTH.md.

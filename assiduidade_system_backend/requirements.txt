@@ -5,9 +5,8 @@ sqlalchemy>=2.0.36,<3.0.0
 python-dotenv>=1.0.0,<2.0.0
 bcrypt==4.0.1
 pyjwt>=2.8.0,<3.0.0
-# Necessario ao PyJWT para verificar RS256 (chave publica) — os tokens
-# emitidos por /oauth/token do Nexora ERP passam a ser verificados
-# localmente via JWKS, nao mais por round-trip a gateway/validate.
+# cryptography é usada para cifragem AES-256-GCM de templates biométricos e
+# cifragem Fernet das credenciais Nexora em repouso.
 cryptography>=42.0.0,<44.0.0
 pyotp>=2.9.0,<3.0.0
 alembic>=1.13.3,<2.0.0

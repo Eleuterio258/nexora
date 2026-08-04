@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const connString = "postgres://postgres:admin@209.126.86.55:5432/nexora_erp?sslmode=disable"
+const connString = "postgres://postgres:Plane%40mento1@209.126.86.55:5432/nexora_erp?sslmode=disable"
 
 type schemaInfo struct {
 	name       string

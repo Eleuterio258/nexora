@@ -1,18 +1,12 @@
 """
 Cliente HTTP para integração com o Nexora ERP.
 
-Desde 2026-07-13, os endpoints autenticados por API Key de device
-(funcionários, config de assiduidade, eventos de presença, QR/NFC/geofence)
-deixaram de passar por aqui — a app Android chama-os directamente no ERP com
-a chave embutida no APK (ver ErpApiService.kt/HardwareEventMapper.kt no
-nexora_assiduidade). Este cliente mantém-se para:
-- Validar o Bearer token de um utilizador já autenticado no ERP (delega em
-  GET /api/auth/gateway/validate — o login em si é feito directamente no
-  ERP, ver Fase 6 da integração).
-- Proxies de consentimentos LGPD (ainda autenticados por API Key de device,
-  porque são submetidos no momento do enrolamento biométrico, antes de haver
-  sessão do próprio colaborador).
-- Proxies Bearer-autenticados (audit-logs, cancelamento de correcção de ponto).
+Autenticação do FaceClock para utilizadores e integrações passou a ser feita
+por Nexora HMAC (app/security/nexora_auth.py). Este cliente mantém-se apenas
+para chamadas serviço-a-serviço do FaceClock ao ERP, usando API Key de device:
+- Configuração de métodos de assiduidade.
+- Proxies de consentimentos LGPD.
+- Proxy de audit-logs.
 
 Quando o ERP não está configurado ou está indisponível, as operações
 levantam ERPUnavailableError para que o chamador possa decidir sobre fallback.
@@ -109,13 +103,6 @@ class ERPClient:
 
         return response.json()
 
-    # validate_bearer_token (round-trip a GET /api/auth/gateway/validate) foi
-    # removido — a verificação de identidade de utilizadores finais passou a
-    # ser local, via JWKS (ver app.oauth_jwks.decode_erp_access_token,
-    # consumido por deps._validate_local_jwt). GatewayValidate/gatewayAppRole
-    # continuam a existir no ERP só para o caso residual de headers X-Auth-*
-    # de confiança (ver deps._check_gateway_secret), não para Bearer tokens.
-
     def _raise_for_proxy(self, response: httpx.Response) -> None:
         if response.status_code >= 400:
             try:
@@ -126,7 +113,6 @@ class ERPClient:
 
     async def list_audit_logs(
         self,
-        authorization: str,
         modulo: str | None = None,
         user_id: str | None = None,
         entidade: str | None = None,
@@ -135,15 +121,14 @@ class ERPClient:
         page: int | None = None,
         limit: int | None = None,
     ) -> dict[str, Any]:
-        """Proxy para `GET /api/audit-logs` no Nexora ERP. Reencaminha o Bearer
-        token de quem chama — o próprio ERP impõe `auditoria:ver_logs` via
-        `RequirePermission`, por isso não há verificação de papel adicional no
-        FaceClock (para não haver duas fontes de verdade sobre quem pode ver
-        auditoria).
+        """Proxy para `GET /api/audit-logs` no Nexora ERP.
+
+        Usa a API Key de device configurada em ERP_API_KEY. O próprio ERP
+        impõe `auditoria:ver_logs` via `RequirePermission`.
         """
         if not self._is_configured():
             raise ERPUnavailableError("ERP_BASE_URL nao configurado.")
-        headers = {**self._headers(), "Authorization": authorization}
+        headers = self._device_headers()
         params = {
             k: v
             for k, v in {

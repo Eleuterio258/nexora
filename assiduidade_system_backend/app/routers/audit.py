@@ -1,9 +1,13 @@
 from typing import Any
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
 
+from app.database import get_db
+from app.deps import ActorContext
 from app.erp_client import erp_client
-from app.erp_proxy import call_erp, require_authorization
+from app.erp_proxy import call_erp
+from app.security import require_nexora_signature
 
 router = APIRouter(tags=["Audit"])
 
@@ -17,17 +21,15 @@ async def list_audit_logs(
     acao: str | None = Query(default=None),
     page: int | None = Query(default=None, ge=1),
     limit: int | None = Query(default=None, ge=1, le=100),
-    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db),
+    actor: ActorContext = require_nexora_signature("audit:read"),
 ) -> dict[str, Any]:
     """Logs de auditoria, delegado no Nexora ERP (`GET /api/audit-logs`).
 
-    O ERP é quem decide quem pode ver auditoria (`auditoria:ver_logs`, via
-    `RequirePermission`) — não há verificação de papel adicional aqui.
+    Autenticado por Nexora HMAC. O ERP é quem decide quem pode ver auditoria.
     """
-    token = require_authorization(authorization)
     return await call_erp(
         lambda: erp_client.list_audit_logs(
-            token,
             modulo=modulo,
             user_id=user_id,
             entidade=entidade,
