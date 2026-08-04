@@ -26,15 +26,16 @@ func main() {
 	}
 
 	dst, err := storage.New(storage.Config{
-		Provider:       cfg.StorageProvider,
-		LocalDir:       cfg.StorageLocalDir,
-		PublicBaseURL:  cfg.StoragePublicURL,
-		MinioEndpoint:  cfg.MinioEndpoint,
-		MinioAccessKey: cfg.MinioAccessKey,
-		MinioSecretKey: cfg.MinioSecretKey,
-		MinioBucket:    cfg.MinioBucket,
-		MinioUseSSL:    cfg.MinioUseSSL,
-		MinioRegion:    cfg.MinioRegion,
+		Provider:          cfg.StorageProvider,
+		LocalDir:          cfg.StorageLocalDir,
+		PublicBaseURL:     cfg.StoragePublicURL,
+		MinioEndpoint:     cfg.MinioEndpoint,
+		MinioAccessKey:    cfg.MinioAccessKey,
+		MinioSecretKey:    cfg.MinioSecretKey,
+		MinioBucket:       cfg.MinioBucket,
+		MinioUseSSL:       cfg.MinioUseSSL,
+		MinioRegion:       cfg.MinioRegion,
+		MinioBucketLookup: cfg.MinioBucketLookup,
 	})
 	if err != nil {
 		log.Fatalf("storage destino: %v", err)

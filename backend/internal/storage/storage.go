@@ -68,15 +68,16 @@ func immutableObjectMatches(ctx context.Context, provider Provider, key string, 
 
 // Config agrupa as configurações necessárias para criar um Provider.
 type Config struct {
-	Provider       string // "local" ou "minio"
-	LocalDir       string // diretório base para provider local
-	MinioEndpoint  string
-	MinioAccessKey string
-	MinioSecretKey string
-	MinioBucket    string
-	MinioUseSSL    bool
-	MinioRegion    string
-	PublicBaseURL  string // URL base devolvida para clientes (ex: http://localhost:9004/nexora)
+	Provider          string // "local" ou "minio"
+	LocalDir          string // diretório base para provider local
+	MinioEndpoint     string
+	MinioAccessKey    string
+	MinioSecretKey    string
+	MinioBucket       string
+	MinioUseSSL       bool
+	MinioRegion       string
+	MinioBucketLookup string // "auto" | "dns" | "path"
+	PublicBaseURL     string // URL base devolvida para clientes (ex: http://localhost:9004/nexora)
 }
 
 // New cria um Provider consoante a configuração.

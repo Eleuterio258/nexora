@@ -25,7 +25,9 @@ class TestBiometricEncryption:
         ciphertext = enc.encrypt_text(plaintext)
 
         assert ciphertext != plaintext
-        assert ciphertext.startswith("enc:v1:")
+        # O ciphertext é base64 do payload binário prefixado com enc:v1:
+        decoded = base64.b64decode(ciphertext)
+        assert decoded.startswith(b"enc:v1:")
         assert enc.decrypt_text(ciphertext) == plaintext
 
     def test_decrypt_legacy_data_returns_unchanged(self):

@@ -18,7 +18,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import ActorContext, apply_tenant, get_actor, require_self_or_manager
+from app.deps import ActorContext, apply_tenant, require_self_or_manager
+from app.security import require_nexora_signature
 from app.limiter import limiter
 from app.models import FingerprintTemplate
 from app.security import get_biometric_encryption
@@ -78,7 +79,7 @@ def enroll_fingerprint(
     request: Request,
     payload: FingerprintEnrollRequest,
     db: Session = Depends(get_db),
-    actor: ActorContext = Depends(get_actor),
+    actor: ActorContext = require_nexora_signature("fingerprint:enroll"),
 ) -> FingerprintEnrollResponse:
     """Regista ou actualiza um template de impressão digital para um utilizador."""
     erp_user_id = payload.user_id
@@ -138,7 +139,7 @@ def identify_fingerprint(
     request: Request,
     payload: FingerprintVerifyRequest,
     db: Session = Depends(get_db),
-    actor: ActorContext = Depends(get_actor),
+    actor: ActorContext = require_nexora_signature("fingerprint:identify"),
 ) -> FingerprintResponse:
     """
     Identifica um utilizador a partir de um template de impressão digital.
@@ -174,7 +175,7 @@ def delete_fingerprint_enrollment(
     user_id: str,
     finger_type: str | None = None,
     db: Session = Depends(get_db),
-    actor: ActorContext = Depends(get_actor),
+    actor: ActorContext = require_nexora_signature("fingerprint:delete"),
 ) -> dict:
     """Remove o enrolamento de impressão digital de um utilizador."""
     require_self_or_manager(actor, user_id)

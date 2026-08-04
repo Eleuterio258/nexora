@@ -1,4 +1,13 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: assiduidade-redis
+    restart: unless-stopped
+    networks:
+      - backend
+    volumes:
+      - redis_data:/data
+
   controle-api:
     build:
       context: .
@@ -15,25 +24,19 @@ services:
       GATEWAY_SHARED_SECRET: ${GATEWAY_SHARED_SECRET:-}
       FACIAL_VERIFICATION_SECRET: ${FACIAL_VERIFICATION_SECRET:-change-me-facial-verification-secret}
       FACIAL_VERIFICATION_TTL_SECONDS: ${FACIAL_VERIFICATION_TTL_SECONDS:-90}
-      # Sem isto, QUALQUER Bearer token falha a validação em
-      # app/deps.py:_validate_local_jwt (via app/oauth_jwks.py, que deriva
-      # ERP_JWKS_URL = ERP_BASE_URL + "/oauth/jwks" por omissão) — partia
-      # /biometric/verify, /liveness/*, audit-logs, etc. por faltar aqui,
-      # mesmo que estivesse definido no ambiente do host.
       ERP_BASE_URL: ${ERP_BASE_URL:-https://api.nexora.e258tech.tech}
       ERP_API_KEY: ${ERP_API_KEY:-}
       SEED_DATA_ON_STARTUP: "false"
       PORT: "8000"
-    healthcheck:
-      test:
-        - "CMD"
-        - "python"
-        - "-c"
-        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      # Nexora HMAC auth
+      NEXORA_CREDENTIAL_ENCRYPTION_KEY: ${NEXORA_CREDENTIAL_ENCRYPTION_KEY:-change-me-nexora-credential-encryption-key}
+      NEXORA_SIGNATURE_TTL_SECONDS: ${NEXORA_SIGNATURE_TTL_SECONDS:-300}
+      NEXORA_AUTH_VERSION: ${NEXORA_AUTH_VERSION:-NEXORA-HMAC-SHA256-V1}
+      NEXORA_HMAC_REQUIRE_HTTPS: ${NEXORA_HMAC_REQUIRE_HTTPS:-true}
+      NEXORA_RATE_LIMIT_PER_KEY: ${NEXORA_RATE_LIMIT_PER_KEY:-100/minute}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      - redis
     networks:
       - backend
     labels:
@@ -50,7 +53,20 @@ services:
       - "traefik.http.routers.asseduidade-http.middlewares=asseduidade-https"
       - "traefik.http.middlewares.asseduidade-https.redirectscheme.scheme=https"
       - "traefik.http.middlewares.asseduidade-https.redirectscheme.permanent=true"
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
 networks:
   backend:
     external: true
+
+volumes:
+  redis_data:

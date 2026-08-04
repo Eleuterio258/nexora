@@ -8,6 +8,7 @@ load_dotenv()
 DEFAULT_JWT_SECRET_KEY = "change-me-in-production"
 DEFAULT_BIOMETRIC_ENCRYPTION_KEY = "change-me-in-production-biometric-key-32bytes"
 DEFAULT_FACIAL_VERIFICATION_SECRET = "change-me-facial-verification-secret"
+DEFAULT_NEXORA_CREDENTIAL_ENCRYPTION_KEY = "change-me-nexora-credential-encryption-key"
 
 
 class Settings:
@@ -72,6 +73,19 @@ class Settings:
     # outro utilizador/tenant. Vazio = confiar nos headers sem verificacao
     # (aceitavel so em dev local; bloqueado em producao por assert_production_secrets).
     gateway_shared_secret: str = os.getenv("GATEWAY_SHARED_SECRET", "")
+    # Autenticacao mútua FaceClock <-> ERP/terminais via HMAC.
+    # As credenciais sao armazenadas na base de dados (ApiCredential) e a chave
+    # secreta e cifrada em repouso com uma chave mestra externa.
+    nexora_credential_encryption_key: str = os.getenv(
+        "NEXORA_CREDENTIAL_ENCRYPTION_KEY", DEFAULT_NEXORA_CREDENTIAL_ENCRYPTION_KEY
+    )
+    nexora_signature_ttl_seconds: int = int(os.getenv("NEXORA_SIGNATURE_TTL_SECONDS", "300"))
+    nexora_auth_version: str = os.getenv("NEXORA_AUTH_VERSION", "NEXORA-HMAC-SHA256-V1")
+    nexora_hmac_require_https: bool = os.getenv(
+        "NEXORA_HMAC_REQUIRE_HTTPS", "true"
+    ).lower() == "true"
+    redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    nexora_rate_limit_per_key: str = os.getenv("NEXORA_RATE_LIMIT_PER_KEY", "100/minute")
 
     @property
     def biometric_encryption_key(self) -> bytes:
@@ -122,6 +136,12 @@ class Settings:
             raise RuntimeError(
                 "FACIAL_VERIFICATION_SECRET nao configurado (ou igual ao default versionado) "
                 "com ENVIRONMENT=production. Use o mesmo segredo forte configurado no Nexora ERP."
+            )
+        if os.getenv("NEXORA_CREDENTIAL_ENCRYPTION_KEY", DEFAULT_NEXORA_CREDENTIAL_ENCRYPTION_KEY) == DEFAULT_NEXORA_CREDENTIAL_ENCRYPTION_KEY:
+            raise RuntimeError(
+                "NEXORA_CREDENTIAL_ENCRYPTION_KEY nao configurado (ou igual ao default versionado) "
+                "com ENVIRONMENT=production. Defina uma chave forte e unica para cifrar "
+                "as credenciais Nexora em repouso antes de arrancar."
             )
 
 

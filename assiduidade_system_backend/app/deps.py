@@ -213,10 +213,13 @@ def require_self_or_manager(actor: ActorContext, target_user_id: str) -> None:
     limpeza stateless (ver CONTRATO-INTEGRACAO-ERP.md secção 8.5): qualquer
     role de gestor pode operar em nome de outrem do seu tenant; um
     colaborador comum só pode operar sobre a própria identidade.
+
+    Chamadas serviço-a-serviço autenticadas por Nexora HMAC usam role SYSTEM
+    e podem operar em nome de qualquer utilizador do tenant.
     """
     if actor.id == target_user_id:
         return
-    if actor.role in ("ADMIN_SISTEMA", "GESTOR_RH"):
+    if actor.role in ("ADMIN_SISTEMA", "GESTOR_RH", "SYSTEM"):
         return
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,

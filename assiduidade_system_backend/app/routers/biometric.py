@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from app.biometric_metrics import biometric_metrics
 from app.config import settings
 from app.database import get_db
-from app.deps import ActorContext, apply_tenant, get_actor, require_self_or_manager
+from app.deps import ActorContext, apply_tenant, require_self_or_manager
+from app.security import require_nexora_signature
 from app.limiter import limiter
 from app.models import FaceTemplate
 from app.schemas.common import SourceType, TemplateStatus
@@ -39,7 +40,7 @@ def enroll_biometric(
     request: Request,
     payload: EnrollRequest,
     db: Session = Depends(get_db),
-    actor: ActorContext = Depends(get_actor),
+    actor: ActorContext = require_nexora_signature("biometric:enroll"),
 ) -> EnrollResponse:
     erp_user_id = str(payload.user_id)
     require_self_or_manager(actor, erp_user_id)
@@ -140,7 +141,7 @@ async def verify_biometric(
     request: Request,
     payload: VerifyRequest,
     db: Session = Depends(get_db),
-    actor: ActorContext = Depends(get_actor),
+    actor: ActorContext = require_nexora_signature("biometric:verify"),
 ) -> VerifyResponse:
     await validar_metodo_assiduidade(SourceType.FACIAL)
 

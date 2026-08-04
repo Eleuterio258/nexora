@@ -24,16 +24,26 @@
       "item": [
         {
           "name": "Login",
-          "event": [{ "listen": "test", "script": { "exec": [
-            "var j = pm.response.json();",
-            "if(j.token) pm.collectionVariables.set('token', j.token);",
-            "if(j.refresh_token) pm.collectionVariables.set('refresh_token', j.refresh_token);"
-          ]}}],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var j = pm.response.json();",
+                  "if(j.token) pm.collectionVariables.set('token', j.token);",
+                  "if(j.refresh_token) pm.collectionVariables.set('refresh_token', j.refresh_token);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{base}}/api/auth/login",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@empresa.co.mz\",\n  \"password\": \"senha123\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@empresa.co.mz\",\n  \"password\": \"senha123\"\n}"
+            }
           }
         },
         {
@@ -42,7 +52,10 @@
             "method": "POST",
             "url": "{{base}}/api/auth/refresh",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            }
           }
         },
         {
@@ -78,7 +91,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"password_atual\": \"senha123\",\n  \"password_nova\": \"novaSenha456\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password_atual\": \"senha123\",\n  \"password_nova\": \"novaSenha456\"\n}"
+            }
           }
         },
         {
@@ -87,7 +103,10 @@
             "method": "POST",
             "url": "{{base}}/api/auth/forgot-password",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"user@empresa.co.mz\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@empresa.co.mz\"\n}"
+            }
           }
         }
       ]
@@ -112,7 +131,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"João Silva\",\n  \"email\": \"joao@empresa.co.mz\",\n  \"password\": \"senha123\",\n  \"tipo\": \"funcionario\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"João Silva\",\n  \"email\": \"joao@empresa.co.mz\",\n  \"password\": \"senha123\",\n  \"tipo\": \"funcionario\"\n}"
+            }
           }
         },
         {
@@ -132,7 +154,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"João Actualizado\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"João Actualizado\"\n}"
+            }
           }
         },
         {
@@ -180,7 +205,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"permissoes\": [1, 2, 3]\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissoes\": [1, 2, 3]\n}"
+            }
           }
         }
       ]
@@ -205,7 +233,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Vendedor\",\n  \"descricao\": \"Acesso ao módulo de vendas\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Vendedor\",\n  \"descricao\": \"Acesso ao módulo de vendas\"\n}"
+            }
           }
         },
         {
@@ -217,7 +248,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"permissoes\": [1, 2, 5, 6]\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissoes\": [1, 2, 5, 6]\n}"
+            }
           }
         }
       ]
@@ -242,7 +276,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Empresa Demo Lda\",\n  \"nuit\": \"400123456\",\n  \"email\": \"geral@empresa.co.mz\",\n  \"telefone\": \"+258 21 123456\",\n  \"pais\": \"Mocambique\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Empresa Demo Lda\",\n  \"nuit\": \"400123456\",\n  \"email\": \"geral@empresa.co.mz\",\n  \"telefone\": \"+258 21 123456\",\n  \"pais\": \"Mocambique\"\n}"
+            }
           }
         },
         {
@@ -270,7 +307,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Filial Maputo\",\n  \"codigo\": \"MAP01\",\n  \"endereco\": \"Av. 25 de Setembro, 1234\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Filial Maputo\",\n  \"codigo\": \"MAP01\",\n  \"endereco\": \"Av. 25 de Setembro, 1234\"\n}"
+            }
           }
         }
       ]
@@ -295,7 +335,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"chave\": \"moeda_padrao\",\n  \"valor\": \"MZN\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chave\": \"moeda_padrao\",\n  \"valor\": \"MZN\"\n}"
+            }
           }
         },
         {
@@ -315,7 +358,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"MZN\",\n  \"nome\": \"Metical Moçambicano\",\n  \"simbolo\": \"MT\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"MZN\",\n  \"nome\": \"Metical Moçambicano\",\n  \"simbolo\": \"MT\"\n}"
+            }
           }
         },
         {
@@ -348,7 +394,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"RETL\",\n  \"nome\": \"Retalho\",\n  \"descricao\": \"Clientes de retalho\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"RETL\",\n  \"nome\": \"Retalho\",\n  \"descricao\": \"Clientes de retalho\"\n}"
+            }
           }
         },
         {
@@ -376,7 +425,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Maria Empresa Lda\",\n  \"nuit\": \"400987654\",\n  \"email\": \"maria@empresa.co.mz\",\n  \"telefone\": \"+258 82 111 2233\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Maria Empresa Lda\",\n  \"nuit\": \"400987654\",\n  \"email\": \"maria@empresa.co.mz\",\n  \"telefone\": \"+258 82 111 2233\"\n}"
+            }
           }
         },
         {
@@ -396,7 +448,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"telefone\": \"+258 82 999 8877\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"telefone\": \"+258 82 999 8877\"\n}"
+            }
           }
         },
         {
@@ -416,7 +471,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"António Gerente\",\n  \"cargo\": \"Gerente\",\n  \"telefone\": \"+258 84 555 6677\",\n  \"email\": \"antonio@empresa.co.mz\",\n  \"principal\": true\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"António Gerente\",\n  \"cargo\": \"Gerente\",\n  \"telefone\": \"+258 84 555 6677\",\n  \"email\": \"antonio@empresa.co.mz\",\n  \"principal\": true\n}"
+            }
           }
         },
         {
@@ -428,7 +486,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"principal\",\n  \"pais\": \"Mocambique\",\n  \"provincia\": \"Maputo\",\n  \"cidade\": \"Maputo\",\n  \"endereco\": \"Av. Karl Marx, 456\",\n  \"principal\": true\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"principal\",\n  \"pais\": \"Mocambique\",\n  \"provincia\": \"Maputo\",\n  \"cidade\": \"Maputo\",\n  \"endereco\": \"Av. Karl Marx, 456\",\n  \"principal\": true\n}"
+            }
           }
         },
         {
@@ -448,7 +509,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"metodo\": \"transferencia\",\n  \"valor\": 5000.00,\n  \"referencia\": \"TRF-2026-001\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"metodo\": \"transferencia\",\n  \"valor\": 5000.00,\n  \"referencia\": \"TRF-2026-001\"\n}"
+            }
           }
         },
         {
@@ -481,7 +545,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"ELEC\",\n  \"nome\": \"Electrónica\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"ELEC\",\n  \"nome\": \"Electrónica\"\n}"
+            }
           }
         },
         {
@@ -521,7 +588,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Unidade\",\n  \"simbolo\": \"un\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Unidade\",\n  \"simbolo\": \"un\"\n}"
+            }
           }
         },
         {
@@ -549,7 +619,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"PROD-001\",\n  \"nome\": \"Televisor 55 Polegadas\",\n  \"product_category_id\": 1,\n  \"product_unit_id\": 1,\n  \"preco_venda\": 45000.00,\n  \"controla_stock\": true\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"PROD-001\",\n  \"nome\": \"Televisor 55 Polegadas\",\n  \"product_category_id\": 1,\n  \"product_unit_id\": 1,\n  \"preco_venda\": 45000.00,\n  \"controla_stock\": true\n}"
+            }
           }
         },
         {
@@ -569,7 +642,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"venda\",\n  \"valor\": 45000.00,\n  \"moeda\": \"MZN\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"venda\",\n  \"valor\": 45000.00,\n  \"moeda\": \"MZN\"\n}"
+            }
           }
         }
       ]
@@ -594,7 +670,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"ARM-001\",\n  \"nome\": \"Armazém Central Maputo\",\n  \"localizacao\": \"Av. de Moçambique, km 5\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"ARM-001\",\n  \"nome\": \"Armazém Central Maputo\",\n  \"localizacao\": \"Av. de Moçambique, km 5\"\n}"
+            }
           }
         },
         {
@@ -614,7 +693,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"codigo\": \"A-01-01\",\n  \"nome\": \"Prateleira A, Corredor 1\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"A-01-01\",\n  \"nome\": \"Prateleira A, Corredor 1\"\n}"
+            }
           }
         },
         {
@@ -637,7 +719,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"product_id\": 1,\n  \"warehouse_id\": 1,\n  \"quantity\": 50,\n  \"minimum_quantity\": 5\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": 1,\n  \"warehouse_id\": 1,\n  \"quantity\": 50,\n  \"minimum_quantity\": 5\n}"
+            }
           }
         },
         {
@@ -657,7 +742,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"stock_item_id\": 1,\n  \"movement_type\": \"entrada\",\n  \"quantity\": 10,\n  \"reference_type\": \"compra\",\n  \"notes\": \"Entrada de stock inicial\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock_item_id\": 1,\n  \"movement_type\": \"entrada\",\n  \"quantity\": 10,\n  \"reference_type\": \"compra\",\n  \"notes\": \"Entrada de stock inicial\"\n}"
+            }
           }
         },
         {
@@ -669,7 +757,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"stock_item_id\": 1,\n  \"adjustment_type\": \"contagem\",\n  \"quantity\": -2,\n  \"reason\": \"Correcção após inventário\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock_item_id\": 1,\n  \"adjustment_type\": \"contagem\",\n  \"quantity\": -2,\n  \"reason\": \"Correcção após inventário\"\n}"
+            }
           }
         },
         {
@@ -681,7 +772,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"numero\": \"TRF-2026-001\",\n  \"from_warehouse_id\": 1,\n  \"to_warehouse_id\": 2\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": \"TRF-2026-001\",\n  \"from_warehouse_id\": 1,\n  \"to_warehouse_id\": 2\n}"
+            }
           }
         },
         {
@@ -705,7 +799,9 @@
               "request": {
                 "method": "GET",
                 "url": "{{base}}/api/faturacao/series",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             },
             {
@@ -717,7 +813,10 @@
                   { "key": "Authorization", "value": "Bearer {{token}}" },
                   { "key": "Content-Type", "value": "application/json" }
                 ],
-                "body": { "mode": "raw", "raw": "{\n  \"tipo\": \"FT\",\n  \"prefixo\": \"FT2026\",\n  \"ano\": 2026\n}" }
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"tipo\": \"FT\",\n  \"prefixo\": \"FT2026\",\n  \"ano\": 2026\n}"
+                }
               }
             }
           ]
@@ -730,7 +829,9 @@
               "request": {
                 "method": "GET",
                 "url": "{{base}}/api/faturacao/quotes",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             },
             {
@@ -742,7 +843,10 @@
                   { "key": "Authorization", "value": "Bearer {{token}}" },
                   { "key": "Content-Type", "value": "application/json" }
                 ],
-                "body": { "mode": "raw", "raw": "{\n  \"customer_id\": 1,\n  \"numero\": \"ORC-2026-000001\",\n  \"moeda\": \"MZN\",\n  \"validade\": \"2026-05-31\",\n  \"observacoes\": \"Validade de 30 dias\"\n}" }
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"customer_id\": 1,\n  \"numero\": \"ORC-2026-000001\",\n  \"moeda\": \"MZN\",\n  \"validade\": \"2026-05-31\",\n  \"observacoes\": \"Validade de 30 dias\"\n}"
+                }
               }
             },
             {
@@ -750,7 +854,9 @@
               "request": {
                 "method": "GET",
                 "url": "{{base}}/api/faturacao/quotes/1",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             },
             {
@@ -762,7 +868,10 @@
                   { "key": "Authorization", "value": "Bearer {{token}}" },
                   { "key": "Content-Type", "value": "application/json" }
                 ],
-                "body": { "mode": "raw", "raw": "{\n  \"product_id\": 1,\n  \"descricao\": \"Televisor 55 Polegadas\",\n  \"quantidade\": 2,\n  \"preco_unitario\": 45000.00,\n  \"desconto_percent\": 5,\n  \"imposto_percent\": 17\n}" }
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"product_id\": 1,\n  \"descricao\": \"Televisor 55 Polegadas\",\n  \"quantidade\": 2,\n  \"preco_unitario\": 45000.00,\n  \"desconto_percent\": 5,\n  \"imposto_percent\": 17\n}"
+                }
               }
             },
             {
@@ -770,7 +879,9 @@
               "request": {
                 "method": "POST",
                 "url": "{{base}}/api/faturacao/quotes/1/enviar",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             },
             {
@@ -778,7 +889,9 @@
               "request": {
                 "method": "POST",
                 "url": "{{base}}/api/faturacao/quotes/1/aprovar",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             }
           ]
@@ -791,7 +904,9 @@
               "request": {
                 "method": "GET",
                 "url": "{{base}}/api/faturacao/orders",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             },
             {
@@ -803,7 +918,10 @@
                   { "key": "Authorization", "value": "Bearer {{token}}" },
                   { "key": "Content-Type", "value": "application/json" }
                 ],
-                "body": { "mode": "raw", "raw": "{\n  \"customer_id\": 1,\n  \"numero\": \"ENC-2026-000001\",\n  \"moeda\": \"MZN\",\n  \"observacoes\": \"Entrega urgente\"\n}" }
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"customer_id\": 1,\n  \"numero\": \"ENC-2026-000001\",\n  \"moeda\": \"MZN\",\n  \"observacoes\": \"Entrega urgente\"\n}"
+                }
               }
             },
             {
@@ -811,7 +929,9 @@
               "request": {
                 "method": "POST",
                 "url": "{{base}}/api/faturacao/orders/1/confirmar",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             },
             {
@@ -819,7 +939,9 @@
               "request": {
                 "method": "POST",
                 "url": "{{base}}/api/faturacao/orders/1/cancelar",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             }
           ]
@@ -840,7 +962,9 @@
                     { "key": "customer_id", "value": "", "disabled": true }
                   ]
                 },
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             },
             {
@@ -852,7 +976,10 @@
                   { "key": "Authorization", "value": "Bearer {{token}}" },
                   { "key": "Content-Type", "value": "application/json" }
                 ],
-                "body": { "mode": "raw", "raw": "{\n  \"customer_id\": 1,\n  \"numero\": \"FT2026/000001\",\n  \"moeda\": \"MZN\",\n  \"due_date\": \"2026-05-31\",\n  \"observacoes\": \"Pagamento a 30 dias\"\n}" }
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"customer_id\": 1,\n  \"numero\": \"FT2026/000001\",\n  \"moeda\": \"MZN\",\n  \"due_date\": \"2026-05-31\",\n  \"observacoes\": \"Pagamento a 30 dias\"\n}"
+                }
               }
             },
             {
@@ -860,7 +987,9 @@
               "request": {
                 "method": "GET",
                 "url": "{{base}}/api/faturacao/invoices/1",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             },
             {
@@ -872,7 +1001,10 @@
                   { "key": "Authorization", "value": "Bearer {{token}}" },
                   { "key": "Content-Type", "value": "application/json" }
                 ],
-                "body": { "mode": "raw", "raw": "{\n  \"product_id\": 1,\n  \"descricao\": \"Televisor 55 Polegadas\",\n  \"quantidade\": 1,\n  \"preco_unitario\": 45000.00,\n  \"desconto_percent\": 0,\n  \"imposto_percent\": 17\n}" }
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"product_id\": 1,\n  \"descricao\": \"Televisor 55 Polegadas\",\n  \"quantidade\": 1,\n  \"preco_unitario\": 45000.00,\n  \"desconto_percent\": 0,\n  \"imposto_percent\": 17\n}"
+                }
               }
             },
             {
@@ -880,7 +1012,9 @@
               "request": {
                 "method": "POST",
                 "url": "{{base}}/api/faturacao/invoices/1/emitir",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             },
             {
@@ -888,7 +1022,9 @@
               "request": {
                 "method": "POST",
                 "url": "{{base}}/api/faturacao/invoices/1/cancelar",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             }
           ]
@@ -901,7 +1037,9 @@
               "request": {
                 "method": "GET",
                 "url": "{{base}}/api/faturacao/receipts",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             },
             {
@@ -913,7 +1051,10 @@
                   { "key": "Authorization", "value": "Bearer {{token}}" },
                   { "key": "Content-Type", "value": "application/json" }
                 ],
-                "body": { "mode": "raw", "raw": "{\n  \"invoice_id\": 1,\n  \"numero\": \"REC-2026-000001\",\n  \"valor\": 52650.00,\n  \"referencia\": \"TRF-BCI-2026-001\",\n  \"observacoes\": \"Pagamento via transferência BCI\"\n}" }
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"invoice_id\": 1,\n  \"numero\": \"REC-2026-000001\",\n  \"valor\": 52650.00,\n  \"referencia\": \"TRF-BCI-2026-001\",\n  \"observacoes\": \"Pagamento via transferência BCI\"\n}"
+                }
               }
             }
           ]
@@ -926,7 +1067,9 @@
               "request": {
                 "method": "GET",
                 "url": "{{base}}/api/faturacao/credit-notes",
-                "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }]
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ]
               }
             },
             {
@@ -938,7 +1081,10 @@
                   { "key": "Authorization", "value": "Bearer {{token}}" },
                   { "key": "Content-Type", "value": "application/json" }
                 ],
-                "body": { "mode": "raw", "raw": "{\n  \"customer_id\": 1,\n  \"invoice_id\": 1,\n  \"numero\": \"NC2026/000001\",\n  \"motivo\": \"Devolução de mercadoria com defeito\",\n  \"moeda\": \"MZN\"\n}" }
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"customer_id\": 1,\n  \"invoice_id\": 1,\n  \"numero\": \"NC2026/000001\",\n  \"motivo\": \"Devolução de mercadoria com defeito\",\n  \"moeda\": \"MZN\"\n}"
+                }
               }
             }
           ]
@@ -971,7 +1117,10 @@
               { "key": "Authorization", "value": "Bearer {{token}}" },
               { "key": "Content-Type", "value": "application/json" }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"acao\": \"UPDATE\",\n  \"tabela\": \"invoices\",\n  \"record_id\": 1,\n  \"descricao\": \"Fatura emitida\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"acao\": \"UPDATE\",\n  \"tabela\": \"invoices\",\n  \"record_id\": 1,\n  \"descricao\": \"Fatura emitida\"\n}"
+            }
           }
         }
       ]

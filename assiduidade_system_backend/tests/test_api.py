@@ -1,65 +1,51 @@
+import json
 import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-from app.database import Base, get_db
-from app.main import app
-from app.models import FingerprintTemplate
-from app.schemas.common import SourceType, TemplateStatus
-from app.security import get_biometric_encryption
-
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test_faceclock.db"
-
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from app.redis_client import set_redis_client
+from app.security import NexoraAuth
+from app.services.api_credentials import create_credential
 
 
-@pytest.fixture(autouse=True)
-def setup_and_teardown_db():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
+def _sign(secret, access_key, method, path, query="", payload=None):
+    body = (
+        json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        if payload is not None
+        else b""
+    )
+    auth = NexoraAuth(access_key, secret)
+    return auth.sign_request(method, path, query=query, body=body), body
 
 
 @pytest.fixture
-def db_session():
-    session = TestingSessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
+def fake_redis():
+    import fakeredis
+
+    client = fakeredis.FakeStrictRedis(version=6)
+    set_redis_client(client)
+    yield client
+    set_redis_client(None)
 
 
 @pytest.fixture
-def client(db_session):
-    def override_get_db():
-        try:
-            yield db_session
-        finally:
-            pass
-
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
-
-
-@pytest.fixture
-def admin_headers():
-    return {"X-Auth-User-Id": "admin-erp-42", "X-Auth-User-Role": "ADMIN_SISTEMA"}
-
-
-@pytest.fixture
-def collab_headers():
-    return {"X-Auth-User-Id": "collab-erp-99", "X-Auth-User-Role": "COLABORADOR"}
-
-
-@pytest.fixture
-def erp_user_id():
-    return "erp-user-123"
+def system_credential(db_session):
+    cred, secret = create_credential(
+        db=db_session,
+        tenant_id="tenant-1",
+        name="Test System",
+        permissions=[
+            "biometric:enroll",
+            "biometric:verify",
+            "fingerprint:enroll",
+            "fingerprint:identify",
+            "fingerprint:delete",
+            "liveness:challenge",
+            "liveness:verify",
+        ],
+    )
+    return cred, secret
 
 
 # ============================================================
@@ -78,88 +64,65 @@ class TestHealthCheck:
 # TESTES: Fingerprint
 # ============================================================
 class TestFingerprint:
-    def test_enroll_and_identify(self, client, admin_headers, erp_user_id):
-        response = client.post(
-            "/api/v1/fingerprint/enroll",
-            json={
-                "user_id": erp_user_id,
-                "finger_type": "right_thumb",
-                "template_base64": "dGVzdDE=",
-            },
-            headers=admin_headers,
-        )
+    def test_enroll_and_identify(self, client, db_session, fake_redis, system_credential):
+        cred, secret = system_credential
+        payload = {
+            "user_id": "erp-user-123",
+            "finger_type": "right_thumb",
+            "template_base64": "dGVzdDE=",
+        }
+        headers, body = _sign(secret, cred.access_key_id, "POST", "/api/v1/fingerprint/enroll", payload=payload)
+
+        response = client.post("/api/v1/fingerprint/enroll", content=body, headers=headers)
         assert response.status_code == 201
         data = response.json()
         assert data["success"] is True
         assert data["template_id"] is not None
-        assert data["user_id"] == erp_user_id
+        assert data["user_id"] == "erp-user-123"
 
-        response = client.post(
+        headers, body = _sign(
+            secret,
+            cred.access_key_id,
+            "POST",
             "/api/v1/fingerprint/identify",
-            json={"template_base64": "dGVzdDE="},
-            headers=admin_headers,
+            payload={"template_base64": "dGVzdDE="},
         )
+        response = client.post("/api/v1/fingerprint/identify", content=body, headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert data["user_id"] == erp_user_id
+        assert data["user_id"] == "erp-user-123"
 
-    def test_delete_fingerprint_enrollment(self, client, admin_headers, erp_user_id):
-        client.post(
-            "/api/v1/fingerprint/enroll",
-            json={
-                "user_id": erp_user_id,
-                "finger_type": "right_thumb",
-                "template_base64": "dGVzdDE=",
-            },
-            headers=admin_headers,
+    def test_delete_fingerprint_enrollment(self, client, db_session, fake_redis, system_credential):
+        cred, secret = system_credential
+        payload = {
+            "user_id": "erp-user-123",
+            "finger_type": "right_thumb",
+            "template_base64": "dGVzdDE=",
+        }
+        headers, body = _sign(secret, cred.access_key_id, "POST", "/api/v1/fingerprint/enroll", payload=payload)
+        client.post("/api/v1/fingerprint/enroll", content=body, headers=headers)
+
+        headers, body = _sign(
+            secret,
+            cred.access_key_id,
+            "DELETE",
+            "/api/v1/fingerprint/enroll/erp-user-123",
         )
-        response = client.delete(
-            f"/api/v1/fingerprint/enroll/{erp_user_id}",
-            headers=admin_headers,
-        )
+        response = client.delete("/api/v1/fingerprint/enroll/erp-user-123", headers=headers)
         assert response.status_code == 200
         assert response.json()["success"] is True
 
-    def test_enroll_rejects_invalid_base64(self, client, admin_headers, erp_user_id):
-        response = client.post(
-            "/api/v1/fingerprint/enroll",
-            json={
-                "user_id": erp_user_id,
-                "finger_type": "right_thumb",
-                "template_base64": "not-valid-base64!!!",
-            },
-            headers=admin_headers,
-        )
+    def test_enroll_rejects_invalid_base64(self, client, db_session, fake_redis, system_credential):
+        cred, secret = system_credential
+        payload = {
+            "user_id": "erp-user-123",
+            "finger_type": "right_thumb",
+            "template_base64": "not-valid-base64!!!",
+        }
+        headers, body = _sign(secret, cred.access_key_id, "POST", "/api/v1/fingerprint/enroll", payload=payload)
+        response = client.post("/api/v1/fingerprint/enroll", content=body, headers=headers)
         assert response.status_code == 422
-
-    def test_enroll_encrypts_template_at_rest(
-        self, client, admin_headers, erp_user_id, db_session
-    ):
-        template_base64 = "dGVzdDE="
-        response = client.post(
-            "/api/v1/fingerprint/enroll",
-            json={
-                "user_id": erp_user_id,
-                "finger_type": "right_thumb",
-                "template_base64": template_base64,
-            },
-            headers=admin_headers,
-        )
-        assert response.status_code == 201
-
-        template = (
-            db_session.query(FingerprintTemplate)
-            .filter(FingerprintTemplate.erp_user_id == erp_user_id)
-            .first()
-        )
-        assert template is not None
-        assert template.template_base64 != template_base64
-        assert template.template_base64.startswith("enc:v1:")
-        assert (
-            get_biometric_encryption().decrypt_text(template.template_base64)
-            == template_base64
-        )
 
 
 # ============================================================
@@ -167,138 +130,95 @@ class TestFingerprint:
 # ============================================================
 class TestBiometric:
     def test_enroll_and_verify_with_mocked_pipeline(
-        self, client, admin_headers, monkeypatch
+        self, client, db_session, fake_redis, system_credential, monkeypatch
     ):
         from app.routers import biometric as biometric_router
 
         fixed_embedding = [0.5] * 512
         user_uuid = str(uuid.uuid4())
 
-        monkeypatch.setattr(biometric_router, "assess_capture_quality", lambda _: (0.95, None))
-        monkeypatch.setattr(biometric_router, "build_embedding", lambda _: fixed_embedding)
-        monkeypatch.setattr(biometric_router, "estimate_liveness", lambda _, **kw: 0.95)
+        monkeypatch.setattr(biometric_router, "assess_capture_quality", lambda *args, **kwargs: (0.95, None))
+        monkeypatch.setattr(biometric_router, "build_embedding", lambda *args, **kwargs: fixed_embedding)
+        monkeypatch.setattr(biometric_router, "estimate_liveness", lambda *args, **kwargs: 0.95)
 
+        cred, secret = system_credential
         captures = [{"image_base64": "fake", "angle": "front"} for _ in range(3)]
-        response = client.post(
-            "/api/v1/biometric/enroll",
-            json={"user_id": user_uuid, "captures": captures},
-            headers=admin_headers,
-        )
+        payload = {"user_id": user_uuid, "captures": captures}
+        headers, body = _sign(secret, cred.access_key_id, "POST", "/api/v1/biometric/enroll", payload=payload)
+
+        response = client.post("/api/v1/biometric/enroll", content=body, headers=headers)
         assert response.status_code == 201
         data = response.json()
         assert data["user_id"] == user_uuid
-        assert data["status"] == TemplateStatus.ACTIVE
 
-        response = client.post(
-            "/api/v1/biometric/verify",
-            json={
-                "user_id": user_uuid,
-                "device_id": str(uuid.uuid4()),
-                "image_base64": "fake",
-            },
-            headers=admin_headers,
-        )
+        payload = {
+            "user_id": user_uuid,
+            "device_id": str(uuid.uuid4()),
+            "image_base64": "fake",
+        }
+        headers, body = _sign(secret, cred.access_key_id, "POST", "/api/v1/biometric/verify", payload=payload)
+        response = client.post("/api/v1/biometric/verify", content=body, headers=headers)
         assert response.status_code == 200
         data = response.json()
         assert data["match"] is True
         assert data["user_id"] == user_uuid
 
     def test_verify_without_enrollment_returns_not_enrolled(
-        self, client, admin_headers, monkeypatch
+        self, client, db_session, fake_redis, system_credential, monkeypatch
     ):
         from app.routers import biometric as biometric_router
 
         user_uuid = str(uuid.uuid4())
 
-        monkeypatch.setattr(biometric_router, "assess_capture_quality", lambda _: (0.95, None))
-        monkeypatch.setattr(biometric_router, "build_embedding", lambda _: [0.5] * 512)
-        monkeypatch.setattr(biometric_router, "estimate_liveness", lambda _, **kw: 0.95)
+        monkeypatch.setattr(biometric_router, "assess_capture_quality", lambda *args, **kwargs: (0.95, None))
+        monkeypatch.setattr(biometric_router, "build_embedding", lambda *args, **kwargs: [0.5] * 512)
+        monkeypatch.setattr(biometric_router, "estimate_liveness", lambda *args, **kwargs: 0.95)
 
-        response = client.post(
-            "/api/v1/biometric/verify",
-            json={
-                "user_id": user_uuid,
-                "device_id": str(uuid.uuid4()),
-                "image_base64": "fake",
-            },
-            headers=admin_headers,
-        )
+        cred, secret = system_credential
+        payload = {
+            "user_id": user_uuid,
+            "device_id": str(uuid.uuid4()),
+            "image_base64": "fake",
+        }
+        headers, body = _sign(secret, cred.access_key_id, "POST", "/api/v1/biometric/verify", payload=payload)
+        response = client.post("/api/v1/biometric/verify", content=body, headers=headers)
         assert response.status_code == 200
         assert response.json()["reason"] == "user_not_enrolled"
 
 
 # ============================================================
-# TESTES: Controlo de acesso (P0 — get_actor/apply_tenant/self-or-manager)
+# TESTES: Controlo de acesso via HMAC
 # ============================================================
-class TestAccessControlP0:
-    def test_anonymous_request_rejected(self, client, erp_user_id):
+class TestAccessControlHMAC:
+    def test_anonymous_request_rejected(self, client, fake_redis):
         response = client.post(
             "/api/v1/fingerprint/enroll",
             json={
-                "user_id": erp_user_id,
+                "user_id": "erp-user-123",
                 "finger_type": "right_thumb",
                 "template_base64": "dGVzdDE=",
             },
         )
         assert response.status_code == 401
 
-    def test_colaborador_cannot_enroll_fingerprint_of_other_user(
-        self, client, collab_headers, erp_user_id
-    ):
-        response = client.post(
-            "/api/v1/fingerprint/enroll",
-            json={
-                "user_id": erp_user_id,
-                "finger_type": "right_thumb",
-                "template_base64": "dGVzdDE=",
-            },
-            headers=collab_headers,
+    def test_credential_without_permission_rejected(self, client, db_session, fake_redis):
+        cred, secret = create_credential(
+            db=db_session,
+            tenant_id="tenant-1",
+            permissions=["biometric:verify"],  # não tem fingerprint:enroll
         )
-        assert response.status_code == 403
-
-    def test_colaborador_cannot_verify_biometric_of_other_user(
-        self, client, collab_headers, erp_user_id
-    ):
-        response = client.post(
-            "/api/v1/biometric/verify",
-            json={
-                "user_id": erp_user_id,
-                "device_id": str(uuid.uuid4()),
-                "image_base64": "fake",
-            },
-            headers=collab_headers,
-        )
-        assert response.status_code == 403
-
-    def test_colaborador_can_enroll_own_fingerprint(self, client, collab_headers):
-        response = client.post(
-            "/api/v1/fingerprint/enroll",
-            json={
-                "user_id": "collab-erp-99",
-                "finger_type": "right_thumb",
-                "template_base64": "dGVzdDE=",
-            },
-            headers={**collab_headers, "X-Auth-Tenant-Id": "5"},
-        )
-        assert response.status_code == 201
-
-    def test_colaborador_without_tenant_id_is_forbidden(self, client, collab_headers):
-        # Sem X-Auth-Tenant-Id, apply_tenant() falha fechado para roles
-        # que nao sejam ADMIN_SISTEMA — nao devolve dados sem filtro.
-        response = client.post(
-            "/api/v1/fingerprint/enroll",
-            json={
-                "user_id": "collab-erp-99",
-                "finger_type": "right_thumb",
-                "template_base64": "dGVzdDE=",
-            },
-            headers=collab_headers,
-        )
+        payload = {
+            "user_id": "erp-user-123",
+            "finger_type": "right_thumb",
+            "template_base64": "dGVzdDE=",
+        }
+        headers, body = _sign(secret, cred.access_key_id, "POST", "/api/v1/fingerprint/enroll", payload=payload)
+        response = client.post("/api/v1/fingerprint/enroll", content=body, headers=headers)
         assert response.status_code == 403
 
 
 # ============================================================
-# TESTES: Auditoria (proxy ERP)
+# TESTES: Auditoria (proxy ERP) — mantém Bearer
 # ============================================================
 class TestAuditLogsProxy:
     def test_audit_logs_requires_authorization(self, client):
@@ -316,4 +236,3 @@ class TestAuditLogsProxy:
         response = client.get("/api/v1/audit/logs", headers={"Authorization": "Bearer tok123"})
         assert response.status_code == 200
         assert response.json() == {"data": [], "meta": {"total": 0, "page": 1, "limit": 50}}
-

@@ -15,11 +15,12 @@ se o prefixo `enc:v1:` nao for encontrado, assume que o dado é legado (JSON ou
 base64) e devolve-o sem alteracoes.
 """
 
+import base64
 import hashlib
-import os
 import secrets
 from typing import ClassVar
 
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 
@@ -66,15 +67,25 @@ class BiometricEncryption:
             raise ValueError("encrypted_payload_too_short")
         nonce = rest[: self.NONCE_SIZE]
         ciphertext = rest[self.NONCE_SIZE :]
-        return self._aesgcm.decrypt(nonce, ciphertext, None)
+        try:
+            return self._aesgcm.decrypt(nonce, ciphertext, None)
+        except InvalidTag as exc:
+            raise ValueError("invalid_authentication_tag") from exc
 
     def encrypt_text(self, plaintext: str) -> str:
-        """Encripta texto (ex.: template base64) e devolve string com prefixo."""
-        return self.encrypt(plaintext.encode("utf-8")).decode("utf-8")
+        """Encripta texto (ex.: template base64) e devolve string base64."""
+        encrypted = self.encrypt(plaintext.encode("utf-8"))
+        return base64.b64encode(encrypted).decode("ascii")
 
     def decrypt_text(self, payload: str) -> str:
         """Desencripta texto; se nao estiver encriptado, devolve como esta."""
-        return self.decrypt(payload.encode("utf-8")).decode("utf-8")
+        try:
+            raw = base64.b64decode(payload)
+        except Exception:
+            return payload
+        if not raw.startswith(self.PREFIX):
+            return payload
+        return self.decrypt(raw).decode("utf-8")
 
 
 def get_biometric_encryption() -> BiometricEncryption:

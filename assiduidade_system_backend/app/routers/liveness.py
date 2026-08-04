@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 from app.biometric_metrics import biometric_metrics
 from app.config import settings
 from app.database import get_db
-from app.deps import ActorContext, apply_tenant, get_actor, require_self_or_manager
+from app.deps import ActorContext, apply_tenant, require_self_or_manager
+from app.security import require_nexora_signature
 from app.limiter import limiter
 from app.models import FaceTemplate
 from app.schemas.common import SourceType, TemplateStatus
@@ -43,7 +44,7 @@ _ACTION_PROMPT_PT = {
 @router.post("/liveness/challenge", status_code=status.HTTP_201_CREATED)
 def request_liveness_challenge(
     payload: LivenessChallengeRequest,
-    actor: ActorContext = Depends(get_actor),
+    actor: ActorContext = require_nexora_signature("liveness:challenge"),
 ) -> dict:
     """Gera um desafio de prova de vida para o utilizador (válido 45s)."""
     erp_user_id = str(payload.user_id)
@@ -63,7 +64,7 @@ async def verify_liveness_challenge(
     request: Request,
     payload: LivenessVerifyRequest,
     db: Session = Depends(get_db),
-    actor: ActorContext = Depends(get_actor),
+    actor: ActorContext = require_nexora_signature("liveness:verify"),
 ) -> dict:
     """Confirma a acção do desafio e faz match facial contra o template local."""
     await validar_metodo_assiduidade(SourceType.SELFIE_GPS)

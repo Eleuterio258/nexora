@@ -1,0 +1,1 @@
+Erro ao conectar ao banco: failed to connect to `user=postgres database=nexora_erp`: 209.126.86.55:5432 (209.126.86.55): failed SASL auth: FATAL: password authentication failed for user "postgres" (SQLSTATE 28P01)

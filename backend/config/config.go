@@ -60,15 +60,16 @@ type Config struct {
 	SESFromName string
 
 	// Object Storage (local ou minio)
-	StorageProvider  string
-	StorageLocalDir  string
-	StoragePublicURL string
-	MinioEndpoint    string
-	MinioAccessKey   string
-	MinioSecretKey   string
-	MinioBucket      string
-	MinioUseSSL      bool
-	MinioRegion      string
+	StorageProvider   string
+	StorageLocalDir   string
+	StoragePublicURL  string
+	MinioEndpoint     string
+	MinioAccessKey    string
+	MinioSecretKey    string
+	MinioBucket       string
+	MinioUseSSL       bool
+	MinioRegion       string
+	MinioBucketLookup string // auto | dns | path
 
 	// Hardware — worker MQTT (opcional; desligado se MQTTBrokerURL vazio)
 	MQTTBrokerURL string
@@ -222,15 +223,16 @@ func Load() *Config {
 		SESFrom:     env("SES_FROM", ""),
 		SESFromName: env("SES_FROM_NAME", "Nexora ERP"),
 
-		StorageProvider:  env("STORAGE_PROVIDER", "minio"),
-		StorageLocalDir:  env("STORAGE_LOCAL_DIR", "./uploads"),
-		StoragePublicURL: env("STORAGE_PUBLIC_URL", ""),
-		MinioEndpoint:    env("MINIO_ENDPOINT", "localhost:9004"),
-		MinioAccessKey:   env("MINIO_ACCESS_KEY", defaultMinioAccessKey),
-		MinioSecretKey:   env("MINIO_SECRET_KEY", defaultMinioSecretKey),
-		MinioBucket:      env("MINIO_BUCKET", "nexora"),
-		MinioUseSSL:      envBool("MINIO_USE_SSL", false),
-		MinioRegion:      env("MINIO_REGION", "us-east-1"),
+		StorageProvider:   env("STORAGE_PROVIDER", "minio"),
+		StorageLocalDir:   env("STORAGE_LOCAL_DIR", "./uploads"),
+		StoragePublicURL:  env("STORAGE_PUBLIC_URL", ""),
+		MinioEndpoint:     env("MINIO_ENDPOINT", "localhost:9004"),
+		MinioAccessKey:    env("MINIO_ACCESS_KEY", defaultMinioAccessKey),
+		MinioSecretKey:    env("MINIO_SECRET_KEY", defaultMinioSecretKey),
+		MinioBucket:       env("MINIO_BUCKET", "nexora"),
+		MinioUseSSL:       envBool("MINIO_USE_SSL", false),
+		MinioRegion:       env("MINIO_REGION", "us-east-1"),
+		MinioBucketLookup: env("MINIO_BUCKET_LOOKUP", "auto"),
 
 		MQTTBrokerURL: env("MQTT_BROKER_URL", ""),
 		MQTTClientID:  env("MQTT_CLIENT_ID", "nexora-hardware-worker"),

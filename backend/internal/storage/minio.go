@@ -24,9 +24,10 @@ type MinioProvider struct {
 // NewMinioProvider cria um provider MinIO.
 func NewMinioProvider(cfg Config) (*MinioProvider, error) {
 	client, err := minio.New(cfg.MinioEndpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.MinioAccessKey, cfg.MinioSecretKey, ""),
-		Secure: cfg.MinioUseSSL,
-		Region: cfg.MinioRegion,
+		Creds:        credentials.NewStaticV4(cfg.MinioAccessKey, cfg.MinioSecretKey, ""),
+		Secure:       cfg.MinioUseSSL,
+		Region:       cfg.MinioRegion,
+		BucketLookup: parseBucketLookup(cfg.MinioBucketLookup),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("minio: %w", err)
@@ -166,4 +167,16 @@ func (p *MinioProvider) PresignedURL(ctx context.Context, key string, expiry tim
 // JoinPath ajuda a construir keys com prefixos.
 func JoinPath(parts ...string) string {
 	return path.Join(parts...)
+}
+
+// parseBucketLookup converte a configuração de estilo de bucket num valor do SDK.
+func parseBucketLookup(s string) minio.BucketLookupType {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "dns":
+		return minio.BucketLookupDNS
+	case "path":
+		return minio.BucketLookupPath
+	default:
+		return minio.BucketLookupAuto
+	}
 }
