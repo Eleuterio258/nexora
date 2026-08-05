@@ -1,47 +1,65 @@
 // Package faceclock é o cliente HTTP partilhado para o serviço de biometria
-// FaceClock (assiduidade_system_backend). Ao contrário do nexorapay (X-API-Key
-// fixa), aqui a autenticação é sempre por Authorization (Bearer) do próprio
-// utilizador autenticado, reenviado tal-e-qual — o FaceClock decide a
-// identidade sozinho via JWKS local (ver CONTRATO-INTEGRACAO-ERP.md secção
-// 11), nunca por API Key de device. Extraído de
-// recursos-humanos/handlers/funcionarios_biometria.go (EnrollFacial) ao criar
-// o segundo ponto de chamada (self-service/handlers/biometria.go,
-// VerificarFacial), seguindo o mesmo padrão já usado para o nexorapay.
+// FaceClock (assiduidade_system_backend).
+//
+// A autenticação é feita via HMAC Nexora (X-Nexora-*), usando credenciais
+// serviço-a-serviço configuradas no ERP. O FaceClock valida a assinatura
+// contra as credenciais armazenadas na sua base de dados (ApiCredential).
 package faceclock
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
+
+	"nexora/internal/pkg/nexorasign"
 )
 
+// Client comunica com o FaceClock usando assinatura HMAC Nexora.
 type Client struct {
 	baseURL string
 	http    *http.Client
+	signer  *nexorasign.Signer
 }
 
-func NewClient(baseURL string) *Client {
-	return &Client{baseURL: baseURL, http: &http.Client{Timeout: 30 * time.Second}}
-}
-
-// PostAsUser envia um POST autenticado com o Bearer token do utilizador
-// autenticado e devolve a resposta do FaceClock tal-e-qual (mapa genérico,
-// já que os payloads de enroll/verify têm formatos diferentes).
-func (c *Client) PostAsUser(ctx context.Context, path, authHeader string, payload any) (map[string]any, int, error) {
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return nil, 0, err
+// NewClient cria um cliente configurado com as credenciais Nexora.
+func NewClient(baseURL, accessKeyID, secretAccessKey string) *Client {
+	return &Client{
+		baseURL: baseURL,
+		http:    &http.Client{Timeout: 30 * time.Second},
+		signer:  nexorasign.New(accessKeyID, secretAccessKey),
 	}
+}
+
+// Post envia um POST assinado para o FaceClock e devolve a resposta como mapa.
+func (c *Client) Post(
+	ctx context.Context,
+	path string,
+	payload any,
+) (map[string]any, int, error) {
+	if c.signer == nil {
+		return nil, 0, fmt.Errorf("faceclock client sem credenciais configuradas")
+	}
+
+	// Serializar uma única vez para garantir que o body enviado e o hash
+	// assinado correspondam byte-a-byte.
+	data, err := nexorasign.SerializeBody(payload)
+	if err != nil {
+		return nil, 0, fmt.Errorf("serializar payload FaceClock: %w", err)
+	}
+	headers := c.signer.SignBytes(http.MethodPost, path, "", data)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(data))
 	if err != nil {
 		return nil, 0, err
 	}
-	req.Header.Set("Authorization", authHeader)
-	req.Header.Set("Content-Type", "application/json")
+
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := c.http.Do(req)
 	if err != nil {

@@ -80,12 +80,6 @@ func (h *Handler) VerificarFacial(w http.ResponseWriter, r *http.Request) {
 		geoLng = body.GeoLng
 	}
 
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		jsonErr(w, "Cabeçalho Authorization em falta", http.StatusUnauthorized)
-		return
-	}
-
 	faceClockReq := faceClockVerifyRequest{
 		UserID:      fmt.Sprintf("%d", user.ID),
 		DeviceID:    deviceID,
@@ -95,8 +89,8 @@ func (h *Handler) VerificarFacial(w http.ResponseWriter, r *http.Request) {
 		GeoLng:      geoLng,
 	}
 
-	client := faceclock.NewClient(h.cfg.FaceClockBaseURL)
-	result, statusCode, err := client.PostAsUser(r.Context(), "/api/v1/biometric/verify", authHeader, faceClockReq)
+	client := faceclock.NewClient(h.cfg.FaceClockBaseURL, h.cfg.FaceClockAccessKeyID, h.cfg.FaceClockSecretAccessKey)
+	result, statusCode, err := client.Post(r.Context(), "/api/v1/biometric/verify", faceClockReq)
 	if err != nil {
 		jsonErr(w, fmt.Sprintf("Erro ao comunicar com FaceClock: %s", err.Error()), http.StatusBadGateway)
 		return

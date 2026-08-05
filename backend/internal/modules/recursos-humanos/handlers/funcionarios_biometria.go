@@ -135,19 +135,14 @@ func (h *Handler) EnrollFacial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Chamar FaceClock para criar o template facial.
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		jsonErr(w, "Cabeçalho Authorization em falta", http.StatusUnauthorized)
-		return
-	}
-
+	// 4. Chamar FaceClock para criar o template facial usando credenciais
+	// serviço-a-serviço Nexora HMAC (não mais Bearer do utilizador).
 	faceClockReq := FaceClockEnrollRequest{
 		UserID:   fmt.Sprintf("%d", erpUserID),
 		Captures: captures,
 	}
-	client := faceclock.NewClient(h.cfg.FaceClockBaseURL)
-	faceClockResp, statusCode, err := client.PostAsUser(r.Context(), "/api/v1/biometric/enroll", authHeader, faceClockReq)
+	client := faceclock.NewClient(h.cfg.FaceClockBaseURL, h.cfg.FaceClockAccessKeyID, h.cfg.FaceClockSecretAccessKey)
+	faceClockResp, statusCode, err := client.Post(r.Context(), "/api/v1/biometric/enroll", faceClockReq)
 	if err != nil {
 		jsonErr(w, fmt.Sprintf("Erro ao comunicar com FaceClock: %s", err.Error()), http.StatusBadGateway)
 		return

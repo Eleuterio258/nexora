@@ -125,6 +125,10 @@ type Config struct {
 	// FacialVerificationSecret valida os comprovativos HS256 emitidos pelo
 	// FaceClock depois de um match. Deve ser exclusivo desta integracao.
 	FacialVerificationSecret string
+	// FaceClockAccessKeyID e FaceClockSecretAccessKey autenticam o ERP perante
+	// o FaceClock via HMAC Nexora (X-Nexora-*). A chave secreta nunca transita.
+	FaceClockAccessKeyID     string
+	FaceClockSecretAccessKey string
 
 	// Authorization Server OAuth2 — chave(s) RS256 que assinam os access
 	// tokens emitidos por /oauth/token. Ver internal/modules/auth/oauthkeys.
@@ -147,6 +151,7 @@ const (
 	defaultMinioAccessKey           = "histories"
 	defaultMinioSecretKey           = "histories"
 	defaultFacialVerificationSecret = "change-me-facial-verification-secret"
+	defaultFaceClockSecretAccessKey = "change-me-faceclock-secret-access-key"
 )
 
 // AssertProductionSecrets falha o arranque (log.Fatal, chamado pelo caller)
@@ -177,6 +182,12 @@ func (c *Config) AssertProductionSecrets() error {
 	if c.FacialVerificationSecret == "" || c.FacialVerificationSecret == defaultFacialVerificationSecret {
 		bad = append(bad, "FACIAL_VERIFICATION_SECRET")
 	}
+	if c.FaceClockAccessKeyID == "" {
+		bad = append(bad, "FACECLOCK_ACCESS_KEY_ID")
+	}
+	if c.FaceClockSecretAccessKey == "" || c.FaceClockSecretAccessKey == defaultFaceClockSecretAccessKey {
+		bad = append(bad, "FACECLOCK_SECRET_ACCESS_KEY")
+	}
 	if len(bad) > 0 {
 		return fmt.Errorf("ENVIRONMENT=production exige segredos reais para: %s (valores por omissão do repositório não são seguros)", strings.Join(bad, ", "))
 	}
@@ -187,7 +198,7 @@ func Load() *Config {
 	webhookProviders, webhookSecrets := loadSignatureWebhookProviders()
 	return &Config{
 		DatabaseURL: env("DATABASE_URL",
-			"postgres://postgres:admin@209.126.86.55:5432/nexora_erp?sslmode=disable"+
+			"postgres://postgres:Plane@mento1@209.126.86.55:5432/nexora_erp?sslmode=disable"+
 				"&options=-csearch_path%3D"+
 				"auth%2Cutilizadores%2Cempresas%2Cauditoria%2C"+
 				"sistema_configuracao%2Cclientes%2Cprodutos%2Cstock%2Cfaturacao%2C"+
@@ -266,6 +277,8 @@ func Load() *Config {
 
 		FaceClockBaseURL:         env("FACECLOCK_BASE_URL", "https://asseduidade.e258tech.tech"),
 		FacialVerificationSecret: env("FACIAL_VERIFICATION_SECRET", defaultFacialVerificationSecret),
+		FaceClockAccessKeyID:     env("FACECLOCK_ACCESS_KEY_ID", ""),
+		FaceClockSecretAccessKey: env("FACECLOCK_SECRET_ACCESS_KEY", defaultFaceClockSecretAccessKey),
 
 		OAuthSigningKeysDir:    env("OAUTH_SIGNING_KEYS_DIR", "./data/oauth-keys"),
 		OAuthAllowGeneratedKey: envBool("OAUTH_ALLOW_GENERATED_KEY", false),
