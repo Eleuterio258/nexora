@@ -110,6 +110,7 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 	// ERP e painel Escola em simultâneo (ver AdminSession::isBoth()).
 	userObj["escopos_pessoa"] = escoposDaPessoa(tipos)
 	features := []string{}
+	modulos := []models.ModuloAcesso{}
 	if userAccess != nil {
 		userObj["tenant_id"] = userAccess.TenantID
 		userObj["cargo_id"] = userAccess.CargoID
@@ -117,6 +118,7 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 			userObj["cargo"] = *userAccess.CargoNome
 		}
 		features = userAccess.Features
+		modulos = userAccess.Modulos
 	} else {
 		userObj["tenant_id"] = u.tenantID
 	}
@@ -128,6 +130,7 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 		"expires_in":    int(h.cfg.JWTExpiresIn.Seconds()),
 		"user":          userObj,
 		"features":      features,
+		"modulos":       modulos,
 	}, http.StatusOK)
 }
 

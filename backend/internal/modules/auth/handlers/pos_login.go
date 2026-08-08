@@ -217,8 +217,10 @@ func (h *Handler) refreshTerminalPOS(w http.ResponseWriter, r *http.Request, ref
 // reflecte isso via LoadUserAccess, tal como qualquer outra conta.
 func (h *Handler) issueTerminalTokens(w http.ResponseWriter, r *http.Request, u *userIdentity, terminal, tenant map[string]interface{}) {
 	scope := ""
+	modulos := []models.ModuloAcesso{}
 	if userAccess, err := models.LoadUserAccess(r.Context(), h.db, u.id, u.membershipID); err == nil {
 		scope = scopeStringFromAccess(userAccess)
+		modulos = userAccess.Modulos
 	}
 	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, scope, terminalTokenExpiry, time.Now())
 	if err != nil {
@@ -246,5 +248,6 @@ func (h *Handler) issueTerminalTokens(w http.ResponseWriter, r *http.Request, u 
 		"expires_in":             int(terminalTokenExpiry.Seconds()),
 		"terminal":               terminal,
 		"tenant":                 tenant,
+		"modulos":                modulos,
 	}, http.StatusOK)
 }

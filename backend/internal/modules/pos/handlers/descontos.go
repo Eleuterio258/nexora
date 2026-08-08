@@ -13,6 +13,31 @@ import (
 // não se ligam entre si nem com o POS. Este é aplicável diretamente numa
 // venda, tal como o PayCore Mobile já modela hoje.
 
+// normalizarTipoDesconto aceita tanto o formato usado pelo PayCore Mobile
+// (PERCENTAGE / FIXED) quanto o formato canónico do backend
+// (percentual / valor_fixo) e devolve sempre o valor canónico para guardar.
+func normalizarTipoDesconto(tipo string) (string, bool) {
+	switch tipo {
+	case "PERCENTAGE", "percentual":
+		return "percentual", true
+	case "FIXED", "valor_fixo":
+		return "valor_fixo", true
+	}
+	return "", false
+}
+
+// tipoDescontoParaMobile converte o valor canónico do backend para o formato
+// esperado pelo PayCore Mobile.
+func tipoDescontoParaMobile(tipo string) string {
+	switch tipo {
+	case "percentual":
+		return "PERCENTAGE"
+	case "valor_fixo":
+		return "FIXED"
+	}
+	return tipo
+}
+
 func (h *Handler) ListarDescontos(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	q := r.URL.Query()
@@ -49,6 +74,7 @@ func (h *Handler) ListarDescontos(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var d Row
 		if rows.Scan(&d.ID, &d.Nome, &d.Descricao, &d.Tipo, &d.Valor, &d.ValorMinimo, &d.ValorMaximo, &d.ValidoDe, &d.ValidoAte, &d.Activo) == nil {
+			d.Tipo = tipoDescontoParaMobile(d.Tipo)
 			data = append(data, d)
 		}
 	}
@@ -72,10 +98,13 @@ func (h *Handler) CriarDesconto(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "name e value são obrigatórios", http.StatusBadRequest)
 		return
 	}
-	if body.Tipo != "percentual" && body.Tipo != "valor_fixo" {
-		jsonErr(w, "type inválido: percentual ou valor_fixo", http.StatusBadRequest)
+	tipoNormalizado, ok := normalizarTipoDesconto(body.Tipo)
+	if !ok {
+		jsonErr(w, "type inválido: percentual, valor_fixo, PERCENTAGE ou FIXED", http.StatusBadRequest)
 		return
 	}
+	body.Tipo = tipoNormalizado
+
 	activo := true
 	if body.Activo != nil {
 		activo = *body.Activo
@@ -111,6 +140,14 @@ func (h *Handler) AtualizarDesconto(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonErr(w, "Body inválido", http.StatusBadRequest)
 		return
+	}
+	if body.Tipo != nil {
+		tipoNormalizado, ok := normalizarTipoDesconto(*body.Tipo)
+		if !ok {
+			jsonErr(w, "type inválido: percentual, valor_fixo, PERCENTAGE ou FIXED", http.StatusBadRequest)
+			return
+		}
+		body.Tipo = &tipoNormalizado
 	}
 
 	tag, err := h.db.Exec(r.Context(), `

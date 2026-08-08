@@ -1773,6 +1773,10 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	r.Post("/api/pos/login", auth.PosLogin)
 	r.Post("/api/pos/refresh", auth.PosRefresh)
 
+	// Validação pública de chave de activação do app PayCore Mobile.
+	// Rate-limited para dificultar brute-force de chaves.
+	r.With(mw.RateLimit(10, time.Minute)).Post("/api/pos/licenca/validar", pos.ValidarLicencaApp)
+
 	// Estado da licença — autenticado, mas deliberadamente fora do bloqueio
 	// de mw.RequireLicencaAtiva (montado dentro do Route abaixo): mesmo com a
 	// licença expirada, o app precisa de conseguir perguntar "porque estou
@@ -1798,7 +1802,8 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Post("/{id}/fechar", pos.FecharSessao)
 				r.Get("/{id}/fecho", pos.ObterFechoSessao)
 				r.Get("/{id}/movimentacoes", pos.ListarMovimentosCaixa)
-				r.Post("/{id}/movimentacoes", pos.RegistarMovimentoCaixa)
+				r.With(mw.RequirePermission(db, "pos", "supervisionar_pos")).
+					Post("/{id}/movimentacoes", pos.RegistarMovimentoCaixa)
 			})
 			r.Route("/sales", func(r chi.Router) {
 				r.With(mw.RequirePermission(db, "pos", "operar_pos")).
@@ -1808,9 +1813,9 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 					{Modulo: "pos", Acao: "ver_vendas"},
 				})).
 					Get("/{id}", pos.ObterVenda)
-				r.With(mw.RequirePermission(db, "pos", "operar_pos")).
+				r.With(mw.RequirePermission(db, "pos", "supervisionar_pos")).
 					Post("/{id}/cancelar", pos.CancelarVenda)
-				r.With(mw.RequirePermission(db, "pos", "operar_pos")).
+				r.With(mw.RequirePermission(db, "pos", "supervisionar_pos")).
 					Post("/{id}/estorno-parcial", pos.EstornoParcialVenda)
 				r.With(mw.RequirePermissionAny(db, []authModels.Permission{
 					{Modulo: "pos", Acao: "operar_pos"},

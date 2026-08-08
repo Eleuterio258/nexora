@@ -18,13 +18,17 @@ type syncProdutoRow struct {
 	ID                int64    `json:"id"`
 	Codigo            string   `json:"codigo"`
 	Nome              string   `json:"nome"`
+	Descricao         *string  `json:"descricao,omitempty"`
 	Tipo              string   `json:"tipo"`
 	Ativo             bool     `json:"ativo"`
 	ProductCategoryID *int64   `json:"product_category_id"`
+	CategoriaNome     *string  `json:"categoria_nome,omitempty"`
 	ProductBrandID    *int64   `json:"product_brand_id"`
 	ProductUnitID     *int64   `json:"product_unit_id"`
 	IvaPercentual     float64  `json:"iva_percentual"`
 	PrecoVenda        *float64 `json:"preco_venda,omitempty"`
+	Barcode           *string  `json:"barcode,omitempty"`
+	ImagemURL         *string  `json:"imagem_url,omitempty"`
 }
 
 type syncCategoriaRow struct {
@@ -87,17 +91,39 @@ func (h *Handler) SyncDownload(w http.ResponseWriter, r *http.Request) {
 
 	if querProdutos {
 		rows, err := h.db.Query(r.Context(), `
-			SELECT p.id, p.codigo, p.nome, p.tipo, p.ativo, p.product_category_id,
-			       p.product_brand_id, p.product_unit_id, p.iva_percentual, pv.valor,
-			       GREATEST(p.updated_at, COALESCE(pv.created_at, p.updated_at)) AS alterado_em
+			SELECT p.id, p.codigo, p.nome, p.descricao, p.tipo, p.ativo, p.product_category_id,
+			       pc.nome AS categoria_nome, p.product_brand_id, p.product_unit_id,
+			       p.iva_percentual, pv.valor, pb.barcode, pi.ficheiro_url,
+			       GREATEST(
+			         p.updated_at,
+			         COALESCE(pv.created_at, p.updated_at),
+			         COALESCE(pb.created_at, p.updated_at),
+			         COALESCE(pi.created_at, p.updated_at)
+			       ) AS alterado_em
 			  FROM produtos.products p
+			  LEFT JOIN produtos.product_categories pc ON pc.id = p.product_category_id
 			  LEFT JOIN LATERAL (
 			    SELECT valor, created_at FROM produtos.product_prices
 			     WHERE product_id = p.id AND tipo_preco = 'venda' AND ativo = true
 			     ORDER BY (moeda = 'MZN') DESC, created_at DESC LIMIT 1
 			  ) pv ON true
+			  LEFT JOIN LATERAL (
+			    SELECT barcode, created_at FROM produtos.product_barcodes
+			     WHERE product_id = p.id AND principal = true
+			     ORDER BY created_at DESC LIMIT 1
+			  ) pb ON true
+			  LEFT JOIN LATERAL (
+			    SELECT ficheiro_url, created_at FROM produtos.product_images
+			     WHERE product_id = p.id AND principal = true
+			     ORDER BY created_at DESC LIMIT 1
+			  ) pi ON true
 			 WHERE p.tenant_id = $1
-			   AND GREATEST(p.updated_at, COALESCE(pv.created_at, p.updated_at)) >= $2
+			   AND GREATEST(
+			         p.updated_at,
+			         COALESCE(pv.created_at, p.updated_at),
+			         COALESCE(pb.created_at, p.updated_at),
+			         COALESCE(pi.created_at, p.updated_at)
+			       ) >= $2
 			 ORDER BY alterado_em ASC, p.id ASC
 			 LIMIT $3`,
 			user.TenantID, since, syncPageSize+1)
@@ -107,8 +133,9 @@ func (h *Handler) SyncDownload(w http.ResponseWriter, r *http.Request) {
 			totalLidas := 0
 			for rows.Next() {
 				var p syncProdutoRow
-				if rows.Scan(&p.ID, &p.Codigo, &p.Nome, &p.Tipo, &p.Ativo, &p.ProductCategoryID,
-					&p.ProductBrandID, &p.ProductUnitID, &p.IvaPercentual, &p.PrecoVenda, &alteradoEm) == nil {
+				if rows.Scan(&p.ID, &p.Codigo, &p.Nome, &p.Descricao, &p.Tipo, &p.Ativo, &p.ProductCategoryID,
+					&p.CategoriaNome, &p.ProductBrandID, &p.ProductUnitID, &p.IvaPercentual, &p.PrecoVenda,
+					&p.Barcode, &p.ImagemURL, &alteradoEm) == nil {
 					totalLidas++
 					if totalLidas <= syncPageSize {
 						resp.Produtos = append(resp.Produtos, p)

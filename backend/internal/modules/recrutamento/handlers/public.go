@@ -72,7 +72,12 @@ func subdominioTenant(host, base string) string {
 
 // resolveTenantID devolve o tenant a usar para endpoints públicos.
 //
-// O tenant é derivado do domínio do pedido, nunca escolhido por quem chama:
+//  0. X-Tenant-Code + X-Tenant-Signature — identificação assinada por HMAC-SHA256
+//     (ver resolveTenantBySignature), para chamadores fora da infra do Nexora que
+//     não podem confiar no Host mediado pelo Traefik. Se X-Tenant-Code vier
+//     presente mas a assinatura for inválida, falha aqui — nunca cai para os
+//     passos seguintes, para não permitir contornar uma assinatura errada
+//     forjando antes um Host.
 //  1. match exacto num domínio registado em saas.tenant_dominios
 //  2. subdomínio da plataforma — <codigo>.<PLATFORM_BASE_DOMAIN>
 //  3. settings.recrutamento_tenant_id  (portal partilhado / instalação single-tenant)
@@ -80,7 +85,11 @@ func subdominioTenant(host, base string) string {
 //
 // Não existe query param: aceitar ?tenant_id deixaria qualquer visitante
 // dirigir escritas (contactos, registos) a qualquer tenant.
-func (h *Handler) resolveTenantID(r *http.Request) int64 {
+func (h *Handler) resolveTenantID(r *http.Request) (int64, error) {
+	if codigo := r.Header.Get("X-Tenant-Code"); codigo != "" {
+		return h.resolveTenantBySignature(r, codigo)
+	}
+
 	ctx := r.Context()
 	host := requestHost(r)
 	var id int64
@@ -91,14 +100,14 @@ func (h *Handler) resolveTenantID(r *http.Request) int64 {
 			  JOIN saas.tenants t ON t.id = d.tenant_id
 			 WHERE d.dominio = $1 AND t.status = 'ativo'`, host,
 		).Scan(&id); err == nil && id > 0 {
-			return id
+			return id, nil
 		}
 
 		if codigo := subdominioTenant(host, h.cfg.PlatformBaseDomain); codigo != "" {
 			if err := h.db.QueryRow(ctx,
 				`SELECT id FROM saas.tenants WHERE codigo=$1 AND status='ativo'`, codigo,
 			).Scan(&id); err == nil && id > 0 {
-				return id
+				return id, nil
 			}
 		}
 	}
@@ -106,10 +115,10 @@ func (h *Handler) resolveTenantID(r *http.Request) int64 {
 	if err := h.db.QueryRow(ctx,
 		`SELECT valor::bigint FROM settings WHERE chave='recrutamento_tenant_id' AND escopo='global' LIMIT 1`,
 	).Scan(&id); err == nil && id > 0 {
-		return id
+		return id, nil
 	}
 
-	return h.cfg.RecruitmentTenantID
+	return h.cfg.RecruitmentTenantID, nil
 }
 
 // clean apara espaços e limita o numero de runes, replicando clean() de config/security.php.
@@ -173,7 +182,11 @@ func (h *Handler) codigoAcompanhamento(ctx context.Context, tenantID int64) (str
 
 func (h *Handler) ListarVagasPublicas(w http.ResponseWriter, r *http.Request) {
 	limit, offset := pageParams(r)
-	tenantID := h.resolveTenantID(r)
+	tenantID, err := h.resolveTenantID(r)
+	if err != nil {
+		jsonErr(w, "Identificação de tenant inválida.", http.StatusUnauthorized)
+		return
+	}
 
 	rows, err := h.db.Query(r.Context(),
 		"SELECT "+vagaSelectCols+` FROM vagas
@@ -207,7 +220,11 @@ func (h *Handler) ListarVagasPublicas(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ObterVagaPublica(w http.ResponseWriter, r *http.Request) {
 	id := h.decodeID(chi.URLParam(r, "id"))
-	tenantID := h.resolveTenantID(r)
+	tenantID, err := h.resolveTenantID(r)
+	if err != nil {
+		jsonErr(w, "Identificação de tenant inválida.", http.StatusUnauthorized)
+		return
+	}
 	row := h.db.QueryRow(r.Context(), "SELECT "+vagaSelectCols+` FROM vagas
 		WHERE id=$1 AND tenant_id=$2 AND ativa=TRUE AND (prazo IS NULL OR prazo >= CURRENT_DATE)`,
 		id, tenantID)
@@ -252,10 +269,15 @@ func (h *Handler) vagaCamposAtivos(ctx context.Context, vagaID int64) ([]campoCu
 
 // VagasAbertasCount replica api/vagas_abertas.php.
 func (h *Handler) VagasAbertasCount(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := h.resolveTenantID(r)
+	if err != nil {
+		jsonErr(w, "Identificação de tenant inválida.", http.StatusUnauthorized)
+		return
+	}
 	var count int
 	h.db.QueryRow(r.Context(),
 		`SELECT COUNT(*) FROM vagas WHERE tenant_id=$1 AND ativa=TRUE AND (prazo IS NULL OR prazo >= CURRENT_DATE)`,
-		h.resolveTenantID(r)).Scan(&count)
+		tenantID).Scan(&count)
 	jsonOK(w, map[string]int{"abertas": count}, http.StatusOK)
 }
 
@@ -312,13 +334,13 @@ func (h *Handler) saveUpload(ctx context.Context, r *http.Request, tenantID int6
 }
 
 type campoCustom struct {
-	ID          int64  `json:"id"`
-	Codigo      string `json:"codigo"`
-	Label       string `json:"label"`
-	Tipo        string `json:"tipo"`
+	ID          int64    `json:"id"`
+	Codigo      string   `json:"codigo"`
+	Label       string   `json:"label"`
+	Tipo        string   `json:"tipo"`
 	Opcoes      []string `json:"opcoes"`
-	Obrigatorio bool   `json:"obrigatorio"`
-	Ordem       int    `json:"ordem"`
+	Obrigatorio bool     `json:"obrigatorio"`
+	Ordem       int      `json:"ordem"`
 }
 
 // camposCustomAtivos devolve os campos customizados ativos do tenant para o formulário.
@@ -347,7 +369,12 @@ func (h *Handler) camposCustomAtivos(ctx context.Context, tenantID int64) ([]cam
 
 // ListarCamposCustomPublicos expõe os campos customizados ativos para renderização do formulário público.
 func (h *Handler) ListarCamposCustomPublicos(w http.ResponseWriter, r *http.Request) {
-	campos, err := h.camposCustomAtivos(r.Context(), h.resolveTenantID(r))
+	tenantID, err := h.resolveTenantID(r)
+	if err != nil {
+		jsonErr(w, "Identificação de tenant inválida.", http.StatusUnauthorized)
+		return
+	}
+	campos, err := h.camposCustomAtivos(r.Context(), tenantID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -407,8 +434,9 @@ func (h *Handler) SubmeterCandidatura(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// O tenant vem da própria vaga — é ela a fonte autoritativa. Só a
-	// candidatura espontânea (sem vaga_id) depende do domínio do pedido.
-	tenantID := h.resolveTenantID(r)
+	// candidatura espontânea (sem vaga_id) depende da identificação do pedido
+	// (domínio ou assinatura HMAC).
+	tenantID, tenantErr := h.resolveTenantID(r)
 	if vagaID != nil {
 		var permitePublica, permiteConta bool
 		err := h.db.QueryRow(r.Context(),
@@ -427,6 +455,9 @@ func (h *Handler) SubmeterCandidatura(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, "Esta vaga não aceita candidatura pública.", http.StatusForbidden)
 			return
 		}
+	} else if tenantErr != nil {
+		jsonErr(w, "Identificação de tenant inválida.", http.StatusUnauthorized)
+		return
 	}
 
 	cvPath, err := h.saveUpload(r.Context(), r, tenantID, uploadSpec{
@@ -661,16 +692,16 @@ func (h *Handler) ConsultarCandidaturaPorCodigo(w http.ResponseWriter, r *http.R
 	}
 
 	var c struct {
-		ID                    int64      `json:"id"`
-		VagaTitulo            string     `json:"vaga_titulo"`
-		Nome                  string     `json:"nome"`
-		Estado                string     `json:"estado"`
-		Score                 *int       `json:"score"`
-		EntrevistaData        *time.Time `json:"entrevista_data"`
-		EntrevistaLocal       *string    `json:"entrevista_local"`
-		EntrevistaLink        *string    `json:"entrevista_link"`
-		CreatedAt             time.Time  `json:"created_at"`
-		CodigoAcompanhamento  string     `json:"codigo_acompanhamento"`
+		ID                   int64      `json:"id"`
+		VagaTitulo           string     `json:"vaga_titulo"`
+		Nome                 string     `json:"nome"`
+		Estado               string     `json:"estado"`
+		Score                *int       `json:"score"`
+		EntrevistaData       *time.Time `json:"entrevista_data"`
+		EntrevistaLocal      *string    `json:"entrevista_local"`
+		EntrevistaLink       *string    `json:"entrevista_link"`
+		CreatedAt            time.Time  `json:"created_at"`
+		CodigoAcompanhamento string     `json:"codigo_acompanhamento"`
 	}
 
 	err := h.db.QueryRow(r.Context(), `
@@ -782,11 +813,17 @@ func (h *Handler) RegistarCandidato(w http.ResponseWriter, r *http.Request) {
 	// candidato só ficava ligado a pessoas.pessoas se/quando fosse contratado.
 	_, _ = pessoas.EnsureUserPessoa(r.Context(), h.db, userID, nome, nil)
 
+	tenantID, err := h.resolveTenantID(r)
+	if err != nil {
+		jsonErr(w, "Identificação de tenant inválida.", http.StatusUnauthorized)
+		return
+	}
+
 	var id int64
-	err := h.db.QueryRow(r.Context(), `
+	err = h.db.QueryRow(r.Context(), `
 		INSERT INTO candidatos (tenant_id, email, nome, telefone, user_id)
 		VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-		h.resolveTenantID(r), email, nome, nullIfEmpty(telefone), userID).Scan(&id)
+		tenantID, email, nome, nullIfEmpty(telefone), userID).Scan(&id)
 	if err != nil {
 		if isUniqueViolation(err) {
 			jsonErr(w, "Já tem uma conta neste empregador. Inicie sessão em /api/auth/login.", http.StatusConflict)
@@ -861,9 +898,15 @@ func (h *Handler) SubmeterContacto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := h.db.Exec(r.Context(),
+	tenantID, err := h.resolveTenantID(r)
+	if err != nil {
+		jsonErr(w, "Identificação de tenant inválida.", http.StatusUnauthorized)
+		return
+	}
+
+	_, err = h.db.Exec(r.Context(),
 		`INSERT INTO contactos (tenant_id, nome, email, assunto, mensagem, ip) VALUES ($1,$2,$3,$4,$5,$6)`,
-		h.resolveTenantID(r), nome, email, assunto, mensagem, clientIP(r))
+		tenantID, nome, email, assunto, mensagem, clientIP(r))
 	if err != nil {
 		jsonErr(w, "Erro ao guardar. Tente novamente.", http.StatusInternalServerError)
 		return
