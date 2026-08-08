@@ -23,6 +23,7 @@ from app.security import require_nexora_signature
 from app.limiter import limiter
 from app.models import FingerprintTemplate
 from app.security import get_biometric_encryption
+from app.services.fingerprint_matching import best_fingerprint_match
 
 router = APIRouter(tags=["Fingerprint"])
 
@@ -144,23 +145,33 @@ def identify_fingerprint(
     """
     Identifica um utilizador a partir de um template de impressão digital.
 
-    Nota: Esta implementacao compara templates de forma exacta (placeholder).
-    Em producao, deve usar um algoritmo de matching de minutias (ISO/IEC 19794-2)
-    fornecido pelo SDK do leitor.
+    Usa matching baseado em caracteristicas locais (ORB) via OpenCV.
+    E self-hosted e nao depende de SDKs de fabricantes nem servicos cloud.
     """
+    from app.config import settings
+
     encryption = get_biometric_encryption()
     templates = db.scalars(
         apply_tenant(select(FingerprintTemplate), actor, FingerprintTemplate)
     ).all()
 
-    for template in templates:
-        stored_template = encryption.decrypt_text(template.template_base64)
-        if stored_template == payload.template_base64:
-            return FingerprintResponse(
-                success=True,
-                user_id=template.erp_user_id,
-                message="Impressão digital identificada.",
-            )
+    references = [
+        (template.erp_user_id, encryption.decrypt_text(template.template_base64))
+        for template in templates
+    ]
+
+    user_id, score = best_fingerprint_match(
+        payload.template_base64,
+        references,
+        threshold=settings.fingerprint_match_threshold,
+    )
+
+    if user_id is not None:
+        return FingerprintResponse(
+            success=True,
+            user_id=user_id,
+            message=f"Impressão digital identificada (score={score}).",
+        )
 
     return FingerprintResponse(
         success=False,

@@ -36,6 +36,10 @@ func jsonErr(w http.ResponseWriter, msg string, status int) {
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
+func decodeJSON(r *http.Request, v any) error {
+	return json.NewDecoder(r.Body).Decode(v)
+}
+
 func isUniqueViolation(err error) bool {
 	if pgErr, ok := err.(*pgconn.PgError); ok {
 		return pgErr.Code == "23505"

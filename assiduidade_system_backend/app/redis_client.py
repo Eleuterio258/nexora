@@ -15,6 +15,11 @@ def get_redis() -> redis.Redis:
     return _redis_client
 
 
+def get_redis_client() -> redis.Redis | None:
+    """Devolve o cliente Redis global ou None se ainda nao foi configurado."""
+    return _redis_client
+
+
 def set_redis_client(client: redis.Redis) -> None:
     """Permite injetar um cliente Redis (útil para testes com fakeredis)."""
     global _redis_client

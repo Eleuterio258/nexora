@@ -1,0 +1,8 @@
+# Dependencias opcionais para funcionalidades avancadas (todas self-hosted).
+# Instalar apenas se necessario:
+#
+#   pip install -r requirements.txt -r requirements-extras.txt
+#
+
+# Classificador PAD treinado (para LIVENESS_MODEL=anti_spoofing)
+onnxruntime>=1.18.0,<2.0.0

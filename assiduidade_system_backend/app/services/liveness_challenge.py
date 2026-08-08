@@ -104,15 +104,11 @@ class LivenessChallenge:
     used: bool = False
 
 
-# Store em memória — mesma limitação já documentada em app/routers/methods.py
-# (`_qr_store`): em produção com múltiplas réplicas, isto precisa de um cache
-# partilhado (Redis). Aceitável para o estado actual (single-instance).
-_challenges: dict[str, LivenessChallenge] = {}
-
-
 def create_challenge(user_id: str) -> LivenessChallenge:
     """Gera um desafio aleatório para o utilizador, válido por um curto período."""
     import random
+
+    from app.services.challenge_store import get_challenge_store
 
     action = random.choice(list(ChallengeAction))
     challenge = LivenessChallenge(
@@ -121,24 +117,21 @@ def create_challenge(user_id: str) -> LivenessChallenge:
         user_id=user_id,
         created_at=time.monotonic(),
     )
-    _challenges[challenge.challenge_id] = challenge
+    get_challenge_store().set(challenge, _CHALLENGE_TTL_SECONDS)
     return challenge
 
 
 def get_challenge(challenge_id: str) -> LivenessChallenge | None:
-    challenge = _challenges.get(challenge_id)
-    if challenge is None:
-        return None
-    if challenge.used or (time.monotonic() - challenge.created_at) > _CHALLENGE_TTL_SECONDS:
-        return None
-    return challenge
+    from app.services.challenge_store import get_challenge_store
+
+    return get_challenge_store().get(challenge_id)
 
 
 def consume_challenge(challenge_id: str) -> None:
     """Marca o desafio como usado, impedindo replay do mesmo challenge_id."""
-    challenge = _challenges.get(challenge_id)
-    if challenge:
-        challenge.used = True
+    from app.services.challenge_store import get_challenge_store
+
+    get_challenge_store().consume(challenge_id)
 
 
 def _dist(p1: tuple[float, float], p2: tuple[float, float]) -> float:

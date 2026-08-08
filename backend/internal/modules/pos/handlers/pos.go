@@ -253,15 +253,15 @@ func (h *Handler) ListarCatalogo(w http.ResponseWriter, r *http.Request) {
 		 ORDER BY p.nome`, user.TenantID)
 	defer rows.Close()
 	type Row struct {
-		ID                int64    `json:"id"`
-		ProductID         int64    `json:"product_id"`
-		ProductVariantID  *int64   `json:"product_variant_id"`
-		Codigo            string   `json:"codigo"`
-		Nome              string   `json:"nome"`
-		CodigoBarra       *string  `json:"codigo_barra"`
-		PrecoVenda        float64  `json:"preco_venda"`
-		Moeda             string   `json:"moeda"`
-		Activo            bool     `json:"activo"`
+		ID               int64   `json:"id"`
+		ProductID        int64   `json:"product_id"`
+		ProductVariantID *int64  `json:"product_variant_id"`
+		Codigo           string  `json:"codigo"`
+		Nome             string  `json:"nome"`
+		CodigoBarra      *string `json:"codigo_barra"`
+		PrecoVenda       float64 `json:"preco_venda"`
+		Moeda            string  `json:"moeda"`
+		Activo           bool    `json:"activo"`
 	}
 	data := []Row{}
 	for rows.Next() {
@@ -339,14 +339,14 @@ func (h *Handler) ListarSessoes(w http.ResponseWriter, r *http.Request) {
 			"FROM pos_sessions WHERE "+where+" ORDER BY opened_at DESC LIMIT $"+strconv.Itoa(n-1)+" OFFSET $"+strconv.Itoa(n), args...)
 	defer rows.Close()
 	type Row struct {
-		ID             int64      `json:"id"`
-		TerminalID     int64      `json:"terminal_id"`
-		UserID         int64      `json:"user_id"`
-		OpenedAt       time.Time  `json:"opened_at"`
-		ClosedAt       *time.Time `json:"closed_at"`
-		OpeningAmount  float64    `json:"opening_amount"`
-		ClosingAmount  *float64   `json:"closing_amount"`
-		Status         string     `json:"status"`
+		ID            int64      `json:"id"`
+		TerminalID    int64      `json:"terminal_id"`
+		UserID        int64      `json:"user_id"`
+		OpenedAt      time.Time  `json:"opened_at"`
+		ClosedAt      *time.Time `json:"closed_at"`
+		OpeningAmount float64    `json:"opening_amount"`
+		ClosingAmount *float64   `json:"closing_amount"`
+		Status        string     `json:"status"`
 	}
 	data := []Row{}
 	for rows.Next() {
@@ -545,12 +545,37 @@ func (h *Handler) ListarVendas(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{"data": data, "meta": map[string]int{"total": total, "page": page, "limit": limit}}, http.StatusOK)
 }
 
+// vendaExistentePorReferencia resolve uma venda já criada a partir do
+// client_reference gerado pelo terminal offline (ver CriarVenda). Devolve o
+// mesmo shape do sucesso de CriarVenda para que um retry idempotente seja
+// indistinguível, do ponto de vista do cliente, de uma criação bem-sucedida.
+func (h *Handler) vendaExistentePorReferencia(ctx context.Context, tenantID int64, ref string) (map[string]any, error) {
+	var id int64
+	var numero string
+	var total, troco float64
+	var invoiceID *int64
+	var invoiceNumero *string
+	err := h.db.QueryRow(ctx, `
+		SELECT s.id, s.numero, s.total, s.troco, s.invoice_id, i.numero
+		  FROM pos_sales s LEFT JOIN faturacao.invoices i ON i.id = s.invoice_id
+		 WHERE s.tenant_id=$1 AND s.client_reference=$2`,
+		tenantID, ref).Scan(&id, &numero, &total, &troco, &invoiceID, &invoiceNumero)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"id": id, "numero": numero, "total": total, "troco": troco,
+		"invoice_id": invoiceID, "invoice_numero": invoiceNumero,
+	}, nil
+}
+
 func (h *Handler) CriarVenda(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	var body struct {
-		PosSessionID int64  `json:"pos_session_id"`
-		CustomerID   *int64 `json:"customer_id"`
-		Itens        []struct {
+		PosSessionID    int64   `json:"pos_session_id"`
+		CustomerID      *int64  `json:"customer_id"`
+		ClientReference *string `json:"client_reference"`
+		Itens           []struct {
 			ProductID        int64   `json:"product_id"`
 			ProductVariantID *int64  `json:"product_variant_id"`
 			Descricao        *string `json:"descricao"`
@@ -578,6 +603,19 @@ func (h *Handler) CriarVenda(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
+
+	// Idempotência: um terminal offline pode reenviar a mesma venda (ex.:
+	// perdeu a resposta HTTP mas o pedido já tinha sido processado). Se
+	// client_reference já existir para este tenant, devolve a venda existente
+	// em vez de duplicar venda + movimentos de stock.
+	temReferencia := body.ClientReference != nil && *body.ClientReference != ""
+	if temReferencia {
+		if existente, err := h.vendaExistentePorReferencia(ctx, user.TenantID, *body.ClientReference); err == nil {
+			jsonOK(w, existente, http.StatusOK)
+			return
+		}
+	}
+
 	tx, err := h.db.Begin(ctx)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
@@ -605,14 +643,23 @@ func (h *Handler) CriarVenda(w http.ResponseWriter, r *http.Request) {
 
 	var id int64
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO pos_sales (tenant_id, pos_session_id, terminal_id, numero, customer_id, status, sold_at, created_by)
-		VALUES ($1,$2,$3,$4,$5,'concluida',NOW(),$6) RETURNING id`,
-		user.TenantID, body.PosSessionID, terminalID, numero, body.CustomerID, user.ID).Scan(&id); err != nil {
+		INSERT INTO pos_sales (tenant_id, pos_session_id, terminal_id, numero, customer_id, client_reference, status, sold_at, created_by)
+		VALUES ($1,$2,$3,$4,$5,$6,'concluida',NOW(),$7) RETURNING id`,
+		user.TenantID, body.PosSessionID, terminalID, numero, body.CustomerID, body.ClientReference, user.ID).Scan(&id); err != nil {
+		// Corrida rara: dois pedidos com a mesma client_reference chegaram em
+		// paralelo e o outro venceu entretanto (protegido pelo índice único).
+		if temReferencia && isUniqueViolation(err) {
+			if existente, err2 := h.vendaExistentePorReferencia(ctx, user.TenantID, *body.ClientReference); err2 == nil {
+				jsonOK(w, existente, http.StatusOK)
+				return
+			}
+		}
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
 
 	var subtotalTotal, descontoTotalTotal, impostoTotalTotal, totalGeral float64
+	itensFatura := make([]itemFaturaPOS, 0, len(body.Itens))
 	for _, item := range body.Itens {
 		if item.Quantidade <= 0 || item.PrecoUnitario < 0 {
 			jsonErr(w, "quantidade e preco_unitario são obrigatórios em todos os itens", http.StatusBadRequest)
@@ -659,6 +706,18 @@ func (h *Handler) CriarVenda(w http.ResponseWriter, r *http.Request) {
 		descontoTotalTotal += descontoValor
 		impostoTotalTotal += impostoValor
 		totalGeral += total
+
+		itensFatura = append(itensFatura, itemFaturaPOS{
+			ProductID:        item.ProductID,
+			ProductVariantID: item.ProductVariantID,
+			Descricao:        item.Descricao,
+			Quantidade:       item.Quantidade,
+			PrecoUnitario:    item.PrecoUnitario,
+			DescontoValor:    descontoValor,
+			ImpostoValor:     impostoValor,
+			Subtotal:         subtotal - descontoValor,
+			Total:            total,
+		})
 	}
 
 	if _, err := tx.Exec(ctx, `UPDATE pos_sales SET subtotal=$1, desconto_total=$2, imposto_total=$3, total=$4 WHERE id=$5`,
@@ -688,6 +747,40 @@ func (h *Handler) CriarVenda(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Faturação fiscal: toda venda POS concluída gera fatura fiscal já
+	// emitida (o pagamento integral acima de "Valor pago insuficiente" já
+	// foi validado), na MESMA transacção da venda — se falhar, a venda
+	// inteira é revertida, para nunca existir uma venda concluída sem
+	// documento fiscal correspondente.
+	customerID := body.CustomerID
+	if customerID == nil {
+		cid, err := h.consumidorFinalID(ctx, tx, user.TenantID)
+		if err != nil {
+			jsonErr(w, "Erro interno ao preparar cliente para a fatura", http.StatusInternalServerError)
+			return
+		}
+		customerID = &cid
+	}
+	invoiceID, invoiceNumero, err := h.criarFaturaParaVenda(ctx, tx, faturaVendaParams{
+		tenantID:   user.TenantID,
+		customerID: *customerID,
+		userID:     user.ID,
+		itens:      itensFatura,
+		subtotal:   subtotalTotal,
+		desconto:   descontoTotalTotal,
+		imposto:    impostoTotalTotal,
+		total:      totalGeral,
+		moeda:      "MZN",
+	})
+	if err != nil {
+		jsonErr(w, "Não existe nenhuma série activa configurada para Faturas (FT). Configure em Faturação > Séries Documentais.", http.StatusUnprocessableEntity)
+		return
+	}
+	if _, err := tx.Exec(ctx, `UPDATE pos_sales SET invoice_id=$1 WHERE id=$2`, invoiceID, id); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -698,7 +791,10 @@ func (h *Handler) CriarVenda(w http.ResponseWriter, r *http.Request) {
 		h.wsHub.SendEvent(user.ID, ws.EvtPagamentoRecebido, map[string]any{"venda_id": id, "valor": valorRecebido})
 	}
 
-	jsonOK(w, map[string]any{"id": id, "numero": numero, "total": totalGeral, "troco": troco}, http.StatusCreated)
+	jsonOK(w, map[string]any{
+		"id": id, "numero": numero, "total": totalGeral, "troco": troco,
+		"invoice_id": invoiceID, "invoice_numero": invoiceNumero,
+	}, http.StatusCreated)
 }
 
 func (h *Handler) ObterVenda(w http.ResponseWriter, r *http.Request) {

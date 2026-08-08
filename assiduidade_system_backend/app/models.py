@@ -4,6 +4,12 @@ from uuid import uuid4
 from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+try:
+    from pgvector.sqlalchemy import Vector
+except ImportError:
+    # Fallback para ambientes sem pgvector instalado (testes com SQLite, etc.)
+    Vector = None  # type: ignore[misc,assignment]
+
 from app.database import Base
 from app.schemas.common import TemplateStatus
 
@@ -22,7 +28,13 @@ class FaceTemplate(Base):
     consent_version: Mapped[str | None] = mapped_column(String(30))
     model_version: Mapped[str] = mapped_column(String(50), nullable=False)
     embedding: Mapped[bytes] = mapped_column(nullable=False)
+    embedding_vector: Mapped[list[float] | None] = mapped_column(
+        Vector(512) if Vector is not None else String,
+        nullable=True,
+        index=True,
+    )
     quality_score: Mapped[float | None] = mapped_column(Numeric(5, 4))
+    transform_version: Mapped[str | None] = mapped_column(String(30))
     status: Mapped[TemplateStatus] = mapped_column(
         Enum(TemplateStatus), default=TemplateStatus.ACTIVE, nullable=False
     )
@@ -60,3 +72,39 @@ class ApiCredential(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DevicePublicKey(Base):
+    """Registo de chaves publicas Ed25519 dos dispositivos moveis."""
+
+    __tablename__ = "device_public_keys"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    device_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    public_key_b64: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class BiometricAuditLog(Base):
+    """Log de auditoria local de eventos biometricos (enroll/verify/identify/
+    liveness). Complementa o audit log do ERP (app/routers/audit.py), que so
+    delega — este fica disponivel mesmo se o ERP estiver em baixo."""
+
+    __tablename__ = "biometric_audit_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    event_type: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    erp_user_id: Mapped[str | None] = mapped_column(String(50), index=True)
+    device_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    reason: Mapped[str | None] = mapped_column(String(100))
+    confidence_score: Mapped[float | None] = mapped_column(Numeric(5, 4))
+    liveness_score: Mapped[float | None] = mapped_column(Numeric(5, 4))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )

@@ -14,8 +14,8 @@ from slowapi.errors import RateLimitExceeded
 from app.bootstrap import seed_data
 from app.limiter import limiter
 from app.config import settings
-from app.database import Base, SessionLocal, engine
-from app.routers import audit, biometric, fingerprint, liveness, monitoring
+from app.database import Base, SessionLocal, engine, ensure_pgvector_extension
+from app.routers import admin, audit, biometric, fingerprint, liveness, monitoring
 from app.services.biometric import warmup_biometric_models
 
 
@@ -33,6 +33,7 @@ async def lifespan(app_instance: FastAPI):
     settings.assert_production_secrets()
     if settings.environment == "production":
         warmup_biometric_models()
+    ensure_pgvector_extension()
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("Database schema ensured.")
@@ -83,6 +84,7 @@ app.add_middleware(
 # Request body size limit (10MB)
 app.state.max_request_body_size = int(os.getenv("MAX_REQUEST_BODY_SIZE_BYTES", "10485760"))
 
+app.include_router(admin.router, prefix="/api/v1")
 app.include_router(biometric.router, prefix="/api/v1")
 app.include_router(liveness.router, prefix="/api/v1")
 app.include_router(fingerprint.router, prefix="/api/v1")

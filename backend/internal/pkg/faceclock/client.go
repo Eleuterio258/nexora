@@ -52,7 +52,53 @@ func (c *Client) Post(
 	}
 	headers := c.signer.SignBytes(http.MethodPost, path, "", data)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(data))
+	return c.do(ctx, http.MethodPost, path, headers, bytes.NewReader(data))
+}
+
+// Get envia um GET assinado para o FaceClock e devolve a resposta como mapa.
+// query é a query string raw (sem o "?" inicial), ou "" se não houver.
+func (c *Client) Get(
+	ctx context.Context,
+	path string,
+	query string,
+) (map[string]any, int, error) {
+	if c.signer == nil {
+		return nil, 0, fmt.Errorf("faceclock client sem credenciais configuradas")
+	}
+	headers := c.signer.SignBytes(http.MethodGet, path, query, nil)
+	return c.do(ctx, http.MethodGet, requestPath(path, query), headers, nil)
+}
+
+// Delete envia um DELETE assinado para o FaceClock e devolve a resposta como mapa.
+// query é a query string raw (sem o "?" inicial), ou "" se não houver.
+func (c *Client) Delete(
+	ctx context.Context,
+	path string,
+	query string,
+) (map[string]any, int, error) {
+	if c.signer == nil {
+		return nil, 0, fmt.Errorf("faceclock client sem credenciais configuradas")
+	}
+	headers := c.signer.SignBytes(http.MethodDelete, path, query, nil)
+	return c.do(ctx, http.MethodDelete, requestPath(path, query), headers, nil)
+}
+
+// requestPath junta path e query (já não assinados separadamente) para
+// construir o URL real do pedido HTTP.
+func requestPath(path, query string) string {
+	if query == "" {
+		return path
+	}
+	return path + "?" + query
+}
+
+func (c *Client) do(
+	ctx context.Context,
+	method, path string,
+	headers map[string]string,
+	body io.Reader,
+) (map[string]any, int, error) {
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -22,16 +22,37 @@ class EnrollRequest(BaseModel):
     captures: list[CaptureInput] = Field(min_length=3)
 
 
+class BatchEnrollRequest(BaseModel):
+    enrollments: list[EnrollRequest] = Field(min_length=1, max_length=20)
+
+
 class VerifyRequest(BaseModel):
     user_id: str
     device_id: UUID
     image_base64: str | None = None
     image_url: str | None = None
+    image_signature: str | None = None
     geo_lat: float | None = None
     geo_lng: float | None = None
 
     @model_validator(mode="after")
     def _check_image_source(self) -> "VerifyRequest":
+        if not self.image_base64 and not self.image_url:
+            raise ValueError("Forneca image_base64 ou image_url.")
+        if self.image_base64 and self.image_url:
+            raise ValueError("Forneca apenas image_base64 ou image_url, nao ambos.")
+        return self
+
+
+class IdentifyRequest(BaseModel):
+    device_id: UUID
+    image_base64: str | None = None
+    image_url: str | None = None
+    image_signature: str | None = None
+    top_k: int = Field(default=5, ge=1, le=20)
+
+    @model_validator(mode="after")
+    def _check_image_source(self) -> "IdentifyRequest":
         if not self.image_base64 and not self.image_url:
             raise ValueError("Forneca image_base64 ou image_url.")
         if self.image_base64 and self.image_url:

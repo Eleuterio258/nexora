@@ -37,6 +37,8 @@ import tech.e258tech.nexora_assiduidade.data.model.FuncionarioListResponse
 import tech.e258tech.nexora_assiduidade.data.model.GenericHardwareEventRequest
 import tech.e258tech.nexora_assiduidade.data.model.JustificacaoRequest
 import tech.e258tech.nexora_assiduidade.data.model.Lead
+import tech.e258tech.nexora_assiduidade.data.model.LivenessChallengeRequest
+import tech.e258tech.nexora_assiduidade.data.model.LivenessVerifyRequest
 import tech.e258tech.nexora_assiduidade.data.model.LeadConverterRequest
 import tech.e258tech.nexora_assiduidade.data.model.LeadEstadoRequest
 import tech.e258tech.nexora_assiduidade.data.model.LeadListResponse
@@ -67,6 +69,8 @@ import tech.e258tech.nexora_assiduidade.data.model.response.AssiduidadeConfigRes
 import tech.e258tech.nexora_assiduidade.data.model.response.AtividadeCreateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.EnrollFacialResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.FaceVerifyResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.LivenessChallengeResponse
+import tech.e258tech.nexora_assiduidade.data.model.response.LivenessVerifyResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageListResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ChatMessageResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ConversationCreateResponse
@@ -377,6 +381,51 @@ interface ErpApiService {
         @Part("geo_lat") geoLat: RequestBody? = null,
         @Part("geo_lng") geoLng: RequestBody? = null
     ): Response<FaceVerifyResponse>
+
+    // Alias curto compatível com o nome do endpoint FaceClock.
+    @POST("api/self-service/assiduidade/biometric/verify")
+    suspend fun verifyFacialShort(
+        @Header("Authorization") token: String,
+        @Body request: FaceVerifyRequest
+    ): Response<FaceVerifyResponse>
+
+    @Multipart
+    @POST("api/self-service/assiduidade/biometric/verify")
+    suspend fun verifyFacialMultipartShort(
+        @Header("Authorization") token: String,
+        @Part("device_id") deviceId: RequestBody,
+        @Part image: MultipartBody.Part,
+        @Part("geo_lat") geoLat: RequestBody? = null,
+        @Part("geo_lng") geoLng: RequestBody? = null
+    ): Response<FaceVerifyResponse>
+
+    // Liveness challenge (prova de vida ativa) — proxy ERP → FaceClock.
+    @POST("api/self-service/assiduidade/biometria/facial/liveness/challenge")
+    suspend fun livenessChallenge(
+        @Header("Authorization") token: String,
+        @Body request: LivenessChallengeRequest
+    ): Response<LivenessChallengeResponse>
+
+    // Alias curto do liveness challenge.
+    @POST("api/self-service/assiduidade/biometric/liveness/challenge")
+    suspend fun livenessChallengeShort(
+        @Header("Authorization") token: String,
+        @Body request: LivenessChallengeRequest
+    ): Response<LivenessChallengeResponse>
+
+    // Validação do desafio de liveness + match facial.
+    @POST("api/self-service/assiduidade/biometria/facial/liveness/verify")
+    suspend fun livenessVerify(
+        @Header("Authorization") token: String,
+        @Body request: LivenessVerifyRequest
+    ): Response<LivenessVerifyResponse>
+
+    // Alias curto do liveness verify.
+    @POST("api/self-service/assiduidade/biometric/liveness/verify")
+    suspend fun livenessVerifyShort(
+        @Header("Authorization") token: String,
+        @Body request: LivenessVerifyRequest
+    ): Response<LivenessVerifyResponse>
 
     // Criação manual de evento de assiduidade por gestor/RH — exige a permissão
     // "recursos-humanos:gerir_funcionarios" (router.go:2069). O ERP decide

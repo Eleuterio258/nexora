@@ -26,3 +26,4 @@ class TemplateStatus(str, Enum):
     ACTIVE = "ACTIVE"
     REVOKED = "REVOKED"
     DELETED = "DELETED"
+    PENDING_REENROLL = "PENDING_REENROLL"

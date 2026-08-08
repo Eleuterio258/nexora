@@ -49,6 +49,7 @@ import (
 	finH "nexora/internal/modules/financeiro/handlers"
 	hardwareH "nexora/internal/modules/hardware/handlers"
 	mmH "nexora/internal/modules/multi-moeda/handlers"
+	monitH "nexora/internal/modules/monitoring/handlers"
 	notifH "nexora/internal/modules/notifications/handlers"
 	pessoasH "nexora/internal/modules/pessoas/handlers"
 	segH "nexora/internal/modules/seguranca/handlers"
@@ -175,6 +176,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	super := superH.New(db, cfg)
 	tarefas := tarefasH.New(db, cfg)
 	hardware := hardwareH.New(db, cfg)
+	faceclockMonit := monitH.New(*cfg)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
@@ -1801,6 +1803,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Post("/iniciar", pos.IniciarPagamento)
 				r.Get("/{gatewayTxnId}/status", pos.StatusPagamento)
 			})
+			r.Get("/sync/download", pos.SyncDownload)
 		})
 
 		// Gerir terminais
@@ -2070,6 +2073,12 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Use(mw.RequirePermission(db, "recursos-humanos", "gerir_funcionarios"))
 			r.Post("/eventos", rh.CriarEvento)
 			r.Post("/assiduidade/ponto", rh.MarcarPontoGestor)
+			// Alias curto FaceClock para enrollment facial.
+			r.Post("/assiduidade/biometric/enroll", rh.EnrollFacial)
+			// Endpoints de impressao digital (proxy FaceClock).
+			r.Post("/assiduidade/fingerprint/enroll", rh.FingerprintEnroll)
+			r.Post("/assiduidade/fingerprint/identify", rh.FingerprintIdentify)
+			r.Delete("/assiduidade/fingerprint/enroll/{user_id}", rh.FingerprintDelete)
 		})
 		// QR Code fixo do gestor — gera o token que os funcionários leem para se
 		// marcarem sozinhos. Precisa de saber QUEM está
@@ -2597,6 +2606,15 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				// para o FaceClock (POST /api/v1/biometric/verify), substituindo
 				// a chamada directa app→FaceClock que existia antes.
 				r.Post("/biometria/facial/verificar", ss.VerificarFacial)
+				// Alias curto exposto para compatibilidade com clientes que usam
+				// o nome do endpoint FaceClock (/api/v1/biometric/verify).
+				r.Post("/biometric/verify", ss.VerificarFacial)
+				// Alias curto do liveness challenge.
+				r.Post("/biometric/liveness/challenge", ss.LivenessChallenge)
+				r.Post("/biometric/liveness/verify", ss.LivenessVerify)
+				// Liveness challenge (prova de vida ativa) — proxy para o FaceClock.
+				r.Post("/biometria/facial/liveness/challenge", ss.LivenessChallenge)
+				r.Post("/biometria/facial/liveness/verify", ss.LivenessVerify)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "assiduidade", "marcar_ponto"))
@@ -2771,6 +2789,11 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Use(mw.RequireSuperadminReauth(15 * time.Minute))
 			r.Get("/", super.ListarConfiguracoesGlobais)
 			r.Put("/", super.ActualizarConfiguracaoGlobal)
+		})
+		// Monitorizacao do FaceClock (metricas Prometheus e audit logs).
+		r.Route("/faceclock", func(r chi.Router) {
+			r.Get("/metrics", faceclockMonit.Metrics)
+			r.Get("/audit-logs", faceclockMonit.AuditLogs)
 		})
 	})
 

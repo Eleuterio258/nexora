@@ -7,16 +7,20 @@ para chamadas serviço-a-serviço do FaceClock ao ERP, usando API Key de device:
 - Configuração de métodos de assiduidade.
 - Proxies de consentimentos LGPD.
 - Proxy de audit-logs.
+- Notificação de re-enrolamento automático (best-effort).
 
 Quando o ERP não está configurado ou está indisponível, as operações
 levantam ERPUnavailableError para que o chamador possa decidir sobre fallback.
 """
 
+import logging
 from typing import Any
 
 import httpx
 
 from app.config import settings
+
+log = logging.getLogger(__name__)
 
 
 class ERPUnavailableError(Exception):
@@ -111,6 +115,28 @@ class ERPClient:
                 detail = response.text
             raise ERPResponseError(response.status_code, detail)
 
+    async def validar_consentimento_ativo(self, erp_user_id: str) -> dict[str, Any]:
+        """Consulta consentimento LGPD ativo de um funcionário no ERP.
+
+        `GET /api/hardware/assiduidade/consentimentos/activo?erp_user_id=...`
+        Levanta ERPResponseError(404) se não houver consentimento ativo.
+        """
+        if not self._is_configured():
+            raise ERPUnavailableError("ERP_BASE_URL nao configurado.")
+        headers = self._device_headers()
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(
+                    f"{self.base_url}/api/hardware/assiduidade/consentimentos/activo",
+                    headers=headers,
+                    params={"erp_user_id": erp_user_id},
+                )
+        except httpx.RequestError as exc:
+            raise ERPUnavailableError(f"ERP indisponivel: {exc}") from exc
+
+        self._raise_for_proxy(response)
+        return response.json()
+
     async def list_audit_logs(
         self,
         modulo: str | None = None,
@@ -154,5 +180,42 @@ class ERPClient:
 
         self._raise_for_proxy(response)
         return response.json()
+
+    async def notify_reenroll_required(
+        self,
+        erp_user_id: str,
+        tenant_id: str | None,
+        old_model_version: str,
+        new_model_version: str,
+    ) -> None:
+        """Notifica o ERP (best-effort) de que um utilizador precisa de
+        re-enrolamento por mudanca de model_version.
+
+        Nunca levanta excecao: se ERP_REENROLL_WEBHOOK_URL nao estiver
+        configurado, ou o pedido falhar, apenas regista um aviso. O verify
+        que despoletou isto ja marcou o template como PENDING_REENROLL — esta
+        notificacao e so uma conveniencia operacional, nao uma dependencia
+        critica do fluxo.
+        """
+        webhook_url = settings.erp_reenroll_webhook_url
+        if not webhook_url:
+            return
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                await client.post(
+                    webhook_url,
+                    headers=self._device_headers(),
+                    json={
+                        "erp_user_id": erp_user_id,
+                        "tenant_id": tenant_id,
+                        "old_model_version": old_model_version,
+                        "new_model_version": new_model_version,
+                    },
+                )
+        except httpx.RequestError as exc:
+            log.warning(
+                "Falha ao notificar ERP de re-enrolamento (erp_user_id=%s): %s", erp_user_id, exc
+            )
+
 
 erp_client = ERPClient()

@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
-	"nexora/internal/modules/auth/audit"
 	mw "nexora/internal/middleware"
+	"nexora/internal/modules/auth/audit"
 )
 
 type requestResponse struct {

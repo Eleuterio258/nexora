@@ -5,7 +5,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-DEFAULT_BIOMETRIC_ENCRYPTION_KEY = "change-me-in-production-biometric-key-32bytes"
+# Defaults inseguros para segredos que DEVEM ser sobrescritos em ambiente real.
+# O default de BIOMETRIC_ENCRYPTION_KEY foi removido: a ausência desta variável
+# levanta erro imediato, evitando templates cifrados com chave previsível.
 DEFAULT_FACIAL_VERIFICATION_SECRET = "change-me-facial-verification-secret"
 DEFAULT_NEXORA_CREDENTIAL_ENCRYPTION_KEY = "change-me-nexora-credential-encryption-key"
 
@@ -24,6 +26,25 @@ class Settings:
     biometric_match_threshold: float = float(
         os.getenv("BIOMETRIC_MATCH_THRESHOLD", "0.85")
     )
+    biometric_model: str = os.getenv("BIOMETRIC_MODEL", "facenet")
+    liveness_model: str = os.getenv("LIVENESS_MODEL", "heuristic")
+    biometric_key_provider: str = "environment"
+    biometric_max_pitch: float = float(os.getenv("BIOMETRIC_MAX_PITCH", "20.0"))
+    biometric_max_roll: float = float(os.getenv("BIOMETRIC_MAX_ROLL", "15.0"))
+    biometric_max_yaw: float = float(os.getenv("BIOMETRIC_MAX_YAW", "25.0"))
+    liveness_challenge_store: str = os.getenv("LIVENESS_CHALLENGE_STORE", "memory")
+    suspicious_activity_threshold: int = int(os.getenv("SUSPICIOUS_ACTIVITY_THRESHOLD", "5"))
+    suspicious_activity_window_seconds: int = int(
+        os.getenv("SUSPICIOUS_ACTIVITY_WINDOW_SECONDS", "600")
+    )
+    require_image_signature: bool = os.getenv("REQUIRE_IMAGE_SIGNATURE", "false").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    fingerprint_match_threshold: float = float(os.getenv("FINGERPRINT_MATCH_THRESHOLD", "0.25"))
+    cancelable_transform_secret: str | None = os.getenv("CANCELABLE_TRANSFORM_SECRET")
+    cancelable_transform_version: str = os.getenv("CANCELABLE_TRANSFORM_VERSION", "v1")
     facial_verification_secret: str = os.getenv(
         "FACIAL_VERIFICATION_SECRET", DEFAULT_FACIAL_VERIFICATION_SECRET
     )
@@ -41,6 +62,7 @@ class Settings:
     erp_base_url: str = os.getenv("ERP_BASE_URL", "")
     erp_api_key: str = os.getenv("ERP_API_KEY", "")
     erp_timeout_seconds: int = int(os.getenv("ERP_TIMEOUT_SECONDS", "10"))
+    erp_reenroll_webhook_url: str = os.getenv("ERP_REENROLL_WEBHOOK_URL", "")
     image_download_timeout_seconds: int = int(
         os.getenv("IMAGE_DOWNLOAD_TIMEOUT_SECONDS", "10")
     )
@@ -63,19 +85,35 @@ class Settings:
     nexora_rate_limit_per_key: str = os.getenv("NEXORA_RATE_LIMIT_PER_KEY", "100/minute")
 
     @property
-    def biometric_encryption_key(self) -> bytes:
-        """Chave para criptografia em repouso de templates biométricos."""
-        key = os.getenv("BIOMETRIC_ENCRYPTION_KEY", DEFAULT_BIOMETRIC_ENCRYPTION_KEY)
-        return key.encode("utf-8")
+    def biometric_encryption_key(self) -> bytes | None:
+        """Chave unica para criptografia em repouso de templates biométricos.
+
+        Pode ser None se BIOMETRIC_ENCRYPTION_KEYS (keyring JSON) estiver
+        configurado. A origem da chave depende do BIOMETRIC_KEY_PROVIDER.
+        """
+        from app.security.key_management import get_key_provider
+
+        try:
+            return get_key_provider().get_key()
+        except RuntimeError:
+            return None
+
+    @property
+    def biometric_encryption_keys(self) -> str | None:
+        """Keyring JSON para suporte a rotação de chaves.
+
+        Exemplo: {"v1": "base64...", "v2": "base64...", "active": "v2"}
+        """
+        return os.getenv("BIOMETRIC_ENCRYPTION_KEYS")
 
     def assert_production_secrets(self) -> None:
         """Falha alto (em vez de degradar em silencio) se ENVIRONMENT=production
         estiver a correr com segredos por omissao/ausentes."""
         if self.environment != "production":
             return
-        if os.getenv("BIOMETRIC_ENCRYPTION_KEY", DEFAULT_BIOMETRIC_ENCRYPTION_KEY) == DEFAULT_BIOMETRIC_ENCRYPTION_KEY:
+        if not self.biometric_encryption_keys and not self.biometric_encryption_key:
             raise RuntimeError(
-                "BIOMETRIC_ENCRYPTION_KEY nao configurado (ou igual ao default versionado) "
+                "BIOMETRIC_ENCRYPTION_KEY/BIOMETRIC_ENCRYPTION_KEYS nao configurada "
                 "com ENVIRONMENT=production. Defina uma chave forte e unica de 32 bytes "
                 "antes de arrancar."
             )
@@ -90,6 +128,10 @@ class Settings:
                 "com ENVIRONMENT=production. Defina uma chave forte e unica para cifrar "
                 "as credenciais Nexora em repouso antes de arrancar."
             )
+
+    @property
+    def biometric_face_detector(self) -> str:
+        return os.getenv("BIOMETRIC_FACE_DETECTOR", "blaze_face").lower()
 
 
 settings = Settings()

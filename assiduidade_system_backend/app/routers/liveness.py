@@ -18,6 +18,8 @@ from app.schemas.common import SourceType, TemplateStatus
 from app.schemas.requests import LivenessChallengeRequest, LivenessVerifyRequest
 from app.services.attendance_validation import validar_metodo_assiduidade
 from app.services.biometric import (
+    _get_cancelable_transform,
+    apply_cancelable_transform,
     assess_capture_quality,
     build_embedding,
     cosine_similarity,
@@ -30,6 +32,8 @@ from app.services.liveness_challenge import (
     get_challenge,
     verify_challenge_sequence,
 )
+from app.services.audit_log import record_audit_event
+from app.services.suspicious_activity import record_verify_failure, record_verify_success
 from app.utils import utc_now
 
 router = APIRouter(tags=["Liveness"])
@@ -74,6 +78,12 @@ async def verify_liveness_challenge(
 
     challenge = get_challenge(payload.challenge_id)
     if challenge is None or challenge.user_id != erp_user_id:
+        record_verify_failure(actor.tenant_id, erp_user_id, str(payload.device_id), "invalid_or_replayed_challenge")
+        record_audit_event(
+            db, actor.tenant_id, "liveness_verify_rejection", erp_user_id=erp_user_id,
+            device_id=str(payload.device_id), reason="invalid_or_replayed_challenge",
+        )
+        db.commit()
         raise HTTPException(
             status_code=400,
             detail="Desafio invalido, expirado ou ja utilizado.",
@@ -84,6 +94,12 @@ async def verify_liveness_challenge(
         challenge.action, payload.frames_base64
     )
     if not action_passed:
+        record_verify_failure(actor.tenant_id, erp_user_id, str(payload.device_id), "liveness_challenge_failed")
+        record_audit_event(
+            db, actor.tenant_id, "liveness_verify_rejection", erp_user_id=erp_user_id,
+            device_id=str(payload.device_id), reason="liveness_challenge_failed",
+        )
+        db.commit()
         return {
             "match": False,
             "user_id": payload.user_id,
@@ -104,6 +120,12 @@ async def verify_liveness_challenge(
             best_frame = frame
 
     if best_frame is None:
+        record_verify_failure(actor.tenant_id, erp_user_id, str(payload.device_id), "low_quality_capture")
+        record_audit_event(
+            db, actor.tenant_id, "liveness_verify_rejection", erp_user_id=erp_user_id,
+            device_id=str(payload.device_id), reason="low_quality_capture",
+        )
+        db.commit()
         return {
             "match": False,
             "user_id": payload.user_id,
@@ -119,6 +141,12 @@ async def verify_liveness_challenge(
         probe_embedding = build_embedding(best_frame)
         liveness_score = estimate_liveness(best_frame, quality_score=best_quality)
     except ValueError:
+        record_verify_failure(actor.tenant_id, erp_user_id, str(payload.device_id), "invalid_base64")
+        record_audit_event(
+            db, actor.tenant_id, "liveness_verify_rejection", erp_user_id=erp_user_id,
+            device_id=str(payload.device_id), reason="invalid_base64",
+        )
+        db.commit()
         return {
             "match": False,
             "user_id": payload.user_id,
@@ -131,6 +159,13 @@ async def verify_liveness_challenge(
         }
 
     if liveness_score < settings.biometric_liveness_threshold:
+        biometric_metrics.record_verify_rejection("liveness_failed", 0.0, liveness_score, liveness_passed=False)
+        record_verify_failure(actor.tenant_id, erp_user_id, str(payload.device_id), "liveness_failed")
+        record_audit_event(
+            db, actor.tenant_id, "liveness_verify_rejection", erp_user_id=erp_user_id,
+            device_id=str(payload.device_id), reason="liveness_failed", liveness_score=liveness_score,
+        )
+        db.commit()
         return {
             "match": False,
             "user_id": payload.user_id,
@@ -153,6 +188,12 @@ async def verify_liveness_challenge(
         )
     )
     if not active_template:
+        record_verify_failure(actor.tenant_id, erp_user_id, str(payload.device_id), "user_not_enrolled")
+        record_audit_event(
+            db, actor.tenant_id, "liveness_verify_rejection", erp_user_id=erp_user_id,
+            device_id=str(payload.device_id), reason="user_not_enrolled", liveness_score=liveness_score,
+        )
+        db.commit()
         return {
             "match": False,
             "user_id": payload.user_id,
@@ -164,14 +205,52 @@ async def verify_liveness_challenge(
             "reason": "user_not_enrolled",
         }
 
+    # Se o template foi guardado com transformacao cancelavel, aplicar a mesma
+    # transformacao ao probe antes de comparar (mesma logica de /biometric/verify).
+    if active_template.transform_version:
+        transform = _get_cancelable_transform()
+        if transform is None or transform.version != active_template.transform_version:
+            biometric_metrics.record_verify_rejection(
+                "transform_version_mismatch", 0.0, liveness_score, liveness_passed=True
+            )
+            record_verify_failure(actor.tenant_id, erp_user_id, str(payload.device_id), "transform_version_mismatch")
+            record_audit_event(
+                db, actor.tenant_id, "liveness_verify_rejection", erp_user_id=erp_user_id,
+                device_id=str(payload.device_id), reason="transform_version_mismatch", liveness_score=liveness_score,
+            )
+            db.commit()
+            return {
+                "match": False,
+                "user_id": payload.user_id,
+                "action": challenge.action.value,
+                "action_passed": True,
+                "confidence_score": 0.0,
+                "liveness_score": liveness_score,
+                "timestamp": utc_now().isoformat(),
+                "reason": "transform_version_mismatch",
+            }
+        probe_embedding, _ = apply_cancelable_transform(probe_embedding)
+
     stored_embedding = deserialize_embedding(active_template.embedding)
     confidence_score = cosine_similarity(probe_embedding, stored_embedding)
     is_match = confidence_score >= settings.biometric_match_threshold
 
     if is_match:
-        biometric_metrics.record_verify_match(confidence_score, liveness_score)
+        biometric_metrics.record_verify_match(confidence_score, liveness_score, liveness_passed=True)
+        record_verify_success(actor.tenant_id, erp_user_id, str(payload.device_id))
+        record_audit_event(
+            db, actor.tenant_id, "liveness_verify_match", erp_user_id=erp_user_id,
+            device_id=str(payload.device_id), confidence_score=confidence_score, liveness_score=liveness_score,
+        )
     else:
-        biometric_metrics.record_verify_rejection("match_below_threshold", confidence_score, liveness_score)
+        biometric_metrics.record_verify_rejection("match_below_threshold", confidence_score, liveness_score, liveness_passed=True)
+        record_verify_failure(actor.tenant_id, erp_user_id, str(payload.device_id), "match_below_threshold")
+        record_audit_event(
+            db, actor.tenant_id, "liveness_verify_rejection", erp_user_id=erp_user_id,
+            device_id=str(payload.device_id), reason="match_below_threshold",
+            confidence_score=confidence_score, liveness_score=liveness_score,
+        )
+    db.commit()
 
     return {
         "match": is_match,
