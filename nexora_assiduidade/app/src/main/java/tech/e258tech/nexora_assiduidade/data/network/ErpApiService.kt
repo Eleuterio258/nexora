@@ -51,6 +51,7 @@ import tech.e258tech.nexora_assiduidade.data.model.OportunidadePerderRequest
 import tech.e258tech.nexora_assiduidade.data.model.OportunidadeRequest
 import tech.e258tech.nexora_assiduidade.data.model.PinValidateRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarLidaRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoGestorAssiduidadeRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoGestorRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoSelfServiceRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoFacialSelfServiceRequest
@@ -80,7 +81,6 @@ import tech.e258tech.nexora_assiduidade.data.model.response.ErpLoginResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ErpMeResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.OAuthTokenResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.EventoAssiduidadeResponse
-import tech.e258tech.nexora_assiduidade.data.model.response.FuncionarioIntegracaoResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.GeofenceDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.HardwareEventResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.HomeResponse
@@ -228,20 +228,15 @@ interface ErpApiService {
         @Header("X-API-Key") apiKey: String
     ): Response<Map<String, Any>>
 
-    @GET("api/hardware/assiduidade/funcionarios")
-    suspend fun getFuncionariosDevice(
-        @Header("X-API-Key") apiKey: String
-    ): Response<List<FuncionarioIntegracaoResponse>>
-
     @POST("api/hardware/events/generic")
     suspend fun registerEventDevice(
         @Header("X-API-Key") apiKey: String,
         @Body request: GenericHardwareEventRequest
     ): Response<HardwareEventResponse>
 
-    @POST("api/hardware/assiduidade/qr/validar")
-    suspend fun validateQrDevice(
-        @Header("X-API-Key") apiKey: String,
+    @POST("api/self-service/assiduidade/qr/validar")
+    suspend fun validateQrSelfService(
+        @Header("Authorization") token: String,
         @Body request: QRValidateDeviceRequest
     ): Response<QRValidateDeviceResponse>
 
@@ -435,6 +430,15 @@ interface ErpApiService {
     suspend fun criarEventoAssiduidade(
         @Header("Authorization") token: String,
         @Body request: MarcarPontoGestorRequest
+    ): Response<EventoAssiduidadeResponse>
+
+    // Marcação manual de ponto por gestor/RH — POST /api/rh/assiduidade/ponto.
+    // Diferente de /api/rh/eventos: aceita data/hora separados e infere
+    // entrada/saída quando tipo_evento_codigo é omitido.
+    @POST("api/rh/assiduidade/ponto")
+    suspend fun marcarPontoGestor(
+        @Header("Authorization") token: String,
+        @Body request: MarcarPontoGestorAssiduidadeRequest
     ): Response<EventoAssiduidadeResponse>
 
     // Consentimento LGPD biométrico de um funcionário (GET/POST por gestor RH).
