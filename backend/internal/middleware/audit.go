@@ -110,7 +110,7 @@ func auditarEscritas(db *pgxpool.Pool, modulo, routePrefix string) func(http.Han
 			}
 
 			db.Exec(context.Background(), `
-				INSERT INTO audit_logs (tenant_id, user_id, modulo, entidade, entidade_id, acao, detalhes, ip_address)
+				INSERT INTO auditoria.audit_logs (tenant_id, user_id, modulo, entidade, entidade_id, acao, detalhes, ip_address)
 				VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
 				user.TenantID, user.ID, modulo, entidade, entidadeID, acao, detalhes, r.RemoteAddr)
 		})

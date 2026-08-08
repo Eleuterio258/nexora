@@ -99,6 +99,36 @@ func (s *Service) SendToUser(ctx context.Context, userID int64, title, body stri
 	s.Send(ctx, tokens, title, body, data)
 }
 
+// SendToTenant envia uma notificação a todos os utilizadores com associação
+// activa (auth.memberships) a um tenant — ao contrário de SendToUser, não é
+// dirigida a uma pessoa específica, serve para avisos gerais (promoções,
+// manutenção, alertas). Devolve o número de dispositivos a que o envio foi
+// tentado, só para dar feedback a quem despoletou o broadcast.
+func (s *Service) SendToTenant(ctx context.Context, tenantID int64, title, body string, data map[string]string) int {
+	if s == nil || s.client == nil || s.db == nil {
+		return 0
+	}
+	rows, err := s.db.Query(ctx, `
+		SELECT DISTINCT pt.token
+		  FROM notifications.push_tokens pt
+		  JOIN auth.memberships m ON m.user_id = pt.user_id AND m.ativo = true
+		 WHERE m.tenant_id = $1`, tenantID)
+	if err != nil {
+		return 0
+	}
+	var tokens []string
+	for rows.Next() {
+		var t string
+		if rows.Scan(&t) == nil {
+			tokens = append(tokens, t)
+		}
+	}
+	rows.Close()
+
+	s.Send(ctx, tokens, title, body, data)
+	return len(tokens)
+}
+
 // Send envia uma notificação a cada token da lista. Tokens individuais que
 // falhem por já não estarem registados são removidos da base de dados;
 // outras falhas (rede, quota, etc.) são apenas registadas em log — nenhuma

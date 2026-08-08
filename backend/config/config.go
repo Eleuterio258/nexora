@@ -80,6 +80,11 @@ type Config struct {
 	// Assinatura digital — convite de assinatura (opcional; sem link clicável se vazio)
 	SignatureInviteBaseURL string
 
+	// Recuperação de senha — página do frontend que lê ?token= e chama
+	// POST /api/auth/reset-password (opcional; sem link clicável se vazio,
+	// igual ao padrão de SignatureInviteBaseURL).
+	PasswordResetBaseURL string
+
 	// Assinatura digital — provider PKI/PAdES. "dev" gera um certificado
 	// auto-assinado local; NUNCA é juridicamente válido. Um provider real
 	// (ex. INTIC) substituiria este valor quando existirem credenciais.
@@ -251,6 +256,7 @@ func Load() *Config {
 		MQTTPassword:  env("MQTT_PASSWORD", ""),
 
 		SignatureInviteBaseURL: env("SIGNATURE_INVITE_BASE_URL", ""),
+		PasswordResetBaseURL:   env("PASSWORD_RESET_BASE_URL", ""),
 
 		SignatureProvider:   env("SIGNATURE_PROVIDER", "dev"),
 		SignatureDevKeyPath: env("SIGNATURE_DEV_KEY_PATH", "./data/assinatura-dev.pem"),

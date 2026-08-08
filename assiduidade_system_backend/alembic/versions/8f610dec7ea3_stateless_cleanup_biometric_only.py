@@ -23,6 +23,9 @@ def upgrade() -> None:
     # Postgres enum types are not dropped with the table; remove it so the
     # face_templates recreation below can create it fresh (idempotent).
     op.execute('DROP TYPE IF EXISTS templatestatus')
+    # Explicitly recreate the enum before creating the table. Some PostgreSQL
+    # drivers do not auto-create native enums inside op.create_table.
+    op.execute("CREATE TYPE templatestatus AS ENUM ('ACTIVE', 'REVOKED', 'DELETED')")
 
     # Drop all non-biometric tables and their dependencies
     op.drop_table('adjustment_requests', if_exists=True)

@@ -131,12 +131,12 @@ func dispatchNotifications(db *pgxpool.Pool, mailer *sesMailer, sms smsSender) {
 	defer rows.Close()
 
 	type msg struct {
-		id          int64
-		canalTipo   string
+		id           int64
+		canalTipo    string
 		destinatario string
-		assunto     string
-		corpo       string
-		tentativas  int
+		assunto      string
+		corpo        string
+		tentativas   int
 	}
 	var msgs []msg
 	for rows.Next() {
@@ -166,7 +166,11 @@ func dispatchNotifications(db *pgxpool.Pool, mailer *sesMailer, sms smsSender) {
 			novasTentativas := m.tentativas + 1
 			novoStatus := "pendente"
 			if novasTentativas >= 3 {
-				novoStatus = "falhou"
+				// "falha", não "falhou" — é o valor aceite por
+				// notification_messages_status_check (ver baseline schema);
+				// "falhou" violava a constraint e o erro ficava silencioso
+				// (Exec com resultado descartado), por isso nunca se notava.
+				novoStatus = "falha"
 			}
 			_, _ = db.Exec(ctx, `
 				UPDATE notifications.notification_messages

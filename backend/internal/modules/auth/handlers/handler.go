@@ -10,6 +10,7 @@ import (
 	"nexora/config"
 	"nexora/internal/modules/auth/oauthkeys"
 	"nexora/internal/push"
+	"nexora/internal/shared/contracts"
 )
 
 type Handler struct {
@@ -17,10 +18,11 @@ type Handler struct {
 	cfg       *config.Config
 	push      *push.Service
 	oauthKeys *oauthkeys.Provider
+	notif     contracts.NotificationPort
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config, pushSvc *push.Service, oauthKeys *oauthkeys.Provider) *Handler {
-	return &Handler{db: db, cfg: cfg, push: pushSvc, oauthKeys: oauthKeys}
+func New(db *pgxpool.Pool, cfg *config.Config, pushSvc *push.Service, oauthKeys *oauthkeys.Provider, notif contracts.NotificationPort) *Handler {
+	return &Handler{db: db, cfg: cfg, push: pushSvc, oauthKeys: oauthKeys, notif: notif}
 }
 
 func jsonOK(w http.ResponseWriter, v interface{}, status int) {

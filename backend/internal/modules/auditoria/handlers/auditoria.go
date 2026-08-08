@@ -51,7 +51,7 @@ func (h *Handler) ListarAuditLogs(w http.ResponseWriter, r *http.Request) {
 	n := len(args)
 
 	rows, err := h.db.Query(r.Context(),
-		"SELECT id, user_id, modulo, entidade, entidade_id, acao, detalhes, ip_address, created_at FROM audit_logs WHERE "+
+		"SELECT id, user_id, modulo, entidade, entidade_id, acao, detalhes, ip_address, created_at FROM auditoria.audit_logs WHERE "+
 			where+" ORDER BY created_at DESC LIMIT $"+strconv.Itoa(n-1)+" OFFSET $"+strconv.Itoa(n),
 		args...)
 	if err != nil {
@@ -82,7 +82,7 @@ func (h *Handler) ListarAuditLogs(w http.ResponseWriter, r *http.Request) {
 
 	var total int
 	countArgs := args[:len(args)-2]
-	h.db.QueryRow(r.Context(), "SELECT COUNT(*) FROM audit_logs WHERE "+where, countArgs...).Scan(&total)
+	h.db.QueryRow(r.Context(), "SELECT COUNT(*) FROM auditoria.audit_logs WHERE "+where, countArgs...).Scan(&total)
 
 	jsonOK(w, map[string]any{
 		"data": data,
@@ -107,7 +107,7 @@ func (h *Handler) ObterAuditLog(w http.ResponseWriter, r *http.Request) {
 	}
 	err := h.db.QueryRow(r.Context(), `
 		SELECT id, user_id, modulo, entidade, entidade_id, acao, detalhes, ip_address, created_at
-		  FROM audit_logs WHERE id = $1 AND tenant_id = $2`, id, user.TenantID).
+		  FROM auditoria.audit_logs WHERE id = $1 AND tenant_id = $2`, id, user.TenantID).
 		Scan(&l.ID, &l.UserID, &l.Modulo, &l.Entidade, &l.EntidadeID,
 			&l.Acao, &l.Detalhes, &l.IPAddress, &l.CreatedAt)
 	if err != nil {
@@ -133,7 +133,7 @@ func (h *Handler) RegistarAuditLog(w http.ResponseWriter, r *http.Request) {
 	}
 	var id int64
 	h.db.QueryRow(r.Context(), `
-		INSERT INTO audit_logs (tenant_id, user_id, modulo, entidade, entidade_id, acao, detalhes, ip_address)
+		INSERT INTO auditoria.audit_logs (tenant_id, user_id, modulo, entidade, entidade_id, acao, detalhes, ip_address)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
 		user.TenantID, user.ID, body.Modulo, body.Entidade, body.EntidadeID,
 		body.Acao, body.Detalhes, r.RemoteAddr).Scan(&id)

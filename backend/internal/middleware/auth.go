@@ -391,6 +391,44 @@ func RequireFeature(pool DBPool, feature string) func(http.Handler) http.Handler
 	}
 }
 
+// RequireLicencaAtiva bloqueia o acesso quando o tenant tem uma licença de
+// aplicação (empresas.company_licenses) explicitamente expirada ou suspensa.
+// Um tenant sem NENHUMA licença registada passa livremente — licenciamento é
+// opt-in por tenant (retrocompatível: a maioria dos tenants existentes nunca
+// teve uma licença criada, bloqueá-los por omissão quebraria produção).
+// Superadmin bypassa sempre. Deve ser usado depois de RequireAuth.
+func RequireLicencaAtiva(pool DBPool) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user := GetUser(r)
+			if user == nil {
+				JSONErr(w, "Utilizador não autenticado", http.StatusUnauthorized)
+				return
+			}
+			if user.Tipo == "superadmin" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			var total, validas int
+			err := pool.QueryRow(r.Context(), `
+				SELECT COUNT(*),
+				       COUNT(*) FILTER (WHERE l.status = 'ativa' AND (l.expira_em IS NULL OR l.expira_em >= CURRENT_DATE))
+				  FROM empresas.company_licenses l
+				  JOIN saas.tenants t ON t.company_id = l.company_id
+				 WHERE t.id = $1`, user.TenantID).Scan(&total, &validas)
+			if err != nil {
+				JSONErr(w, "Erro interno ao validar licença", http.StatusInternalServerError)
+				return
+			}
+			if total > 0 && validas == 0 {
+				JSONErr(w, "Licença da aplicação expirada ou suspensa — contacte o administrador", http.StatusPaymentRequired)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func GetUser(r *http.Request) *AuthUser {
 	u, _ := r.Context().Value(UserKey).(*AuthUser)
 	return u

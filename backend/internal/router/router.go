@@ -48,8 +48,8 @@ import (
 	assH "nexora/internal/modules/assinaturas/handlers"
 	finH "nexora/internal/modules/financeiro/handlers"
 	hardwareH "nexora/internal/modules/hardware/handlers"
-	mmH "nexora/internal/modules/multi-moeda/handlers"
 	monitH "nexora/internal/modules/monitoring/handlers"
+	mmH "nexora/internal/modules/multi-moeda/handlers"
 	notifH "nexora/internal/modules/notifications/handlers"
 	pessoasH "nexora/internal/modules/pessoas/handlers"
 	segH "nexora/internal/modules/seguranca/handlers"
@@ -84,7 +84,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		panic(fmt.Sprintf("oauth keys init: %v", err))
 	}
 
-	auth := authH.New(db, cfg, pushSvc, oauthKeys)
+	auth := authH.New(db, cfg, pushSvc, oauthKeys, adapters.NewNotificationAdapter(db))
 	util := utilH.New(db, cfg, store, wsHub)
 	cli := cliH.New(db, cfg)
 	escolar := escolarH.New(db, cfg, escolarH.Ports{
@@ -107,7 +107,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	recrutRealtime := recrutH.NewRealtimeServer(db, cfg.JWTSecret)
 	idh := idhash.New(cfg.IDHashSalt)
 	crm := crmH.New(db, cfg)
-	pos := posH.New(db, cfg, wsHub)
+	pos := posH.New(db, cfg, wsHub, pushSvc)
 	rh := rhH.New(db, cfg, store, adapters.NewSignatureAdapter(db))
 	centros := centrosH.New(db, cfg)
 	logistica := logH.New(db, cfg)
@@ -170,7 +170,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	fat := fatH.New(db, cfg, store, signaturePort)
 	fin := finH.New(db, cfg)
 	mm := mmH.New(db, cfg)
-	notif := notifH.New(db, cfg)
+	notif := notifH.New(db, cfg, pushSvc)
 	ss := ssH.New(db, cfg, store)
 	pessoas := pessoasH.New(db)
 	super := superH.New(db, cfg)
@@ -892,6 +892,10 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 
 	// Callback público de gateway de pagamentos escolares (não requer JWT).
 	r.With(mw.RateLimit(60, time.Minute)).Post("/api/escolar/payments/callback", escolar.CallbackPagamentoEscolar)
+
+	// Callback público do Nexora-Pay para pagamentos móveis do POS (não requer
+	// JWT — o tenant vem de thirdPartyReference, ver WebhookPagamento).
+	r.With(mw.RateLimit(60, time.Minute)).Post("/api/pos/pagamentos/webhook", pos.WebhookPagamento)
 
 	r.Route("/api/escolar", func(r chi.Router) {
 		r.Use(mw.RequireAuth(cfg.JWTSecret, db, oauthKeys))
@@ -1769,9 +1773,19 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	r.Post("/api/pos/login", auth.PosLogin)
 	r.Post("/api/pos/refresh", auth.PosRefresh)
 
+	// Estado da licença — autenticado, mas deliberadamente fora do bloqueio
+	// de mw.RequireLicencaAtiva (montado dentro do Route abaixo): mesmo com a
+	// licença expirada, o app precisa de conseguir perguntar "porque estou
+	// bloqueado" em vez de só receber 402 sem contexto em tudo o resto.
+	r.With(mw.RequireAuth(cfg.JWTSecret, db, oauthKeys)).Get("/api/pos/licenca", pos.ObterLicenca)
+
 	r.Route("/api/pos", func(r chi.Router) {
 		r.Use(mw.RequireAuth(cfg.JWTSecret, db, oauthKeys))
 		r.Use(mw.AuditModule(db, "/api/pos", "pos"))
+		// Bloqueio automático quando a licença do tenant está explicitamente
+		// expirada/suspensa (empresas.company_licenses) — ver a doc do
+		// middleware para a semântica de "sem licença registada = passa".
+		r.Use(mw.RequireLicencaAtiva(db))
 
 		// Visualização e operação do terminal
 		r.Group(func(r chi.Router) {
@@ -1782,6 +1796,9 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Post("/", pos.AbrirSessao)
 				r.Get("/atual", pos.ObterSessaoAtual)
 				r.Post("/{id}/fechar", pos.FecharSessao)
+				r.Get("/{id}/fecho", pos.ObterFechoSessao)
+				r.Get("/{id}/movimentacoes", pos.ListarMovimentosCaixa)
+				r.Post("/{id}/movimentacoes", pos.RegistarMovimentoCaixa)
 			})
 			r.Route("/sales", func(r chi.Router) {
 				r.With(mw.RequirePermission(db, "pos", "operar_pos")).
@@ -1793,6 +1810,18 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 					Get("/{id}", pos.ObterVenda)
 				r.With(mw.RequirePermission(db, "pos", "operar_pos")).
 					Post("/{id}/cancelar", pos.CancelarVenda)
+				r.With(mw.RequirePermission(db, "pos", "operar_pos")).
+					Post("/{id}/estorno-parcial", pos.EstornoParcialVenda)
+				r.With(mw.RequirePermissionAny(db, []authModels.Permission{
+					{Modulo: "pos", Acao: "operar_pos"},
+					{Modulo: "pos", Acao: "ver_vendas"},
+				})).
+					Get("/{id}/estornos", pos.ListarEstornosVenda)
+				r.With(mw.RequirePermissionAny(db, []authModels.Permission{
+					{Modulo: "pos", Acao: "operar_pos"},
+					{Modulo: "pos", Acao: "ver_vendas"},
+				})).
+					Get("/{id}/recibo", pos.ObterRecibo)
 				r.With(mw.RequirePermissionAny(db, []authModels.Permission{
 					{Modulo: "pos", Acao: "operar_pos"},
 					{Modulo: "pos", Acao: "ver_vendas"},
@@ -1804,6 +1833,10 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Get("/{gatewayTxnId}/status", pos.StatusPagamento)
 			})
 			r.Get("/sync/download", pos.SyncDownload)
+			// Troca rápida de operador (mudança de turno) — o chamador já está
+			// autenticado (tipicamente o próprio terminal); só o PIN identifica
+			// o operador, dentro do tenant do chamador. Ver LoginOperadorPorPIN.
+			r.Post("/login-operador", auth.LoginOperadorPorPIN)
 		})
 
 		// Gerir terminais
@@ -1835,6 +1868,19 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Post("/", pos.CriarDesconto)
 				r.Put("/{id}", pos.AtualizarDesconto)
 				r.Delete("/{id}", pos.RemoverDesconto)
+			})
+		})
+
+		// Relatórios POS — vendas por período/operador/terminal/método, top
+		// produtos, cancelamentos, fecho de caixa e disponibilidade de terminais.
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequirePermission(db, "pos", "relatorios"))
+			r.Route("/relatorios", func(r chi.Router) {
+				r.Get("/vendas", pos.RelatorioVendas)
+				r.Get("/top-produtos", pos.RelatorioTopProdutos)
+				r.Get("/cancelamentos", pos.RelatorioCancelamentos)
+				r.Get("/fecho-caixa", pos.RelatorioFechoCaixa)
+				r.Get("/terminais", pos.RelatorioTerminais)
 			})
 		})
 	})
@@ -2521,6 +2567,11 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Post("/", notif.EnviarNotificacao)
 			})
 		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequirePermission(db, "notificacoes", "gerir_notificacoes"))
+			r.Post("/broadcast", notif.BroadcastPush)
+		})
 	})
 
 	// ── Segurança ────────────────────────────────────────────────────
@@ -2858,6 +2909,13 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Post("/assiduidade/qr/registar", rh.RegistarQRDevice)
 			r.Post("/assiduidade/qr/gerar-terminal", rh.GerarQRTerminal)
 			r.Get("/assiduidade/nfc/validar", rh.ValidarNFCDevice)
+
+			// Webhook do FaceClock: template marcado como PENDING_REENROLL por
+			// mudança de model_version (ver notify_reenroll_required).
+			r.Post("/assiduidade/biometria/reenroll-required", rh.NotificarReenrollDevice)
+
+			// Logs de auditoria acessiveis a dispositivos autorizados (ex.: FaceClock)
+			r.Get("/audit-logs", audit.ListarAuditLogs)
 		})
 
 		// Gestão de dispositivos e eventos (admin do tenant)

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -219,7 +220,10 @@ func (h *Handler) parseEnrollMultipart(r *http.Request, w http.ResponseWriter) (
 		if err != nil {
 			return 0, nil, fmt.Errorf("erro ao guardar captura %d: %v", i+1, err)
 		}
-		captures = append(captures, CaptureImage{ImageURL: url})
+		// Enviar base64 ao FaceClock para evitar 403 em URLs públicas do MinIO.
+		// A URL pública mantém-se disponível para auditoria/consulta directa.
+		captures = append(captures, CaptureImage{ImageBase64: base64.StdEncoding.EncodeToString(data)})
+		_ = url
 	}
 
 	return funcionarioID, captures, nil
