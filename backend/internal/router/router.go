@@ -2668,6 +2668,14 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Post("/biometria/facial/liveness/verify", ss.LivenessVerify)
 			})
 			r.Group(func(r chi.Router) {
+				// Validação do QR Code pessoal de um funcionário quando lido por um
+				// gestor/RH. Requer permissão para gerir funcionários porque o
+				// scanner está a agir em nome de outra pessoa (substitui o endpoint
+				// /api/hardware/assiduidade/qr/validar que usava X-API-Key partilhada).
+				r.Use(mw.RequirePermission(db, "recursos-humanos", "gerir_funcionarios"))
+				r.Post("/qr/validar", rh.ValidarQRDevice)
+			})
+			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "assiduidade", "marcar_ponto"))
 				// Marcacao do proprio ponto por PIN, autenticada por JWT --
 				// alternativa a POST /api/hardware/events*, que exige a API Key de

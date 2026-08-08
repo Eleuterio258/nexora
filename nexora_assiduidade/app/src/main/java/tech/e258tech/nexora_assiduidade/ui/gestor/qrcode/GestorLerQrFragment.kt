@@ -18,7 +18,6 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
-import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,18 +26,14 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import tech.e258tech.nexora_assiduidade.BuildConfig
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoGestorAssiduidadeRequest
 import tech.e258tech.nexora_assiduidade.data.model.QRValidateDeviceRequest
 import tech.e258tech.nexora_assiduidade.data.model.response.QRValidateDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
-import tech.e258tech.nexora_assiduidade.data.repository.AttendanceRepository
 import tech.e258tech.nexora_assiduidade.ui.common.CaptureActivityPortrait
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
-import tech.e258tech.nexora_assiduidade.utils.Constants
 import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
-import tech.e258tech.nexora_assiduidade.utils.HardwareEventMapper
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
@@ -49,7 +44,6 @@ class GestorLerQrFragment : Fragment() {
     private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private lateinit var sessionManager: SessionManager
-    private lateinit var attendanceRepository: AttendanceRepository
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     private lateinit var btnScan: Button
@@ -99,7 +93,6 @@ class GestorLerQrFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         sessionManager = SessionManager(requireContext())
-        attendanceRepository = AttendanceRepository(requireContext())
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext())
 
         btnScan = view.findViewById(R.id.btnScan)
@@ -162,8 +155,8 @@ class GestorLerQrFragment : Fragment() {
     }
 
     private fun validarERegistar(qrCode: String) {
-        val gestorUserId = sessionManager.getUserId()
-        if (gestorUserId.isNullOrBlank()) {
+        val token = sessionManager.getToken()
+        if (token.isNullOrBlank()) {
             Toast.makeText(context, "Sessão inválida. Faça login novamente.", Toast.LENGTH_LONG).show()
             return
         }
@@ -175,8 +168,8 @@ class GestorLerQrFragment : Fragment() {
             try {
                 val validateResult: Pair<QRValidateDeviceResponse?, String?> = withContext(Dispatchers.IO) {
                     try {
-                        val response = RetrofitClient.erpApiService.validateQrDevice(
-                            BuildConfig.DEVICE_API_KEY,
+                        val response = RetrofitClient.erpApiService.validateQrSelfService(
+                            ApiUtils.bearerToken(token),
                             QRValidateDeviceRequest(qr_code = qrCode)
                         )
                         if (response.isSuccessful && response.body() != null) {
@@ -192,64 +185,42 @@ class GestorLerQrFragment : Fragment() {
                 val response = validateResult.first
                 val error = validateResult.second
 
-                if (response == null || !response.valid || response.employee_no.isNullOrBlank() || response.funcionario_id == null) {
+                if (response == null || !response.valid || response.funcionario_id == null) {
                     setLoading(false)
                     tvInfo.text = error ?: "QR Code inválido ou não vinculado a funcionário."
                     Toast.makeText(context, error ?: "QR Code inválido ou não vinculado a funcionário.", Toast.LENGTH_LONG).show()
                     return@launch
                 }
 
-                tvInfo.text = "A identificar funcionário..."
-
-                // Resolve o employee_code pelo funcionario_id devolvido na validação
-                // do QR — não pela sessão actual, que é a do gestor, não a do
-                // funcionário cuja presença está a ser registada.
-                val employeeCode = withContext(Dispatchers.IO) {
-                    HardwareEventMapper.resolveEmployeeCodeById(response.funcionario_id!!)
-                }
-                if (employeeCode == null) {
-                    setLoading(false)
-                    tvInfo.text = "Funcionário não encontrado no ERP."
-                    Toast.makeText(context, "Funcionário não encontrado no ERP.", Toast.LENGTH_LONG).show()
-                    return@launch
-                }
-
                 tvInfo.text = "A registar presença..."
 
-                val request = ClockRegisterRequest(
-                    idempotency_key = UUID.randomUUID().toString(),
-                    user_id = response.funcionario_id.toString(),
-                    device_id = sessionManager.getOrCreateDeviceId(),
-                    event_type = Constants.EVENT_AUTO,
-                    recorded_at = DateTimeUtils.nowForApi(),
-                    source = Constants.SOURCE_QR_CODE,
-                    geo_lat = currentLocation?.latitude,
-                    geo_lng = currentLocation?.longitude,
-                    qr_token_id = null, // token já foi consumido na validação; poderíamos devolver o ID se necessário
-                    registered_by = gestorUserId.toLongOrNull()
+                val registerRequest = MarcarPontoGestorAssiduidadeRequest(
+                    funcionario_id = response.funcionario_id,
+                    data = DateTimeUtils.todayForApi(),
+                    hora = DateTimeUtils.currentTimeShortForApi(),
+                    tipo_evento_codigo = "", // vazio para o ERP inferir entrada/saída pela paridade do dia
+                    latitude = currentLocation?.latitude,
+                    longitude = currentLocation?.longitude,
+                    observacoes = "Registo via QR Code lido por gestor"
                 )
 
-                val registerResult = withContext(Dispatchers.IO) {
-                    attendanceRepository.registerClock(request, employeeCodeOverride = employeeCode)
+                val registerResponse = withContext(Dispatchers.IO) {
+                    RetrofitClient.erpApiService.marcarPontoGestor(
+                        ApiUtils.bearerToken(token),
+                        registerRequest
+                    )
                 }
 
                 setLoading(false)
 
-                when (registerResult) {
-                    is AttendanceRepository.RegisterResult.Success -> {
-                        tvInfo.text = "Presença registada com sucesso."
-                        Toast.makeText(context, "Presença registada com sucesso.", Toast.LENGTH_SHORT).show()
-                        parentFragmentManager.popBackStack()
-                    }
-                    is AttendanceRepository.RegisterResult.SavedOffline -> {
-                        tvInfo.text = "Sem internet. Registo guardado localmente."
-                        Toast.makeText(context, "Sem internet. Registo guardado e será sincronizado automaticamente.", Toast.LENGTH_LONG).show()
-                        parentFragmentManager.popBackStack()
-                    }
-                    is AttendanceRepository.RegisterResult.Error -> {
-                        tvInfo.text = registerResult.message
-                        Toast.makeText(context, registerResult.message, Toast.LENGTH_LONG).show()
-                    }
+                if (registerResponse.isSuccessful) {
+                    tvInfo.text = "Presença registada com sucesso."
+                    Toast.makeText(context, "Presença registada com sucesso.", Toast.LENGTH_SHORT).show()
+                    parentFragmentManager.popBackStack()
+                } else {
+                    val message = ApiUtils.errorMessage(registerResponse)
+                    tvInfo.text = message
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                 }
             } catch (e: CancellationException) {
                 throw e
