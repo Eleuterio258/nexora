@@ -45,6 +45,10 @@ services:
       # Provider de assinatura em modo 'dev' (chave autoassinada, NÃO juridicamente
       # válida). O código recusa arrancar com ele sem este opt-in explícito.
       SIGNATURE_ALLOW_INSECURE_PROVIDER: ${SIGNATURE_ALLOW_INSECURE_PROVIDER:-true}
+      # FaceClock — gateway de biometria facial/digital (assiduidade_system_backend).
+      FACECLOCK_BASE_URL: ${FACECLOCK_BASE_URL:-https://asseduidade.e258tech.tech}
+      FACECLOCK_ACCESS_KEY_ID: ${FACECLOCK_ACCESS_KEY_ID}
+      FACECLOCK_SECRET_ACCESS_KEY: ${FACECLOCK_SECRET_ACCESS_KEY}
     volumes:
       - api_uploads:/app/uploads
       - api_avatars:/app/avatars

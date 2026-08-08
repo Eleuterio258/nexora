@@ -171,7 +171,7 @@ class ERPClient:
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
-                    f"{self.base_url}/api/audit-logs",
+                    f"{self.base_url}/api/hardware/audit-logs",
                     headers=headers,
                     params=params,
                 )

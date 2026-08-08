@@ -2909,6 +2909,13 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Post("/assiduidade/qr/registar", rh.RegistarQRDevice)
 			r.Post("/assiduidade/qr/gerar-terminal", rh.GerarQRTerminal)
 			r.Get("/assiduidade/nfc/validar", rh.ValidarNFCDevice)
+
+			// Webhook do FaceClock: template marcado como PENDING_REENROLL por
+			// mudança de model_version (ver notify_reenroll_required).
+			r.Post("/assiduidade/biometria/reenroll-required", rh.NotificarReenrollDevice)
+
+			// Logs de auditoria acessiveis a dispositivos autorizados (ex.: FaceClock)
+			r.Get("/audit-logs", audit.ListarAuditLogs)
 		})
 
 		// Gestão de dispositivos e eventos (admin do tenant)

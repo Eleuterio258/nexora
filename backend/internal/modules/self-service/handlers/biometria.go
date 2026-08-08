@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -55,12 +56,13 @@ func (h *Handler) VerificarFacial(w http.ResponseWriter, r *http.Request) {
 	var geoLat, geoLng *float64
 
 	if strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
-		parsedURL, parsedDeviceID, parsedGeoLat, parsedGeoLng, err := h.parseVerifyMultipart(r, w)
+		parsedURL, parsedBase64, parsedDeviceID, parsedGeoLat, parsedGeoLng, err := h.parseVerifyMultipart(r, w)
 		if err != nil {
 			jsonErr(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		imageURL = parsedURL
+		imageBase64 = parsedBase64
 		deviceID = parsedDeviceID
 		geoLat = parsedGeoLat
 		geoLng = parsedGeoLng
@@ -84,7 +86,6 @@ func (h *Handler) VerificarFacial(w http.ResponseWriter, r *http.Request) {
 		UserID:      fmt.Sprintf("%d", user.ID),
 		DeviceID:    deviceID,
 		ImageBase64: imageBase64,
-		ImageURL:    imageURL,
 		GeoLat:      geoLat,
 		GeoLng:      geoLng,
 	}
@@ -105,17 +106,18 @@ func (h *Handler) VerificarFacial(w http.ResponseWriter, r *http.Request) {
 }
 
 // parseVerifyMultipart processa um pedido multipart/form-data de verificação
-// facial, fazendo upload da selfie para MinIO e devolvendo a URL pública.
-func (h *Handler) parseVerifyMultipart(r *http.Request, w http.ResponseWriter) (string, string, *float64, *float64, error) {
+// facial, fazendo upload da selfie para MinIO e devolvendo a URL pública e o
+// base64 da imagem (para envio ao FaceClock sem depender de URL pública).
+func (h *Handler) parseVerifyMultipart(r *http.Request, w http.ResponseWriter) (string, string, string, *float64, *float64, error) {
 	const maxBytes = 10 * 1024 * 1024 // 10 MB
 	r.Body = http.MaxBytesReader(w, r.Body, maxBytes+1024)
 	if err := r.ParseMultipartForm(maxBytes); err != nil {
-		return "", "", nil, nil, fmt.Errorf("falha ao processar multipart: %v", err)
+		return "", "", "", nil, nil, fmt.Errorf("falha ao processar multipart: %v", err)
 	}
 
 	deviceID := r.FormValue("device_id")
 	if deviceID == "" {
-		return "", "", nil, nil, fmt.Errorf("device_id é obrigatório")
+		return "", "", "", nil, nil, fmt.Errorf("device_id é obrigatório")
 	}
 
 	var geoLat, geoLng *float64
@@ -134,16 +136,16 @@ func (h *Handler) parseVerifyMultipart(r *http.Request, w http.ResponseWriter) (
 
 	file, header, err := r.FormFile("image")
 	if err != nil {
-		return "", "", nil, nil, fmt.Errorf("campo 'image' em falta")
+		return "", "", "", nil, nil, fmt.Errorf("campo 'image' em falta")
 	}
 	defer file.Close()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return "", "", nil, nil, fmt.Errorf("erro ao ler imagem: %v", err)
+		return "", "", "", nil, nil, fmt.Errorf("erro ao ler imagem: %v", err)
 	}
 	if len(data) == 0 {
-		return "", "", nil, nil, fmt.Errorf("imagem vazia")
+		return "", "", "", nil, nil, fmt.Errorf("imagem vazia")
 	}
 
 	contentType := header.Header.Get("Content-Type")
@@ -151,7 +153,7 @@ func (h *Handler) parseVerifyMultipart(r *http.Request, w http.ResponseWriter) (
 		contentType = http.DetectContentType(data)
 	}
 	if !strings.HasPrefix(contentType, "image/") {
-		return "", "", nil, nil, fmt.Errorf("ficheiro não é uma imagem")
+		return "", "", "", nil, nil, fmt.Errorf("ficheiro não é uma imagem")
 	}
 
 	exts, _ := mime.ExtensionsByType(contentType)
@@ -159,6 +161,7 @@ func (h *Handler) parseVerifyMultipart(r *http.Request, w http.ResponseWriter) (
 	if len(exts) > 0 {
 		ext = exts[0]
 	}
+	imageBase64 := base64.StdEncoding.EncodeToString(data)
 
 	user := mw.GetUser(r)
 	ctx := r.Context()
@@ -173,8 +176,8 @@ func (h *Handler) parseVerifyMultipart(r *http.Request, w http.ResponseWriter) (
 	)
 	url, err := h.storage.Put(ctx, key, data, contentType)
 	if err != nil {
-		return "", "", nil, nil, fmt.Errorf("erro ao guardar imagem: %v", err)
+		return "", "", "", nil, nil, fmt.Errorf("erro ao guardar imagem: %v", err)
 	}
 
-	return url, deviceID, geoLat, geoLng, nil
+	return url, imageBase64, deviceID, geoLat, geoLng, nil
 }

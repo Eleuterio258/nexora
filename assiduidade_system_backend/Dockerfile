@@ -8,6 +8,7 @@ ENV TORCH_HOME=/app/.cache/torch
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 libsm6 libxext6 libxrender-dev \
+    libgles2 libegl1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Etapa 3 — PyTorch CPU-only (evita download da variante CUDA, ~750 MB menor)
