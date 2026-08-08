@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -411,36 +412,230 @@ func (h *Handler) ObterSessaoAtual(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, s, http.StatusOK)
 }
 
+// detalharPagamentosSessao soma as vendas concluídas da sessão por método de
+// pagamento — devolve o mapa completo (informativo, todos os métodos) e em
+// separado o total em numerário (o único fisicamente contável na gaveta, e
+// por isso o único que entra no cálculo de "valor esperado" do fecho).
+func (h *Handler) detalharPagamentosSessao(ctx context.Context, sessaoID string) (map[string]float64, float64, error) {
+	rows, err := h.db.Query(ctx, `
+		SELECT sp.tipo, COALESCE(SUM(sp.valor),0)
+		  FROM pos_sale_payments sp
+		  JOIN pos_sales s ON s.id = sp.pos_sale_id
+		 WHERE s.pos_session_id=$1 AND s.status='concluida'
+		 GROUP BY sp.tipo`, sessaoID)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	detalhamento := map[string]float64{}
+	var totalNumerario float64
+	for rows.Next() {
+		var tipo string
+		var total float64
+		if rows.Scan(&tipo, &total) != nil {
+			continue
+		}
+		detalhamento[tipo] = total
+		if tipo == "numerario" {
+			totalNumerario = total
+		}
+	}
+	return detalhamento, totalNumerario, nil
+}
+
+// resumoMovimentosCaixa soma os movimentos (suprimento/sangria/depósito) de
+// uma sessão por tipo. "outro" fica de fora do cálculo automático do valor
+// esperado — existe só para registo/auditoria, não tem sinal óbvio (nem
+// sempre é entrada, nem sempre é saída).
+func (h *Handler) resumoMovimentosCaixa(ctx context.Context, tenantID int64, sessaoID string) (suprimentos, sangrias, depositos float64, err error) {
+	rows, err := h.db.Query(ctx, `
+		SELECT tipo, COALESCE(SUM(valor),0) FROM pos_cash_movements
+		 WHERE pos_session_id=$1 AND tenant_id=$2
+		 GROUP BY tipo`, sessaoID, tenantID)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var tipo string
+		var total float64
+		if rows.Scan(&tipo, &total) != nil {
+			continue
+		}
+		switch tipo {
+		case "suprimento":
+			suprimentos = total
+		case "sangria":
+			sangrias = total
+		case "deposito":
+			depositos = total
+		}
+	}
+	return suprimentos, sangrias, depositos, nil
+}
+
+// FecharSessao calcula o valor esperado em numerário — fundo de caixa +
+// vendas em numerário + suprimentos - sangrias - depósitos — e devolve
+// também o detalhamento por método de pagamento (informativo; só o
+// numerário é fisicamente contável). Se enviada, a contagem de notas/moedas
+// tem de bater com closing_amount; se houver diferença não-trivial, exige
+// justificativa em vez de aceitar o fecho em silêncio.
 func (h *Handler) FecharSessao(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")
 	var body struct {
-		ClosingAmount float64 `json:"closing_amount"`
+		ClosingAmount float64        `json:"closing_amount"`
+		ContagemNotas map[string]int `json:"contagem_notas"`
+		Justificativa *string        `json:"justificativa"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		jsonErr(w, "closing_amount é obrigatório", http.StatusBadRequest)
 		return
 	}
 	var openingAmount float64
-	err := h.db.QueryRow(r.Context(), `SELECT opening_amount FROM pos_sessions WHERE id=$1 AND tenant_id=$2 AND status='aberta'`, id, user.TenantID).Scan(&openingAmount)
-	if err != nil {
+	if err := h.db.QueryRow(r.Context(), `SELECT opening_amount FROM pos_sessions WHERE id=$1 AND tenant_id=$2 AND status='aberta'`, id, user.TenantID).Scan(&openingAmount); err != nil {
 		jsonErr(w, "Sessão de caixa não encontrada ou já fechada", http.StatusNotFound)
 		return
 	}
-	var totalNumerario float64
-	h.db.QueryRow(r.Context(), `
-		SELECT COALESCE(SUM(sp.valor),0)
-		  FROM pos_sale_payments sp
-		  JOIN pos_sales s ON s.id = sp.pos_sale_id
-		 WHERE s.pos_session_id=$1 AND s.status='concluida' AND sp.tipo='numerario'`, id).Scan(&totalNumerario)
-	valorEsperado := openingAmount + totalNumerario
+
+	detalhamentoMetodos, totalNumerario, err := h.detalharPagamentosSessao(r.Context(), id)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	suprimentos, sangrias, depositos, err := h.resumoMovimentosCaixa(r.Context(), user.TenantID, id)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	valorEsperado := openingAmount + totalNumerario + suprimentos - sangrias - depositos
 	diferenca := body.ClosingAmount - valorEsperado
-	h.db.Exec(r.Context(), `
+
+	if body.ContagemNotas != nil {
+		var somaContagem float64
+		for denomTxt, qtd := range body.ContagemNotas {
+			denom, errConv := strconv.ParseFloat(denomTxt, 64)
+			if errConv != nil || qtd < 0 {
+				jsonErr(w, "contagem_notas inválida — chaves devem ser o valor da nota/moeda, valores a quantidade", http.StatusBadRequest)
+				return
+			}
+			somaContagem += denom * float64(qtd)
+		}
+		if math.Abs(somaContagem-body.ClosingAmount) > 0.005 {
+			jsonErr(w, fmt.Sprintf("A contagem de notas/moedas soma %.2f, mas closing_amount é %.2f", somaContagem, body.ClosingAmount), http.StatusUnprocessableEntity)
+			return
+		}
+	}
+	if math.Abs(diferenca) > 0.005 && (body.Justificativa == nil || strings.TrimSpace(*body.Justificativa) == "") {
+		jsonErr(w, fmt.Sprintf("Há uma diferença de caixa de %.2f — indique uma justificativa para fechar", diferenca), http.StatusUnprocessableEntity)
+		return
+	}
+
+	var contagemJSON []byte
+	if body.ContagemNotas != nil {
+		contagemJSON, _ = json.Marshal(body.ContagemNotas)
+	}
+
+	if _, err := h.db.Exec(r.Context(), `
 		UPDATE pos_sessions
-		   SET closing_amount=$1, closed_at=NOW(), status='fechada'
-		 WHERE id=$2`,
-		body.ClosingAmount, id)
-	jsonOK(w, map[string]any{"valor_esperado": valorEsperado, "diferenca": diferenca}, http.StatusOK)
+		   SET closing_amount=$1, closed_at=NOW(), status='fechada',
+		       contagem_notas=$2, justificativa_diferenca=$3
+		 WHERE id=$4`,
+		body.ClosingAmount, contagemJSON, body.Justificativa, id); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w, map[string]any{
+		"valor_esperado":       valorEsperado,
+		"diferenca":            diferenca,
+		"detalhamento_metodos": detalhamentoMetodos,
+		"movimentos": map[string]float64{
+			"suprimentos": suprimentos, "sangrias": sangrias, "depositos": depositos,
+		},
+	}, http.StatusOK)
+}
+
+// ObterFechoSessao devolve o "relatório de fecho" completo de uma sessão —
+// pensado para o app poder mostrar/imprimir sem repetir os cálculos que já
+// aconteceram em FecharSessao. Funciona tanto para sessões já fechadas
+// (mostra os valores gravados) como para uma sessão ainda aberta (pré-visualização
+// de "quanto daria se fechasse agora").
+func (h *Handler) ObterFechoSessao(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+
+	var s struct {
+		ID            int64
+		TerminalID    int64
+		TerminalNome  string
+		UserID        int64
+		OperadorNome  string
+		OpenedAt      time.Time
+		ClosedAt      *time.Time
+		OpeningAmount float64
+		ClosingAmount *float64
+		Status        string
+		ContagemNotas []byte
+		Justificativa *string
+	}
+	err := h.db.QueryRow(r.Context(), `
+		SELECT s.id, s.terminal_id, COALESCE(t.nome,''), s.user_id, COALESCE(u.nome,''),
+		       s.opened_at, s.closed_at, s.opening_amount, s.closing_amount, s.status,
+		       s.contagem_notas, s.justificativa_diferenca
+		  FROM pos_sessions s
+		  LEFT JOIN pos_terminals t ON t.id = s.terminal_id
+		  LEFT JOIN auth.users u ON u.id = s.user_id
+		 WHERE s.id=$1 AND s.tenant_id=$2`,
+		id, user.TenantID,
+	).Scan(&s.ID, &s.TerminalID, &s.TerminalNome, &s.UserID, &s.OperadorNome,
+		&s.OpenedAt, &s.ClosedAt, &s.OpeningAmount, &s.ClosingAmount, &s.Status,
+		&s.ContagemNotas, &s.Justificativa)
+	if err != nil {
+		jsonErr(w, "Sessão de caixa não encontrada", http.StatusNotFound)
+		return
+	}
+
+	detalhamentoMetodos, totalNumerario, err := h.detalharPagamentosSessao(r.Context(), id)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	suprimentos, sangrias, depositos, err := h.resumoMovimentosCaixa(r.Context(), user.TenantID, id)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	valorEsperado := s.OpeningAmount + totalNumerario + suprimentos - sangrias - depositos
+
+	var diferenca *float64
+	if s.ClosingAmount != nil {
+		d := *s.ClosingAmount - valorEsperado
+		diferenca = &d
+	}
+
+	var contagem map[string]int
+	if len(s.ContagemNotas) > 0 {
+		_ = json.Unmarshal(s.ContagemNotas, &contagem)
+	}
+
+	jsonOK(w, map[string]any{
+		"sessao": map[string]any{
+			"id": s.ID, "terminal_id": s.TerminalID, "terminal_nome": s.TerminalNome,
+			"user_id": s.UserID, "operador_nome": s.OperadorNome,
+			"opened_at": s.OpenedAt, "closed_at": s.ClosedAt, "status": s.Status,
+			"opening_amount": s.OpeningAmount, "closing_amount": s.ClosingAmount,
+		},
+		"detalhamento_metodos": detalhamentoMetodos,
+		"movimentos": map[string]float64{
+			"suprimentos": suprimentos, "sangrias": sangrias, "depositos": depositos,
+		},
+		"valor_esperado": valorEsperado,
+		"diferenca":      diferenca,
+		"contagem_notas": contagem,
+		"justificativa":  s.Justificativa,
+	}, http.StatusOK)
 }
 
 // ── Produtos (pesquisa rápida) ──────────────────────────────────────────────
@@ -503,6 +698,17 @@ func (h *Handler) ListarVendas(w http.ResponseWriter, r *http.Request) {
 			args = append(args, v)
 			where += " AND " + f + "=$" + strconv.Itoa(len(args))
 		}
+	}
+	// Busca livre por número do documento, client_reference (terminal
+	// offline) ou referência de pagamento (pos_sale_payments.referencia,
+	// ex.: ID de transação Mobile Money) — as três condições em OR, porque
+	// do ponto de vista de quem procura é "por número ou por referência",
+	// não os dois ao mesmo tempo.
+	if v := q.Get("q"); v != "" {
+		args = append(args, "%"+v+"%")
+		n := strconv.Itoa(len(args))
+		where += " AND (numero ILIKE $" + n + " OR client_reference ILIKE $" + n +
+			" OR EXISTS (SELECT 1 FROM pos_sale_payments p WHERE p.pos_sale_id = pos_sales.id AND p.referencia ILIKE $" + n + "))"
 	}
 	countArgs := make([]any, len(args))
 	copy(countArgs, args)
@@ -790,6 +996,11 @@ func (h *Handler) CriarVenda(w http.ResponseWriter, r *http.Request) {
 		h.wsHub.SendEvent(user.ID, ws.EvtVendaCriada, map[string]any{"id": id, "numero": numero, "total": totalGeral})
 		h.wsHub.SendEvent(user.ID, ws.EvtPagamentoRecebido, map[string]any{"venda_id": id, "valor": valorRecebido})
 	}
+	if h.push != nil {
+		h.push.SendToUser(ctx, user.ID, "Venda concluída",
+			fmt.Sprintf("Venda %s registada — %.2f %s", numero, totalGeral, "MZN"),
+			map[string]string{"tipo": "venda_criada", "venda_id": strconv.FormatInt(id, 10)})
+	}
 
 	jsonOK(w, map[string]any{
 		"id": id, "numero": numero, "total": totalGeral, "troco": troco,
@@ -826,25 +1037,26 @@ func (h *Handler) ObterVenda(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rows, _ := h.db.Query(r.Context(), `
-		SELECT id, product_id, product_variant_id, descricao, quantidade, preco_unitario, desconto_valor, imposto_valor, subtotal, total
+		SELECT id, product_id, product_variant_id, descricao, quantidade, preco_unitario, desconto_valor, imposto_valor, subtotal, total, quantidade_devolvida
 		  FROM pos_sale_items WHERE pos_sale_id=$1 ORDER BY id`, id)
 	defer rows.Close()
 	type Item struct {
-		ID               int64   `json:"id"`
-		ProductID        int64   `json:"product_id"`
-		ProductVariantID *int64  `json:"product_variant_id"`
-		Descricao        *string `json:"descricao"`
-		Quantidade       float64 `json:"quantidade"`
-		PrecoUnitario    float64 `json:"preco_unitario"`
-		DescontoValor    float64 `json:"desconto_valor"`
-		ImpostoValor     float64 `json:"imposto_valor"`
-		Subtotal         float64 `json:"subtotal"`
-		Total            float64 `json:"total"`
+		ID                  int64   `json:"id"`
+		ProductID           int64   `json:"product_id"`
+		ProductVariantID    *int64  `json:"product_variant_id"`
+		Descricao           *string `json:"descricao"`
+		Quantidade          float64 `json:"quantidade"`
+		PrecoUnitario       float64 `json:"preco_unitario"`
+		DescontoValor       float64 `json:"desconto_valor"`
+		ImpostoValor        float64 `json:"imposto_valor"`
+		Subtotal            float64 `json:"subtotal"`
+		Total               float64 `json:"total"`
+		QuantidadeDevolvida float64 `json:"quantidade_devolvida"`
 	}
 	items := []Item{}
 	for rows.Next() {
 		var i Item
-		if rows.Scan(&i.ID, &i.ProductID, &i.ProductVariantID, &i.Descricao, &i.Quantidade, &i.PrecoUnitario, &i.DescontoValor, &i.ImpostoValor, &i.Subtotal, &i.Total) == nil {
+		if rows.Scan(&i.ID, &i.ProductID, &i.ProductVariantID, &i.Descricao, &i.Quantidade, &i.PrecoUnitario, &i.DescontoValor, &i.ImpostoValor, &i.Subtotal, &i.Total, &i.QuantidadeDevolvida) == nil {
 			items = append(items, i)
 		}
 	}

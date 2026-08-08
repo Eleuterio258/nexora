@@ -3,8 +3,10 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"crypto/rand"
@@ -15,6 +17,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/contracts"
 )
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -845,9 +848,16 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var uid int64
+	var nome string
+	var tenantID int64
 	err := h.db.QueryRow(r.Context(), `
-		SELECT id FROM users WHERE email = LOWER($1) AND estado = 'ativo'`,
-		body.Email).Scan(&uid)
+		SELECT u.id, u.nome, COALESCE(m.tenant_id, 0)
+		  FROM users u
+		  LEFT JOIN auth.memberships m ON m.user_id = u.id AND m.ativo = true
+		 WHERE u.email = LOWER($1) AND u.estado = 'ativo'
+		 ORDER BY m.principal DESC NULLS LAST, m.id ASC
+		 LIMIT 1`,
+		body.Email).Scan(&uid, &nome, &tenantID)
 
 	if err == nil {
 		b := make([]byte, 32)
@@ -857,7 +867,30 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		h.db.Exec(r.Context(), `
 			INSERT INTO password_resets (user_id, token_hash, expira_em)
 			VALUES ($1, $2, NOW() + INTERVAL '1 hour')`, uid, tokenHash)
-		// TODO: enqueue email via message broker
+
+		// Email real via fila de notificações (notifications.notification_messages,
+		// despachada por internal/background.dispatchNotifications) — mesmo padrão
+		// já usado pelo convite de assinatura digital. Nunca bloqueia a resposta:
+		// NotificationAdapter.Send só regista a falha em log.
+		if h.notif != nil {
+			link := token
+			if h.cfg.PasswordResetBaseURL != "" {
+				link = strings.TrimRight(h.cfg.PasswordResetBaseURL, "/") + "/" + token
+			}
+			corpo := fmt.Sprintf(
+				"Olá %s,\n\nRecebemos um pedido para repor a password da sua conta. Aceda a %s para escolher uma password nova. Este link expira em 1 hora.\n\nSe não foi você a pedir, ignore este email — a sua password actual continua válida.",
+				nome, link,
+			)
+			h.notif.Send(r.Context(), contracts.Notification{
+				TenantID:       tenantID,
+				CanalTipo:      "email",
+				Destinatario:   body.Email,
+				Assunto:        "Recuperação de password",
+				Corpo:          corpo,
+				ReferenciaTipo: "auth.password_reset",
+				ReferenciaID:   &uid,
+			})
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

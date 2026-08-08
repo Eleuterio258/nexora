@@ -99,3 +99,67 @@ func (h *Handler) criarFaturaParaVenda(ctx context.Context, tx pgx.Tx, p faturaV
 
 	return invoiceID, numero, nil
 }
+
+// itemNotaCreditoPOS é uma linha devolvida de EstornoParcialVenda —
+// suficiente para preencher faturacao.credit_note_items sem depender do
+// shape interno de itemDevolvido (definido em estorno_parcial.go).
+type itemNotaCreditoPOS struct {
+	ProductID  int64
+	Descricao  *string
+	Quantidade float64
+	Valor      float64
+}
+
+type notaCreditoParams struct {
+	tenantID   int64
+	customerID int64
+	invoiceID  int64
+	userID     int64
+	motivo     string
+	itens      []itemNotaCreditoPOS
+	total      float64
+}
+
+// criarNotaCreditoParaEstorno emite uma nota de crédito (série "NC") ligada
+// à fatura original — só é chamada quando a venda tem invoice_id (ver
+// EstornoParcialVenda), para o estorno de vendas fiscalmente documentadas
+// ficar também fiscalmente documentado, em vez de só desaparecer do stock e
+// do caixa sem deixar rasto na faturação.
+func (h *Handler) criarNotaCreditoParaEstorno(ctx context.Context, tx pgx.Tx, p notaCreditoParams) (id int64, numero string, err error) {
+	numero, serieID, err := proximoNumeroSerie(ctx, tx, p.tenantID, "NC")
+	if err != nil {
+		return 0, "", err
+	}
+	err = tx.QueryRow(ctx, `
+		INSERT INTO faturacao.credit_notes (
+		  tenant_id, serie_id, customer_id, invoice_id, numero, motivo, total,
+		  status, emitida_em, criado_por)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,'emitida',NOW(),$8)
+		RETURNING id`,
+		p.tenantID, serieID, p.customerID, p.invoiceID, numero, p.motivo, p.total, p.userID,
+	).Scan(&id)
+	if err != nil {
+		return 0, "", err
+	}
+
+	for _, item := range p.itens {
+		descricao := ""
+		if item.Descricao != nil {
+			descricao = *item.Descricao
+		}
+		var precoUnitario float64
+		if item.Quantidade > 0 {
+			precoUnitario = item.Valor / item.Quantidade
+		}
+		if _, err = tx.Exec(ctx, `
+			INSERT INTO faturacao.credit_note_items (
+			  credit_note_id, product_id, descricao, quantidade, preco_unitario, total)
+			VALUES ($1,$2,$3,$4,$5,$6)`,
+			id, item.ProductID, descricao, item.Quantidade, precoUnitario, item.Valor,
+		); err != nil {
+			return 0, "", err
+		}
+	}
+
+	return id, numero, nil
+}

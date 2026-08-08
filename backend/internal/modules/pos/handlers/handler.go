@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
+	"nexora/internal/push"
 	"nexora/internal/ws"
 )
 
@@ -15,10 +16,11 @@ type Handler struct {
 	db    *pgxpool.Pool
 	cfg   *config.Config
 	wsHub *ws.Hub
+	push  *push.Service
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config, wsHub *ws.Hub) *Handler {
-	return &Handler{db: db, cfg: cfg, wsHub: wsHub}
+func New(db *pgxpool.Pool, cfg *config.Config, wsHub *ws.Hub, pushSvc *push.Service) *Handler {
+	return &Handler{db: db, cfg: cfg, wsHub: wsHub, push: pushSvc}
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {
