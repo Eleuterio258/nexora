@@ -154,6 +154,29 @@ final class NexoraClient implements NexoraGateway
         ]);
     }
 
+    /**
+     * Autentica um terminal POS. Ao contrário do login normal, não há email
+     * nem password: o terminal identifica-se pelo código e prova-o com o
+     * código de activação, que a API compara por bcrypt contra a conta
+     * sintética <codigo>@terminal.internal criada com ele.
+     *
+     * O tenant é opcional e serve para desambiguar — o código do terminal só é
+     * único dentro de cada tenant.
+     */
+    public function authenticateTerminal(string $codigoTerminal, string $activationCode, string $tenantSlug = ''): HttpResponse
+    {
+        $payload = [
+            'tipo' => 'terminal',
+            'codigo_terminal' => $codigoTerminal,
+            'activation_code' => $activationCode,
+        ];
+        if ($tenantSlug !== '') {
+            $payload['tenant_slug'] = $tenantSlug;
+        }
+
+        return $this->json('POST', $this->baseUrl . '/api/pos/login', $payload);
+    }
+
     public function refresh(string $refreshToken): HttpResponse
     {
         return $this->json('POST', $this->baseUrl . '/api/auth/refresh', [

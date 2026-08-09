@@ -38,6 +38,72 @@ final readonly class AdminAuthController
         require $this->viewRoot . '/pages/login.php';
     }
 
+    /**
+     * Login de terminal POS: o dispositivo identifica-se pelo código do
+     * terminal e prova-o com o código de activação, sem email nem password.
+     * Até aqui este fluxo só existia na app PayCore — quem opera o POS pelo
+     * navegador não tinha por onde entrar sem credenciais de uma pessoa.
+     */
+    public function loginTerminal(): void
+    {
+        if ($this->session->isAuthenticated()) {
+            header('Location: /nexora/pos');
+            exit;
+        }
+
+        $erro = '';
+
+        if ($this->request->isPost()) {
+            $erro = $this->attemptLoginTerminal();
+        }
+
+        $csrf = $this->security->csrfToken();
+        $app = Application::instance();
+
+        require $this->viewRoot . '/pages/login_terminal.php';
+    }
+
+    private function attemptLoginTerminal(): string
+    {
+        if (!$this->security->hasValidCsrf($this->request->csrfToken())) {
+            return 'Token de segurança inválido. Recarregue a página.';
+        }
+
+        // Limite próprio: um terminal enganado a repetir o código não deve
+        // gastar as tentativas de quem faz login com email.
+        if (!$this->security->allow('terminal_login', 5, 300)) {
+            return 'Demasiadas tentativas. Aguarde 5 minutos.';
+        }
+
+        $codigo = trim($this->request->postString('codigo_terminal'));
+        $activacao = trim((string) $this->request->postValue('activation_code', ''));
+        $tenant = trim($this->request->postString('tenant_slug'));
+
+        if ($codigo === '' || $activacao === '') {
+            return 'Preencha o código do terminal e o código de activação.';
+        }
+
+        try {
+            $resp = $this->session->loginTerminal($codigo, $activacao, $tenant);
+
+            if ($resp['status'] === 200 && !empty($resp['body']['terminal_token'])) {
+                session_regenerate_id(true);
+                $this->session->storeTerminal($resp['body']);
+                header('Location: /nexora/pos');
+                exit;
+            }
+
+            // A API responde 401 tanto a código errado como a terminal
+            // inexistente, de propósito: dizer qual dos dois falhou deixaria
+            // descobrir que códigos de terminal existem.
+            return (string) ($resp['body']['error'] ?? 'Código de terminal ou de activação inválido.');
+        } catch (HttpClientException $exception) {
+            error_log('[terminal-login] Falha na API Nexora: ' . $exception->getMessage());
+
+            return 'Não foi possível contactar o servidor. Tente novamente.';
+        }
+    }
+
     public function logout(): never
     {
         try {
