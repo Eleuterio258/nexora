@@ -28,7 +28,7 @@ final class NexoraClient implements NexoraGateway
             $method,
             $this->url($path, $query),
             $payload,
-            ['Authorization: Bearer ' . $this->tokens->accessToken()]
+            $this->authHeaders($this->tokens->accessToken())
         );
 
         return $response->status === 401
@@ -36,7 +36,7 @@ final class NexoraClient implements NexoraGateway
                 $method,
                 $this->url($path, $query),
                 $payload,
-                ['Authorization: Bearer ' . $this->tokens->accessToken(true)]
+                $this->authHeaders($this->tokens->accessToken(true))
             )
             : $response;
     }
@@ -67,9 +67,27 @@ final class NexoraClient implements NexoraGateway
             $method,
             $this->url($path, $query),
             $payload,
-            ['Authorization: Bearer ' . $token]
+            $this->authHeaders($token)
         );
         return ['status' => $response->status, 'body' => $response->body];
+    }
+
+    /**
+     * Cabeçalhos de uma chamada autenticada. Além do token, reenvia o host por
+     * onde o utilizador entrou: é assim que a API sabe a que tenant o endereço
+     * pertence e pode recusar uma sessão que não seja desse tenant. Sem este
+     * cabeçalho a API vê apenas o salto interno e o domínio não significa nada.
+     *
+     * @return string[]
+     */
+    private function authHeaders(string $token): array
+    {
+        $headers = ['Authorization: Bearer ' . $token];
+        if ($host = $this->clientHost()) {
+            $headers[] = 'X-Forwarded-Host: ' . $host;
+        }
+
+        return $headers;
     }
 
     public function publicRequest(
