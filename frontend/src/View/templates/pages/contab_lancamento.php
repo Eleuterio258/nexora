@@ -209,7 +209,7 @@
 <?php endif; ?>
 
 <script>
-const LANCAMENTO_ID = <?php echo $id ?>;
+const LANCAMENTO_ID = <?php echo (int) ($lancamento['id'] ?? 0) ?>;
 const CSRF          = '<?php echo $csrf ?>';
 
 async function adicionarLinha() {
