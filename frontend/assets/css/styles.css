@@ -1299,3 +1299,103 @@ a.contact-link:hover { color: var(--green); }
 @media (max-width: 600px) {
     .site-footer-bottom-inner { justify-content: center; text-align: center; }
 }
+
+/* =========================================
+   PARCEIROS — MARQUEE INFINITO
+   ========================================= */
+
+.section-partners {
+    background: linear-gradient(180deg, var(--gray-50) 0%, var(--white) 100%);
+    overflow: hidden;
+}
+
+.partners-marquee {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    padding: 0.5rem 0;
+    mask-image: linear-gradient(
+        to right,
+        transparent 0%,
+        black 8%,
+        black 92%,
+        transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+        to right,
+        transparent 0%,
+        black 8%,
+        black 92%,
+        transparent 100%
+    );
+}
+
+.partners-track {
+    display: flex;
+    gap: 2.5rem;
+    width: max-content;
+    animation: partners-marquee 24s linear infinite;
+}
+
+.partners-marquee:hover .partners-track {
+    animation-play-state: paused;
+}
+
+.partner-card {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.875rem 1.5rem;
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    text-decoration: none;
+    color: var(--gray-700);
+    transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+    flex-shrink: 0;
+}
+
+.partner-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: var(--shadow-md);
+    border-color: var(--green-light);
+}
+
+.partner-logo-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    background: var(--gray-100);
+    color: var(--gray-700);
+    font-family: var(--font-heading);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+}
+
+.partner-logo-green {
+    background: var(--green-xlight);
+    color: var(--green-dark);
+}
+
+.partner-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+@keyframes partners-marquee {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+@media (max-width: 768px) {
+    .partners-track { gap: 1.5rem; }
+    .partner-card { padding: 0.75rem 1rem; }
+    .partner-logo-placeholder { width: 40px; height: 40px; font-size: 0.7rem; }
+    .partner-name { font-size: 0.8rem; }
+}

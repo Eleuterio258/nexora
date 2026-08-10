@@ -12,10 +12,15 @@ use E258Tech\Http\HttpResponse;
 
 final class NexoraClient implements NexoraGateway
 {
+    private readonly TenantSignature $tenantSignature;
+
     public function __construct(
         private readonly string $baseUrl,
-        private readonly TokenProvider $tokens
+        private readonly TokenProvider $tokens,
+        ?string $tenantCode = null,
+        ?string $tenantSecret = null
     ) {
+        $this->tenantSignature = new TenantSignature($tenantCode, $tenantSecret);
     }
 
     public function request(
@@ -89,6 +94,10 @@ final class NexoraClient implements NexoraGateway
         if ($auth = $this->incomingAuthorization()) {
             $headers[] = 'Authorization: ' . $auth;
         }
+
+        // Identificação assinada por HMAC-SHA256 do tenant. Quando configurada,
+        // é mais segura do que X-Forwarded-Host (forjável). Ver TenantSignature.
+        $headers = array_merge($headers, $this->tenantSignature->headers($method, $path));
 
         return $this->json(
             $method,
@@ -216,6 +225,9 @@ final class NexoraClient implements NexoraGateway
         if ($host = $this->clientHost()) {
             $headers[] = 'X-Forwarded-Host: ' . $host;
         }
+
+        // Identificação assinada por HMAC-SHA256 do tenant (uploads públicos).
+        $headers = array_merge($headers, $this->tenantSignature->headers('POST', $path));
 
         $response = $this->raw($this->baseUrl . $path, [
             CURLOPT_POST => true,

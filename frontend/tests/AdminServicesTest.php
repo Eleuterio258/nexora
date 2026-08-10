@@ -24,6 +24,24 @@ final class FakeNexoraGateway implements NexoraGateway
         $this->calls[] = compact('method', 'path', 'payload');
         return array_shift($this->responses) ?? new HttpResponse(200, []);
     }
+
+    public function uploadBinary(string $path, string $bytes, string $contentType): array
+    {
+        $this->calls[] = compact('method', 'path', 'bytes', 'contentType');
+        return ['status' => 200, 'body' => []];
+    }
+
+    public function uploadMultipart(string $path, array $fields, array $files): array
+    {
+        $this->calls[] = compact('method', 'path', 'fields', 'files');
+        return ['status' => 200, 'body' => []];
+    }
+
+    public function download(string $path): \E258Tech\Http\BinaryResponse
+    {
+        $this->calls[] = ['method' => 'GET', 'path' => $path];
+        return new \E258Tech\Http\BinaryResponse(200, 'application/octet-stream', [], '');
+    }
 }
 
 function expectSame(mixed $expected, mixed $actual, string $message): void

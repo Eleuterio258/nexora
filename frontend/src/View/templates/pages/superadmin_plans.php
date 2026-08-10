@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 $resp  = $app->nexora->call('GET', '/api/superadmin/plans');
 $plans = $resp['body'] ?? [];

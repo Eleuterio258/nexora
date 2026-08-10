@@ -30,6 +30,7 @@ final class ComercialPageRoutes
             // Clientes
             'clientes'                  => ['path' => '/nexora/clientes', 'view' => 'clientes.php', 'permission' => 'clientes'],
             'cliente_form'              => ['path' => '/nexora/clientes/form', 'view' => 'cliente_form.php', 'permission' => 'clientes'],
+            'cliente_detalhe'           => ['path' => '/nexora/clientes/ver', 'view' => 'cliente_detalhe.php', 'permission' => 'clientes'],
             // Faturação
             'faturacao_series'          => ['path' => '/nexora/faturacao/series', 'view' => 'faturacao_series.php', 'permission' => 'faturacao'],
             'orcamentos'                => ['path' => '/nexora/faturacao/orcamentos', 'view' => 'orcamentos.php', 'permission' => 'faturacao'],
@@ -38,6 +39,7 @@ final class ComercialPageRoutes
             'encomendas'                => ['path' => '/nexora/faturacao/encomendas', 'view' => 'encomendas.php', 'permission' => 'faturacao'],
             'faturas'                   => ['path' => '/nexora/faturacao/faturas', 'view' => 'faturas.php', 'permission' => 'faturacao'],
             'fatura_form'               => ['path' => '/nexora/faturacao/faturas/form', 'view' => 'fatura_form.php', 'permission' => 'faturacao'],
+            'fatura_detalhe'            => ['path' => '/nexora/faturacao/faturas/ver', 'view' => 'fatura_detalhe.php', 'permission' => 'faturacao'],
             'fatura_proforma'           => ['path' => '/nexora/faturacao/faturas/proforma', 'view' => 'fatura_proforma.php', 'permission' => 'faturacao'],
             'recibos'                   => ['path' => '/nexora/faturacao/recibos', 'view' => 'recibos.php', 'permission' => 'faturacao'],
             'notas_credito'             => ['path' => '/nexora/faturacao/notas-credito', 'view' => 'notas_credito.php', 'permission' => 'faturacao'],
@@ -50,11 +52,19 @@ final class ComercialPageRoutes
             'pos_catalogo'              => ['path' => '/nexora/pos/catalogo', 'view' => 'pos_catalogo.php', 'permission' => 'pos'],
             'pos_relatorios'            => ['path' => '/nexora/pos/relatorios', 'view' => 'pos_relatorios.php', 'permission' => 'pos'],
             'pos_devolucoes'            => ['path' => '/nexora/pos/devolucoes', 'view' => 'pos_devolucoes.php', 'permission' => 'pos'],
+            'pos_sessoes'               => ['path' => '/nexora/pos/sessoes', 'view' => 'pos_sessoes.php', 'permission' => 'pos'],
+            'pos_sessa_abrir'           => ['path' => '/nexora/pos/sessoes/abrir', 'view' => 'pos_sessa_abrir.php', 'permission' => 'pos'],
+            'pos_sessa_detalhe'         => ['path' => '/nexora/pos/sessoes/ver', 'view' => 'pos_sessa_detalhe.php', 'permission' => 'pos'],
+            'pos_sessa_fecho'           => ['path' => '/nexora/pos/sessoes/fechar', 'view' => 'pos_sessa_fecho.php', 'permission' => 'pos'],
+            'pos_relatorio_fecho'       => ['path' => '/nexora/pos/relatorios/fecho', 'view' => 'pos_relatorio_fecho.php', 'permission' => 'pos'],
+            'pos_descontos'             => ['path' => '/nexora/pos/descontos', 'view' => 'pos_descontos.php', 'permission' => 'pos'],
             // Produtos & Stock
             'produtos'                  => ['path' => '/nexora/produtos', 'view' => 'produtos.php', 'permission' => 'stock'],
             'produto_form'              => ['path' => '/nexora/produtos/form', 'view' => 'produto_form.php', 'permission' => 'stock'],
             'produto_categorias'        => ['path' => '/nexora/produtos/categorias', 'view' => 'produto_categorias.php', 'permission' => 'stock'],
+            'produto_detalhe'           => ['path' => '/nexora/produtos/ver', 'view' => 'produto_detalhe.php', 'permission' => 'stock'],
             'stock'                     => ['path' => '/nexora/stock', 'view' => 'stock.php', 'permission' => 'stock'],
+            'stock_alertas'             => ['path' => '/nexora/stock/alertas', 'view' => 'stock_alertas.php', 'permission' => 'stock'],
             // Compras
             'compras'                   => ['path' => '/nexora/compras', 'view' => 'compras.php', 'permission' => 'compras'],
         ];

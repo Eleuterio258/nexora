@@ -57,6 +57,7 @@ final class SchoolAdminRoutes
      * Mapa das rotas do Painel Escolar independente (/escola/*).
      */
     private const ESCOLAR_PANEL_PATHS = [
+        'gestao_escolar'                => '/escola/gestao-escolar',
         'escolar_dashboard'             => '/escola/dashboard',
         'escolar_anos_lectivos'         => '/escola/anos-lectivos',
         'escolar_periodos'              => '/escola/periodos',
@@ -88,6 +89,7 @@ final class SchoolAdminRoutes
         'escolar_resumo_academico'      => '/escola/resumo-academico',
         'escolar_resumo_financeiro'     => '/escola/resumo-financeiro',
         'escolar_config_financeira'     => '/escola/config-financeira',
+        'escolar_dashboard_diraccao'    => '/escola/dashboard-diraccao',
     ];
 
     public function resolveByPath(string $path): ?string

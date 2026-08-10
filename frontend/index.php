@@ -5,6 +5,8 @@ require_once __DIR__ . '/src/autoload.php';
 require_once __DIR__ . '/vendor/autoload.php';
 
 use E258Tech\Controller\Admin\AdminApiRuntime;
+use E258Tech\Controller\Admin\Api\ApiProxyController;
+use E258Tech\Controller\Admin\Api\PosPaymentApiController;
 use E258Tech\Controller\Portal\PortalAlunoController;
 use E258Tech\Controller\Portal\PortalEncarregadoController;
 use E258Tech\Controller\Portal\PortalProfessorController;
@@ -57,6 +59,15 @@ if (str_starts_with($uri, '/admin')) {
     http_response_code($resp['status'] ?: 200);
     echo json_encode($resp['body']);
     exit;
+} elseif ($uri === '/nexora/api/v1/pos/pagamentos/iniciar') {
+    PosPaymentApiController::iniciarPagamento();
+} elseif ($uri === '/nexora/api/v1/pos/pagamentos/status') {
+    PosPaymentApiController::statusPagamento();
+} elseif ($uri === '/nexora/api/v1/pos/vendas') {
+    PosPaymentApiController::registarVenda();
+} elseif (str_starts_with($uri, '/nexora/api/v1/')) {
+    // Proxy REST genérico para paths compostos (ex.: /nexora/api/v1/pos/sessoes).
+    ApiProxyController::handle();
 } elseif (str_starts_with($uri, '/nexora/api/')) {
     (new AdminApiRuntime(Application::bootstrap()))->dispatch(basename($uri, '.php'));
 } elseif (str_starts_with($uri, '/aluno')) {

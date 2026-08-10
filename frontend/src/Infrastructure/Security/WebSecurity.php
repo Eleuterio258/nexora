@@ -22,6 +22,13 @@ final class WebSecurity
         return $sessionToken !== '' && hash_equals($sessionToken, $token);
     }
 
+    public function validateCsrf(string $token): void
+    {
+        if (!$this->hasValidCsrf($token)) {
+            throw new \RuntimeException('Token CSRF invalido.');
+        }
+    }
+
     public function sanitize(string $input, int $maxLength = 500): string
     {
         return htmlspecialchars(trim(substr($input, 0, $maxLength)), ENT_QUOTES, 'UTF-8');

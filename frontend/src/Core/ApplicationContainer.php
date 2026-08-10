@@ -17,6 +17,19 @@ use E258Tech\Controller\PublicSite\HomeController;
 use E258Tech\Controller\PublicSite\OpenVacanciesCounter;
 use E258Tech\Controller\PublicSite\PublicApiController;
 use E258Tech\Http\ServerRequest;
+use E258Tech\Model\Service\PayCore\DashboardService;
+use E258Tech\Model\Service\PayCore\PosCashDrawerService;
+use E258Tech\Model\Service\PayCore\PosDiscountService;
+use E258Tech\Model\Service\PayCore\CustomerService;
+use E258Tech\Model\Service\PayCore\FileUploadService;
+use E258Tech\Model\Service\PayCore\InvoicingService;
+use E258Tech\Model\Service\PayCore\PosPaymentService;
+use E258Tech\Model\Service\PayCore\PosTransactionReportService;
+use E258Tech\Model\Service\PayCore\StockAdjustmentService;
+use E258Tech\Model\Service\PayCore\StockCategoryService;
+use E258Tech\Model\Service\PayCore\StockProductService;
+use E258Tech\Model\Service\PayCore\TerminalAdminService;
+use E258Tech\Model\Service\PayCore\UserService;
 use E258Tech\Routing\AdminPageRouter;
 use E258Tech\Routing\AdminRoutes;
 use E258Tech\Routing\CandidatoRoutes;
@@ -42,12 +55,30 @@ final readonly class ApplicationContainer
     public AdminAuthController $adminAuth;
     public AdminDownloadController $adminDownload;
     public OpenVacanciesCounter $openVacancies;
+    public DashboardService $payCoreDashboard;
+    public PosCashDrawerService $payCoreCashDrawer;
+    public PosTransactionReportService $payCoreTransactionReport;
+    public PosPaymentService $payCorePayment;
+    public PosDiscountService $payCoreDiscount;
+    public StockCategoryService $payCoreStockCategory;
+    public StockProductService $payCoreStockProduct;
+    public StockAdjustmentService $payCoreStockAdjustment;
+    public InvoicingService $payCoreInvoicing;
+    public CustomerService $payCoreCustomer;
+    public FileUploadService $payCoreFileUpload;
+    public UserService $payCoreUser;
+    public TerminalAdminService $payCoreTerminalAdmin;
 
     public function __construct(string $baseUrl)
     {
         $http = new CurlHttpClient();
         $tokens = new PhpSessionTokenProvider($http, $baseUrl);
-        $this->nexora = new NexoraClient($baseUrl, $tokens);
+        $this->nexora = new NexoraClient(
+            $baseUrl,
+            $tokens,
+            getenv('NEXORA_TENANT_CODE') ?: null,
+            getenv('NEXORA_TENANT_SECRET') ?: null
+        );
         $this->session = new AdminSession($this->nexora);
         $this->security = new WebSecurity();
         $this->request = ServerRequest::fromGlobals();
@@ -85,5 +116,18 @@ final readonly class ApplicationContainer
             dirname(__DIR__, 2) . '/src/View/templates'
         );
         $this->adminDownload = new AdminDownloadController($this->guard, $this->request, $this->nexora);
+        $this->payCoreDashboard = new DashboardService($this->nexora);
+        $this->payCoreCashDrawer = new PosCashDrawerService($this->nexora);
+        $this->payCoreTransactionReport = new PosTransactionReportService($this->nexora);
+        $this->payCorePayment = new PosPaymentService($this->nexora);
+        $this->payCoreDiscount = new PosDiscountService($this->nexora);
+        $this->payCoreStockCategory = new StockCategoryService($this->nexora);
+        $this->payCoreStockProduct = new StockProductService($this->nexora);
+        $this->payCoreStockAdjustment = new StockAdjustmentService($this->nexora);
+        $this->payCoreInvoicing = new InvoicingService($this->nexora);
+        $this->payCoreCustomer = new CustomerService($this->nexora);
+        $this->payCoreFileUpload = new FileUploadService($this->nexora);
+        $this->payCoreUser = new UserService($this->nexora);
+        $this->payCoreTerminalAdmin = new TerminalAdminService($this->nexora);
     }
 }

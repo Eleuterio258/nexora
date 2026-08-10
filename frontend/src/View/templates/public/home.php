@@ -532,6 +532,55 @@
         </div>
     </section>
 
+    <!-- Parceiros Section -->
+    <section id="parceiros" class="section section-partners" style="padding-top:1rem; padding-bottom:1rem;">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Parceiros</h2>
+                <p class="section-subtitle">Empresas que confiam na e258tech para impulsionar a sua transformação digital.</p>
+            </div>
+
+            <div class="partners-marquee" aria-label="Logos dos parceiros">
+                <div class="partners-track">
+                    <!-- Repetição dupla para loop infinito sem cortes -->
+                    <a href="https://jsrs.co.mz" target="_blank" rel="noopener" class="partner-card">
+                        <div class="partner-logo-placeholder" aria-hidden="true">JSRS</div>
+                        <span class="partner-name">jsrs.co.mz</span>
+                    </a>
+                    <a href="https://mwanaafricaconsulting.com" target="_blank" rel="noopener" class="partner-card">
+                        <div class="partner-logo-placeholder partner-logo-green" aria-hidden="true">MA</div>
+                        <span class="partner-name">mwanaafricaconsulting.com</span>
+                    </a>
+                    <a href="https://jsrs.co.mz" target="_blank" rel="noopener" class="partner-card">
+                        <div class="partner-logo-placeholder" aria-hidden="true">JSRS</div>
+                        <span class="partner-name">jsrs.co.mz</span>
+                    </a>
+                    <a href="https://mwanaafricaconsulting.com" target="_blank" rel="noopener" class="partner-card">
+                        <div class="partner-logo-placeholder partner-logo-green" aria-hidden="true">MA</div>
+                        <span class="partner-name">mwanaafricaconsulting.com</span>
+                    </a>
+                    <!-- Segunda série para loop fluido -->
+                    <a href="https://jsrs.co.mz" target="_blank" rel="noopener" class="partner-card">
+                        <div class="partner-logo-placeholder" aria-hidden="true">JSRS</div>
+                        <span class="partner-name">jsrs.co.mz</span>
+                    </a>
+                    <a href="https://mwanaafricaconsulting.com" target="_blank" rel="noopener" class="partner-card">
+                        <div class="partner-logo-placeholder partner-logo-green" aria-hidden="true">MA</div>
+                        <span class="partner-name">mwanaafricaconsulting.com</span>
+                    </a>
+                    <a href="https://jsrs.co.mz" target="_blank" rel="noopener" class="partner-card">
+                        <div class="partner-logo-placeholder" aria-hidden="true">JSRS</div>
+                        <span class="partner-name">jsrs.co.mz</span>
+                    </a>
+                    <a href="https://mwanaafricaconsulting.com" target="_blank" rel="noopener" class="partner-card">
+                        <div class="partner-logo-placeholder partner-logo-green" aria-hidden="true">MA</div>
+                        <span class="partner-name">mwanaafricaconsulting.com</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Contato Section -->
     <section id="contato" class="section" style="padding-top:1rem;">
         <div class="container">

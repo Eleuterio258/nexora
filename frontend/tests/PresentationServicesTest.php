@@ -51,7 +51,7 @@ presentationExpect(
 );
 
 $routes = new AdminRoutes();
-presentationExpect(71, count($routes->names()), 'Deve registrar todas as paginas administrativas.');
+presentationExpect(150, count($routes->names()), 'Deve registrar todas as paginas administrativas.');
 foreach ($routes->names() as $routeName) {
     $definition = $routes->definition($routeName);
     presentationExpect(
@@ -62,27 +62,25 @@ foreach ($routes->names() as $routeName) {
 }
 presentationExpect('/nexora/', $routes->path('dashboard'), 'Deve resolver o dashboard.');
 presentationExpect(
-    '/nexora/vaga_form.php?id=12',
+    '/nexora/recrutamento/vagas/form?id=12',
     $routes->path('vaga_form', ['id' => 12]),
     'Deve construir URLs administrativas com query.'
 );
+$apiRoutes = new \E258Tech\Routing\AdminApiRoutes();
 presentationExpect(
-    '/nexora/api/vaga_save.php',
-    $routes->api('vaga_save'),
+    '/nexora/api/vaga_save',
+    $apiRoutes->path('vaga_save'),
     'Deve construir URLs da API administrativa.'
 );
 
-$apiFiles = array_map(
-    static fn(string $path): string => basename($path, '.php'),
-    (array) glob(__DIR__ . '/../nexora/api/*.php')
-);
-sort($apiFiles);
-$apiNames = $routes->apiNames();
-sort($apiNames);
-presentationExpect(
-    $apiFiles,
-    $apiNames,
-    'O catalogo de rotas de API deve corresponder aos ficheiros em nexora/api.'
-);
+$apiNames = $apiRoutes->names();
+foreach ($apiNames as $apiName) {
+    $definition = $apiRoutes->definition($apiName);
+    presentationExpect(
+        true,
+        isset($definition['module']) && isset($definition['action']),
+        "O endpoint $apiName deve ter modulo e acao definidos."
+    );
+}
 
 echo "Presentation service tests passed.\n";

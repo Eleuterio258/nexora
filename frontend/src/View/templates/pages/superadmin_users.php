@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 $search   = $app->request->queryString('search');
 $tenantId = $app->request->queryString('tenant_id');

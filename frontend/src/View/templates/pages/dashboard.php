@@ -54,8 +54,6 @@ foreach ($moduloRotaMap as $modKey => $info) {
 }
 
 // ── Redirecionamento automático para o Painel da Escola (legado) ──────────────
-// Agora o redireccionamento é feito pela flag 'escopo'. Mantemos a verificação
-// como fallback para contas sem escopo definido ou com permissões exclusivas.
 if (!$app->session->isBoth()) {
     $_modulosNegocio = [
         'recrutamento','crm','clientes','faturacao','pos','stock','compras',
@@ -67,6 +65,32 @@ if (!$app->session->isBoth()) {
     if (count($_negocioAcessiveis) === 1 && isset($_negocioAcessiveis['gestao-escolar'])) {
         header('Location: /escola');
         exit;
+    }
+}
+
+// ── Dashboard operacional (PayCore) ───────────────────────────────────────────
+$mostrarDashboardOperacional = $app->session->canModule('pos') || $app->session->canModule('stock');
+$operacional = [];
+$erroOperacional = null;
+$graficoLabels = [];
+$graficoValores = [];
+
+if ($mostrarDashboardOperacional) {
+    try {
+        $operacional = $app->payCoreDashboard->summary();
+        $sessoes = $app->payCoreDashboard->cashDrawers(5);
+        $alertas = $app->payCoreDashboard->lowStock(5);
+        $transacoes = $app->payCoreDashboard->recentTransactions(5);
+
+        // Dados para o gráfico dos últimos 7 dias
+        for ($i = 6; $i >= 0; $i--) {
+            $dia = date('Y-m-d', strtotime("-$i days"));
+            $graficoLabels[] = date('d/m', strtotime($dia));
+            $report = $app->payCoreDashboard->transactionReport($dia, $dia);
+            $graficoValores[] = (float) ($report['summary']['netTotal'] ?? 0);
+        }
+    } catch (\Throwable $e) {
+        $erroOperacional = $e->getMessage();
     }
 }
 
@@ -115,6 +139,178 @@ include dirname(__DIR__) . '/layouts/top.php';
         </p>
     </div>
 </div>
+
+<?php if ($mostrarDashboardOperacional): ?>
+<?php if ($erroOperacional): ?>
+<div class="adm-alert adm-alert--error" style="margin-bottom:var(--adm-sp-5)">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    <span>Erro ao carregar dashboard operacional: <?= htmlspecialchars($erroOperacional) ?></span>
+</div>
+<?php endif; ?>
+
+<!-- ── KPIs operacionais ─────────────────────────────────────────────────── -->
+<div class="adm-stats-grid" style="margin-bottom:var(--adm-sp-6)">
+    <div class="adm-stat-card">
+        <div class="adm-stat-icon adm-stat-icon--green"><i class="fa-solid fa-cash-register" style="font-size:1rem"></i></div>
+        <div class="adm-stat-info">
+            <div class="adm-stat-num"><?= number_format((float) ($operacional['vendas_hoje'] ?? 0), 2) ?> MZN</div>
+            <div class="adm-stat-label">Vendas hoje</div>
+        </div>
+    </div>
+    <div class="adm-stat-card">
+        <div class="adm-stat-icon adm-stat-icon--blue"><i class="fa-solid fa-calendar-check" style="font-size:1rem"></i></div>
+        <div class="adm-stat-info">
+            <div class="adm-stat-num"><?= number_format((float) ($operacional['vendas_mes'] ?? 0), 2) ?> MZN</div>
+            <div class="adm-stat-label">Vendas este mês</div>
+        </div>
+    </div>
+    <div class="adm-stat-card">
+        <div class="adm-stat-icon adm-stat-icon--yellow"><i class="fa-solid fa-receipt" style="font-size:1rem"></i></div>
+        <div class="adm-stat-info">
+            <div class="adm-stat-num"><?= (int) ($operacional['transacoes_hoje'] ?? 0) ?></div>
+            <div class="adm-stat-label">Transações hoje</div>
+        </div>
+    </div>
+    <div class="adm-stat-card">
+        <div class="adm-stat-icon adm-stat-icon--red"><i class="fa-solid fa-triangle-exclamation" style="font-size:1rem"></i></div>
+        <div class="adm-stat-info">
+            <div class="adm-stat-num"><?= count($alertas ?? []) ?></div>
+            <div class="adm-stat-label">Alertas de stock</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Gráfico + métodos de pagamento ─────────────────────────────────────── -->
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:var(--adm-sp-6);margin-bottom:var(--adm-sp-8);align-items:start">
+    <div class="adm-card">
+        <div class="adm-card-header">
+            <h2 class="adm-card-title">Vendas dos últimos 7 dias</h2>
+        </div>
+        <div class="adm-card-body">
+            <canvas id="salesChart" height="120"></canvas>
+        </div>
+    </div>
+
+    <div class="adm-card">
+        <div class="adm-card-header">
+            <h2 class="adm-card-title">Pagamentos hoje</h2>
+        </div>
+        <div class="adm-card-body">
+            <?php if (!empty($operacional['por_metodo'])): ?>
+            <div style="display:flex;flex-direction:column;gap:var(--adm-sp-3)">
+                <?php foreach ($operacional['por_metodo'] as $metodo): ?>
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                    <span class="adm-text-sm adm-fw-600"><?= htmlspecialchars($metodo['method'] ?? '—') ?></span>
+                    <span class="adm-text-sm"><?= number_format((float) ($metodo['total'] ?? 0), 2) ?> MZN</span>
+                </div>
+                <div style="height:6px;background:var(--adm-gray-100);border-radius:99px;overflow:hidden">
+                    <div style="height:100%;width:<?= min(100, (int) (($metodo['total'] / max(1, $operacional['vendas_hoje'] ?? 1)) * 100)) ?>%;background:var(--adm-green)"></div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <?php else: ?>
+            <div class="adm-empty" style="padding:var(--adm-sp-6)">
+                <p class="adm-empty-title">Sem vendas hoje</p>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- ── Tabelas operacionais ───────────────────────────────────────────────── -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--adm-sp-6);margin-bottom:var(--adm-sp-8);align-items:start">
+    <div class="adm-card">
+        <div class="adm-card-header" style="justify-content:space-between">
+            <h2 class="adm-card-title">Últimas transações</h2>
+            <a href="/nexora/pos/vendas" class="adm-btn adm-btn-outline adm-btn-sm">Ver todas</a>
+        </div>
+        <div class="adm-card-body" style="padding:0">
+            <?php if (!empty($transacoes)): ?>
+            <div class="adm-table-wrap">
+                <table class="adm-table">
+                    <thead><tr><th>Ref.</th><th>Total</th><th>Método</th><th>Hora</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($transacoes as $t): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($t['reference'] ?? '—') ?></td>
+                        <td class="adm-fw-600"><?= number_format((float) ($t['total'] ?? 0), 2) ?> MZN</td>
+                        <td><span class="adm-badge adm-badge--gray"><?= htmlspecialchars($t['payment_method'] ?? '—') ?></span></td>
+                        <td class="adm-text-muted"><?= !empty($t['timestamp']) ? date('H:i', (int) ($t['timestamp'] / 1000)) : '—' ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <div class="adm-empty" style="padding:var(--adm-sp-6)">
+                <p class="adm-empty-title">Sem transações recentes</p>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="adm-card">
+        <div class="adm-card-header" style="justify-content:space-between">
+            <h2 class="adm-card-title">Sessões de caixa</h2>
+            <a href="/nexora/pos/sessoes" class="adm-btn adm-btn-outline adm-btn-sm">Ver todas</a>
+        </div>
+        <div class="adm-card-body" style="padding:0">
+            <?php if (!empty($sessoes)): ?>
+            <div class="adm-table-wrap">
+                <table class="adm-table">
+                    <thead><tr><th>Operador</th><th>Estado</th><th>Abertura</th></tr></thead>
+                    <tbody>
+                    <?php foreach ($sessoes as $s): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($s['opened_by_name'] ?? '—') ?></td>
+                        <td>
+                            <?php if (($s['status'] ?? '') === 'OPEN'): ?>
+                            <span class="adm-badge adm-badge--green">Aberta</span>
+                            <?php else: ?>
+                            <span class="adm-badge adm-badge--gray">Fechada</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="adm-text-muted"><?= !empty($s['opened_at']) ? date('d/m/y H:i', strtotime($s['opened_at'])) : '—' ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <div class="adm-empty" style="padding:var(--adm-sp-6)">
+                <p class="adm-empty-title">Sem sessões de caixa</p>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<?php if (!empty($alertas)): ?>
+<div class="adm-card" style="margin-bottom:var(--adm-sp-8)">
+    <div class="adm-card-header" style="justify-content:space-between">
+        <h2 class="adm-card-title">Alertas de stock baixo</h2>
+        <a href="/nexora/stock" class="adm-btn adm-btn-outline adm-btn-sm">Ver stock</a>
+    </div>
+    <div class="adm-card-body" style="padding:0">
+        <div class="adm-table-wrap">
+            <table class="adm-table">
+                <thead><tr><th>Produto</th><th>SKU</th><th>Stock actual</th><th>Mínimo</th></tr></thead>
+                <tbody>
+                <?php foreach ($alertas as $a): ?>
+                <tr>
+                    <td><?= htmlspecialchars($a['name'] ?? '—') ?></td>
+                    <td class="adm-text-muted"><?= htmlspecialchars($a['sku'] ?? '—') ?></td>
+                    <td><span class="adm-badge adm-badge--red"><?= (int) ($a['stock'] ?? 0) ?></span></td>
+                    <td class="adm-text-muted"><?= (int) ($a['min_stock'] ?? 0) ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<?php endif; // dashboard operacional ?>
 
 <?php if ($app->session->can('recrutamento', 'ver_vagas')): ?>
 <!-- ── Stats de Recrutamento ─────────────────────────────────────────────── -->
@@ -265,6 +461,40 @@ include dirname(__DIR__) . '/layouts/top.php';
         <?php endif; ?>
     </div>
 </div>
+<?php endif; ?>
+
+<?php if ($mostrarDashboardOperacional): ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+    const ctx = document.getElementById('salesChart');
+    if (!ctx) return;
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: <?= json_encode($graficoLabels) ?>,
+            datasets: [{
+                label: 'Vendas (MZN)',
+                data: <?= json_encode($graficoValores) ?>,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16,185,129,0.1)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 4,
+                pointBackgroundColor: '#10b981'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+})();
+</script>
 <?php endif; ?>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>

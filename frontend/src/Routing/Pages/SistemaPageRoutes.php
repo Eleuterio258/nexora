@@ -28,6 +28,9 @@ final class SistemaPageRoutes
             // Administração
             'utilizadores'         => ['path' => '/nexora/admin/utilizadores', 'view' => 'utilizadores.php', 'permission' => 'autorizacao'],
             'utilizador_form'      => ['path' => '/nexora/admin/utilizadores/form', 'view' => 'utilizador_form.php', 'permission' => 'autorizacao'],
+            'utilizador_detalhe'   => ['path' => '/nexora/admin/utilizadores/ver', 'view' => 'utilizador_detalhe.php', 'permission' => 'autorizacao'],
+            'terminais_admin'      => ['path' => '/nexora/admin/terminais', 'view' => 'terminais_admin.php', 'permission' => 'autorizacao'],
+            'terminal_admin_form'  => ['path' => '/nexora/admin/terminais/form', 'view' => 'terminal_admin_form.php', 'permission' => 'autorizacao'],
             'cargos'               => ['path' => '/nexora/admin/cargos', 'view' => 'cargos.php', 'permission' => 'autorizacao'],
             'cargo_form'           => ['path' => '/nexora/admin/cargos/form', 'view' => 'cargo_form.php', 'permission' => 'autorizacao'],
             'empresa'              => ['path' => '/nexora/admin/empresa', 'view' => 'empresa.php', 'permission' => 'empresa'],

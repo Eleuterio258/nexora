@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 $search = $app->request->queryString('search');
 $status = $app->request->queryString('status');

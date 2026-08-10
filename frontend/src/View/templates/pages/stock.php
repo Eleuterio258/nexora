@@ -1,159 +1,157 @@
 <?php
+
 declare(strict_types=1);
 
-$pageTitle = 'Gestão de Stock';
+if (!$app->session->canModule('stock')) {
+    header('Location: /nexora');
+    exit;
+}
+
+$erro = null;
+$totalProdutos = 0;
+$alertas = [];
+$produtos = [];
+
+try {
+    $produtos = $app->payCoreStockProduct->list();
+    $totalProdutos = count($produtos);
+    $alertas = $app->payCoreStockProduct->lowStock();
+} catch (\Throwable $e) {
+    $erro = $e->getMessage();
+}
+
+$pageTitle  = 'Gestão de Stock';
 $activePage = 'stock';
 $breadcrumb = [['Admin', '/nexora/'], ['Gestão de Stock', '']];
 
-$warehouseFields = [
-    ['name' => 'codigo', 'label' => 'Código', 'required' => true],
-    ['name' => 'nome', 'label' => 'Nome', 'required' => true],
-    ['name' => 'endereco', 'label' => 'Endereço'],
-    ['name' => 'responsavel', 'label' => 'Responsável'],
-];
-$productWarehouseFields = [
-    ['name' => 'product_id', 'label' => 'ID do produto', 'type' => 'number', 'required' => true],
-    ['name' => 'warehouse_id', 'label' => 'ID do armazém', 'type' => 'number', 'required' => true],
-];
+include dirname(__DIR__) . '/layouts/top.php';
+?>
 
-$workspace = [
-    'title' => 'Gestão de Stock',
-    'subtitle' => 'Armazéns, movimentos, reservas, lotes, séries, contagens e alertas.',
-    'endpoint' => '/nexora/api/stock_operacao',
-    'resources' => [
-        'warehouses' => [
-            'label' => 'Armazéns', 'path' => '/api/stock/warehouses',
-            'columns' => [['codigo|id', 'Código'], ['nome', 'Nome'], ['endereco', 'Endereço'], ['ativo|status', 'Estado']],
-            'create' => ['operation' => 'warehouse.create', 'label' => 'Novo armazém', 'fields' => $warehouseFields],
-            'actions' => [
-                ['operation' => 'warehouse.update', 'label' => 'Editar', 'fields' => $warehouseFields],
-                ['operation' => 'warehouse.activate', 'label' => 'Activar'],
-                ['operation' => 'warehouse.deactivate', 'label' => 'Desactivar', 'confirm' => 'Desactivar este armazém?'],
-            ],
-        ],
-        'locations' => [
-            'label' => 'Localizações', 'path' => null,
-            'description' => 'Crie corredores, prateleiras e outras localizações dentro de um armazém.',
-            'create' => ['operation' => 'location.create', 'label' => 'Nova localização', 'fields' => [
-                ['name' => 'warehouse_id', 'label' => 'ID do armazém', 'type' => 'number', 'required' => true],
-                ['name' => 'codigo', 'label' => 'Código', 'required' => true],
-                ['name' => 'nome', 'label' => 'Nome'],
-                ['name' => 'tipo', 'label' => 'Tipo', 'type' => 'select', 'options' => ['corredor', 'prateleira', 'zona', 'outro']],
-            ]],
-        ],
-        'items' => [
-            'label' => 'Posição', 'path' => '/api/stock/items',
-            'columns' => [['product_name|product_id', 'Produto'], ['warehouse_name|warehouse_id', 'Armazém'], ['quantidade|quantity', 'Quantidade'], ['reservado|reserved_quantity', 'Reservado'], ['stock_minimo|minimum_stock', 'Mínimo']],
-            'create' => ['operation' => 'item.create', 'label' => 'Inicializar stock', 'fields' => array_merge($productWarehouseFields, [
-                ['name' => 'quantidade', 'label' => 'Quantidade inicial', 'type' => 'number'],
-            ])],
-            'actions' => [[
-                'operation' => 'item.minimum', 'label' => 'Definir limites', 'fields' => [
-                    ['name' => 'stock_minimo', 'label' => 'Stock mínimo', 'type' => 'number', 'required' => true],
-                    ['name' => 'stock_maximo', 'label' => 'Stock máximo', 'type' => 'number'],
-                ],
-            ]],
-        ],
-        'movements' => [
-            'label' => 'Movimentos', 'path' => '/api/stock/movements',
-            'columns' => [['id', 'ID'], ['product_name|product_id', 'Produto'], ['warehouse_name|warehouse_id', 'Armazém'], ['tipo|type', 'Tipo'], ['quantidade|quantity', 'Quantidade'], ['created_at|data', 'Data']],
-            'create' => ['operation' => 'movement.create', 'label' => 'Novo movimento', 'fields' => array_merge($productWarehouseFields, [
-                ['name' => 'tipo', 'label' => 'Tipo', 'type' => 'select', 'options' => ['entrada', 'saida'], 'required' => true],
-                ['name' => 'quantidade', 'label' => 'Quantidade', 'type' => 'number', 'required' => true],
-                ['name' => 'motivo', 'label' => 'Motivo', 'type' => 'textarea'],
-            ])],
-        ],
-        'adjustments' => [
-            'label' => 'Ajustes', 'path' => '/api/stock/adjustments',
-            'columns' => [['id', 'ID'], ['product_name|product_id', 'Produto'], ['warehouse_name|warehouse_id', 'Armazém'], ['tipo', 'Tipo'], ['quantidade', 'Quantidade'], ['motivo', 'Motivo']],
-            'create' => ['operation' => 'adjustment.create', 'label' => 'Novo ajuste', 'fields' => array_merge($productWarehouseFields, [
-                ['name' => 'tipo', 'label' => 'Tipo', 'type' => 'select', 'options' => ['positivo', 'negativo'], 'required' => true],
-                ['name' => 'quantidade', 'label' => 'Quantidade', 'type' => 'number', 'required' => true],
-                ['name' => 'motivo', 'label' => 'Motivo', 'type' => 'textarea', 'required' => true],
-            ])],
-        ],
-        'transfers' => [
-            'label' => 'Transferências', 'path' => '/api/stock/transfers',
-            'columns' => [['numero|id', 'Número'], ['source_warehouse_name|warehouse_origem_id', 'Origem'], ['destination_warehouse_name|warehouse_destino_id', 'Destino'], ['status', 'Estado'], ['created_at|data', 'Data']],
-            'create' => ['operation' => 'transfer.create', 'label' => 'Nova transferência', 'fields' => [
-                ['name' => 'warehouse_origem_id', 'label' => 'ID armazém de origem', 'type' => 'number', 'required' => true],
-                ['name' => 'warehouse_destino_id', 'label' => 'ID armazém de destino', 'type' => 'number', 'required' => true],
-                ['name' => 'observacoes', 'label' => 'Observações', 'type' => 'textarea'],
-            ]],
-            'actions' => [
-                ['operation' => 'transfer.confirm', 'label' => 'Confirmar'],
-                ['operation' => 'transfer.receive', 'label' => 'Receber'],
-                ['operation' => 'transfer.cancel', 'label' => 'Cancelar', 'confirm' => 'Cancelar esta transferência?'],
-            ],
-        ],
-        'reservations' => [
-            'label' => 'Reservas', 'path' => '/api/stock/reservations',
-            'columns' => [['id', 'ID'], ['product_name|product_id', 'Produto'], ['warehouse_name|warehouse_id', 'Armazém'], ['quantidade|quantity', 'Quantidade'], ['reference_type', 'Referência'], ['status', 'Estado']],
-            'create' => ['operation' => 'reservation.create', 'label' => 'Nova reserva', 'fields' => array_merge($productWarehouseFields, [
-                ['name' => 'quantidade', 'label' => 'Quantidade', 'type' => 'number', 'required' => true],
-                ['name' => 'reference_type', 'label' => 'Tipo de referência', 'required' => true],
-                ['name' => 'reference_id', 'label' => 'ID da referência', 'type' => 'number', 'required' => true],
-            ])],
-            'actions' => [
-                ['operation' => 'reservation.release', 'label' => 'Liberar'],
-                ['operation' => 'reservation.consume', 'label' => 'Consumir'],
-            ],
-        ],
-        'batches' => [
-            'label' => 'Lotes', 'path' => '/api/stock/batches',
-            'columns' => [['numero|batch_number', 'Lote'], ['product_name|product_id', 'Produto'], ['warehouse_name|warehouse_id', 'Armazém'], ['quantidade|quantity', 'Quantidade'], ['validade|expiry_date', 'Validade']],
-            'create' => ['operation' => 'batch.create', 'label' => 'Novo lote', 'fields' => array_merge($productWarehouseFields, [
-                ['name' => 'numero', 'label' => 'Número do lote', 'required' => true],
-                ['name' => 'fabricacao', 'label' => 'Fabricação', 'type' => 'date'],
-                ['name' => 'validade', 'label' => 'Validade', 'type' => 'date'],
-                ['name' => 'quantidade', 'label' => 'Quantidade', 'type' => 'number', 'required' => true],
-            ])],
-        ],
-        'serials' => [
-            'label' => 'Números de série', 'path' => '/api/stock/serials',
-            'columns' => [['serial|numero_serie', 'Número'], ['product_name|product_id', 'Produto'], ['warehouse_name|warehouse_id', 'Armazém'], ['status', 'Estado']],
-            'create' => ['operation' => 'serial.create', 'label' => 'Novo número de série', 'fields' => array_merge($productWarehouseFields, [
-                ['name' => 'serial', 'label' => 'Número de série', 'required' => true],
-            ])],
-            'actions' => [[
-                'operation' => 'serial.status', 'label' => 'Alterar estado', 'fields' => [
-                    ['name' => 'status', 'label' => 'Estado', 'type' => 'select', 'options' => ['disponivel', 'reservado', 'vendido', 'devolvido'], 'required' => true],
-                ],
-            ]],
-        ],
-        'counts' => [
-            'label' => 'Contagens', 'path' => '/api/stock/counts',
-            'columns' => [['numero|id', 'Número'], ['warehouse_name|warehouse_id', 'Armazém'], ['status', 'Estado'], ['created_at|data_inicio', 'Início'], ['divergencias|items', 'Itens']],
-            'create' => ['operation' => 'count.create', 'label' => 'Iniciar contagem', 'fields' => [
-                ['name' => 'warehouse_id', 'label' => 'ID do armazém', 'type' => 'number', 'required' => true],
-                ['name' => 'observacoes', 'label' => 'Observações', 'type' => 'textarea'],
-            ]],
-            'actions' => [
-                ['operation' => 'count.item.create', 'label' => 'Lançar item', 'fields' => [
-                    ['name' => 'product_id', 'label' => 'ID do produto', 'type' => 'number', 'required' => true],
-                    ['name' => 'quantidade_contada', 'label' => 'Quantidade contada', 'type' => 'number', 'required' => true],
-                ]],
-                ['operation' => 'count.close', 'label' => 'Fechar', 'confirm' => 'Fechar a contagem e gerar os ajustes?'],
-                ['operation' => 'count.cancel', 'label' => 'Cancelar', 'confirm' => 'Cancelar esta contagem?'],
-            ],
-        ],
-        'alerts' => [
-            'label' => 'Alertas', 'path' => '/api/stock/alerts',
-            'columns' => [['id', 'ID'], ['alert_type|tipo', 'Tipo'], ['product_name|product_id', 'Produto'], ['warehouse_name|warehouse_id', 'Armazém'], ['message|mensagem', 'Mensagem'], ['status', 'Estado']],
-            'actions' => [
-                ['operation' => 'alert.resolve', 'label' => 'Resolver'],
-                ['operation' => 'alert.ignore', 'label' => 'Ignorar'],
-            ],
-        ],
-        'low_stock' => [
-            'label' => 'Stock crítico', 'path' => '/api/stock/reports/low-stock',
-            'columns' => [['product_name|product_id', 'Produto'], ['warehouse_name|warehouse_id', 'Armazém'], ['quantidade|quantity', 'Quantidade'], ['stock_minimo|minimum_stock', 'Mínimo']],
-        ],
-        'valuation' => [
-            'label' => 'Valorização', 'path' => '/api/stock/reports/valuation',
-            'columns' => [['product_name|product_id', 'Produto'], ['warehouse_name|warehouse_id', 'Armazém'], ['quantidade|quantity', 'Quantidade'], ['custo_medio|average_cost', 'Custo médio'], ['valor|valuation', 'Valor']],
-        ],
-    ],
-];
+<div class="adm-page-header">
+    <h1 class="adm-page-title">Gestão de Stock</h1>
+    <div class="adm-page-header-actions">
+        <a href="<?= htmlspecialchars($app->routes->path('produtos')) ?>" class="adm-btn adm-btn-outline">
+            <i class="fa-solid fa-boxes-stacked"></i> Produtos
+        </a>
+        <a href="<?= htmlspecialchars($app->routes->path('produto_form')) ?>" class="adm-btn adm-btn-primary">
+            <i class="fa-solid fa-plus"></i> Novo Produto
+        </a>
+    </div>
+</div>
 
-include dirname(__DIR__) . '/partials/operational_workspace.php';
+<?php if ($erro): ?>
+<div class="adm-alert adm-alert--error" style="margin-bottom:var(--adm-sp-5)">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    <span><?= htmlspecialchars($erro) ?></span>
+</div>
+<?php endif; ?>
+
+<div class="adm-stats-grid" style="margin-bottom:var(--adm-sp-6)">
+    <div class="adm-stat-card">
+        <div class="adm-stat-icon adm-stat-icon--blue"><i class="fa-solid fa-boxes-stacked" style="font-size:1rem"></i></div>
+        <div class="adm-stat-info">
+            <div class="adm-stat-num"><?= $totalProdutos ?></div>
+            <div class="adm-stat-label">Produtos</div>
+        </div>
+    </div>
+    <div class="adm-stat-card">
+        <div class="adm-stat-icon adm-stat-icon--red"><i class="fa-solid fa-triangle-exclamation" style="font-size:1rem"></i></div>
+        <div class="adm-stat-info">
+            <div class="adm-stat-num"><?= count($alertas) ?></div>
+            <div class="adm-stat-label">Alertas de stock</div>
+        </div>
+    </div>
+    <div class="adm-stat-card">
+        <div class="adm-stat-icon adm-stat-icon--green"><i class="fa-solid fa-check-circle" style="font-size:1rem"></i></div>
+        <div class="adm-stat-info">
+            <div class="adm-stat-num"><?= count(array_filter($produtos, static fn(array $p): bool => ($p['active'] ?? false))) ?></div>
+            <div class="adm-stat-label">Produtos activos</div>
+        </div>
+    </div>
+    <div class="adm-stat-card">
+        <div class="adm-stat-icon adm-stat-icon--yellow"><i class="fa-solid fa-rotate" style="font-size:1rem"></i></div>
+        <div class="adm-stat-info">
+            <div class="adm-stat-num"><?= count(array_filter($produtos, static fn(array $p): bool => ($p['stock'] ?? 0) === 0)) ?></div>
+            <div class="adm-stat-label">Sem stock</div>
+        </div>
+    </div>
+</div>
+
+<div class="adm-card" style="margin-bottom:var(--adm-sp-6)">
+    <div class="adm-card-header" style="justify-content:space-between">
+        <h2 class="adm-card-title">Alertas de stock baixo</h2>
+        <a href="<?= htmlspecialchars($app->routes->path('stock_alertas')) ?>" class="adm-btn adm-btn-outline adm-btn-sm">Ver todos</a>
+    </div>
+    <div class="adm-card-body" style="padding:0">
+        <?php if (!empty($alertas)): ?>
+        <div class="adm-table-wrap">
+            <table class="adm-table">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>SKU</th>
+                        <th>Stock actual</th>
+                        <th>Stock mínimo</th>
+                        <th>Diferença</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach (array_slice($alertas, 0, 10) as $a):
+                    $diff = (int) ($a['stock'] ?? 0) - (int) ($a['min_stock'] ?? 0);
+                ?>
+                    <tr>
+                        <td><?= htmlspecialchars($a['name'] ?? '—') ?></td>
+                        <td class="adm-text-muted"><?= htmlspecialchars($a['sku'] ?? '—') ?></td>
+                        <td><span class="adm-badge adm-badge--red"><?= (int) ($a['stock'] ?? 0) ?></span></td>
+                        <td class="adm-text-muted"><?= (int) ($a['min_stock'] ?? 0) ?></td>
+                        <td class="adm-text-red adm-fw-600"><?= $diff ?></td>
+                        <td>
+                            <a href="<?= htmlspecialchars($app->routes->path('produto_detalhe', ['id' => $a['id'] ?? ''])) ?>" class="adm-btn adm-btn-ghost adm-btn-icon adm-btn-sm" title="Ajustar stock">
+                                <i class="fa-solid fa-sliders"></i>
+                            </a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php else: ?>
+        <div class="adm-empty" style="padding:var(--adm-sp-8)">
+            <i class="fa-solid fa-check-circle" style="font-size:2rem;opacity:.2"></i>
+            <p class="adm-empty-title">Sem alertas de stock</p>
+            <p class="adm-empty-sub">Todos os produtos estão acima do stock mínimo.</p>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<div class="adm-card">
+    <div class="adm-card-header" style="justify-content:space-between">
+        <h2 class="adm-card-title">Atalhos</h2>
+    </div>
+    <div class="adm-card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--adm-sp-4)">
+            <a href="<?= htmlspecialchars($app->routes->path('produtos')) ?>" class="adm-module-card" style="--adm-module-color:#10b98140">
+                <div class="adm-module-card-icon" style="background:#10b98118">
+                    <i class="fa-solid fa-boxes-stacked" style="font-size:1.05rem;color:#10b981"></i>
+                </div>
+                <span class="adm-module-card-label">Produtos</span>
+            </a>
+            <a href="<?= htmlspecialchars($app->routes->path('produto_categorias')) ?>" class="adm-module-card" style="--adm-module-color:#3b82f640">
+                <div class="adm-module-card-icon" style="background:#3b82f618">
+                    <i class="fa-solid fa-tags" style="font-size:1.05rem;color:#3b82f6"></i>
+                </div>
+                <span class="adm-module-card-label">Categorias</span>
+            </a>
+            <a href="<?= htmlspecialchars($app->routes->path('stock_alertas')) ?>" class="adm-module-card" style="--adm-module-color:#ef444440">
+                <div class="adm-module-card-icon" style="background:#ef444418">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size:1.05rem;color:#ef4444"></i>
+                </div>
+                <span class="adm-module-card-label">Alertas</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>

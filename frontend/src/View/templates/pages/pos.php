@@ -261,6 +261,15 @@ html, body { height:100%; overflow:hidden; font-family:'Plus Jakarta Sans',sans-
 
 /* Scrollbars finos */
 ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-track { background:transparent; } ::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:2px; }
+
+/* ── Modal pagamento movel ───────────────────────────────────────────────── */
+#mobilePaymentModal .adm-modal-content { border-radius:14px; }
+.pos-mp-status {
+    padding:12px 14px; border-radius:8px; font-size:13px; font-weight:600; text-align:center;
+}
+.pos-mp-status--pending { background:#fef3c7; color:#92400e; }
+.pos-mp-status--success { background:#d1fae5; color:#065f46; }
+.pos-mp-status--error   { background:#fee2e2; color:#991b1b; }
 </style>
 </head>
 <body>
@@ -445,6 +454,44 @@ html, body { height:100%; overflow:hidden; font-family:'Plus Jakarta Sans',sans-
 
 </div> <!-- /pos-body -->
 </div> <!-- /pos-wrap -->
+
+<!-- Modal de pagamento movel -->
+<div class="adm-modal-overlay" id="mobilePaymentModal">
+    <div class="adm-modal-content" style="max-width:420px;width:100%">
+        <div class="adm-modal-header">
+            <h3><i class="fa-solid fa-mobile-screen"></i> Pagar com <span id="mpGateway">M-Pesa</span></h3>
+            <button type="button" class="adm-btn adm-btn-ghost adm-btn-icon adm-btn-sm" onclick="fecharModalPagamentoMovel()">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div style="padding:var(--adm-sp-6)">
+            <div style="text-align:center;margin-bottom:var(--adm-sp-5)">
+                <div class="adm-text-sm adm-text-muted">Total a pagar</div>
+                <div style="font-size:1.6rem;font-weight:700;color:var(--adm-gray-900)" id="mpTotal">0,00 MT</div>
+            </div>
+
+            <div class="adm-form-group">
+                <label class="adm-label" for="mpPhone">Numero do telefone</label>
+                <input type="tel" id="mpPhone" class="adm-input" placeholder="84/85/86/87 123 4567" maxlength="12">
+                <p class="adm-input-hint">Introduza o numero associado a conta <span class="mpGatewayLabel">M-Pesa</span>.</p>
+            </div>
+
+            <div class="adm-form-group">
+                <label class="adm-label" for="mpReference">Referencia / Codigo (opcional)</label>
+                <input type="text" id="mpReference" class="adm-input" placeholder="Codigo da transacao">
+            </div>
+
+            <div class="pos-mp-status" id="mpStatus" style="display:none;margin-bottom:var(--adm-sp-4)"></div>
+
+            <div class="adm-modal-footer" style="padding:0;border:none;justify-content:space-between">
+                <button type="button" class="adm-btn adm-btn-outline" onclick="fecharModalPagamentoMovel()">Cancelar</button>
+                <button type="button" class="adm-btn adm-btn-primary" id="btnConfirmarMP" onclick="confirmarPagamentoMovel()">
+                    <i class="fa-solid fa-check"></i> Confirmar pagamento
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div id="posToast" class="pos-toast"></div>
 
@@ -658,20 +705,145 @@ function aplicarDesconto() {
     showToast('Desconto de ' + d + '% aplicado');
 }
 
+// ── Pagamento móvel ────────────────────────────────────────────────────────
+let pollingTimer = null;
+
+function isMobilePayment(method) {
+    return ['M-Pesa','E-Mola'].includes(method);
+}
+
+function abrirModalPagamentoMovel() {
+    let total = 0;
+    cart.forEach(item => total += item.quantidade * item.preco_unitario * (1 + item.imposto_percent/100));
+    document.getElementById('mpTotal').textContent = fmt(total) + ' MT';
+    document.getElementById('mpGateway').textContent = metodoAtual;
+    document.getElementById('mpPhone').value = '';
+    document.getElementById('mpReference').value = '';
+    document.getElementById('mpStatus').className = 'pos-mp-status';
+    document.getElementById('mpStatus').textContent = 'Aguarda confirmacao do cliente.';
+    document.getElementById('mpStatus').style.display = 'none';
+    document.getElementById('mobilePaymentModal').classList.add('open');
+    document.getElementById('mpPhone').focus();
+}
+
+async function confirmarPagamentoMovel() {
+    const phone = document.getElementById('mpPhone').value.trim();
+    const manualRef = document.getElementById('mpReference').value.trim();
+    if (!/^\d{9,12}$/.test(phone)) { showToast('Numero de telefone invalido', 'error'); return; }
+
+    let total = 0;
+    cart.forEach(item => total += item.quantidade * item.preco_unitario * (1 + item.imposto_percent/100));
+
+    const items = cart.map(item => ({
+        name: item.nome,
+        quantity: item.quantidade,
+        price: item.preco_unitario,
+        discount: 0,
+    }));
+
+    const btn = document.getElementById('btnConfirmarMP');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A iniciar…';
+
+    try {
+        const res = await fetch('/nexora/api/v1/pos/pagamentos/iniciar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                gateway: metodoAtual,
+                phone: phone,
+                reference: manualRef || null,
+                amount: total,
+                items: items,
+                csrf: CSRF
+            })
+        });
+        const data = await res.json();
+        if (!data.ok) {
+            showToast(data.erro || 'Erro ao iniciar pagamento', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar pagamento';
+            return;
+        }
+
+        const statusEl = document.getElementById('mpStatus');
+        statusEl.style.display = 'block';
+        statusEl.className = 'pos-mp-status pos-mp-status--pending';
+        statusEl.textContent = 'A aguardar confirmacao…';
+
+        iniciarPollingPagamento(data.reference || manualRef);
+    } catch {
+        showToast('Erro de ligacao', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar pagamento';
+    }
+}
+
+function iniciarPollingPagamento(reference) {
+    if (pollingTimer) clearInterval(pollingTimer);
+    const statusEl = document.getElementById('mpStatus');
+    let elapsed = 0;
+    const maxTime = 120000; // 2 minutos
+
+    pollingTimer = setInterval(async () => {
+        elapsed += 3000;
+        if (elapsed > maxTime) {
+            clearInterval(pollingTimer);
+            statusEl.className = 'pos-mp-status pos-mp-status--error';
+            statusEl.textContent = 'Tempo esgotado. Tente novamente.';
+            document.getElementById('btnConfirmarMP').disabled = false;
+            document.getElementById('btnConfirmarMP').innerHTML = '<i class="fa-solid fa-rotate-right"></i> Tentar novamente';
+            return;
+        }
+
+        try {
+            const res = await fetch('/nexora/api/v1/pos/pagamentos/status?reference=' + encodeURIComponent(reference));
+            const data = await res.json();
+            if (!data.ok) return;
+
+            if (data.status === 'APPROVED' || data.status === 'concluido') {
+                clearInterval(pollingTimer);
+                statusEl.className = 'pos-mp-status pos-mp-status--success';
+                statusEl.textContent = 'Pagamento confirmado!';
+                document.getElementById('mobilePaymentModal').classList.remove('open');
+                finalizarVendaBackend(reference);
+            } else if (data.status === 'DECLINED' || data.status === 'falhado' || data.status === 'CANCELLED') {
+                clearInterval(pollingTimer);
+                statusEl.className = 'pos-mp-status pos-mp-status--error';
+                statusEl.textContent = 'Pagamento recusado ou cancelado.';
+                document.getElementById('btnConfirmarMP').disabled = false;
+                document.getElementById('btnConfirmarMP').innerHTML = '<i class="fa-solid fa-rotate-right"></i> Tentar novamente';
+            }
+        } catch {}
+    }, 3000);
+}
+
+function fecharModalPagamentoMovel() {
+    if (pollingTimer) clearInterval(pollingTimer);
+    document.getElementById('mobilePaymentModal').classList.remove('open');
+}
+
 // ── Finalizar venda ────────────────────────────────────────────────────────
 async function finalizarVenda() {
     if (!cart.length) { showToast('Carrinho vazio', 'error'); return; }
 
+    if (isMobilePayment(metodoAtual)) {
+        abrirModalPagamentoMovel();
+        return;
+    }
+
+    await finalizarVendaBackend();
+}
+
+async function finalizarVendaBackend(paymentReference = null) {
     let subtotal = 0;
     cart.forEach(item => subtotal += item.quantidade * item.preco_unitario * (1 + item.imposto_percent/100));
 
-    const itens = cart.map(item => ({
-        product_id: item.product_id,
-        product_variant_id: item.product_variant_id,
-        quantidade: item.quantidade,
-        preco_unitario: item.preco_unitario,
-        desconto_percent: 0,
-        imposto_percent: item.imposto_percent,
+    const items = cart.map(item => ({
+        name: item.nome,
+        quantity: item.quantidade,
+        price: item.preco_unitario,
+        discount: 0,
     }));
 
     const btn = document.getElementById('btnFinalizar');
@@ -679,25 +851,27 @@ async function finalizarVenda() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A processar…';
 
     try {
-        const res = await fetch('/nexora/api/pos_venda_save', {
+        const res = await fetch('/nexora/api/v1/pos/vendas', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 pos_session_id: SESSAO_ID,
-                itens,
-                pagamentos: [{ tipo: metodoAtual.toLowerCase().replace(' ','_').replace('ão','ao'), valor: subtotal, referencia: null }],
+                payment_method: metodoAtual,
+                payment_reference: paymentReference,
+                amount: subtotal,
+                items: items,
                 csrf: CSRF
             })
         });
         const data = await res.json();
         if (data.ok) {
-            showToast('✓ Venda ' + (data.numero || '') + ' registada — Troco: ' + fmt(data.troco ?? 0) + ' MT');
+            showToast('✓ Venda ' + (data.reference || '') + ' registada');
             cart = [];
             renderAll();
         } else {
             showToast(data.erro || data.error || 'Erro ao registar venda', 'error');
         }
-    } catch { showToast('Erro de ligação', 'error'); }
+    } catch { showToast('Erro de ligacao', 'error'); }
 
     btn.disabled = false;
     btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Finalizar Venda';

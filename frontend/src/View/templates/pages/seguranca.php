@@ -1,66 +1,35 @@
 <?php
+
 declare(strict_types=1);
+
+if (!$app->session->canModule('seguranca')) {
+    header('Location: /nexora');
+    exit;
+}
 
 $pageTitle  = 'Segurança';
 $activePage = 'seguranca';
 $breadcrumb = [['Admin', '/nexora/'], ['Segurança', '']];
 
-$workspace = [
-    'title'    => 'Segurança',
-    'subtitle' => 'Políticas, MFA e lista de IPs autorizados.',
-    'endpoint' => '/nexora/api/seguranca_operacao',
-    'resources' => [
-        'politicas' => [
-            'label'   => 'Políticas',
-            'path'    => '/api/seguranca/politicas',
-            'columns' => [
-                ['codigo', 'Código'],
-                ['nome',   'Nome'],
-                ['activo', 'Activa'],
-            ],
-            'create' => [
-                'operation' => 'politica.create',
-                'label'     => 'Nova Política',
-                'fields'    => [
-                    ['name' => 'codigo', 'label' => 'Código', 'required' => true],
-                    ['name' => 'nome',   'label' => 'Nome',   'required' => true],
-                ],
-            ],
-            'actions' => [
-                ['operation' => 'politica.update', 'label' => 'Editar'],
-            ],
-        ],
-        'mfa_enrollments' => [
-            'label'   => 'MFA Enrollments',
-            'path'    => '/api/seguranca/mfa-enrollments',
-            'columns' => [
-                ['user_id',    'ID Utilizador'],
-                ['metodo',     'Método'],
-                ['verified',   'Verificado'],
-                ['created_at', 'Criado em'],
-            ],
-        ],
-        'ip_allowlist' => [
-            'label'   => 'IPs Autorizados',
-            'path'    => '/api/seguranca/ip-allowlist',
-            'columns' => [
-                ['ip_or_cidr', 'IP / CIDR'],
-                ['descricao',  'Descrição'],
-                ['activo',     'Activo'],
-            ],
-            'create' => [
-                'operation' => 'ip.add',
-                'label'     => 'Adicionar IP',
-                'fields'    => [
-                    ['name' => 'ip_or_cidr', 'label' => 'IP ou CIDR', 'required' => true],
-                    ['name' => 'descricao',  'label' => 'Descrição'],
-                ],
-            ],
-            'actions' => [
-                ['operation' => 'ip.remove', 'label' => 'Remover', 'confirm' => 'Remover este IP da allowlist?'],
-            ],
-        ],
-    ],
-];
+include dirname(__DIR__) . '/layouts/top.php';
+?>
 
-include dirname(__DIR__) . '/partials/operational_workspace.php';
+<div class="adm-page-header">
+    <h1 class="adm-page-title">Segurança</h1>
+</div>
+
+<div class="adm-card" style="max-width:640px">
+    <div class="adm-card-body" style="text-align:center;padding:var(--adm-sp-12)">
+        <i class="fa-solid fa-shield-halved" style="font-size:3rem;color:var(--adm-gray-300);margin-bottom:var(--adm-sp-4)"></i>
+        <h2 class="adm-empty-title">Módulo em desenvolvimento</h2>
+        <p class="adm-text-sm adm-text-muted" style="margin-bottom:var(--adm-sp-6)">
+            O backend PayCore ainda nao expoe endpoints de politicas de seguranca, roles detalhadas nem sessoes activas.
+            A gestao de utilizadores ja esta disponivel em <a href="<?= htmlspecialchars($app->routes->path('utilizadores')) ?>">Utilizadores</a>.
+        </p>
+        <a href="<?= htmlspecialchars($app->routes->path('utilizadores')) ?>" class="adm-btn adm-btn-primary">
+            <i class="fa-solid fa-users"></i> Gerir utilizadores
+        </a>
+    </div>
+</div>
+
+<?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>

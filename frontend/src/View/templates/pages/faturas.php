@@ -1,207 +1,210 @@
 <?php
 
-    $filtroEstado  = $app->request->queryEnum('status', ['rascunho', 'emitida', 'parcialmente_paga', 'paga', 'cancelada', 'vencida']);
-    $filtroCliente = $app->request->queryInt('customer_id', 0) ?: 0;
+declare(strict_types=1);
 
-    $query = ['limit' => 100];
-    if ($filtroEstado)  $query['status']      = $filtroEstado;
-    if ($filtroCliente) $query['customer_id'] = $filtroCliente;
+if (!$app->session->canModule('faturacao')) {
+    header('Location: /nexora');
+    exit;
+}
 
-    $resp    = $app->nexora->call('GET', '/api/faturacao/invoices', null, $query);
-    $faturas = $resp['body']['data'] ?? [];
+$erro = null;
+$sucesso = null;
+$transacoes = [];
 
-    $clientesResp = $app->nexora->call('GET', '/api/clientes', null, ['limit' => 200]);
-    $clientes     = $clientesResp['body']['data'] ?? [];
-    $clienteNomes = array_column($clientes, 'nome', 'id');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['acao'])) {
+    try {
+        $app->security->validateCsrf($_POST['csrf_token'] ?? '');
 
-    $estadoBadges = [
-        'rascunho'          => ['adm-badge--gray',   'Rascunho'],
-        'emitida'           => ['adm-badge--blue',   'Emitida'],
-        'parcialmente_paga' => ['adm-badge--yellow', 'Parcialmente Paga'],
-        'paga'              => ['adm-badge--green',  'Paga'],
-        'cancelada'         => ['adm-badge--red',    'Cancelada'],
-        'vencida'           => ['adm-badge--indigo', 'Vencida'],
-    ];
+        $acao = $_POST['acao'];
+        $id = $_POST['id'] ?? '';
+        $reason = $_POST['reason'] ?? '';
 
-    $tipoBadges = [
-        'normal'   => ['adm-badge--gray',   'Fatura'],
-        'proforma' => ['adm-badge--indigo', 'Pró-forma'],
-    ];
+        if ($acao === 'cancelar') {
+            $app->payCoreInvoicing->cancel($id, $reason);
+            $sucesso = 'Transaccao cancelada com sucesso.';
+        } elseif ($acao === 'estornar') {
+            $app->payCoreInvoicing->reverse($id, $reason);
+            $sucesso = 'Transaccao estornada com sucesso.';
+        }
+    } catch (\Throwable $e) {
+        $erro = $e->getMessage();
+    }
+}
 
-    $csrf       = $app->security->csrfToken();
-    $canEmitirFaturas = $app->session->can('faturacao', 'emitir_faturas');
-    $pageTitle  = 'Faturas';
-    $activePage = 'faturas';
-    $breadcrumb = [['Admin', '/nexora/'], ['Faturação', ''], ['Faturas', '']];
+$filtroStatus = $_GET['status'] ?? '';
+$filtroData = $_GET['data'] ?? '';
+$filtroRef = trim($_GET['ref'] ?? '');
 
-    include dirname(__DIR__) . '/layouts/top.php';
+try {
+    $query = [];
+    if ($filtroStatus !== '') {
+        $query['status'] = $filtroStatus;
+    }
+    if ($filtroData !== '') {
+        $query['date'] = $filtroData;
+    }
+
+    $transacoes = $app->payCoreInvoicing->list($query);
+
+    if ($filtroRef !== '') {
+        $transacoes = array_filter($transacoes, static fn(array $t): bool =>
+            str_contains((string) ($t['reference'] ?? ''), $filtroRef) ||
+            str_contains((string) ($t['id'] ?? ''), $filtroRef)
+        );
+    }
+} catch (\Throwable $e) {
+    $erro = $e->getMessage();
+}
+
+$pageTitle  = 'Documentos de Venda';
+$activePage = 'faturas';
+$breadcrumb = [['Admin', '/nexora/'], ['Faturação', ''], ['Documentos de Venda', '']];
+$csrf       = $app->security->csrfToken();
+
+include dirname(__DIR__) . '/layouts/top.php';
 ?>
 
 <div class="adm-page-header">
-    <h1 class="adm-page-title">Faturas</h1>
-    <?php if ($canEmitirFaturas): ?>
+    <h1 class="adm-page-title">Documentos de Venda</h1>
     <div class="adm-page-header-actions">
-        <a href="<?php echo htmlspecialchars($app->routes->path('fatura_form')) ?>" class="adm-btn adm-btn-primary">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Nova Fatura
-        </a>
+        <span class="adm-text-sm adm-text-muted" style="max-width:320px">
+            O backend PayCore ainda nao tem documentos fiscais. As vendas POS sao apresentadas como documentos de venda.
+        </span>
     </div>
-    <?php endif; ?>
+</div>
+
+<?php if ($erro): ?>
+<div class="adm-alert adm-alert--error" style="margin-bottom:var(--adm-sp-5)">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    <span><?= htmlspecialchars($erro) ?></span>
+</div>
+<?php endif; ?>
+
+<?php if ($sucesso): ?>
+<div class="adm-alert adm-alert--success" style="margin-bottom:var(--adm-sp-5)">
+    <i class="fa-solid fa-check-circle"></i>
+    <span><?= htmlspecialchars($sucesso) ?></span>
+</div>
+<?php endif; ?>
+
+<div class="adm-card" style="margin-bottom:var(--adm-sp-6)">
+    <div class="adm-card-body">
+        <form method="get" action="" class="adm-filter-bar" style="padding:0;background:none;border:none">
+            <div class="adm-form-row" style="gap:var(--adm-sp-3);margin:0;align-items:end">
+                <div class="adm-form-group" style="margin-bottom:0">
+                    <label class="adm-label" for="ref">Referência</label>
+                    <input type="text" id="ref" name="ref" class="adm-input" value="<?= htmlspecialchars($filtroRef) ?>" placeholder="Ex.: TXN-123">
+                </div>
+                <div class="adm-form-group" style="margin-bottom:0">
+                    <label class="adm-label" for="status">Estado</label>
+                    <select id="status" name="status" class="adm-select">
+                        <option value="">Todos</option>
+                        <option value="APPROVED" <?= $filtroStatus === 'APPROVED' ? 'selected' : '' ?>>Aprovado</option>
+                        <option value="PENDING" <?= $filtroStatus === 'PENDING' ? 'selected' : '' ?>>Pendente</option>
+                        <option value="CANCELLED" <?= $filtroStatus === 'CANCELLED' ? 'selected' : '' ?>>Cancelado</option>
+                        <option value="REVERSED" <?= $filtroStatus === 'REVERSED' ? 'selected' : '' ?>>Estornado</option>
+                    </select>
+                </div>
+                <div class="adm-form-group" style="margin-bottom:0">
+                    <label class="adm-label" for="data">Data</label>
+                    <input type="date" id="data" name="data" class="adm-input" value="<?= htmlspecialchars($filtroData) ?>">
+                </div>
+                <button type="submit" class="adm-btn adm-btn-primary">
+                    <i class="fa-solid fa-filter"></i> Filtrar
+                </button>
+                <a href="<?= htmlspecialchars($app->routes->path('faturas')) ?>" class="adm-btn adm-btn-outline">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </a>
+            </div>
+        </form>
+    </div>
 </div>
 
 <div class="adm-card">
-    <div class="adm-filter-bar">
-        <div class="adm-search-wrap">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input class="adm-input" type="search" id="faturaSearch" placeholder="Pesquisar faturas…" oninput="filterTable()">
+    <div class="adm-card-header">
+        <h2 class="adm-card-title">Transacções</h2>
+    </div>
+    <div class="adm-card-body" style="padding:0">
+        <?php if (!empty($transacoes)): ?>
+        <div class="adm-table-wrap">
+            <table class="adm-table">
+                <thead>
+                    <tr>
+                        <th>Referência</th>
+                        <th>Data</th>
+                        <th>Método</th>
+                        <th>Itens</th>
+                        <th>Total</th>
+                        <th>Estado</th>
+                        <th style="width:140px"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($transacoes as $t):
+                    $status = $t['status'] ?? 'UNKNOWN';
+                    $statusClass = match ($status) {
+                        'APPROVED' => 'adm-badge--green',
+                        'PENDING' => 'adm-badge--yellow',
+                        'CANCELLED' => 'adm-badge--red',
+                        'REVERSED' => 'adm-badge--indigo',
+                        default => 'adm-badge--gray',
+                    };
+                    $statusLabel = match ($status) {
+                        'APPROVED' => 'Aprovado',
+                        'PENDING' => 'Pendente',
+                        'CANCELLED' => 'Cancelado',
+                        'REVERSED' => 'Estornado',
+                        default => $status,
+                    };
+                ?>
+                    <tr>
+                        <td class="adm-fw-600"><?= htmlspecialchars($t['reference'] ?? '—') ?></td>
+                        <td class="adm-text-muted"><?= !empty($t['timestamp']) ? date('d/m/Y H:i', (int) ($t['timestamp'] / 1000)) : '—' ?></td>
+                        <td class="adm-text-muted"><?= htmlspecialchars($t['payment_method'] ?? '—') ?></td>
+                        <td class="adm-text-muted"><?= count($t['items'] ?? []) ?></td>
+                        <td class="adm-fw-600"><?= number_format((float) ($t['total'] ?? 0), 2) ?> MZN</td>
+                        <td><span class="adm-badge <?= $statusClass ?>"><?= $statusLabel ?></span></td>
+                        <td>
+                            <div class="adm-actions">
+                                <a href="<?= htmlspecialchars($app->routes->path('fatura_detalhe', ['id' => $t['id'] ?? ''])) ?>" class="adm-btn adm-btn-ghost adm-btn-icon adm-btn-sm" title="Ver detalhes">
+                                    <i class="fa-solid fa-eye"></i>
+                                </a>
+                                <?php if ($status === 'APPROVED' || $status === 'PENDING'): ?>
+                                <button type="button" class="adm-btn adm-btn-ghost adm-btn-icon adm-btn-sm" title="Cancelar" onclick="cancelarTransaccao('<?= htmlspecialchars($t['id'] ?? '') ?>')">
+                                    <i class="fa-solid fa-ban"></i>
+                                </button>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
-        <select class="adm-select" id="faturaEstado" onchange="filterTable()" style="width:180px">
-            <option value="">Todos os estados</option>
-            <?php foreach ($estadoBadges as $key => [$cls, $label]): ?>
-            <option value="<?php echo $key ?>" <?php echo $filtroEstado === $key ? 'selected' : '' ?>><?php echo $label ?></option>
-            <?php endforeach; ?>
-        </select>
-        <select class="adm-select" id="faturaCliente" onchange="filterTable()" style="width:200px">
-            <option value="">Todos os clientes</option>
-            <?php foreach ($clientes as $c): ?>
-            <option value="<?php echo $c['id'] ?>" <?php echo $filtroCliente === (int) $c['id'] ? 'selected' : '' ?>><?php echo htmlspecialchars($c['nome']) ?></option>
-            <?php endforeach; ?>
-        </select>
-        <span class="adm-filter-count" id="faturaCount"><?php echo count($faturas) ?> faturas</span>
-    </div>
-
-    <?php if ($faturas): ?>
-    <div class="adm-table-wrap">
-        <table class="adm-table" id="faturasTable">
-            <thead>
-                <tr>
-                    <th>Número</th>
-                    <th>Cliente</th>
-                    <th>Tipo</th>
-                    <th>Data emissão</th>
-                    <th>Vencimento</th>
-                    <th>Total</th>
-                    <th>Imposto</th>
-                    <th>Estado</th>
-                    <?php if ($canEmitirFaturas): ?><th>Ações</th><?php endif; ?>
-                </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($faturas as $f):
-                    $estadoBadge = $estadoBadges[$f['status']] ?? ['adm-badge--gray', $f['status']];
-                    $tipoBadge   = $tipoBadges[$f['tipo'] ?? 'normal'] ?? ['adm-badge--gray', $f['tipo'] ?? 'normal'];
-                    $clienteNome = $clienteNomes[$f['customer_id']] ?? ('#' . $f['customer_id']);
-            ?>
-            <tr data-estado="<?php echo htmlspecialchars($f['status']) ?>" data-cliente="<?php echo (int) $f['customer_id'] ?>">
-                <td class="adm-fw-600"><?php echo htmlspecialchars($f['numero']) ?></td>
-                <td><?php echo htmlspecialchars($clienteNome) ?></td>
-                <td><span class="adm-badge <?php echo $tipoBadge[0] ?>"><?php echo $tipoBadge[1] ?></span></td>
-                <td class="adm-text-muted"><?php echo $f['invoice_date'] ? date('d/m/Y', strtotime($f['invoice_date'])) : '—' ?></td>
-                <td class="adm-text-muted"><?php echo $f['due_date'] ? date('d/m/Y', strtotime($f['due_date'])) : '—' ?></td>
-                <td class="adm-fw-600"><?php echo number_format((float) $f['total'], 2, ',', '.') ?> <?php echo htmlspecialchars($f['moeda']) ?></td>
-                <td><?php echo number_format((float) $f['imposto_total'], 2, ',', '.') ?></td>
-                <td><span class="adm-badge <?php echo $estadoBadge[0] ?>"><?php echo $estadoBadge[1] ?></span></td>
-                <?php if ($canEmitirFaturas): ?>
-                <td>
-                    <div class="adm-actions">
-                        <a href="<?php echo htmlspecialchars($app->routes->path('fatura_form', ['id' => $f['id']])) ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Ver / Editar">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
-                        </a>
-                        <a href="/nexora/api/fatura_pdf?id=<?php echo $app->id->encode((int) $f['id']) ?>" target="_blank" rel="noopener" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Gerar PDF">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                <polyline points="14 2 14 8 20 8"/>
-                                <line x1="16" y1="13" x2="8" y2="13"/>
-                                <line x1="16" y1="17" x2="8" y2="17"/>
-                                <polyline points="10 9 9 9 8 9"/>
-                            </svg>
-                        </a>
-                        <?php if ($f['status'] === 'rascunho'): ?>
-                        <button class="adm-btn adm-btn-ghost adm-btn-sm" style="color:var(--adm-green-dark)"
-                                onclick="changeEstado(<?php echo (int) $f['id'] ?>, 'emitir', '<?php echo htmlspecialchars(addslashes($f['numero'])) ?>')">
-                            Emitir
-                        </button>
-                        <?php elseif (in_array($f['status'], ['emitida', 'parcialmente_paga', 'vencida'], true)): ?>
-                        <button class="adm-btn adm-btn-ghost adm-btn-sm" style="color:var(--adm-red)"
-                                onclick="changeEstado(<?php echo (int) $f['id'] ?>, 'cancelar', '<?php echo htmlspecialchars(addslashes($f['numero'])) ?>')">
-                            Cancelar
-                        </button>
-                        <?php endif; ?>
-                    </div>
-                </td>
-                <?php else: ?>
-                <td>—</td>
-                <?php endif; ?>
-            </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-    <?php else: ?>
-    <div class="adm-empty">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
-        </svg>
-        <p class="adm-empty-title">Nenhuma fatura criada</p>
-        <p class="adm-empty-sub">Começa por criar a primeira fatura.</p>
-        <?php if ($canEmitirFaturas): ?>
-        <a href="<?php echo htmlspecialchars($app->routes->path('fatura_form')) ?>" class="adm-btn adm-btn-primary">Criar Fatura</a>
+        <?php else: ?>
+        <div class="adm-empty" style="padding:var(--adm-sp-12)">
+            <i class="fa-solid fa-file-invoice" style="font-size:2rem;opacity:.2"></i>
+            <p class="adm-empty-title">Sem documentos de venda</p>
+            <p class="adm-empty-sub">As vendas registadas no POS serao apresentadas aqui.</p>
+        </div>
         <?php endif; ?>
     </div>
-    <?php endif; ?>
 </div>
 
+<form method="post" action="" id="cancelForm" style="display:none">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+    <input type="hidden" name="acao" value="cancelar">
+    <input type="hidden" name="id" id="cancelId" value="">
+    <input type="hidden" name="reason" id="cancelReason" value="">
+</form>
+
 <script>
-const CSRF = '<?php echo $csrf ?>';
-
-function filterTable() {
-    const q       = document.getElementById('faturaSearch').value.toLowerCase();
-    const estado  = document.getElementById('faturaEstado').value;
-    const cliente = document.getElementById('faturaCliente').value;
-    const rows    = document.querySelectorAll('#faturasTable tbody tr');
-    let vis = 0;
-    rows.forEach(row => {
-        const txt  = row.textContent.toLowerCase();
-        const est  = row.dataset.estado;
-        const cli  = row.dataset.cliente;
-        const show = (!q || txt.includes(q)) && (!estado || est === estado) && (!cliente || cli === cliente);
-        row.style.display = show ? '' : 'none';
-        if (show) vis++;
-    });
-    document.getElementById('faturaCount').textContent = vis + ' fatura' + (vis !== 1 ? 's' : '');
-}
-
-const ESTADO_VERBOS = { emitir: 'emitir', cancelar: 'cancelar' };
-
-function changeEstado(id, action, numero) {
-    openConfirm(
-        'Alterar estado',
-        'Pretende ' + ESTADO_VERBOS[action] + ' a fatura "' + numero + '"?',
-        async () => {
-            try {
-                const res  = await fetch('/nexora/api/fatura_estado', {
-                    method: 'POST',
-                    headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({id, action, csrf: CSRF})
-                });
-                const data = await res.json();
-                if (data.ok) {
-                    showToast('Estado actualizado');
-                    setTimeout(() => location.reload(), 700);
-                } else {
-                    showToast(data.erro || 'Erro', 'error');
-                }
-            } catch { showToast('Erro de ligação', 'error'); }
-        }
-    );
+function cancelarTransaccao(id) {
+    const reason = prompt('Motivo do cancelamento:');
+    if (!reason) return;
+    document.getElementById('cancelId').value = id;
+    document.getElementById('cancelReason').value = reason;
+    document.getElementById('cancelForm').submit();
 }
 </script>
 

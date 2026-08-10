@@ -54,13 +54,13 @@
 
     $recrutamentoOpen  = in_array($ap, ['recrutamento_dashboard','pipeline','relatorios','vagas','vaga_form','candidaturas','candidatura_ver','recrutamento_configuracao','recrutamento_contactos'], true);
     $crmOpen           = in_array($ap, ['leads','lead_form','crm_leads_pipeline','oportunidades','oportunidade_form','crm_pipeline'], true);
-    $faturacaoOpen     = in_array($ap, ['faturacao_series','orcamentos','orcamento_form','encomendas','faturas','fatura_form','recibos','notas_credito'], true);
+    $faturacaoOpen     = in_array($ap, ['faturacao_series','orcamentos','orcamento_form','encomendas','faturas','fatura_form','fatura_detalhe','recibos','notas_credito'], true);
     $posOpen           = in_array($ap, ['pos','pos_dashboard','pos_vendas','pos_venda_ver','pos_terminais','pos_catalogo','pos_relatorios','pos_devolucoes'], true);
     $sistemaOpen       = in_array($ap, ['sistema_geral','sistema_templates','sistema_logs'], true);
     $rhOpen            = str_starts_with($ap, 'rh_');
     $contabOpen        = in_array($ap, ['contab_plano_contas','contab_periodos','contab_lancamentos','contab_lancamento','contab_impostos','contab_ativos_fixos','contab_amortizacoes','contab_orcamentos','contab_encerramento','contab_relatorios'], true);
-    $produtosOpen      = in_array($ap, ['produtos','produto_form','produto_categorias'], true);
-    $adminOpen         = in_array($ap, ['utilizadores','utilizador_form','cargos','cargo_form','empresa','sessoes','auditoria'], true);
+    $produtosOpen      = in_array($ap, ['produtos','produto_form','produto_categorias','produto_detalhe','stock','stock_alertas'], true);
+    $adminOpen         = in_array($ap, ['utilizadores','utilizador_form','utilizador_detalhe','terminais_admin','terminal_admin_form','cargos','cargo_form','empresa','sessoes','auditoria'], true);
     $superadminOpen    = in_array($ap, ['superadmin_dashboard','superadmin_tenants','superadmin_plans','superadmin_modules','superadmin_users','superadmin_settings'], true);
 ?>
 <!DOCTYPE html>
@@ -102,6 +102,9 @@
 </script>
 </head>
 <body>
+<?php include dirname(__DIR__) . '/partials/components/loading-overlay.php'; ?>
+<?php include dirname(__DIR__) . '/partials/components/flash-messages.php'; ?>
+<?php include dirname(__DIR__) . '/partials/components/license-modal.php'; ?>
 <div class="adm-wrapper">
 
     <!-- ── Sidebar ── -->
@@ -185,7 +188,7 @@
             <?php if ($canClientes): ?>
             <div class="adm-nav-section">
                 <p class="adm-nav-label">Clientes</p>
-                <a href="<?= htmlspecialchars($app->routes->path('clientes')) ?>" class="adm-nav-item <?= in_array($ap, ['clientes','cliente_form'], true) ? 'active' : '' ?>">
+                <a href="<?= htmlspecialchars($app->routes->path('clientes')) ?>" class="adm-nav-item <?= in_array($ap, ['clientes','cliente_form','cliente_detalhe'], true) ? 'active' : '' ?>">
                     <i class="fa-solid fa-user-tie fa-fw"></i> Clientes
                 </a>
             </div>
@@ -242,6 +245,15 @@
                         <a href="<?= htmlspecialchars($app->routes->path('pos_relatorios')) ?>" class="adm-nav-item <?= $ap === 'pos_relatorios' ? 'active' : '' ?>">
                             <i class="fa-solid fa-chart-bar fa-fw"></i> Relatórios
                         </a>
+                        <a href="<?= htmlspecialchars($app->routes->path('pos_sessoes')) ?>" class="adm-nav-item <?= in_array($ap, ['pos_sessoes','pos_sessa_abrir','pos_sessa_detalhe','pos_sessa_fecho'], true) ? 'active' : '' ?>">
+                            <i class="fa-solid fa-cash-register fa-fw"></i> Sessões de Caixa
+                        </a>
+                        <a href="<?= htmlspecialchars($app->routes->path('pos_relatorio_fecho')) ?>" class="adm-nav-item <?= $ap === 'pos_relatorio_fecho' ? 'active' : '' ?>">
+                            <i class="fa-solid fa-file-invoice-dollar fa-fw"></i> Fecho de Caixa
+                        </a>
+                        <a href="<?= htmlspecialchars($app->routes->path('pos_descontos')) ?>" class="adm-nav-item <?= $ap === 'pos_descontos' ? 'active' : '' ?>">
+                            <i class="fa-solid fa-tag fa-fw"></i> Descontos
+                        </a>
                         <a href="<?= htmlspecialchars($app->routes->path('pos_devolucoes')) ?>" class="adm-nav-item <?= $ap === 'pos_devolucoes' ? 'active' : '' ?>">
                             <i class="fa-solid fa-rotate-left fa-fw"></i> Devoluções
                         </a>
@@ -264,14 +276,17 @@
                         <i class="fa-solid fa-box fa-fw"></i> Produtos <?= $chevron ?>
                     </summary>
                     <div class="adm-nav-submenu">
-                        <a href="<?= htmlspecialchars($app->routes->path('produtos')) ?>" class="adm-nav-item <?= in_array($ap, ['produtos','produto_form'], true) ? 'active' : '' ?>">
+                        <a href="<?= htmlspecialchars($app->routes->path('produtos')) ?>" class="adm-nav-item <?= in_array($ap, ['produtos','produto_form','produto_detalhe'], true) ? 'active' : '' ?>">
                             <i class="fa-solid fa-box-open fa-fw"></i> Catálogo
                         </a>
                         <a href="<?= htmlspecialchars($app->routes->path('produto_categorias')) ?>" class="adm-nav-item <?= $ap === 'produto_categorias' ? 'active' : '' ?>">
-                            <i class="fa-solid fa-tags fa-fw"></i> Categorias &amp; Marcas
+                            <i class="fa-solid fa-tags fa-fw"></i> Categorias
                         </a>
-                        <a href="<?= htmlspecialchars($app->routes->path('stock')) ?>" class="adm-nav-item <?= $ap === 'stock' ? 'active' : '' ?>">
+                        <a href="<?= htmlspecialchars($app->routes->path('stock')) ?>" class="adm-nav-item <?= in_array($ap, ['stock','stock_alertas'], true) ? 'active' : '' ?>">
                             <i class="fa-solid fa-warehouse fa-fw"></i> Gestão de Stock
+                        </a>
+                        <a href="<?= htmlspecialchars($app->routes->path('stock_alertas')) ?>" class="adm-nav-item <?= $ap === 'stock_alertas' ? 'active' : '' ?>">
+                            <i class="fa-solid fa-triangle-exclamation fa-fw"></i> Alertas
                         </a>
                     </div>
                 </details>
@@ -524,10 +539,13 @@
                     </summary>
                     <div class="adm-nav-submenu">
                         <?php if ($canUtilizadores): ?>
-                        <a href="<?= htmlspecialchars($app->routes->path('utilizadores')) ?>" class="adm-nav-item <?= in_array($ap, ['utilizadores','utilizador_form'], true) ? 'active' : '' ?>">
+                        <a href="<?= htmlspecialchars($app->routes->path('utilizadores')) ?>" class="adm-nav-item <?= in_array($ap, ['utilizadores','utilizador_form','utilizador_detalhe'], true) ? 'active' : '' ?>">
                             <i class="fa-solid fa-users fa-fw"></i> Utilizadores
                         </a>
                         <?php endif; ?>
+                        <a href="<?= htmlspecialchars($app->routes->path('terminais_admin')) ?>" class="adm-nav-item <?= in_array($ap, ['terminais_admin','terminal_admin_form'], true) ? 'active' : '' ?>">
+                            <i class="fa-solid fa-desktop fa-fw"></i> Terminais POS
+                        </a>
                         <?php if ($canCargos): ?>
                         <a href="<?= htmlspecialchars($app->routes->path('cargos')) ?>" class="adm-nav-item <?= in_array($ap, ['cargos','cargo_form'], true) ? 'active' : '' ?>">
                             <i class="fa-solid fa-user-shield fa-fw"></i> Cargos &amp; Permissões
@@ -540,7 +558,7 @@
                         <?php endif; ?>
                         <?php if ($canSessoes): ?>
                         <a href="<?= htmlspecialchars($app->routes->path('sessoes')) ?>" class="adm-nav-item <?= $ap === 'sessoes' ? 'active' : '' ?>">
-                            <i class="fa-solid fa-desktop fa-fw"></i> Sessões
+                            <i class="fa-solid fa-desktop fa-fw"></i> Sessões Web
                         </a>
                         <?php endif; ?>
                         <?php if ($canAuditoria): ?>

@@ -69,5 +69,6 @@ document.getElementById('confirmModal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeConfirm();
 });
 </script>
+<script src="/assets/js/api.js"></script>
 </body>
 </html>

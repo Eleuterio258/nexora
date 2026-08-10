@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 $idHash = $app->request->queryString('id');
 if (!$idHash) { header('Location: /nexora/recrutamento/candidaturas'); exit; }
