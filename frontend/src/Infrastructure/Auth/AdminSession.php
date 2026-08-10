@@ -23,6 +23,46 @@ final class AdminSession
         return ['status' => $response->status, 'body' => $response->body];
     }
 
+    /**
+     * Autentica um terminal POS pelo código e código de activação.
+     */
+    public function loginTerminal(string $codigoTerminal, string $activationCode, string $tenantSlug = ''): array
+    {
+        $response = $this->client->authenticateTerminal($codigoTerminal, $activationCode, $tenantSlug);
+        return ['status' => $response->status, 'body' => $response->body];
+    }
+
+    /**
+     * Guarda a sessão de um terminal. A resposta do /api/pos/login não tem a
+     * forma do login normal — o token vem em terminal_token e não há objecto
+     * `user` —, por isso normaliza-se aqui antes de reutilizar o store comum,
+     * que é quem sabe povoar tudo o resto.
+     *
+     * O tipo fica 'funcionario', que é o que o token realmente carrega: a
+     * conta do terminal é uma conta de funcionário com o cargo "Terminal POS"
+     * e uma única permissão, pos:operar_pos. É essa permissão, e não um tipo
+     * especial, que lhe abre o POS e lhe fecha o resto.
+     */
+    public function storeTerminal(array $body): void
+    {
+        $normalizado = $body;
+        $normalizado['access_token'] = $body['terminal_token'] ?? '';
+        $normalizado['refresh_token'] = $body['terminal_refresh_token'] ?? '';
+        $normalizado['user'] = ['tipo' => 'funcionario', 'escopo' => 'erp'];
+
+        $this->store($normalizado);
+
+        // Guardado à parte para o POS poder mostrar de que caixa se trata e
+        // para o logout saber que esta sessão é de terminal.
+        $_SESSION['nexora_terminal'] = $body['terminal'] ?? [];
+    }
+
+    /** Se a sessão actual é de um terminal POS e não de uma pessoa. */
+    public function isTerminal(): bool
+    {
+        return !empty($_SESSION['nexora_terminal']);
+    }
+
     public function store(array $body): void
     {
         // tipo/escopo/pessoa_id/tipos só vêm dentro do objecto próprio de cada

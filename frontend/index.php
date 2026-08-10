@@ -219,6 +219,10 @@ if (str_starts_with($uri, '/admin')) {
     $path = rtrim($uri, '/') ?: '/nexora';
     if ($path === '/nexora/login') {
         $app->adminAuth->login();
+    } elseif ($path === '/nexora/login/terminal') {
+        // Entrada dos terminais POS: código do terminal + código de activação,
+        // sem credenciais de pessoa (ver AdminAuthController::loginTerminal).
+        $app->adminAuth->loginTerminal();
     } elseif ($path === '/nexora/destino') {
         $app->adminAuth->destino();
     } elseif (str_starts_with($path, '/nexora/papel/')) {

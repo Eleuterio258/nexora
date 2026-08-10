@@ -33,7 +33,7 @@ final class NexoraClient implements NexoraGateway
             $method,
             $this->url($path, $query),
             $payload,
-            ['Authorization: Bearer ' . $this->tokens->accessToken()]
+            $this->authHeaders($this->tokens->accessToken())
         );
 
         return $response->status === 401
@@ -41,7 +41,7 @@ final class NexoraClient implements NexoraGateway
                 $method,
                 $this->url($path, $query),
                 $payload,
-                ['Authorization: Bearer ' . $this->tokens->accessToken(true)]
+                $this->authHeaders($this->tokens->accessToken(true))
             )
             : $response;
     }
@@ -72,9 +72,27 @@ final class NexoraClient implements NexoraGateway
             $method,
             $this->url($path, $query),
             $payload,
-            ['Authorization: Bearer ' . $token]
+            $this->authHeaders($token)
         );
         return ['status' => $response->status, 'body' => $response->body];
+    }
+
+    /**
+     * Cabeçalhos de uma chamada autenticada. Além do token, reenvia o host por
+     * onde o utilizador entrou: é assim que a API sabe a que tenant o endereço
+     * pertence e pode recusar uma sessão que não seja desse tenant. Sem este
+     * cabeçalho a API vê apenas o salto interno e o domínio não significa nada.
+     *
+     * @return string[]
+     */
+    private function authHeaders(string $token): array
+    {
+        $headers = ['Authorization: Bearer ' . $token];
+        if ($host = $this->clientHost()) {
+            $headers[] = 'X-Forwarded-Host: ' . $host;
+        }
+
+        return $headers;
     }
 
     public function publicRequest(
@@ -143,6 +161,29 @@ final class NexoraClient implements NexoraGateway
             'email' => $email,
             'password' => $password,
         ]);
+    }
+
+    /**
+     * Autentica um terminal POS. Ao contrário do login normal, não há email
+     * nem password: o terminal identifica-se pelo código e prova-o com o
+     * código de activação, que a API compara por bcrypt contra a conta
+     * sintética <codigo>@terminal.internal criada com ele.
+     *
+     * O tenant é opcional e serve para desambiguar — o código do terminal só é
+     * único dentro de cada tenant.
+     */
+    public function authenticateTerminal(string $codigoTerminal, string $activationCode, string $tenantSlug = ''): HttpResponse
+    {
+        $payload = [
+            'tipo' => 'terminal',
+            'codigo_terminal' => $codigoTerminal,
+            'activation_code' => $activationCode,
+        ];
+        if ($tenantSlug !== '') {
+            $payload['tenant_slug'] = $tenantSlug;
+        }
+
+        return $this->json('POST', $this->baseUrl . '/api/pos/login', $payload);
     }
 
     public function refresh(string $refreshToken): HttpResponse

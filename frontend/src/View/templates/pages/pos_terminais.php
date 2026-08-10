@@ -3,13 +3,18 @@
     $resp      = $app->nexora->call('GET', '/api/pos/terminais');
     $terminais = $resp['body'] ?? [];
 
+    // Um tenant sem a feature de stock recebe 402 com um corpo de erro, não
+    // uma lista. Sem esta guarda a página inteira rebentava com 500 — e é
+    // nela que se criam os terminais, que nada têm a ver com armazéns.
     $whResp     = $app->nexora->call('GET', '/api/stock/warehouses');
-    $warehouses = $whResp['body'] ?? [];
+    $warehouses = is_array($whResp['body'] ?? null)
+        ? array_values(array_filter($whResp['body'], 'is_array'))
+        : [];
     $whMap      = [];
     foreach ($warehouses as $w) {
-        $whMap[(int) $w['id']] = $w['nome'];
+        $whMap[(int) ($w['id'] ?? 0)] = $w['nome'] ?? '';
     }
-    $warehousesAtivos = array_filter($warehouses, static fn ($w) => (bool) $w['ativo']);
+    $warehousesAtivos = array_filter($warehouses, static fn ($w) => (bool) ($w['ativo'] ?? false));
 
     $csrf       = $app->security->csrfToken();
     $pageTitle  = 'Terminais POS';
@@ -88,6 +93,22 @@
                 <p class="adm-help">Sem armazém configurado, as vendas neste terminal falham.</p>
             </div>
         </div>
+        <div class="adm-form-row">
+            <div class="adm-form-group">
+                <label class="adm-label" for="t-activacao">Código de activação</label>
+                <input class="adm-input" type="text" id="t-activacao" maxlength="60" placeholder="deixe vazio para gerar automaticamente">
+                <p class="adm-help">É com ele que o terminal se autentica. Só é mostrado uma vez, logo a seguir a criar.</p>
+            </div>
+        </div>
+
+        <div id="t-resultado" style="display:none;margin-bottom:16px;padding:16px;border:1px solid var(--adm-green,#10b981);background:#f0fdf4">
+            <p style="margin:0 0 4px;font-weight:600">Terminal criado. Guarde este código de activação:</p>
+            <p id="t-resultado-codigo" style="margin:0 0 8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:1.35rem;letter-spacing:.08em"></p>
+            <p style="margin:0;font-size:.85rem;color:#4b5563">
+                Não volta a ser mostrado — a partir de agora só existe cifrado no servidor.
+                Use-o em <a href="/nexora/login/terminal">/nexora/login/terminal</a> ou na app PayCore.
+            </p>
+        </div>
         <button class="adm-btn adm-btn-primary" onclick="saveTerminal()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Criar Terminal
@@ -105,8 +126,10 @@ async function saveTerminal() {
     if (!nome)   { showToast('O nome é obrigatório.', 'error'); return; }
 
     const armazemId = document.getElementById('t-armazem').value;
+    const activacao = document.getElementById('t-activacao').value.trim();
     const payload = { codigo, nome, csrf: CSRF };
     if (armazemId) payload.warehouse_id = Number(armazemId);
+    if (activacao) payload.activation_code = activacao;
 
     try {
         const res  = await fetch('/nexora/api/pos_terminal_save', {
@@ -114,7 +137,14 @@ async function saveTerminal() {
         });
         const data = await res.json();
         if (data.ok) {
-            window.location.href = '/nexora/pos/terminais?msg=' + encodeURIComponent(data.msg || 'Terminal criado com sucesso.');
+            // Sem redirect: o código de activação só existe nesta resposta e
+            // recarregar a página perdia-o para sempre.
+            document.getElementById('t-resultado-codigo').textContent = data.activation_code || '(indisponível)';
+            document.getElementById('t-resultado').style.display = 'block';
+            document.getElementById('t-codigo').value = '';
+            document.getElementById('t-nome').value = '';
+            document.getElementById('t-activacao').value = '';
+            showToast(data.msg || 'Terminal criado com sucesso.', 'success');
         } else {
             showToast(data.erro || 'Erro', 'error');
         }

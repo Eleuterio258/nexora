@@ -43,7 +43,9 @@
 
 <form id="vagaForm">
     <input type="hidden" name="csrf_token" value="<?php echo $csrf ?>">
-    <?php if ($isEdit): ?><input type="hidden" name="id" value="<?php echo $id ?>"><?php endif; ?>
+    <?php /* O id vai numérico: vaga_save faz int('id') e um hash daria 0,
+             criando uma vaga nova em vez de gravar por cima desta. */ ?>
+    <?php if ($isEdit): ?><input type="hidden" name="id" value="<?php echo (int) ($vaga['id'] ?? 0) ?>"><?php endif; ?>
 
     <!-- Bloco: Identificação -->
     <div class="adm-card adm-mb-6">
@@ -417,7 +419,11 @@ document.head.appendChild(style);
 
 <?php if ($isEdit): ?>
 // ── Form Builder ──────────────────────────────────────────────
-const VAGA_ID = <?php echo $id ?>;
+// Numérico de propósito: a rota /vagas/{vagaID}/campos faz ParseInt e o
+// middleware do IdHasher só descodifica parâmetros chamados "id" ou
+// terminados em "_id" — "vagaID" não é nenhum dos dois, logo o hash não
+// serve aqui (ao contrário de /vagas/{id}, que o aceita).
+const VAGA_ID = <?php echo (int) ($vaga['id'] ?? 0) ?>;
 const FB_CSRF = '<?php echo $csrf ?>';
 let editingCampoId = null;
 

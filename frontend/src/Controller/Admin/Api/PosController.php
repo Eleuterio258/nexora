@@ -59,6 +59,8 @@ final class PosController
             'codigo' => $request->string('codigo'),
             'nome' => $request->string('nome'),
             'warehouse_id' => $request->int('warehouse_id'),
+            // Opcional: em branco, o serviço gera um.
+            'activation_code' => $request->string('activation_code'),
         ];
 
         return $d->result(fn() => $d->pos->createTerminal($payload));

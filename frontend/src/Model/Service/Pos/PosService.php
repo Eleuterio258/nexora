@@ -24,10 +24,47 @@ final class PosService extends NexoraService
             throw new OperationException('O nome do terminal e obrigatorio.');
         }
 
+        // O backend exige um activation_code e nunca o gera: é a password da
+        // conta do terminal, guardada em bcrypt. Sem ele o pedido era recusado
+        // com 400 e nenhum terminal podia ser criado pelo ERP.
+        $activationCode = trim((string) ($payload['activation_code'] ?? ''));
+        if ($activationCode === '') {
+            $activationCode = self::gerarCodigoActivacao();
+        }
+        $payload['activation_code'] = $activationCode;
+
         $response = $this->gateway->request('POST', '/api/pos/terminais', $payload);
         $this->ensureSuccess($response, 'Erro ao criar o terminal.');
 
-        return ['ok' => true, 'msg' => 'Terminal criado com sucesso.', 'id' => $response->body['id'] ?? null];
+        return [
+            'ok' => true,
+            'msg' => 'Terminal criado com sucesso.',
+            'id' => $response->body['id'] ?? null,
+            // Devolvido para ser mostrado uma única vez: a partir daqui só
+            // existe como hash no servidor e não há como o recuperar.
+            'activation_code' => $activationCode,
+        ];
+    }
+
+    /**
+     * Código de activação legível: três grupos de quatro, sem caracteres que
+     * se confundam a ler de um papel (0/O, 1/I). Autentica o terminal durante
+     * 30 dias, por isso não são quatro dígitos.
+     */
+    private static function gerarCodigoActivacao(): string
+    {
+        $alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        $grupos = [];
+
+        for ($g = 0; $g < 3; $g++) {
+            $grupo = '';
+            for ($i = 0; $i < 4; $i++) {
+                $grupo .= $alfabeto[random_int(0, strlen($alfabeto) - 1)];
+            }
+            $grupos[] = $grupo;
+        }
+
+        return implode('-', $grupos);
     }
 
     public function addCatalogItem(array $payload): array

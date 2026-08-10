@@ -134,7 +134,7 @@
 
 <form id="opForm">
     <input type="hidden" name="csrf_token" value="<?php echo $csrf ?>">
-    <?php if ($isEdit): ?><input type="hidden" name="id" value="<?php echo $id ?>"><?php endif; ?>
+    <?php if ($isEdit): ?><input type="hidden" name="id" value="<?php echo (int) ($o['id'] ?? 0) ?>"><?php endif; ?>
 
     <div class="adm-card adm-mb-6">
         <div class="adm-card-header"><h2 class="adm-card-title">Identificação</h2></div>
