@@ -18,7 +18,7 @@ import (
 // scope é a string de permissões RBAC finas ("modulo:acao modulo2:acao2 ..."),
 // já calculada por quem chama (ver models.LoadUserAccess) — este helper não
 // vai à BD, só assina.
-func (h *Handler) signOAuthAccessToken(userID, tenantID, membershipID int64, tipo, escopo, scope string, expiry time.Duration, reauthAt time.Time) (token string, jti string, err error) {
+func (h *Handler) signOAuthAccessToken(userID, tenantID, membershipID int64, tipo, escopo, scope string, expiry time.Duration, reauthAt time.Time, terminalID, funcionarioID *int64) (token string, jti string, err error) {
 	if escopo == "" {
 		escopo = "erp"
 	}
@@ -40,6 +40,12 @@ func (h *Handler) signOAuthAccessToken(userID, tenantID, membershipID int64, tip
 		"exp":        now.Add(expiry).Unix(),
 		"iat":        now.Unix(),
 		"reauth_at":  reauthAt.Unix(),
+	}
+	if terminalID != nil && *terminalID > 0 {
+		claims["terminal_id"] = *terminalID
+	}
+	if funcionarioID != nil && *funcionarioID > 0 {
+		claims["funcionario_id"] = *funcionarioID
 	}
 	jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	jwtToken.Header["kid"] = h.oauthKeys.ActiveKID()

@@ -9,6 +9,7 @@ import (
 
 	mw "nexora/internal/middleware"
 	"nexora/internal/modules/auth/models"
+	"nexora/internal/shared/contracts"
 )
 
 // ── Listar ────────────────────────────────────────────────────────────────────
@@ -242,6 +243,16 @@ func (h *Handler) DefinirPermissoesCargo(w http.ResponseWriter, r *http.Request)
 		UPDATE users SET permissoes_atualizadas_em = NOW()
 		WHERE id IN (SELECT user_id FROM auth.memberships WHERE cargo_id = $1 AND tenant_id = $2)`,
 		id, user.TenantID)
+
+	if h.legalAudit != nil {
+		actorID := user.ID
+		h.legalAudit.RecordEvent(r.Context(), contracts.LegalAuditEvent{
+			TenantID: user.TenantID, ActorUserID: &actorID, IPAddress: r.RemoteAddr,
+			ServiceName: "nexora-erp", ModuleName: "auth", Action: "definir_permissoes_cargo",
+			EntityType: "cargo", EntityID: id,
+			PayloadAfter: map[string]any{"permissoes": body.Permissoes},
+		})
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }

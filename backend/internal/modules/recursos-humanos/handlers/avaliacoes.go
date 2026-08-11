@@ -205,5 +205,6 @@ func (h *Handler) AprovarAvaliacaoDesempenho(w http.ResponseWriter, r *http.Requ
 		jsonErr(w, "Avaliação já foi processada", http.StatusConflict)
 		return
 	}
+	h.registarAprovacaoLegal(r.Context(), user.TenantID, user.ID, r.RemoteAddr, "aprovar_avaliacao_desempenho", "avaliacao", id)
 	w.WriteHeader(http.StatusNoContent)
 }

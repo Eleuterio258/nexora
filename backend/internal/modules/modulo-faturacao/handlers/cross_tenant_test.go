@@ -18,7 +18,7 @@ func TestAdicionarItemOrcamento_CrossTenant(t *testing.T) {
 	}
 	defer mock.Close()
 
-	h := New(mock, nil, nil, nil)
+	h := New(mock, nil, nil, nil, nil, nil, nil)
 
 	// O orçamento #10 existe mas pertence a outro tenant.
 	mock.ExpectQuery("SELECT 1 FROM sales_quotes WHERE id=\\$1 AND tenant_id=\\$2").
@@ -51,7 +51,7 @@ func TestCriarRecibo_CrossTenant(t *testing.T) {
 	}
 	defer mock.Close()
 
-	h := New(mock, nil, nil, nil)
+	h := New(mock, nil, nil, nil, nil, nil, nil)
 
 	// A fatura #20 existe mas pertence a outro tenant.
 	mock.ExpectQuery("SELECT 1 FROM invoices WHERE id=\\$1 AND tenant_id=\\$2").

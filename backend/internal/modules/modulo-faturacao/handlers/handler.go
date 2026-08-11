@@ -23,14 +23,17 @@ type DB interface {
 }
 
 type Handler struct {
-	db        DB
-	cfg       *config.Config
-	storage   storage.Provider
-	signature contracts.SignaturePort
+	db           DB
+	cfg          *config.Config
+	storage      storage.Provider
+	signature    contracts.SignaturePort
+	accounting   contracts.AccountingPort
+	legalAudit   contracts.LegalAuditPort
+	notification contracts.NotificationPort
 }
 
-func New(db DB, cfg *config.Config, st storage.Provider, signature contracts.SignaturePort) *Handler {
-	return &Handler{db: db, cfg: cfg, storage: st, signature: signature}
+func New(db DB, cfg *config.Config, st storage.Provider, signature contracts.SignaturePort, accounting contracts.AccountingPort, legalAudit contracts.LegalAuditPort, notification contracts.NotificationPort) *Handler {
+	return &Handler{db: db, cfg: cfg, storage: st, signature: signature, accounting: accounting, legalAudit: legalAudit, notification: notification}
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {
@@ -49,9 +52,13 @@ func itoa(n int64) string { return fmt.Sprintf("%d", n) }
 
 func pageParams(r *http.Request) (limit, offset int) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 { page = 1 }
+	if page < 1 {
+		page = 1
+	}
 	limit, _ = strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit < 1 || limit > 100 { limit = 20 }
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
 	offset = (page - 1) * limit
 	return
 }

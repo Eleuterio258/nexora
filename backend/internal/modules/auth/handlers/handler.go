@@ -14,15 +14,16 @@ import (
 )
 
 type Handler struct {
-	db        *pgxpool.Pool
-	cfg       *config.Config
-	push      *push.Service
-	oauthKeys *oauthkeys.Provider
-	notif     contracts.NotificationPort
+	db         *pgxpool.Pool
+	cfg        *config.Config
+	push       *push.Service
+	oauthKeys  *oauthkeys.Provider
+	notif      contracts.NotificationPort
+	legalAudit contracts.LegalAuditPort
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config, pushSvc *push.Service, oauthKeys *oauthkeys.Provider, notif contracts.NotificationPort) *Handler {
-	return &Handler{db: db, cfg: cfg, push: pushSvc, oauthKeys: oauthKeys, notif: notif}
+func New(db *pgxpool.Pool, cfg *config.Config, pushSvc *push.Service, oauthKeys *oauthkeys.Provider, notif contracts.NotificationPort, legalAudit contracts.LegalAuditPort) *Handler {
+	return &Handler{db: db, cfg: cfg, push: pushSvc, oauthKeys: oauthKeys, notif: notif, legalAudit: legalAudit}
 }
 
 func jsonOK(w http.ResponseWriter, v interface{}, status int) {

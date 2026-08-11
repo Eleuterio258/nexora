@@ -93,7 +93,7 @@ func TestEnviarOrdemCompraParaAssinatura_Sucesso(t *testing.T) {
 	store.Put(context.Background(), storageKey, pdfData, "application/pdf")
 
 	sig := &mockSignaturePort{}
-	h := New(mock, nil, store, sig)
+	h := New(mock, nil, store, sig, nil)
 
 	mock.ExpectQuery("SELECT COALESCE").
 		WithArgs(int64(10), int64(1)).

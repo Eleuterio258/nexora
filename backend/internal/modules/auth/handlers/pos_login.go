@@ -151,7 +151,7 @@ func (h *Handler) loginTerminalPOS(w http.ResponseWriter, r *http.Request, codig
 		if c.activo {
 			status = "ATIVO"
 		}
-		h.issueTerminalTokens(w, r, u,
+		h.issueTerminalTokens(w, r, u, c.terminalID,
 			map[string]interface{}{"id": c.terminalID, "codigo": c.codigo, "nome": c.nome, "status": status},
 			map[string]interface{}{"id": u.tenantID, "name": tenantNome, "slug": tenantCodigo},
 		)
@@ -203,7 +203,7 @@ func (h *Handler) refreshTerminalPOS(w http.ResponseWriter, r *http.Request, ref
 	h.db.QueryRow(ctx, `SELECT nome, codigo FROM saas.tenants WHERE id = $1`, u.tenantID).
 		Scan(&tenantNome, &tenantCodigo)
 
-	h.issueTerminalTokens(w, r, &u,
+	h.issueTerminalTokens(w, r, &u, terminalID,
 		map[string]interface{}{"id": terminalID, "codigo": codigo, "nome": nome, "status": "ATIVO"},
 		map[string]interface{}{"id": u.tenantID, "name": tenantNome, "slug": tenantCodigo},
 	)
@@ -215,14 +215,14 @@ func (h *Handler) refreshTerminalPOS(w http.ResponseWriter, r *http.Request, ref
 // resposta próprio (terminal_token em vez de access_token). Terminais só têm
 // a permissão pos:operar_pos (ver comentário no topo do ficheiro) — o scope
 // reflecte isso via LoadUserAccess, tal como qualquer outra conta.
-func (h *Handler) issueTerminalTokens(w http.ResponseWriter, r *http.Request, u *userIdentity, terminal, tenant map[string]interface{}) {
+func (h *Handler) issueTerminalTokens(w http.ResponseWriter, r *http.Request, u *userIdentity, terminalID int64, terminal, tenant map[string]interface{}) {
 	scope := ""
 	modulos := []models.ModuloAcesso{}
 	if userAccess, err := models.LoadUserAccess(r.Context(), h.db, u.id, u.membershipID); err == nil {
 		scope = scopeStringFromAccess(userAccess)
 		modulos = userAccess.Modulos
 	}
-	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, scope, terminalTokenExpiry, time.Now())
+	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, scope, terminalTokenExpiry, time.Now(), &terminalID, nil)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return

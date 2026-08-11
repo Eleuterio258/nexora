@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -18,10 +19,11 @@ type Handler struct {
 	storage     storage.Provider
 	assiduidade *assiduidade.Service
 	signature   contracts.SignaturePort
+	legalAudit  contracts.LegalAuditPort
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider, signature contracts.SignaturePort) *Handler {
-	return &Handler{db: db, cfg: cfg, storage: st, assiduidade: assiduidade.NewService(db), signature: signature}
+func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider, signature contracts.SignaturePort, legalAudit contracts.LegalAuditPort) *Handler {
+	return &Handler{db: db, cfg: cfg, storage: st, assiduidade: assiduidade.NewService(db), signature: signature, legalAudit: legalAudit}
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {
@@ -54,4 +56,20 @@ func uniqueViolationConstraint(err error) string {
 		return pgErr.ConstraintName
 	}
 	return ""
+}
+
+// registarAprovacaoLegal grava em auditoria.audit_events uma decisão de
+// aprovação/rejeição de RH (avaliações, correcções, justificações, férias,
+// disciplinar). Não-bloqueante — chamar sempre depois de a decisão já ter
+// sido comitada.
+func (h *Handler) registarAprovacaoLegal(ctx context.Context, tenantID, userID int64, ip, action, entityType, entityID string) {
+	if h.legalAudit == nil {
+		return
+	}
+	actorID := userID
+	h.legalAudit.RecordEvent(ctx, contracts.LegalAuditEvent{
+		TenantID: tenantID, ActorUserID: &actorID, IPAddress: ip,
+		ServiceName: "nexora-erp", ModuleName: "recursos-humanos", Action: action,
+		EntityType: entityType, EntityID: entityID,
+	})
 }

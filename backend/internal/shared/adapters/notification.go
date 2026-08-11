@@ -38,10 +38,10 @@ func (a *NotificationAdapter) Send(ctx context.Context, n contracts.Notification
 	_, err := a.db.Exec(wCtx, `
 		INSERT INTO notifications.notification_messages
 		(tenant_id, canal_tipo, destinatario, assunto, corpo, template_id,
-		 referencia_tipo, referencia_id, status)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pendente')`,
+		 referencia_tipo, referencia_id, anexo_storage_key, anexo_nome, status)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pendente')`,
 		n.TenantID, n.CanalTipo, n.Destinatario, assunto, n.Corpo, n.TemplateID,
-		nullStr(n.ReferenciaTipo), n.ReferenciaID)
+		nullStr(n.ReferenciaTipo), n.ReferenciaID, nullStr(n.AnexoStorageKey), nullStr(n.AnexoNome))
 	if err != nil {
 		log.Printf("[notif] falha ao enviar para %s (tenant=%d): %v",
 			n.Destinatario, n.TenantID, err)

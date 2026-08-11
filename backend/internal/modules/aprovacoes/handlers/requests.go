@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	mw "nexora/internal/middleware"
 	"nexora/internal/modules/auth/audit"
+	"nexora/internal/shared/contracts"
 )
 
 type requestResponse struct {
@@ -270,6 +272,20 @@ func (h *Handler) DecidirRequest(w http.ResponseWriter, r *http.Request) {
 		RecursoID: id,
 		Detalhes:  map[string]any{"decisao": body.Decisao, "nivel": nivelAtual},
 	})
+
+	if h.legalAudit != nil {
+		actorID := user.ID
+		moduleName, _, _ := strings.Cut(entidade, ".")
+		if moduleName == "" {
+			moduleName = "aprovacoes"
+		}
+		h.legalAudit.RecordEvent(r.Context(), contracts.LegalAuditEvent{
+			TenantID: user.TenantID, ActorUserID: &actorID, IPAddress: r.RemoteAddr,
+			ServiceName: "nexora-erp", ModuleName: moduleName, Action: "decidir_aprovacao",
+			EntityType: entidade, EntityID: strconv.FormatInt(entidadeID, 10),
+			Metadata: map[string]any{"decisao": body.Decisao, "nivel": nivelAtual, "approval_request_id": id},
+		})
+	}
 
 	h.ObterRequest(w, r)
 }

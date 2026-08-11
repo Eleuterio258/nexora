@@ -8,6 +8,7 @@ import (
 
 	mw "nexora/internal/middleware"
 	"nexora/internal/modules/auth/models"
+	"nexora/internal/shared/contracts"
 )
 
 // ObterAcessoUtilizador devolve tipo + cargo + permissões mergeadas.
@@ -101,6 +102,16 @@ func (h *Handler) DefinirPermissoesDiretas(w http.ResponseWriter, r *http.Reques
 	h.db.Exec(r.Context(), `
 		UPDATE users SET permissoes_atualizadas_em = NOW() WHERE id = $1`, targetID)
 
+	if h.legalAudit != nil {
+		actorID := user.ID
+		h.legalAudit.RecordEvent(r.Context(), contracts.LegalAuditEvent{
+			TenantID: user.TenantID, ActorUserID: &actorID, IPAddress: r.RemoteAddr,
+			ServiceName: "nexora-erp", ModuleName: "auth", Action: "definir_permissoes_diretas",
+			EntityType: "utilizador", EntityID: targetID,
+			PayloadAfter: map[string]any{"permissoes": body.Permissoes},
+		})
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -137,5 +148,16 @@ func (h *Handler) AtribuirCargo(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Utilizador não encontrado", http.StatusNotFound)
 		return
 	}
+
+	if h.legalAudit != nil {
+		actorID := user.ID
+		h.legalAudit.RecordEvent(r.Context(), contracts.LegalAuditEvent{
+			TenantID: user.TenantID, ActorUserID: &actorID, IPAddress: r.RemoteAddr,
+			ServiceName: "nexora-erp", ModuleName: "auth", Action: "atribuir_cargo",
+			EntityType: "utilizador", EntityID: targetID,
+			PayloadAfter: map[string]any{"cargo_id": body.CargoID},
+		})
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }

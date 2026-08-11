@@ -174,6 +174,7 @@ func (h *Handler) AprovarCorrecaoEvento(w http.ResponseWriter, r *http.Request) 
 		Operacao: "UPDATE", AlteradoPor: &user.ID, Motivo: &motivo, IPOrigem: &ip,
 		EstadoAnterior: &estadoAnterior, EstadoNovo: &estadoNovo,
 	})
+	h.registarAprovacaoLegal(r.Context(), user.TenantID, user.ID, ip, "aprovar_correcao_evento", "correcao_evento", id)
 
 	jsonOK(w, map[string]any{"evento_gerado_id": eventoGeradoID}, http.StatusOK)
 }

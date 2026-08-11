@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -397,6 +398,71 @@ func (h *Handler) ObterFolhaPagamento(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, map[string]any{"folha": f, "recibos": recibos, "pode_ver_salarios": podeVerSalarios, "journal_entry_id": journalEntryID}, http.StatusOK)
+}
+
+// ExportarFolhaPagamentoBancario gera um ficheiro CSV com os dados necessários
+// para submeter a transferência salarial em lote no portal de empresas do
+// banco (número/nome do funcionário, NUIT, banco, NIB/IBAN, valor líquido).
+// Só disponível depois de a folha estar processada (os valores já são finais).
+func (h *Handler) ExportarFolhaPagamentoBancario(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+
+	var estado string
+	var ano, mes int
+	if err := h.db.QueryRow(r.Context(), `
+		SELECT estado, ano, mes FROM rh.folhas_pagamento WHERE id=$1 AND tenant_id=$2`, id, user.TenantID).
+		Scan(&estado, &ano, &mes); err != nil {
+		jsonErr(w, "Folha de pagamento não encontrada", http.StatusNotFound)
+		return
+	}
+	if estado != "processada" && estado != "paga" {
+		jsonErr(w, "Apenas folhas 'processada' ou 'paga' podem ser exportadas", http.StatusConflict)
+		return
+	}
+
+	rows, err := h.db.Query(r.Context(), `
+		SELECT fu.numero_funcionario, fu.nome_completo, fu.nuit, fu.banco, fu.numero_conta, fu.nib, fu.iban, rv.salario_liquido
+		  FROM rh.recibos_vencimento rv
+		  JOIN rh.funcionarios fu ON fu.id = rv.funcionario_id
+		 WHERE rv.folha_id=$1 AND rv.tenant_id=$2
+		 ORDER BY fu.nome_completo`, id, user.TenantID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	filename := fmt.Sprintf("folha-pagamento-%04d-%02d-bancario.csv", ano, mes)
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.WriteHeader(http.StatusOK)
+
+	// BOM para o Excel reconhecer UTF-8 e mostrar acentos correctamente.
+	w.Write([]byte{0xEF, 0xBB, 0xBF})
+
+	cw := csv.NewWriter(w)
+	cw.Write([]string{"numero_funcionario", "nome_completo", "nuit", "banco", "numero_conta", "nib", "iban", "valor_liquido"})
+	for rows.Next() {
+		var numeroFuncionario, nuit, banco, numeroConta, nib, iban *string
+		var nomeCompleto string
+		var valorLiquido float64
+		if rows.Scan(&numeroFuncionario, &nomeCompleto, &nuit, &banco, &numeroConta, &nib, &iban, &valorLiquido) != nil {
+			continue
+		}
+		cw.Write([]string{
+			derefStr(numeroFuncionario), nomeCompleto, derefStr(nuit), derefStr(banco), derefStr(numeroConta), derefStr(nib), derefStr(iban),
+			strconv.FormatFloat(valorLiquido, 'f', 2, 64),
+		})
+	}
+	cw.Flush()
+}
+
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 func (h *Handler) ProcessarFolhaPagamento(w http.ResponseWriter, r *http.Request) {

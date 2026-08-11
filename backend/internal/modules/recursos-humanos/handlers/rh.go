@@ -292,6 +292,10 @@ func (h *Handler) CriarFuncionario(w http.ResponseWriter, r *http.Request) {
 		Estado            *string  `json:"estado"`
 		UserID            *int64   `json:"user_id"`
 		CentroCustoID     *int64   `json:"centro_custo_id"`
+		Banco             *string  `json:"banco"`
+		NumeroConta       *string  `json:"numero_conta"`
+		Nib               *string  `json:"nib"`
+		Iban              *string  `json:"iban"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.NomeCompleto == "" {
 		jsonErr(w, "nome_completo é obrigatório", http.StatusBadRequest)
@@ -346,10 +350,12 @@ func (h *Handler) CriarFuncionario(w http.ResponseWriter, r *http.Request) {
 	var id int64
 	err := h.db.QueryRow(r.Context(), `
 		INSERT INTO rh.funcionarios (tenant_id, numero_funcionario, nome_completo, data_nascimento, genero, nuit, telefone, email,
-		  endereco, provincia, cidade, bairro, unit_id, cargo, cargo_id, horario_id, data_admissao, tipo_contrato, salario_base, estado, user_id, criado_por)
-		VALUES ($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,COALESCE($17::date,CURRENT_DATE),$18,$19,$20,$21,$22) RETURNING id`,
+		  endereco, provincia, cidade, bairro, unit_id, cargo, cargo_id, horario_id, data_admissao, tipo_contrato, salario_base, estado, user_id, criado_por,
+		  banco, numero_conta, nib, iban)
+		VALUES ($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,COALESCE($17::date,CURRENT_DATE),$18,$19,$20,$21,$22,$23,$24,$25,$26) RETURNING id`,
 		user.TenantID, body.NumeroFuncionario, body.NomeCompleto, body.DataNascimento, genero, body.Nuit, body.Telefone, body.Email,
-		body.Endereco, body.Provincia, body.Cidade, body.Bairro, body.UnitID, body.Cargo, cargoID, horarioID, body.DataAdmissao, tipoContrato, body.SalarioBase, estado, body.UserID, user.ID).Scan(&id)
+		body.Endereco, body.Provincia, body.Cidade, body.Bairro, body.UnitID, body.Cargo, cargoID, horarioID, body.DataAdmissao, tipoContrato, body.SalarioBase, estado, body.UserID, user.ID,
+		body.Banco, body.NumeroConta, body.Nib, body.Iban).Scan(&id)
 	if err != nil {
 		switch uniqueViolationConstraint(err) {
 		case "uq_funcionarios_user_id":
@@ -430,15 +436,21 @@ func (h *Handler) ObterFuncionario(w http.ResponseWriter, r *http.Request) {
 		Estado            string     `json:"estado"`
 		UserID            *int64     `json:"user_id"`
 		CentroCustoID     *int64     `json:"centro_custo_id"`
+		Banco             *string    `json:"banco"`
+		NumeroConta       *string    `json:"numero_conta"`
+		Nib               *string    `json:"nib"`
+		Iban              *string    `json:"iban"`
 	}
 	err := h.db.QueryRow(r.Context(), `
 		SELECT f.id, f.numero_funcionario, f.nome_completo, f.data_nascimento, f.genero, f.nuit, f.telefone, f.email,
-		       f.endereco, f.provincia, f.cidade, f.bairro, f.unit_id, u.nome, f.cargo, f.cargo_id, f.horario_id, f.data_admissao, f.data_saida, f.tipo_contrato, f.salario_base, f.estado, f.user_id, f.centro_custo_id
+		       f.endereco, f.provincia, f.cidade, f.bairro, f.unit_id, u.nome, f.cargo, f.cargo_id, f.horario_id, f.data_admissao, f.data_saida, f.tipo_contrato, f.salario_base, f.estado, f.user_id, f.centro_custo_id,
+		       f.banco, f.numero_conta, f.nib, f.iban
 		  FROM rh.funcionarios f
 		  LEFT JOIN rh.unidades_organizacionais u ON u.id = f.unit_id
 		 WHERE f.id=$1 AND f.tenant_id=$2`, id, user.TenantID).
 		Scan(&f.ID, &f.NumeroFuncionario, &f.NomeCompleto, &f.DataNascimento, &f.Genero, &f.Nuit, &f.Telefone, &f.Email,
-			&f.Endereco, &f.Provincia, &f.Cidade, &f.Bairro, &f.UnitID, &f.UnidadeNome, &f.Cargo, &f.CargoID, &f.HorarioID, &f.DataAdmissao, &f.DataSaida, &f.TipoContrato, &f.SalarioBase, &f.Estado, &f.UserID, &f.CentroCustoID)
+			&f.Endereco, &f.Provincia, &f.Cidade, &f.Bairro, &f.UnitID, &f.UnidadeNome, &f.Cargo, &f.CargoID, &f.HorarioID, &f.DataAdmissao, &f.DataSaida, &f.TipoContrato, &f.SalarioBase, &f.Estado, &f.UserID, &f.CentroCustoID,
+			&f.Banco, &f.NumeroConta, &f.Nib, &f.Iban)
 	if err != nil {
 		jsonErr(w, "Funcionário não encontrado", http.StatusNotFound)
 		return
@@ -504,6 +516,10 @@ func (h *Handler) ObterFuncionario(w http.ResponseWriter, r *http.Request) {
 		for i := range contratos {
 			contratos[i].Salario = nil
 		}
+		f.Banco = nil
+		f.NumeroConta = nil
+		f.Nib = nil
+		f.Iban = nil
 	}
 
 	avaliacaoRows, _ := h.db.Query(r.Context(), `
@@ -610,6 +626,10 @@ func (h *Handler) ActualizarFuncionario(w http.ResponseWriter, r *http.Request) 
 		Estado            *string  `json:"estado"`
 		UserID            *int64   `json:"user_id"`
 		CentroCustoID     *int64   `json:"centro_custo_id"`
+		Banco             *string  `json:"banco"`
+		NumeroConta       *string  `json:"numero_conta"`
+		Nib               *string  `json:"nib"`
+		Iban              *string  `json:"iban"`
 	}
 	json.NewDecoder(r.Body).Decode(&body)
 	if body.TipoContrato != nil && *body.TipoContrato != "" && !tiposContratoValidos[*body.TipoContrato] {
@@ -652,12 +672,15 @@ func (h *Handler) ActualizarFuncionario(w http.ResponseWriter, r *http.Request) 
 		  unit_id=COALESCE($12,unit_id), cargo=COALESCE($13,cargo), cargo_id=COALESCE($14,cargo_id), horario_id=COALESCE($15,horario_id),
 		  data_admissao=COALESCE($16::date,data_admissao), tipo_contrato=COALESCE($17,tipo_contrato),
 		  salario_base=COALESCE($18,salario_base), estado=COALESCE($19,estado), user_id=COALESCE($20,user_id),
-		  centro_custo_id=COALESCE($21,centro_custo_id), updated_at=NOW()
-		WHERE id=$22 AND tenant_id=$23`,
+		  centro_custo_id=COALESCE($21,centro_custo_id),
+		  banco=COALESCE($22,banco), numero_conta=COALESCE($23,numero_conta), nib=COALESCE($24,nib), iban=COALESCE($25,iban),
+		  updated_at=NOW()
+		WHERE id=$26 AND tenant_id=$27`,
 		body.NumeroFuncionario, body.NomeCompleto, body.DataNascimento, body.Genero, body.Nuit,
 		body.Telefone, body.Email, body.Endereco, body.Provincia, body.Cidade, body.Bairro,
 		body.UnitID, body.Cargo, cargoID, horarioID,
-		body.DataAdmissao, body.TipoContrato, body.SalarioBase, body.Estado, body.UserID, body.CentroCustoID, id, user.TenantID)
+		body.DataAdmissao, body.TipoContrato, body.SalarioBase, body.Estado, body.UserID, body.CentroCustoID,
+		body.Banco, body.NumeroConta, body.Nib, body.Iban, id, user.TenantID)
 	if err != nil {
 		switch uniqueViolationConstraint(err) {
 		case "uq_funcionarios_user_id":
@@ -1289,6 +1312,7 @@ func (h *Handler) AprovarAusencia(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	h.registarAprovacaoLegal(r.Context(), user.TenantID, user.ID, r.RemoteAddr, "aprovar_ausencia", "ausencia", id)
 	w.WriteHeader(http.StatusNoContent)
 }
 

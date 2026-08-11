@@ -95,6 +95,7 @@ func (h *Handler) AprovarPedidoCorrecao(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	h.registarAprovacaoLegal(r.Context(), user.TenantID, user.ID, r.RemoteAddr, "aprovar_pedido_correcao_ponto", "pedido_correcao_ponto", id)
 	w.WriteHeader(http.StatusNoContent)
 }
 

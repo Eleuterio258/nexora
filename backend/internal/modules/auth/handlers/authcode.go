@@ -68,7 +68,7 @@ func (h *Handler) issueFuncionarioTokens(w http.ResponseWriter, r *http.Request,
 		scope = scopeStringFromAccess(userAccess)
 	}
 
-	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, scope, h.cfg.JWTExpiresIn, time.Now())
+	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, scope, h.cfg.JWTExpiresIn, time.Now(), nil, funcionarioID)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
@@ -559,7 +559,7 @@ func (h *Handler) Reauth(w http.ResponseWriter, r *http.Request) {
 	if escopo == "" {
 		escopo = "erp"
 	}
-	accessToken, _, err := h.signOAuthAccessToken(user.ID, tenantID, membershipID, user.Tipo, escopo, scope, h.cfg.JWTExpiresIn, time.Now())
+	accessToken, _, err := h.signOAuthAccessToken(user.ID, tenantID, membershipID, user.Tipo, escopo, scope, h.cfg.JWTExpiresIn, time.Now(), nil, nil)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return

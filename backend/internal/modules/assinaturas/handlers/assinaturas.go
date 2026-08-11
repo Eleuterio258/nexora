@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/contracts"
 )
 
 func (h *Handler) listAll(w http.ResponseWriter, r *http.Request, query string, args ...any) {
@@ -156,6 +157,14 @@ func (h *Handler) RenovarAssinatura(w http.ResponseWriter, r *http.Request) {
 	if err != nil || tag.RowsAffected() == 0 {
 		jsonErr(w, "Assinatura nao encontrada", http.StatusNotFound)
 		return
+	}
+	if h.legalAudit != nil {
+		actorID := u.ID
+		h.legalAudit.RecordEvent(r.Context(), contracts.LegalAuditEvent{
+			TenantID: u.TenantID, ActorUserID: &actorID, IPAddress: r.RemoteAddr,
+			ServiceName: "nexora-erp", ModuleName: "assinaturas", Action: "renovar_assinatura",
+			EntityType: "subscription", EntityID: id,
+		})
 	}
 	jsonOK(w, map[string]any{"ok": true}, http.StatusOK)
 }

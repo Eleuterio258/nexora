@@ -11,16 +11,17 @@ import (
 	"nexora/config"
 	"nexora/internal/modules/recursos-humanos/service/assiduidade"
 	"nexora/internal/shared/contracts"
+	"nexora/internal/storage"
 )
 
 // StartJobs lança os jobs em background e retorna quando ctx é cancelado.
-func StartJobs(ctx context.Context, db *pgxpool.Pool, notif contracts.NotificationPort, cfg *config.Config) {
+func StartJobs(ctx context.Context, db *pgxpool.Pool, notif contracts.NotificationPort, cfg *config.Config, store storage.Provider) {
 	mailer := newMailer(cfg)
 	sms := newSMSSender(cfg)
 
 	// Despacho de notificações pendentes — a cada 30s
 	go runInterval(ctx, "dispatch-notifications", 30*time.Second, func() {
-		dispatchNotifications(db, mailer, sms)
+		dispatchNotifications(db, mailer, sms, store)
 	})
 
 	// Reminders de cobranças escolares — diário
@@ -109,7 +110,7 @@ func runInterval(ctx context.Context, name string, interval time.Duration, fn fu
 
 // dispatchNotifications lê mensagens pendentes e envia por email ou SMS.
 // Até 3 tentativas por mensagem; após isso marca como 'falhou'.
-func dispatchNotifications(db *pgxpool.Pool, mailer *sesMailer, sms smsSender) {
+func dispatchNotifications(db *pgxpool.Pool, mailer *sesMailer, sms smsSender, store storage.Provider) {
 	if !mailer.enabled() && sms == nil {
 		return
 	}
@@ -118,7 +119,8 @@ func dispatchNotifications(db *pgxpool.Pool, mailer *sesMailer, sms smsSender) {
 	defer cancel()
 
 	rows, err := db.Query(ctx, `
-		SELECT id, canal_tipo, destinatario, assunto, corpo, tentativas
+		SELECT id, canal_tipo, destinatario, assunto, corpo, tentativas,
+		       COALESCE(anexo_storage_key,''), COALESCE(anexo_nome,'')
 		  FROM notifications.notification_messages
 		 WHERE status = 'pendente' AND tentativas < 3
 		 ORDER BY created_at
@@ -131,17 +133,20 @@ func dispatchNotifications(db *pgxpool.Pool, mailer *sesMailer, sms smsSender) {
 	defer rows.Close()
 
 	type msg struct {
-		id           int64
-		canalTipo    string
-		destinatario string
-		assunto      string
-		corpo        string
-		tentativas   int
+		id              int64
+		canalTipo       string
+		destinatario    string
+		assunto         string
+		corpo           string
+		tentativas      int
+		anexoStorageKey string
+		anexoNome       string
 	}
 	var msgs []msg
 	for rows.Next() {
 		var m msg
-		if err := rows.Scan(&m.id, &m.canalTipo, &m.destinatario, &m.assunto, &m.corpo, &m.tentativas); err != nil {
+		if err := rows.Scan(&m.id, &m.canalTipo, &m.destinatario, &m.assunto, &m.corpo, &m.tentativas,
+			&m.anexoStorageKey, &m.anexoNome); err != nil {
 			continue
 		}
 		msgs = append(msgs, m)
@@ -153,7 +158,11 @@ func dispatchNotifications(db *pgxpool.Pool, mailer *sesMailer, sms smsSender) {
 		var sendErr error
 		switch m.canalTipo {
 		case "email":
-			sendErr = mailer.send(m.destinatario, m.assunto, m.corpo)
+			if m.anexoStorageKey != "" && store != nil {
+				sendErr = sendEmailComAnexo(ctx, mailer, store, m.destinatario, m.assunto, m.corpo, m.anexoNome, m.anexoStorageKey)
+			} else {
+				sendErr = mailer.send(m.destinatario, m.assunto, m.corpo)
+			}
 		case "sms":
 			sendErr = sms.send(m.destinatario, m.corpo)
 		default:

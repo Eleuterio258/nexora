@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/adapters"
 )
 
 func (h *Handler) CriarFacturaCompra(w http.ResponseWriter, r *http.Request) {
@@ -86,6 +87,9 @@ func (h *Handler) AdicionarItemFacturaCompra(w http.ResponseWriter, r *http.Requ
 		jsonErr(w, "Erro ao recalcular factura", 500)
 		return
 	}
+
+	adapters.PostPurchaseInvoiceJournalEntry(r.Context(), h.db, h.accounting, u.TenantID, u.ID, invoiceID)
+
 	jsonOK(w, map[string]any{"id": id}, http.StatusCreated)
 }
 

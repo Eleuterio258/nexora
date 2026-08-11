@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/contracts"
 )
 
 func (h *Handler) AdicionarItemFaturaFiscal(w http.ResponseWriter, r *http.Request) {
@@ -104,5 +107,18 @@ func (h *Handler) EmitirFaturaFiscal(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Nao foi possivel emitir a fatura", http.StatusInternalServerError)
 		return
 	}
+
+	if invoiceID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64); err == nil {
+		h.gerarLancamentoContabilisticoFatura(r.Context(), user.TenantID, user.ID, invoiceID)
+		if h.legalAudit != nil {
+			actorID := user.ID
+			h.legalAudit.RecordEvent(r.Context(), contracts.LegalAuditEvent{
+				TenantID: user.TenantID, ActorUserID: &actorID, IPAddress: r.RemoteAddr,
+				ServiceName: "nexora-erp", ModuleName: "faturacao", Action: "emitir_fatura",
+				EntityType: "invoice", EntityID: fmt.Sprint(invoiceID),
+			})
+		}
+	}
+
 	jsonOK(w, map[string]any{"estado": "emitida", "itens_isentos": exemptions}, http.StatusOK)
 }

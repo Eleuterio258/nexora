@@ -15,6 +15,7 @@ import (
 	hardwaremqtt "nexora/internal/modules/hardware/mqtt"
 	"nexora/internal/router"
 	"nexora/internal/shared/adapters"
+	"nexora/internal/storage"
 )
 
 func main() {
@@ -29,8 +30,24 @@ func main() {
 	ctx, cancelJobs := context.WithCancel(context.Background())
 	defer cancelJobs()
 
+	store, err := storage.New(storage.Config{
+		Provider:          cfg.StorageProvider,
+		LocalDir:          cfg.StorageLocalDir,
+		PublicBaseURL:     cfg.StoragePublicURL,
+		MinioEndpoint:     cfg.MinioEndpoint,
+		MinioAccessKey:    cfg.MinioAccessKey,
+		MinioSecretKey:    cfg.MinioSecretKey,
+		MinioBucket:       cfg.MinioBucket,
+		MinioUseSSL:       cfg.MinioUseSSL,
+		MinioRegion:       cfg.MinioRegion,
+		MinioBucketLookup: cfg.MinioBucketLookup,
+	})
+	if err != nil {
+		log.Fatalf("[nexora] storage init: %v", err)
+	}
+
 	// Arrancar jobs recorrentes (notificações, reminders, etc.)
-	background.StartJobs(ctx, pool, adapters.NewNotificationAdapter(pool), cfg)
+	background.StartJobs(ctx, pool, adapters.NewNotificationAdapter(pool), cfg, store)
 
 	// Worker MQTT do módulo hardware — opcional, só liga se MQTT_BROKER_URL estiver definida.
 	var mqttWorker *hardwaremqtt.Worker

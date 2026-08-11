@@ -13,14 +13,15 @@ import (
 )
 
 type Handler struct {
-	db        *pgxpool.Pool
-	cfg       *config.Config
-	storage   storage.Provider
-	signature contracts.SignaturePort
+	db         *pgxpool.Pool
+	cfg        *config.Config
+	storage    storage.Provider
+	signature  contracts.SignaturePort
+	legalAudit contracts.LegalAuditPort
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider, signature contracts.SignaturePort) *Handler {
-	return &Handler{db: db, cfg: cfg, storage: st, signature: signature}
+func New(db *pgxpool.Pool, cfg *config.Config, st storage.Provider, signature contracts.SignaturePort, legalAudit contracts.LegalAuditPort) *Handler {
+	return &Handler{db: db, cfg: cfg, storage: st, signature: signature, legalAudit: legalAudit}
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {

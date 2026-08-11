@@ -1,0 +1,56 @@
+[
+    {
+        "id": 1,
+        "code": "A",
+        "type": "FT",
+        "description": "Faturas 2026",
+        "year": 2026,
+        "next": 48,
+        "active": true
+    },
+    {
+        "id": 2,
+        "code": "A",
+        "type": "FR",
+        "description": "Faturas-recibo 2026",
+        "year": 2026,
+        "next": 16,
+        "active": true
+    },
+    {
+        "id": 3,
+        "code": "A",
+        "type": "VD",
+        "description": "Vendas a dinheiro 2026",
+        "year": 2026,
+        "next": 29,
+        "active": true
+    },
+    {
+        "id": 4,
+        "code": "OR",
+        "type": "ORC",
+        "description": "Orçamentos 2026",
+        "year": 2026,
+        "next": 35,
+        "active": true
+    },
+    {
+        "id": 5,
+        "code": "NC",
+        "type": "NC",
+        "description": "Notas de crédito 2026",
+        "year": 2026,
+        "next": 7,
+        "active": true
+    },
+    {
+        "id": 6,
+        "code": "PP",
+        "type": "PP",
+        "description": "Faturas pro forma 2026",
+        "year": 2026,
+        "next": 2,
+        "active": true
+    }
+]

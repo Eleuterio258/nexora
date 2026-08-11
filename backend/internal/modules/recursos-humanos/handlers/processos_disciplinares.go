@@ -155,6 +155,9 @@ func (h *Handler) ActualizarProcessoDisciplinarFuncionario(w http.ResponseWriter
 		jsonErr(w, "Processo disciplinar não encontrado", http.StatusNotFound)
 		return
 	}
+	if body.Estado != nil && *body.Estado == "decidido" {
+		h.registarAprovacaoLegal(r.Context(), user.TenantID, user.ID, r.RemoteAddr, "decidir_processo_disciplinar", "processo_disciplinar", registoID)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

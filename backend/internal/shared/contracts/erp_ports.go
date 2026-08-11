@@ -60,14 +60,20 @@ type AccountingPort interface {
 }
 
 // JournalEntry cabeçalho + linhas de um lançamento contabilístico.
+// O adaptador resolve o período fiscal (fiscal_period_id) automaticamente a
+// partir de TenantID + DataEntrada — tem de existir um período aberto para
+// esse mês, caso contrário RecordJournalEntry devolve erro.
 type JournalEntry struct {
-	TenantID    int64
-	Numero      string
-	Descricao   string
-	Referencia  string
-	DataEntrada time.Time
-	CreatedBy   *int64
-	Linhas      []JournalLine
+	TenantID            int64
+	AccountingJournalID int64 // contabilidade.accounting_journals.id — obrigatório
+	Numero              string
+	Descricao           string
+	ReferenciaTipo      string
+	ReferenciaID        *int64
+	Moeda               string // default "MZN" se vazio
+	DataEntrada         time.Time
+	CreatedBy           *int64
+	Linhas              []JournalLine
 }
 
 // JournalLine linha de débito ou crédito.
@@ -89,14 +95,14 @@ type InvoicingPort interface {
 
 // SchoolReceipt dados para criação de recibo de propina.
 type SchoolReceipt struct {
-	TenantID   int64
-	CustomerID int64 // gestao_clientes.customers.id
-	Numero     string
-	Descricao  string
-	Valor      float64
-	Moeda      string
+	TenantID    int64
+	CustomerID  int64 // gestao_clientes.customers.id
+	Numero      string
+	Descricao   string
+	Valor       float64
+	Moeda       string
 	DataEmissao time.Time
-	CreatedBy  *int64
+	CreatedBy   *int64
 }
 
 // ── Notificações ────────────────────────────────────────────────────────────
@@ -114,8 +120,14 @@ type Notification struct {
 	Assunto        string
 	Corpo          string
 	TemplateID     *int64
-	ReferenciaTipo string  // origem: "escolar.notas", "escolar.pagamento", etc.
-	ReferenciaID   *int64  // ID da entidade de origem
+	ReferenciaTipo string // origem: "escolar.notas", "escolar.pagamento", etc.
+	ReferenciaID   *int64 // ID da entidade de origem
+
+	// AnexoStorageKey, se preenchido, identifica um ficheiro já gravado no
+	// storage.Provider (ex.: PDF de factura) que o dispatcher de e-mail deve
+	// anexar. AnexoNome é o nome de ficheiro apresentado ao destinatário.
+	AnexoStorageKey string
+	AnexoNome       string
 }
 
 // ── Recursos Humanos ────────────────────────────────────────────────────────
@@ -230,4 +242,33 @@ type SignatureDocumentRequest struct {
 
 	OrigemModulo string // ex.: "recursos-humanos"
 	OrigemID     int64  // id da entidade de origem nesse módulo
+}
+
+// ── Auditoria legal ─────────────────────────────────────────────────────────
+
+// LegalAuditPort regista eventos com valor legal/compliance, numa cadeia de
+// hash imutável (auditoria.audit_events) — distinto do log operacional de
+// rotina (auditoria.audit_logs, escrito automaticamente pelo middleware
+// mw.AuditModule). Usar só para eventos irreversíveis: emissão de facturas
+// fiscais, fecho de período contabilístico, alterações de permissões, etc.
+type LegalAuditPort interface {
+	RecordEvent(ctx context.Context, e LegalAuditEvent) error
+}
+
+// LegalAuditEvent dados de um evento legal imutável.
+type LegalAuditEvent struct {
+	TenantID    int64
+	ActorUserID *int64
+	ServiceName string // ex.: "nexora-erp"
+	ModuleName  string // ex.: "faturacao", "contabilidade", "auth"
+	Action      string // ex.: "emitir_fatura", "fechar_periodo_contabilistico"
+	EntityType  string // ex.: "invoice", "fiscal_period", "cargo"
+	EntityID    string
+	Status      string // "sucesso" (default se vazio), "falha" ou "alerta"
+	IPAddress   string
+	UserAgent   string
+
+	Metadata      map[string]any
+	PayloadBefore map[string]any
+	PayloadAfter  map[string]any
 }

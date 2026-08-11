@@ -180,15 +180,16 @@ func (r *FeeRepository) CreateTreasuryMovement(ctx context.Context, tenantID int
 
 // FinancialConfig configuração financeira do módulo escolar por tenant.
 type FinancialConfig struct {
-	ContaBancariaID             *int64
-	CentroCustoID               *int64
-	CriarMovimentoTesouraria    bool
-	CriarMovimentoFinanceiro    bool
+	ContaBancariaID              *int64
+	CentroCustoID                *int64
+	CriarMovimentoTesouraria     bool
+	CriarMovimentoFinanceiro     bool
 	CriarLancamentoContabilidade bool
-	ContaDebitoID               *int64 // conta bancária/caixa para débito no journal
-	ContaCreditoID              *int64 // conta de receita para crédito no journal
-	CriarReciboFaturacao        bool
-	CustomerGroupID             *int64 // grupo de clientes para encarregados
+	AccountingJournalID          *int64 // diário contabilístico para o lançamento
+	ContaDebitoID                *int64 // conta bancária/caixa para débito no journal
+	ContaCreditoID               *int64 // conta de receita para crédito no journal
+	CriarReciboFaturacao         bool
+	CustomerGroupID              *int64 // grupo de clientes para encarregados
 }
 
 // GetFinancialConfig obtém configuração financeira escolar.
@@ -198,7 +199,7 @@ func (r *FeeRepository) GetFinancialConfig(ctx context.Context, tenantID int64) 
 		SELECT conta_bancaria_id, centro_custo_id,
 		       criar_movimento_tesouraria, criar_movimento_financeiro,
 		       COALESCE(criar_lancamento_contabilidade, FALSE),
-		       conta_debito_id, conta_credito_id,
+		       accounting_journal_id, conta_debito_id, conta_credito_id,
 		       COALESCE(criar_recibo_faturacao, FALSE),
 		       customer_group_id
 		FROM gestao_escolar.school_financial_config
@@ -206,7 +207,7 @@ func (r *FeeRepository) GetFinancialConfig(ctx context.Context, tenantID int64) 
 		&cfg.ContaBancariaID, &cfg.CentroCustoID,
 		&cfg.CriarMovimentoTesouraria, &cfg.CriarMovimentoFinanceiro,
 		&cfg.CriarLancamentoContabilidade,
-		&cfg.ContaDebitoID, &cfg.ContaCreditoID,
+		&cfg.AccountingJournalID, &cfg.ContaDebitoID, &cfg.ContaCreditoID,
 		&cfg.CriarReciboFaturacao,
 		&cfg.CustomerGroupID)
 	if err == pgx.ErrNoRows {

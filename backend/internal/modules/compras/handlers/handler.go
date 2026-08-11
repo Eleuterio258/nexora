@@ -21,14 +21,15 @@ type DB interface {
 }
 
 type Handler struct {
-	db        DB
-	cfg       *config.Config
-	storage   storage.Provider
-	signature contracts.SignaturePort
+	db         DB
+	cfg        *config.Config
+	storage    storage.Provider
+	signature  contracts.SignaturePort
+	accounting contracts.AccountingPort
 }
 
-func New(db DB, cfg *config.Config, st storage.Provider, signature contracts.SignaturePort) *Handler {
-	return &Handler{db: db, cfg: cfg, storage: st, signature: signature}
+func New(db DB, cfg *config.Config, st storage.Provider, signature contracts.SignaturePort, accounting contracts.AccountingPort) *Handler {
+	return &Handler{db: db, cfg: cfg, storage: st, signature: signature, accounting: accounting}
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {

@@ -1,0 +1,2 @@
+-- Não é seguro reverter emails para o formato antigo sem perder a unicidade global.
+-- Esta migration down é intencionalmente vazia.

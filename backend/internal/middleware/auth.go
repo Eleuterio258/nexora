@@ -22,13 +22,15 @@ type contextKey string
 const UserKey contextKey = "authUser"
 
 type AuthUser struct {
-	ID           int64
-	TenantID     int64
-	SessionID    int64
-	MembershipID int64     // auth.memberships.id usado neste login; 0 se não houver (ex.: superadmin)
-	Tipo         string    // "superadmin" | "funcionario"
-	Escopo       string    // "erp" | "escola"
-	ReauthAt     time.Time // momento da última reautenticação (step-up)
+	ID            int64
+	TenantID      int64
+	SessionID     int64
+	MembershipID  int64     // auth.memberships.id usado neste login; 0 se não houver (ex.: superadmin)
+	Tipo          string    // "superadmin" | "funcionario" | "terminal"
+	Escopo        string    // "erp" | "escola"
+	ReauthAt      time.Time // momento da última reautenticação (step-up)
+	TerminalID    *int64    // preenchido quando o token representa um terminal POS
+	FuncionarioID *int64    // preenchido quando o token representa um funcionário operador
 }
 
 func HashToken(token string) string {
@@ -130,6 +132,16 @@ func RequireAuth(jwtSecret string, pool *pgxpool.Pool, oauthKeys *oauthkeys.Prov
 			midRaw, _ := claims["mid"].(float64)
 			membershipID := int64(midRaw)
 
+			var terminalID, funcionarioID *int64
+			if raw, ok := claims["terminal_id"].(float64); ok && raw > 0 {
+				tid := int64(raw)
+				terminalID = &tid
+			}
+			if raw, ok := claims["funcionario_id"].(float64); ok && raw > 0 {
+				fid := int64(raw)
+				funcionarioID = &fid
+			}
+
 			var reauthAt time.Time
 			if raw, ok := claims["reauth_at"].(float64); ok && raw > 0 {
 				reauthAt = time.Unix(int64(raw), 0)
@@ -175,7 +187,7 @@ func RequireAuth(jwtSecret string, pool *pgxpool.Pool, oauthKeys *oauthkeys.Prov
 			ctx := context.WithValue(r.Context(), UserKey, &AuthUser{
 				ID: userID, TenantID: tenantID, SessionID: sessionID,
 				MembershipID: membershipID, Tipo: tipo, Escopo: escopo,
-				ReauthAt: reauthAt,
+				ReauthAt: reauthAt, TerminalID: terminalID, FuncionarioID: funcionarioID,
 			})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -219,6 +231,16 @@ func RequireJWT(jwtSecret string, oauthKeys *oauthkeys.Provider) func(http.Handl
 				return
 			}
 
+			var terminalID, funcionarioID *int64
+			if raw, ok := claims["terminal_id"].(float64); ok && raw > 0 {
+				tid := int64(raw)
+				terminalID = &tid
+			}
+			if raw, ok := claims["funcionario_id"].(float64); ok && raw > 0 {
+				fid := int64(raw)
+				funcionarioID = &fid
+			}
+
 			var reauthAt time.Time
 			if raw, ok := claims["reauth_at"].(float64); ok && raw > 0 {
 				reauthAt = time.Unix(int64(raw), 0)
@@ -228,7 +250,7 @@ func RequireJWT(jwtSecret string, oauthKeys *oauthkeys.Provider) func(http.Handl
 
 			ctx := context.WithValue(r.Context(), UserKey, &AuthUser{
 				ID: userID, TenantID: int64(tidRaw), MembershipID: int64(midRaw), Tipo: tipo, Escopo: escopo,
-				ReauthAt: reauthAt,
+				ReauthAt: reauthAt, TerminalID: terminalID, FuncionarioID: funcionarioID,
 			})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -432,6 +454,28 @@ func RequireLicencaAtiva(pool DBPool) func(http.Handler) http.Handler {
 func GetUser(r *http.Request) *AuthUser {
 	u, _ := r.Context().Value(UserKey).(*AuthUser)
 	return u
+}
+
+// IsTerminalToken indica se o token autenticado representa um terminal POS
+// (identidade técnica) em vez de um utilizador/funcionário humano.
+func IsTerminalToken(r *http.Request) bool {
+	u := GetUser(r)
+	return u != nil && u.Tipo == "terminal" && u.TerminalID != nil && *u.TerminalID > 0
+}
+
+// RequireHumanOperator é um middleware que rejeita pedidos feitos por tokens
+// de terminal. Deve ser usado em rotas onde uma pessoa (operador de caixa)
+// precisa estar autenticada, como abertura de sessão, venda e fecho de caixa.
+func RequireHumanOperator() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if IsTerminalToken(r) {
+				JSONErr(w, "Operação requer autenticação de operador humano", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func JSONErr(w http.ResponseWriter, msg string, status int) {

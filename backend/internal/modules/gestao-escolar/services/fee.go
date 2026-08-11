@@ -242,15 +242,18 @@ func (s *FeeService) RegisterPayment(ctx context.Context, p *models.SchoolPaymen
 
 	// Integração com Contabilidade (débito bancário / crédito receita propinas)
 	if cfg.CriarLancamentoContabilidade && s.accounting != nil &&
-		cfg.ContaDebitoID != nil && cfg.ContaCreditoID != nil {
+		cfg.AccountingJournalID != nil && cfg.ContaDebitoID != nil && cfg.ContaCreditoID != nil {
 		numEntry := fmt.Sprintf("ESC-JE-%d-%d", p.TenantID, p.ID)
+		pID := p.SchoolFeeID
 		if err := s.accounting.RecordJournalEntry(ctx, contracts.JournalEntry{
-			TenantID:    p.TenantID,
-			Numero:      numEntry,
-			Descricao:   descricao,
-			Referencia:  referencia,
-			DataEntrada: p.PagoEm,
-			CreatedBy:   p.CreatedBy,
+			TenantID:            p.TenantID,
+			AccountingJournalID: *cfg.AccountingJournalID,
+			Numero:              numEntry,
+			Descricao:           descricao,
+			ReferenciaTipo:      "escolar",
+			ReferenciaID:        &pID,
+			DataEntrada:         p.PagoEm,
+			CreatedBy:           p.CreatedBy,
 			Linhas: []contracts.JournalLine{
 				{ContaID: *cfg.ContaDebitoID, Debito: p.Valor, Credito: 0, Memo: descricao},
 				{ContaID: *cfg.ContaCreditoID, Debito: 0, Credito: p.Valor, Memo: descricao},

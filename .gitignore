@@ -154,3 +154,7 @@ nexora-erp/infra/traefik/acme/acme.json
 .env
 .env.*
 !.env.example
+
+# Dados pessoais locais do protótipo PHC
+phc/dados.md
+phc/documentos-pessoais/

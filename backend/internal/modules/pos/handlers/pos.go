@@ -14,6 +14,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 	mw "nexora/internal/middleware"
+	"nexora/internal/modules/recursos-humanos/service/funcionario"
+	"nexora/internal/shared/adapters"
 	"nexora/internal/ws"
 )
 
@@ -153,7 +155,7 @@ func (h *Handler) CriarTerminal(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
-	syntheticEmail := strings.ToLower(body.Codigo) + "@terminal.internal"
+	syntheticEmail := fmt.Sprintf("terminal.%d.%s@nexora.local", user.TenantID, strings.ToLower(body.Codigo))
 
 	var userID int64
 	if err := tx.QueryRow(ctx, `
@@ -369,27 +371,96 @@ func (h *Handler) AbrirSessao(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "terminal_id é obrigatório", http.StatusBadRequest)
 		return
 	}
+
+	// O token de terminal não deve abrir sessões — apenas operadores humanos.
+	// Esta proteção é redundante com o middleware RequireHumanOperator, mas
+	// defende contra chamadas internas ou testes que o contornem.
+	if mw.IsTerminalToken(r) {
+		jsonErr(w, "Operação requer autenticação de operador humano", http.StatusForbidden)
+		return
+	}
+
+	// Resolver o funcionário de RH associado à conta pessoal do operador.
+	funcID, err := h.resolveFuncionarioID(r.Context(), user.TenantID, user.ID)
+	if err != nil || funcID == 0 {
+		jsonErr(w, "Utilizador não está ligado a um funcionário ativo", http.StatusForbidden)
+		return
+	}
+
 	var ativo bool
 	if err := h.db.QueryRow(r.Context(), `SELECT activo FROM pos_terminals WHERE id=$1 AND tenant_id=$2`, body.TerminalID, user.TenantID).Scan(&ativo); err != nil || !ativo {
 		jsonErr(w, "Terminal não encontrado ou inativo", http.StatusBadRequest)
 		return
 	}
-	var existeAberta int64
-	err := h.db.QueryRow(r.Context(), `SELECT id FROM pos_sessions WHERE tenant_id=$1 AND user_id=$2 AND status='aberta'`, user.TenantID, user.ID).Scan(&existeAberta)
-	if err == nil {
-		jsonErr(w, fmt.Sprintf("Já tem uma sessão de caixa aberta (#%d)", existeAberta), http.StatusConflict)
+
+	// Validar autorização do funcionário no terminal (Fase 3).
+	// Quando não existem atribuições para o terminal, permite (modo permissivo).
+	autorizado, err := h.funcionarioAutorizadoNoTerminal(r.Context(), user.TenantID, body.TerminalID, funcID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
+	if !autorizado {
+		jsonErr(w, "Funcionário não autorizado a operar este terminal", http.StatusForbidden)
+		return
+	}
+
+	// Não permitir duas sessões abertas para o mesmo terminal (Fase 3).
+	var existeTerminalAberto int64
+	if err := h.db.QueryRow(r.Context(), `SELECT id FROM pos_sessions WHERE tenant_id=$1 AND terminal_id=$2 AND status='aberta'`, user.TenantID, body.TerminalID).Scan(&existeTerminalAberto); err == nil {
+		jsonErr(w, fmt.Sprintf("Já existe uma sessão de caixa aberta para este terminal (#%d)", existeTerminalAberto), http.StatusConflict)
+		return
+	}
+
 	var id int64
 	err = h.db.QueryRow(r.Context(), `
-		INSERT INTO pos_sessions (tenant_id, terminal_id, user_id, opening_amount)
-		VALUES ($1,$2,$3,$4) RETURNING id`,
-		user.TenantID, body.TerminalID, user.ID, body.OpeningAmount).Scan(&id)
+		INSERT INTO pos_sessions (tenant_id, terminal_id, user_id, funcionario_id, opening_amount)
+		VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+		user.TenantID, body.TerminalID, user.ID, funcID, body.OpeningAmount).Scan(&id)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
 	jsonOK(w, map[string]any{"id": id}, http.StatusCreated)
+}
+
+// resolveFuncionarioID devolve o rh.funcionarios.id associado a um user_id no
+// tenant, ou 0 se não existir/inativo. Centraliza a resolução para evitar
+// duplicação entre sessões e vendas.
+func (h *Handler) resolveFuncionarioID(ctx context.Context, tenantID, userID int64) (int64, error) {
+	f, err := funcionario.NewService(h.db).PorUserID(ctx, tenantID, userID)
+	if err != nil {
+		return 0, err
+	}
+	if f == nil || strings.ToLower(f.Estado) != "ativo" {
+		return 0, fmt.Errorf("funcionário inativo ou não encontrado")
+	}
+	return f.ID, nil
+}
+
+// funcionarioAutorizadoNoTerminal verifica se um funcionário pode operar um
+// terminal. Se não existirem atribuições para o terminal, permite (modo
+// permissivo). Se existirem, exige pelo menos uma ativa e válida.
+func (h *Handler) funcionarioAutorizadoNoTerminal(ctx context.Context, tenantID, terminalID, funcionarioID int64) (bool, error) {
+	var totalAtribuicoes int
+	err := h.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM pos.terminal_funcionarios
+		 WHERE tenant_id=$1 AND terminal_id=$2 AND ativo=true
+		   AND (valido_de IS NULL OR valido_de <= NOW())
+		   AND (valido_ate IS NULL OR valido_ate >= NOW())`, tenantID, terminalID).Scan(&totalAtribuicoes)
+	if err != nil {
+		return false, err
+	}
+	if totalAtribuicoes == 0 {
+		return true, nil
+	}
+	var autorizado int
+	err = h.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM pos.terminal_funcionarios
+		 WHERE tenant_id=$1 AND terminal_id=$2 AND funcionario_id=$3 AND ativo=true
+		   AND (valido_de IS NULL OR valido_de <= NOW())
+		   AND (valido_ate IS NULL OR valido_ate >= NOW())`, tenantID, terminalID, funcionarioID).Scan(&autorizado)
+	return autorizado > 0, err
 }
 
 func (h *Handler) ObterSessaoAtual(w http.ResponseWriter, r *http.Request) {
@@ -829,9 +900,13 @@ func (h *Handler) CriarVenda(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 
-	var terminalID int64
-	if err := tx.QueryRow(ctx, `SELECT terminal_id FROM pos_sessions WHERE id=$1 AND tenant_id=$2 AND status='aberta'`, body.PosSessionID, user.TenantID).Scan(&terminalID); err != nil {
+	var terminalID, funcionarioID int64
+	if err := tx.QueryRow(ctx, `SELECT terminal_id, COALESCE(funcionario_id,0) FROM pos_sessions WHERE id=$1 AND tenant_id=$2 AND status='aberta'`, body.PosSessionID, user.TenantID).Scan(&terminalID, &funcionarioID); err != nil {
 		jsonErr(w, "Sessão de caixa não encontrada ou já fechada", http.StatusBadRequest)
+		return
+	}
+	if funcionarioID == 0 {
+		jsonErr(w, "Sessão de caixa sem operador identificado", http.StatusUnprocessableEntity)
 		return
 	}
 
@@ -849,9 +924,9 @@ func (h *Handler) CriarVenda(w http.ResponseWriter, r *http.Request) {
 
 	var id int64
 	if err := tx.QueryRow(ctx, `
-		INSERT INTO pos_sales (tenant_id, pos_session_id, terminal_id, numero, customer_id, client_reference, status, sold_at, created_by)
-		VALUES ($1,$2,$3,$4,$5,$6,'concluida',NOW(),$7) RETURNING id`,
-		user.TenantID, body.PosSessionID, terminalID, numero, body.CustomerID, body.ClientReference, user.ID).Scan(&id); err != nil {
+		INSERT INTO pos_sales (tenant_id, pos_session_id, terminal_id, funcionario_id, numero, customer_id, client_reference, status, sold_at, created_by)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,'concluida',NOW(),$8) RETURNING id`,
+		user.TenantID, body.PosSessionID, terminalID, funcionarioID, numero, body.CustomerID, body.ClientReference, user.ID).Scan(&id); err != nil {
 		// Corrida rara: dois pedidos com a mesma client_reference chegaram em
 		// paralelo e o outro venceu entretanto (protegido pelo índice único).
 		if temReferencia && isUniqueViolation(err) {
@@ -991,6 +1066,8 @@ func (h *Handler) CriarVenda(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
+
+	adapters.PostInvoiceJournalEntry(ctx, h.db, h.accounting, user.TenantID, user.ID, invoiceID)
 
 	if h.wsHub != nil {
 		h.wsHub.SendEvent(user.ID, ws.EvtVendaCriada, map[string]any{"id": id, "numero": numero, "total": totalGeral})

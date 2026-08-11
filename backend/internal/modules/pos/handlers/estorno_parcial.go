@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/adapters"
 )
 
 // itemDevolvido é uma linha já processada (stock reposto, quantidade
@@ -193,6 +194,8 @@ func (h *Handler) EstornoParcialVenda(w http.ResponseWriter, r *http.Request) {
 	// Nota de crédito fiscal — só se a venda tiver fatura associada (ver §2.5
 	// de docs/backend-go-gaps-paycore.md). Vendas sem fatura (ex.: anteriores
 	// a esta funcionalidade) só ficam com o registo em pos_sale_returns.
+	var creditNoteID int64
+	temNotaCredito := false
 	if invoiceID != nil && customerID != nil {
 		itensNC := make([]itemNotaCreditoPOS, len(itensDevolvidos))
 		for i, it := range itensDevolvidos {
@@ -201,7 +204,9 @@ func (h *Handler) EstornoParcialVenda(w http.ResponseWriter, r *http.Request) {
 				Quantidade: it.quantidade, Valor: it.valor,
 			}
 		}
-		creditNoteID, creditNoteNumero, err := h.criarNotaCreditoParaEstorno(ctx, tx, notaCreditoParams{
+		var creditNoteNumero string
+		var err error
+		creditNoteID, creditNoteNumero, err = h.criarNotaCreditoParaEstorno(ctx, tx, notaCreditoParams{
 			tenantID: user.TenantID, customerID: *customerID, invoiceID: *invoiceID,
 			userID: user.ID, motivo: body.Motivo, itens: itensNC, total: valorTotalDevolvido,
 		})
@@ -213,6 +218,7 @@ func (h *Handler) EstornoParcialVenda(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, "Erro interno", http.StatusInternalServerError)
 			return
 		}
+		temNotaCredito = true
 		resp["credit_note_id"] = creditNoteID
 		resp["credit_note_numero"] = creditNoteNumero
 	}
@@ -220,6 +226,10 @@ func (h *Handler) EstornoParcialVenda(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(ctx); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
+	}
+
+	if temNotaCredito {
+		adapters.PostCreditNoteJournalEntry(ctx, h.db, h.accounting, user.TenantID, user.ID, creditNoteID)
 	}
 
 	jsonOK(w, resp, http.StatusCreated)

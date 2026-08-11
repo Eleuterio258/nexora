@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	mw "nexora/internal/middleware"
+	"nexora/internal/shared/contracts"
 )
 
 type periodClosingRow struct {
@@ -328,6 +330,16 @@ func (h *Handler) ConfirmarEncerramento(w http.ResponseWriter, r *http.Request) 
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
+
+	if h.legalAudit != nil {
+		actorID := user.ID
+		h.legalAudit.RecordEvent(r.Context(), contracts.LegalAuditEvent{
+			TenantID: user.TenantID, ActorUserID: &actorID, IPAddress: r.RemoteAddr,
+			ServiceName: "nexora-erp", ModuleName: "contabilidade", Action: "fechar_periodo_contabilistico",
+			EntityType: "fiscal_period", EntityID: fmt.Sprint(fiscalPeriodID),
+		})
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 

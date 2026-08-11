@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "code": "SRV-001",
+    "name": "Consultoria de gestão",
+    "unit": "Hora",
+    "price": 2500,
+    "tax": 16,
+    "stock": null,
+    "active": true
+  },
+  {
+    "id": 2,
+    "code": "LIC-001",
+    "name": "Licença Software ERP — Mensal",
+    "unit": "Un.",
+    "price": 18500,
+    "tax": 16,
+    "stock": null,
+    "active": true
+  },
+  {
+    "id": 3,
+    "code": "EQP-014",
+    "name": "Terminal POS Android",
+    "unit": "Un.",
+    "price": 32000,
+    "tax": 16,
+    "stock": 18,
+    "active": true
+  },
+  {
+    "id": 4,
+    "code": "SRV-007",
+    "name": "Instalação e parametrização",
+    "unit": "Serv.",
+    "price": 12000,
+    "tax": 16,
+    "stock": null,
+    "active": true
+  },
+  {
+    "id": 5,
+    "code": "PAP-003",
+    "name": "Rolo térmico 80 mm",
+    "unit": "Cx.",
+    "price": 1450,
+    "tax": 16,
+    "stock": 42,
+    "active": true
+  },
+  {
+    "id": 6,
+    "code": "FORM-01",
+    "name": "Formação de utilizadores",
+    "unit": "Dia",
+    "price": 8500,
+    "tax": 0,
+    "stock": null,
+    "active": true
+  }
+]

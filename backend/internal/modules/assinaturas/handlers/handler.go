@@ -6,15 +6,17 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
+	"nexora/internal/shared/contracts"
 )
 
 type Handler struct {
-	db  *pgxpool.Pool
-	cfg *config.Config
+	db         *pgxpool.Pool
+	cfg        *config.Config
+	legalAudit contracts.LegalAuditPort
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config) *Handler {
-	return &Handler{db: db, cfg: cfg}
+func New(db *pgxpool.Pool, cfg *config.Config, legalAudit contracts.LegalAuditPort) *Handler {
+	return &Handler{db: db, cfg: cfg, legalAudit: legalAudit}
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {
