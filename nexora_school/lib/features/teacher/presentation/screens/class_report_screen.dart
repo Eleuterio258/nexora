@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 const _grey = Color(0xFF8E8E93);
 
@@ -52,7 +51,7 @@ class ClassReportScreen extends StatelessWidget {
                 'Média da Turma',
                 '13.4',
                 Icons.bar_chart_rounded,
-                _green,
+                AppColors.primary,
               ),
               const SizedBox(height: 12),
               _buildStatCard(
@@ -80,7 +79,7 @@ class ClassReportScreen extends StatelessWidget {
               const SizedBox(height: 12),
               _buildBarRow('0 – 9', 2, 28, Colors.red),
               _buildBarRow('10 – 13', 8, 28, const Color(0xFFF59E0B)),
-              _buildBarRow('14 – 17', 14, 28, _green),
+              _buildBarRow('14 – 17', 14, 28, AppColors.primary),
               _buildBarRow('18 – 20', 4, 28, const Color(0xFF6B4EFF)),
             ],
           ),

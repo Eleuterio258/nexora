@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nexora_school/core/constants/app_routes.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 const _grey = Color(0xFF8E8E93);
 
@@ -67,7 +66,7 @@ class ClassDetailTeacherScreen extends StatelessWidget {
                   IconButton(
                     onPressed: () =>
                         Navigator.pushNamed(context, AppRoutes.classReport),
-                    icon: const Icon(Icons.bar_chart_rounded, color: _green),
+                    icon: Icon(Icons.bar_chart_rounded, color: AppColors.primary),
                     tooltip: 'Relatório',
                   ),
                 ],
@@ -153,19 +152,19 @@ class _ActionChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: _green.withValues(alpha: 0.08),
+            color: AppColors.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Column(
             children: [
-              Icon(icon, color: _green, size: 22),
+              Icon(icon, color: AppColors.primary, size: 22),
               const SizedBox(height: 4),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: _green,
+                  color: AppColors.primary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -182,7 +181,7 @@ class _AlunoTile extends StatelessWidget {
   final _AlunoResume aluno;
 
   Color get _mediaColor {
-    if (aluno.media >= 14) return _green;
+    if (aluno.media >= 14) return AppColors.primary;
     if (aluno.media >= 10) return const Color(0xFFF59E0B);
     return Colors.red;
   }
@@ -208,10 +207,10 @@ class _AlunoTile extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: _green.withValues(alpha: 0.08),
+              color: AppColors.primary.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.person_rounded, color: _green, size: 20),
+            child: Icon(Icons.person_rounded, color: AppColors.primary, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(

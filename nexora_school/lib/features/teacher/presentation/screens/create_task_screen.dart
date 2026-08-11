@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 
 class CreateTaskScreen extends StatefulWidget {
@@ -41,7 +40,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       builder: (context, child) => Theme(
         data: Theme.of(
           context,
-        ).copyWith(colorScheme: const ColorScheme.light(primary: _green)),
+        ).copyWith(colorScheme: ColorScheme.light(primary: AppColors.primary)),
         child: child!,
       ),
     );
@@ -122,9 +121,9 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.calendar_today_rounded,
-                        color: _green,
+                        color: AppColors.primary,
                         size: 18,
                       ),
                       const SizedBox(width: 10),
@@ -151,7 +150,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _green,
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -183,7 +182,7 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _green, width: 1.5),
+        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );

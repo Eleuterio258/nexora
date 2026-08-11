@@ -4,8 +4,7 @@ import 'package:nexora_school/core/di/injection.dart';
 import '../../cubit/student_presencas_cubit.dart';
 import '../../cubit/student_presencas_state.dart';
 import '../../../domain/repositories/student_portal_repository.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 const _red = Color(0xFFEF4444);
 
@@ -70,7 +69,7 @@ class _FaltasViewState extends State<_FaltasView> {
       body: BlocBuilder<StudentPresencasCubit, StudentPresencasState>(
         builder: (context, state) {
           if (state is StudentPresencasLoading || state is StudentPresencasInitial) {
-            return const Center(child: CircularProgressIndicator(color: _green));
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
           if (state is StudentPresencasError) {
             return Center(
@@ -84,8 +83,8 @@ class _FaltasViewState extends State<_FaltasView> {
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: () => context.read<StudentPresencasCubit>().load(),
-                    child: const Text('Tentar novamente',
-                        style: TextStyle(color: _green)),
+                    child: Text('Tentar novamente',
+                        style: TextStyle(color: AppColors.primary)),
                   ),
                 ],
               ),
@@ -141,7 +140,7 @@ class _FaltasViewState extends State<_FaltasView> {
         children: [
           _StatChip(value: total, label: 'Total', color: _navy),
           const SizedBox(width: 10),
-          _StatChip(value: just, label: 'Justificadas', color: _green),
+          _StatChip(value: just, label: 'Justificadas', color: AppColors.primary),
           const SizedBox(width: 10),
           _StatChip(value: porJust, label: 'Por justificar', color: _red),
         ],
@@ -164,7 +163,7 @@ class _FaltasViewState extends State<_FaltasView> {
                 duration: const Duration(milliseconds: 180),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
-                  color: selected ? _green : const Color(0xFFF0F2F5),
+                  color: selected ? AppColors.primary : const Color(0xFFF0F2F5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -185,7 +184,7 @@ class _FaltasViewState extends State<_FaltasView> {
 
   Widget _buildFaltaCard(BuildContext context, Map<String, dynamic> f) {
     final isPorJust = f['estado'] == 'ausente';
-    final iconColor = isPorJust ? _red : _green;
+    final iconColor = isPorJust ? _red : AppColors.primary;
     final disciplina = (f['disciplina'] ?? '—').toString();
     final data = _formatDate(f['attendance_date']?.toString());
     final id = f['id']?.toString() ?? '';
@@ -221,9 +220,9 @@ class _FaltasViewState extends State<_FaltasView> {
                           fontSize: 11, fontWeight: FontWeight.w600, color: _red)),
                 )
               else
-                const Text('Justificada',
+                Text('Justificada',
                     style: TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w600, color: _green)),
+                        fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
             ],
           ),
         ),
@@ -238,7 +237,7 @@ class _FaltasViewState extends State<_FaltasView> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.check_circle_outline_rounded,
-              size: 64, color: _green.withValues(alpha: 0.4)),
+              size: 64, color: AppColors.primary.withValues(alpha: 0.4)),
           const SizedBox(height: 16),
           const Text('Sem faltas nesta categoria',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _navy)),
@@ -307,7 +306,7 @@ class _FaltasViewState extends State<_FaltasView> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: _green, width: 1.5),
+                      borderSide: BorderSide(color: AppColors.primary, width: 1.5),
                     ),
                   ),
                 ),
@@ -327,9 +326,9 @@ class _FaltasViewState extends State<_FaltasView> {
                               if (ctx.mounted) Navigator.pop(ctx);
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
+                                  SnackBar(
                                     content: Text('Justificação enviada com sucesso'),
-                                    backgroundColor: _green,
+                                    backgroundColor: AppColors.primary,
                                     behavior: SnackBarBehavior.floating,
                                   ),
                                 );
@@ -349,7 +348,7 @@ class _FaltasViewState extends State<_FaltasView> {
                             }
                           },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _green,
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(

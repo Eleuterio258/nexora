@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:nexora_school/core/constants/app_colors.dart';
 import 'package:nexora_school/core/constants/app_routes.dart';
 import 'package:nexora_school/core/di/injection.dart';
 import 'package:nexora_school/features/agenda/presentation/bloc/agenda_bloc.dart';
@@ -41,144 +42,113 @@ class NexoraSchoolApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(create: (_) => sl<AuthBloc>()),
-        BlocProvider(create: (_) => sl<AgendaBloc>()..add(AgendaStarted())),
-      ],
-      child: MaterialApp(
-        title: 'Nexora School',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF00B87A),
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          cardTheme: const CardThemeData(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(8)),
-            ),
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+    return ValueListenableBuilder<AppColorsTheme>(
+      valueListenable: AppColors.notifier,
+      builder: (context, theme, _) {
+        return MultiBlocProvider(
+          providers: [
+            BlocProvider(create: (_) => sl<AuthBloc>()),
+            BlocProvider(create: (_) => sl<AgendaBloc>()..add(AgendaStarted())),
+          ],
+          child: MaterialApp(
+            title: 'Nexora School',
+            debugShowCheckedModeBanner: false,
+            theme: _buildTheme(theme, Brightness.light),
+            darkTheme: _buildTheme(theme, Brightness.dark),
+            themeMode: ThemeMode.system,
+            initialRoute: AppRoutes.splash,
+            routes: {
+              AppRoutes.splash: (_) => const SplashScreen(),
+              AppRoutes.onboarding: (_) => const OnboardingScreen(),
+              AppRoutes.login: (_) => const LoginScreen(),
+              AppRoutes.dashboard: (_) => const DashboardScreen(),
+
+              // Aluno
+              AppRoutes.notifications: (_) => const notif.NotificacoesScreen(),
+              AppRoutes.calendar: (_) => const CalendarioScreen(),
+              AppRoutes.messages: (_) => const ChatScreen(
+                nome: 'Conversa',
+                sub: '',
               ),
-            ),
-          ),
-          outlinedButtonTheme: OutlinedButtonThemeData(
-            style: OutlinedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+              AppRoutes.classDetail: (_) => const TurmaScreen(),
+              AppRoutes.studentAttendance: (_) => const FrequenciaScreen(),
+              AppRoutes.justifyAbsence: (_) => const FaltasScreen(),
+              AppRoutes.editProfile: (_) => const EditarPerfilScreen(),
+              AppRoutes.changePassword: (_) => const SegurancaScreen(),
+              AppRoutes.helpFaq: (_) => const AjudaFaqScreen(),
+              AppRoutes.settingsMenu: (_) =>
+                  const notif_settings.NotificacoesScreen(),
+              AppRoutes.announcementDetail: (_) => const NoticiasScreen(),
+
+              // Teacher
+              AppRoutes.teacherDashboard: (_) => const TeacherDashboardScreen(),
+              AppRoutes.classList: (_) => const ClassListScreen(),
+              AppRoutes.gradeEntryClass: (_) => const GradeEntryClassScreen(),
+              AppRoutes.gradeEntryStudents: (_) =>
+                  const GradeEntryStudentsScreen(),
+              AppRoutes.attendance: (_) => const AttendanceScreen(),
+              AppRoutes.classDetailTeacher: (_) => const ClassDetailTeacherScreen(
+                turma: '10ª Classe A',
+                disciplina: 'Matemática',
               ),
-            ),
+              AppRoutes.createTask: (_) => const CreateTaskScreen(),
+              AppRoutes.createAnnouncement: (_) =>
+                  const CreateAnnouncementScreen(),
+              AppRoutes.classReport: (_) => const ClassReportScreen(),
+            },
           ),
-          inputDecorationTheme: InputDecorationTheme(
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            filled: true,
-          ),
-          dialogTheme: DialogThemeData(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          snackBarTheme: SnackBarThemeData(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-          bottomSheetTheme: const BottomSheetThemeData(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
-            ),
+        );
+      },
+    );
+  }
+
+  ThemeData _buildTheme(AppColorsTheme theme, Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    return ThemeData(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: theme.primary,
+        brightness: brightness,
+      ),
+      useMaterial3: true,
+      scaffoldBackgroundColor: isDark ? const Color(0xFF0D1B2A) : null,
+      cardTheme: const CardThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(8)),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
           ),
         ),
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF00B87A),
-            brightness: Brightness.dark,
-          ),
-          scaffoldBackgroundColor: const Color(0xFF0D1B2A),
-          useMaterial3: true,
-          cardTheme: const CardThemeData(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(8)),
-            ),
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-          outlinedButtonTheme: OutlinedButtonThemeData(
-            style: OutlinedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-          inputDecorationTheme: InputDecorationTheme(
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            filled: true,
-          ),
-          dialogTheme: DialogThemeData(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          snackBarTheme: SnackBarThemeData(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-          bottomSheetTheme: const BottomSheetThemeData(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
-            ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
           ),
         ),
-        themeMode: ThemeMode.system,
-        initialRoute: AppRoutes.splash,
-        routes: {
-          AppRoutes.splash: (_) => const SplashScreen(),
-          AppRoutes.onboarding: (_) => const OnboardingScreen(),
-          AppRoutes.login: (_) => const LoginScreen(),
-          AppRoutes.dashboard: (_) => const DashboardScreen(),
-
-          // Aluno
-          AppRoutes.notifications: (_) => const notif.NotificacoesScreen(),
-          AppRoutes.calendar: (_) => const CalendarioScreen(),
-          AppRoutes.messages: (_) =>
-              const ChatScreen(nome: 'Conversa', sub: ''),
-          AppRoutes.classDetail: (_) => const TurmaScreen(),
-          AppRoutes.studentAttendance: (_) => const FrequenciaScreen(),
-          AppRoutes.justifyAbsence: (_) => const FaltasScreen(),
-          AppRoutes.editProfile: (_) => const EditarPerfilScreen(),
-          AppRoutes.changePassword: (_) => const SegurancaScreen(),
-          AppRoutes.helpFaq: (_) => const AjudaFaqScreen(),
-          AppRoutes.settingsMenu: (_) =>
-              const notif_settings.NotificacoesScreen(),
-          AppRoutes.announcementDetail: (_) => const NoticiasScreen(),
-
-          // Teacher
-          AppRoutes.teacherDashboard: (_) => const TeacherDashboardScreen(),
-          AppRoutes.classList: (_) => const ClassListScreen(),
-          AppRoutes.gradeEntryClass: (_) => const GradeEntryClassScreen(),
-          AppRoutes.gradeEntryStudents: (_) => const GradeEntryStudentsScreen(),
-          AppRoutes.attendance: (_) => const AttendanceScreen(),
-          AppRoutes.classDetailTeacher: (_) => const ClassDetailTeacherScreen(
-            turma: '10ª Classe A',
-            disciplina: 'Matemática',
-          ),
-          AppRoutes.createTask: (_) => const CreateTaskScreen(),
-          AppRoutes.createAnnouncement: (_) => const CreateAnnouncementScreen(),
-          AppRoutes.classReport: (_) => const ClassReportScreen(),
-        },
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        filled: true,
+      ),
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+        ),
       ),
     );
   }

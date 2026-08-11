@@ -4,8 +4,7 @@ import 'package:nexora_school/features/student_portal/domain/entities/student_fi
 import 'package:nexora_school/features/student_portal/presentation/cubit/student_financeiro_cubit.dart';
 import 'package:nexora_school/features/student_portal/presentation/cubit/student_financeiro_state.dart';
 import 'package:nexora_school/features/student_portal/presentation/screens/dashboard/sub/comprovativo_screen.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 const _orange = Color(0xFFF59E0B);
 
@@ -37,8 +36,8 @@ class FinanceiroTab extends StatelessWidget {
                         StudentFinanceiroState
                       >(
                         builder: (context, state) => switch (state) {
-                          StudentFinanceiroLoading() => const Center(
-                            child: CircularProgressIndicator(color: _green),
+                          StudentFinanceiroLoading() => Center(
+                            child: CircularProgressIndicator(color: AppColors.primary),
                           ),
                           StudentFinanceiroError(:final message) => Center(
                             child: Padding(
@@ -167,9 +166,9 @@ class FinanceiroTab extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
+            Icon(
               Icons.account_balance_wallet_rounded,
-              color: _green,
+              color: AppColors.primary,
               size: 40,
             ),
             const SizedBox(width: 16),
@@ -202,13 +201,13 @@ class FinanceiroTab extends StatelessWidget {
               icon: Icons.check_circle_outline_rounded,
               label: 'Pago',
               value: _formatMoney(totalPago),
-              color: _green,
+              color: AppColors.primary,
             ),
             _InfoChip(
               icon: Icons.schedule_rounded,
               label: 'Pendente',
               value: _formatMoney(totalPendente),
-              color: totalPendente > 0 ? _orange : _green,
+              color: totalPendente > 0 ? _orange : AppColors.primary,
             ),
             _InfoChip(
               icon: Icons.receipt_long_outlined,
@@ -277,7 +276,7 @@ class FinanceiroTab extends StatelessWidget {
     final saldo = _toDouble(cobranca['saldo'] ?? cobranca['valor_total']);
     final pago = status == 'paga';
     final vencida = status == 'vencida';
-    final color = pago ? _green : (vencida ? Colors.redAccent : _orange);
+    final color = pago ? AppColors.primary : (vencida ? Colors.redAccent : _orange);
 
     final pagamento = ComprovativoPagamento(
       referencia: (cobranca['numero'] ?? '').toString(),
@@ -469,7 +468,7 @@ class _BlobPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF00B87A).withValues(alpha: 0.06);
+      ..color = AppColors.primary.withValues(alpha: 0.06);
     final path = Path()
       ..moveTo(size.width, 0)
       ..lineTo(size.width * 0.2, 0)

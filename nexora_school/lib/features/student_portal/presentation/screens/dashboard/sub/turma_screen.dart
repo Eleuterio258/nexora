@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nexora_school/core/di/injection.dart';
 import '../../../cubit/student_turma_cubit.dart';
 import '../../../cubit/student_turma_state.dart';
+import 'package:nexora_school/core/constants/app_colors.dart';
 
 const _navy = Color(0xFF0D1B2A);
-const _green = Color(0xFF00B87A);
 
 class TurmaScreen extends StatelessWidget {
   const TurmaScreen({super.key});
@@ -60,10 +60,10 @@ class _TurmaViewState extends State<_TurmaView>
           preferredSize: const Size.fromHeight(49),
           child: TabBar(
             controller: _tabController,
-            indicatorColor: _green,
+            indicatorColor: AppColors.primary,
             indicatorWeight: 2.5,
             indicatorSize: TabBarIndicatorSize.tab,
-            labelColor: _green,
+            labelColor: AppColors.primary,
             unselectedLabelColor: const Color(0xFFADB5BD),
             labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
             unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
@@ -78,7 +78,7 @@ class _TurmaViewState extends State<_TurmaView>
       body: BlocBuilder<StudentTurmaCubit, StudentTurmaState>(
         builder: (context, state) {
           if (state is StudentTurmaLoading || state is StudentTurmaInitial) {
-            return const Center(child: CircularProgressIndicator(color: _green));
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
           if (state is StudentTurmaError) {
             return _ErrorView(
@@ -276,7 +276,7 @@ class _ErrorView extends StatelessWidget {
           const SizedBox(height: 12),
           TextButton(
             onPressed: onRetry,
-            child: const Text('Tentar novamente', style: TextStyle(color: _green)),
+            child: Text('Tentar novamente', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),

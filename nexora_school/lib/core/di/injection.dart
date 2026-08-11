@@ -10,6 +10,8 @@ import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/domain/usecases/login_usecase.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/branding/data/datasources/branding_remote_datasource.dart';
+import '../../features/branding/presentation/controllers/branding_controller.dart';
 import '../../features/student_portal/data/datasources/student_portal_remote_datasource.dart';
 import '../../features/student_portal/data/repositories/student_portal_repository_impl.dart';
 import '../../features/student_portal/domain/repositories/student_portal_repository.dart';
@@ -60,6 +62,14 @@ Future<void> setupDependencies() async {
   sl.registerLazySingleton<StudentPortalRemoteDatasource>(
     () => StudentPortalRemoteDatasourceImpl(sl()),
   );
+  sl.registerLazySingleton<BrandingRemoteDatasource>(
+    () => BrandingRemoteDatasourceImpl(sl()),
+  );
+
+  // Branding controller (cache local + refresh remoto)
+  sl.registerLazySingleton<BrandingController>(
+    () => BrandingController(sl(), sl()),
+  );
 
   // Repositories
   sl.registerLazySingleton<StudentPortalRepository>(
@@ -83,7 +93,12 @@ Future<void> setupDependencies() async {
   sl.registerLazySingleton(() => GetStudentBibliotecaUseCase(sl()));
 
   // BLoC — Auth
-  sl.registerFactory(() => AuthBloc(loginUseCase: sl()));
+  sl.registerFactory(
+    () => AuthBloc(
+      loginUseCase: sl(),
+      brandingController: sl(),
+    ),
+  );
 
   // Cubit — Student Portal
   sl.registerFactory(() => StudentHomeCubit(sl()));

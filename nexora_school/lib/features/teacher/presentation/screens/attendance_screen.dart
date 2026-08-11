@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 const _grey = Color(0xFF8E8E93);
 
@@ -140,7 +139,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _green,
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -196,7 +195,7 @@ class _AlunoPresencaTile extends StatelessWidget {
             height: 32,
             decoration: BoxDecoration(
               color: presente
-                  ? _green.withValues(alpha: 0.08)
+                  ? AppColors.primary.withValues(alpha: 0.08)
                   : Colors.red.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
@@ -206,7 +205,7 @@ class _AlunoPresencaTile extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: presente ? _green : Colors.red,
+                  color: presente ? AppColors.primary : Colors.red,
                 ),
               ),
             ),
@@ -232,12 +231,12 @@ class _AlunoPresencaTile extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: presente ? _green : Colors.transparent,
+                    color: presente ? AppColors.primary : Colors.transparent,
                     borderRadius: const BorderRadius.horizontal(
                       left: Radius.circular(20),
                     ),
                     border: Border.all(
-                      color: presente ? _green : const Color(0xFFE5E5EA),
+                      color: presente ? AppColors.primary : const Color(0xFFE5E5EA),
                     ),
                   ),
                   child: Text(

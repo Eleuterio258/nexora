@@ -100,7 +100,7 @@ class _AgendaViewState extends State<_AgendaView>
               AgendaError(:final message) => Center(
                 child: Text(
                   message,
-                  style: const TextStyle(color: AppColors.error),
+                  style: TextStyle(color: AppColors.error),
                 ),
               ),
               AgendaLoaded() => _buildLoaded(context, state),

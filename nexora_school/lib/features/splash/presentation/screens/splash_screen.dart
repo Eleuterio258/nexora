@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import '../../../../core/constants/app_assets.dart';
-import '../../../../core/constants/app_colors.dart';
+import 'package:nexora_school/core/constants/app_colors.dart';
 import '../../../../core/constants/app_routes.dart';
+import '../../../../core/di/injection.dart';
+import '../../../branding/presentation/controllers/branding_controller.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -34,7 +36,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _animCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: Duration(milliseconds: 900),
     );
 
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeIn);
@@ -48,7 +50,15 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _init() async {
-    await Future.delayed(const Duration(seconds: 3));
+    // Tenta actualizar o branding a partir do servidor em paralelo com a
+    // animação da splash. Em caso de falha mantém o cache já carregado.
+    final brandingRefresh = sl<BrandingController>().refreshOrCache();
+
+    await Future.wait([
+      brandingRefresh,
+      Future.delayed(Duration(seconds: 3)),
+    ]);
+
     FlutterNativeSplash.remove();
     if (!mounted) return;
     Navigator.of(context).pushReplacementNamed(AppRoutes.login);
@@ -102,7 +112,7 @@ class _SplashScreenState extends State<SplashScreen>
                         minHeight: 2,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     Text(
                       _version,
                       style: TextStyle(

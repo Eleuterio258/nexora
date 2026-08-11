@@ -7,8 +7,7 @@ import 'package:nexora_school/features/student_portal/presentation/screens/dashb
 import 'package:nexora_school/features/student_portal/presentation/screens/dashboard/sub/calendario_screen.dart';
 import 'package:nexora_school/features/student_portal/presentation/screens/dashboard/sub/turma_screen.dart';
 import 'package:nexora_school/features/student_portal/presentation/screens/dashboard/sub/notificacoes_screen.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 
 class HomeTab extends StatelessWidget {
@@ -32,8 +31,8 @@ class HomeTab extends StatelessWidget {
             child: BlocBuilder<StudentHomeCubit, StudentHomeState>(
               builder: (context, state) {
                 return switch (state) {
-                  StudentHomeLoading() => const Center(
-                    child: CircularProgressIndicator(color: _green),
+                  StudentHomeLoading() => Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
                   ),
                   StudentHomeError(:final message) => Center(
                     child: Padding(
@@ -130,8 +129,8 @@ class HomeTab extends StatelessWidget {
                 child: Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(
-                    color: _green,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -348,9 +347,9 @@ class HomeTab extends StatelessWidget {
             Expanded(
               child: _StatItem(
                 icon: Icons.school_rounded,
-                iconColor: const Color(0xFF00B87A),
+                iconColor: AppColors.primary,
                 value: '${data.faltas}',
-                valueColor: const Color(0xFF00B87A),
+                valueColor: AppColors.primary,
                 label: 'Faltas',
                 sub: 'de ${data.faltasPermitidas} permitidas',
               ),
@@ -433,16 +432,16 @@ class HomeTab extends StatelessWidget {
                 color: _navy,
               ),
             ),
-            const Row(
+            Row(
               children: [
-                Icon(Icons.filter_list_rounded, size: 18, color: _green),
+                Icon(Icons.filter_list_rounded, size: 18, color: AppColors.primary),
                 SizedBox(width: 4),
                 Text(
                   'Ver tudo',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: _green,
+                    color: AppColors.primary,
                   ),
                 ),
               ],
@@ -467,10 +466,10 @@ class HomeTab extends StatelessWidget {
   }
 
   static Color _parseColor(dynamic value) {
-    if (value == null) return _green;
+    if (value == null) return AppColors.primary;
     final hex = value.toString().replaceFirst('#', '');
     final color = int.tryParse(hex, radix: 16);
-    if (color == null) return _green;
+    if (color == null) return AppColors.primary;
     return Color(0xFF000000 + color);
   }
 }
@@ -647,7 +646,7 @@ class _BlobPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF00B87A).withValues(alpha: 0.06);
+      ..color = AppColors.primary.withValues(alpha: 0.06);
     final path = Path()
       ..moveTo(size.width, 0)
       ..lineTo(size.width * 0.2, 0)

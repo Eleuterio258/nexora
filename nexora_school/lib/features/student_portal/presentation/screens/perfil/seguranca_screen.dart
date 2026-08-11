@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nexora_school/core/di/injection.dart';
 import '../../../data/datasources/student_portal_remote_datasource.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 
 class SegurancaScreen extends StatefulWidget {
@@ -69,7 +68,7 @@ class _SegurancaScreenState extends State<SegurancaScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: isError ? const Color(0xFFEF4444) : _green,
+        backgroundColor: isError ? Color(0xFFEF4444) : AppColors.primary,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -129,7 +128,7 @@ class _SegurancaScreenState extends State<SegurancaScreen> {
               child: ElevatedButton(
                 onPressed: _loading ? null : _alterar,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _green,
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -158,17 +157,17 @@ class _SegurancaScreenState extends State<SegurancaScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _green.withValues(alpha: 0.08),
+        color: AppColors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.shield_outlined, color: _green, size: 22),
+          Icon(Icons.shield_outlined, color: AppColors.primary, size: 22),
           SizedBox(width: 12),
           Expanded(
             child: Text(
               'Use uma senha com pelo menos 8 caracteres, incluindo letras e números.',
-              style: TextStyle(fontSize: 13, color: _green),
+              style: TextStyle(fontSize: 13, color: AppColors.primary),
             ),
           ),
         ],
@@ -194,7 +193,7 @@ class _SegurancaScreenState extends State<SegurancaScreen> {
           obscureText: !visible,
           style: const TextStyle(fontSize: 14, color: _navy),
           decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.lock_outline_rounded, color: _green, size: 20),
+            prefixIcon: Icon(Icons.lock_outline_rounded, color: AppColors.primary, size: 20),
             suffixIcon: IconButton(
               icon: Icon(
                 visible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -217,7 +216,7 @@ class _SegurancaScreenState extends State<SegurancaScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: _green, width: 1.5),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
             ),
           ),
         ),

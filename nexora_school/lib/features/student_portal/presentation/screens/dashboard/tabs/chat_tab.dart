@@ -4,9 +4,9 @@ import 'package:nexora_school/features/student_portal/domain/entities/student_me
 import 'package:nexora_school/features/student_portal/presentation/cubit/student_mensagens_cubit.dart';
 import 'package:nexora_school/features/student_portal/presentation/cubit/student_mensagens_state.dart';
 import 'package:nexora_school/features/student_portal/presentation/screens/dashboard/sub/chat_screen.dart';
+import 'package:nexora_school/core/constants/app_colors.dart';
 
 const _navy = Color(0xFF0D1B2A);
-const _green = Color(0xFF00B87A);
 
 class ChatTab extends StatelessWidget {
   const ChatTab({super.key});
@@ -24,8 +24,8 @@ class ChatTab extends StatelessWidget {
               child: BlocBuilder<StudentMensagensCubit, StudentMensagensState>(
                 builder: (context, state) => switch (state) {
                   StudentMensagensLoading() || StudentMensagensInitial() =>
-                    const Center(
-                      child: CircularProgressIndicator(color: _green),
+                    Center(
+                      child: CircularProgressIndicator(color: AppColors.primary),
                     ),
                   StudentMensagensError(:final message) => Center(
                     child: Padding(
@@ -221,10 +221,10 @@ class _MensagemItem extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: _green.withValues(alpha: 0.12),
+                color: AppColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(_icon, color: _green, size: 22),
+              child: Icon(_icon, color: AppColors.primary, size: 22),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -256,9 +256,9 @@ class _MensagemItem extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     _label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: _green,
+                      color: AppColors.primary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),

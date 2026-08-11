@@ -4,8 +4,7 @@ import 'package:nexora_school/core/constants/app_routes.dart';
 import 'package:nexora_school/core/local/local_storage/i_local_storage.dart';
 import 'class_list_screen.dart';
 import 'grade_entry_class_screen.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 const _grey = Color(0xFF8E8E93);
 
@@ -87,19 +86,19 @@ class _BottomNav extends StatelessWidget {
                           height: 3,
                           margin: const EdgeInsets.only(bottom: 4),
                           decoration: BoxDecoration(
-                            color: _green,
+                            color: AppColors.primary,
                             borderRadius: BorderRadius.circular(2),
                           ),
                         )
                       else
                         const SizedBox(height: 7),
-                      Icon(item.icon, color: active ? _green : _grey, size: 24),
+                      Icon(item.icon, color: active ? AppColors.primary : _grey, size: 24),
                       const SizedBox(height: 4),
                       Text(
                         item.label,
                         style: TextStyle(
                           fontSize: 11,
-                          color: active ? _green : _grey,
+                          color: active ? AppColors.primary : _grey,
                           fontWeight: active
                               ? FontWeight.w600
                               : FontWeight.normal,
@@ -141,7 +140,7 @@ class _TeacherHomeTab extends StatelessWidget {
     ),
   ];
 
-  static const _pendencias = [
+  static final _pendencias = [
     _Pendencia(
       titulo: 'Notas do Teste 2 — Física 11ª B',
       prazo: 'Entregar até amanhã',
@@ -150,7 +149,7 @@ class _TeacherHomeTab extends StatelessWidget {
     _Pendencia(
       titulo: 'Presenças de Matemática 10ª A',
       prazo: 'Hoje · 09h30',
-      cor: _green,
+      cor: AppColors.primary,
     ),
   ];
 
@@ -253,8 +252,8 @@ class _TeacherHomeTab extends StatelessWidget {
               child: Container(
                 width: 8,
                 height: 8,
-                decoration: const BoxDecoration(
-                  color: _green,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -450,12 +449,12 @@ class _TeacherHomeTab extends StatelessWidget {
         const SizedBox(height: 12),
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: _StatItem(
                 icon: Icons.groups_rounded,
-                iconColor: _green,
+                iconColor: AppColors.primary,
                 value: '6',
-                valueColor: _green,
+                valueColor: AppColors.primary,
                 label: 'Turmas',
                 sub: 'activas',
               ),
@@ -651,21 +650,21 @@ class _AulaCard extends StatelessWidget {
               children: [
                 Text(
                   aula.hora.split('–').first,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: _green,
+                    color: AppColors.primary,
                   ),
                 ),
                 Container(
                   width: 32,
                   height: 1,
-                  color: _green.withValues(alpha: 0.3),
+                  color: AppColors.primary.withValues(alpha: 0.3),
                   margin: const EdgeInsets.symmetric(vertical: 4),
                 ),
                 Text(
                   aula.hora.split('–').last,
-                  style: const TextStyle(fontSize: 12, color: _green),
+                  style: TextStyle(fontSize: 12, color: AppColors.primary),
                 ),
               ],
             ),
@@ -696,15 +695,15 @@ class _AulaCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                border: Border.all(color: _green),
+                border: Border.all(color: AppColors.primary),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Text(
+              child: Text(
                 'Marcar Presenças',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: _green,
+                  color: AppColors.primary,
                 ),
               ),
             ),
@@ -941,10 +940,10 @@ class _TeacherPerfilTab extends StatelessWidget {
               width: 76,
               height: 76,
               decoration: BoxDecoration(
-                color: _green.withValues(alpha: 0.10),
+                color: AppColors.primary.withValues(alpha: 0.10),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.person_rounded, color: _green, size: 40),
+              child: Icon(Icons.person_rounded, color: AppColors.primary, size: 40),
             ),
             Positioned(
               bottom: 0,
@@ -952,8 +951,8 @@ class _TeacherPerfilTab extends StatelessWidget {
               child: Container(
                 width: 26,
                 height: 26,
-                decoration: const BoxDecoration(
-                  color: _green,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -997,10 +996,10 @@ class _TeacherPerfilTab extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: _green.withValues(alpha: 0.08),
+            color: AppColors.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.school_outlined, color: _green, size: 22),
+          child: Icon(Icons.school_outlined, color: AppColors.primary, size: 22),
         ),
       ],
     );
@@ -1032,7 +1031,7 @@ class _TeacherPerfilTab extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Icon(e.value.icon, color: _green, size: 22),
+                      Icon(e.value.icon, color: AppColors.primary, size: 22),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
@@ -1087,7 +1086,7 @@ class _BlobPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF00B87A).withValues(alpha: 0.06);
+      ..color = AppColors.primary.withValues(alpha: 0.06);
     final path = Path()
       ..moveTo(size.width, 0)
       ..lineTo(size.width * 0.2, 0)

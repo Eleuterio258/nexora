@@ -4,9 +4,9 @@ import 'package:nexora_school/core/di/injection.dart';
 import '../../../cubit/student_mensagens_cubit.dart';
 import '../../../cubit/student_mensagens_state.dart';
 import '../../../../domain/entities/student_mensagem.dart';
+import 'package:nexora_school/core/constants/app_colors.dart';
 
 const _navy = Color(0xFF0D1B2A);
-const _green = Color(0xFF00B87A);
 
 class NotificacoesScreen extends StatelessWidget {
   const NotificacoesScreen({super.key});
@@ -71,7 +71,7 @@ class _NotificacoesView extends StatelessWidget {
       body: BlocBuilder<StudentMensagensCubit, StudentMensagensState>(
         builder: (context, state) {
           if (state is StudentMensagensLoading || state is StudentMensagensInitial) {
-            return const Center(child: CircularProgressIndicator(color: _green));
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
           if (state is StudentMensagensError) {
             return Center(
@@ -85,8 +85,8 @@ class _NotificacoesView extends StatelessWidget {
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: () => context.read<StudentMensagensCubit>().load(),
-                    child: const Text('Tentar novamente',
-                        style: TextStyle(color: _green)),
+                    child: Text('Tentar novamente',
+                        style: TextStyle(color: AppColors.primary)),
                   ),
                 ],
               ),

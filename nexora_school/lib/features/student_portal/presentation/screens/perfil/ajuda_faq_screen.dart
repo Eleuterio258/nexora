@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 
 class AjudaFaqScreen extends StatefulWidget {
@@ -113,7 +112,7 @@ class _AjudaFaqScreenState extends State<AjudaFaqScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: expanded
-              ? Border.all(color: _green.withValues(alpha: 0.4))
+              ? Border.all(color: AppColors.primary.withValues(alpha: 0.4))
               : null,
         ),
         child: Column(
@@ -127,16 +126,16 @@ class _AjudaFaqScreenState extends State<AjudaFaqScreen> {
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: _green.withValues(alpha: 0.10),
+                      color: AppColors.primary.withValues(alpha: 0.10),
                       shape: BoxShape.circle,
                     ),
                     child: Center(
                       child: Text(
                         '${i + 1}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: _green,
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
@@ -186,7 +185,7 @@ class _AjudaFaqScreenState extends State<AjudaFaqScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _green.withValues(alpha: 0.08),
+        color: AppColors.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -213,7 +212,7 @@ class _AjudaFaqScreenState extends State<AjudaFaqScreen> {
               icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
               label: const Text('Fale connosco'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _green,
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(

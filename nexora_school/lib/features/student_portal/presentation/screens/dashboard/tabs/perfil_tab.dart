@@ -14,8 +14,7 @@ import 'package:nexora_school/features/student_portal/presentation/screens/frequ
 import 'package:nexora_school/features/student_portal/presentation/screens/frequencia/faltas_screen.dart';
 import 'package:nexora_school/features/student_portal/presentation/screens/ocorrencias/ocorrencias_screen.dart';
 import 'package:nexora_school/features/student_portal/presentation/screens/biblioteca/biblioteca_screen.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 
 class PerfilTab extends StatelessWidget {
@@ -44,8 +43,8 @@ class PerfilTab extends StatelessWidget {
                   child: BlocBuilder<StudentHomeCubit, StudentHomeState>(
                     builder: (context, state) {
                       return switch (state) {
-                        StudentHomeLoading() => const Center(
-                          child: CircularProgressIndicator(color: _green),
+                        StudentHomeLoading() => Center(
+                          child: CircularProgressIndicator(color: AppColors.primary),
                         ),
                         StudentHomeError(:final message) => Center(
                           child: Padding(
@@ -218,8 +217,8 @@ class PerfilTab extends StatelessWidget {
                 child: Container(
                   width: 9,
                   height: 9,
-                  decoration: const BoxDecoration(
-                    color: _green,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -246,12 +245,12 @@ class PerfilTab extends StatelessWidget {
                   width: 76,
                   height: 76,
                   decoration: BoxDecoration(
-                    color: _green.withValues(alpha: 0.10),
+                    color: AppColors.primary.withValues(alpha: 0.10),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.person_rounded,
-                    color: _green,
+                    color: AppColors.primary,
                     size: 40,
                   ),
                 ),
@@ -261,8 +260,8 @@ class PerfilTab extends StatelessWidget {
                   child: Container(
                     width: 26,
                     height: 26,
-                    decoration: const BoxDecoration(
-                      color: _green,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -309,10 +308,10 @@ class PerfilTab extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: _green.withValues(alpha: 0.08),
+                color: AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.school_outlined, color: _green, size: 22),
+              child: Icon(Icons.school_outlined, color: AppColors.primary, size: 22),
             ),
           ],
         ),
@@ -387,7 +386,7 @@ class PerfilTab extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
-                Icon(item.icon, color: _green, size: 22),
+                Icon(item.icon, color: AppColors.primary, size: 22),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -479,7 +478,7 @@ class _InfoChip extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 14, color: _green),
+              Icon(icon, size: 14, color: AppColors.primary),
               const SizedBox(width: 4),
               Text(
                 label,
@@ -509,7 +508,7 @@ class _BlobPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF00B87A).withValues(alpha: 0.06);
+      ..color = AppColors.primary.withValues(alpha: 0.06);
     final path = Path()
       ..moveTo(size.width, 0)
       ..lineTo(size.width * 0.2, 0)

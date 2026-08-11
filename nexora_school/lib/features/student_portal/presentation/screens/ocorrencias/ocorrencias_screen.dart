@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nexora_school/core/di/injection.dart';
 import '../../cubit/student_ocorrencias_cubit.dart';
 import '../../cubit/student_ocorrencias_state.dart';
+import 'package:nexora_school/core/constants/app_colors.dart';
 
 const _navy = Color(0xFF0D1B2A);
-const _green = Color(0xFF00B87A);
 
 class OcorrenciasScreen extends StatelessWidget {
   const OcorrenciasScreen({super.key});
@@ -60,10 +60,10 @@ class _OcorrenciasViewState extends State<_OcorrenciasView>
           preferredSize: const Size.fromHeight(49),
           child: TabBar(
             controller: _tabController,
-            indicatorColor: _green,
+            indicatorColor: AppColors.primary,
             indicatorWeight: 2.5,
             indicatorSize: TabBarIndicatorSize.tab,
-            labelColor: _green,
+            labelColor: AppColors.primary,
             unselectedLabelColor: const Color(0xFFADB5BD),
             labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
             unselectedLabelStyle:
@@ -81,7 +81,7 @@ class _OcorrenciasViewState extends State<_OcorrenciasView>
         builder: (context, state) {
           if (state is StudentOcorrenciasLoading ||
               state is StudentOcorrenciasInitial) {
-            return const Center(child: CircularProgressIndicator(color: _green));
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
           if (state is StudentOcorrenciasError) {
             return Center(
@@ -96,8 +96,8 @@ class _OcorrenciasViewState extends State<_OcorrenciasView>
                   TextButton(
                     onPressed: () =>
                         context.read<StudentOcorrenciasCubit>().load(),
-                    child: const Text('Tentar novamente',
-                        style: TextStyle(color: _green)),
+                    child: Text('Tentar novamente',
+                        style: TextStyle(color: AppColors.primary)),
                   ),
                 ],
               ),
@@ -133,7 +133,7 @@ class _OcorrenciasViewState extends State<_OcorrenciasView>
                 _OcorrenciasList(
                   items: meritos,
                   icon: Icons.emoji_events_outlined,
-                  color: const Color(0xFF10B981),
+                  color: AppColors.primary,
                   emptyLabel: 'Sem méritos registados',
                   titleKey: 'descricao',
                   dateKey: 'data_merito',

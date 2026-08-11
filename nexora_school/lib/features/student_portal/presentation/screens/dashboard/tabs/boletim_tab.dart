@@ -6,7 +6,6 @@ import 'package:nexora_school/features/student_portal/presentation/cubit/student
 import 'package:nexora_school/features/student_portal/presentation/cubit/student_boletim_state.dart';
 
 const _navy = Color(0xFF0D1B2A);
-const _green = Color(0xFF00B87A);
 const _red = Color(0xFFEF4444);
 
 class BoletimTab extends StatefulWidget {
@@ -31,8 +30,8 @@ class _BoletimTabState extends State<BoletimTab> {
             Expanded(
               child: BlocBuilder<StudentBoletimCubit, StudentBoletimState>(
                 builder: (context, state) => switch (state) {
-                  StudentBoletimLoading() => const Center(
-                      child: CircularProgressIndicator(color: _green)),
+                  StudentBoletimLoading() => Center(
+                      child: CircularProgressIndicator(color: AppColors.primary)),
                   StudentBoletimError(:final message) => _buildError(message),
                   StudentBoletimLoaded(:final data) => _buildContent(data),
                   _ => const SizedBox.shrink(),
@@ -83,8 +82,8 @@ class _BoletimTabState extends State<BoletimTab> {
           const SizedBox(height: 12),
           TextButton(
             onPressed: () => context.read<StudentBoletimCubit>().load(),
-            child: const Text('Tentar novamente',
-                style: TextStyle(color: _green)),
+            child: Text('Tentar novamente',
+                style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -167,7 +166,7 @@ class _BoletimTabState extends State<BoletimTab> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _green,
+        color: AppColors.primary,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -315,10 +314,10 @@ class _BoletimTabState extends State<BoletimTab> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 7),
                         decoration: BoxDecoration(
-                          color: selected ? _green : Colors.white,
+                          color: selected ? AppColors.primary : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: selected ? _green : const Color(0xFFE5E7EB),
+                            color: selected ? AppColors.primary : const Color(0xFFE5E7EB),
                           ),
                         ),
                         child: Text(
@@ -407,7 +406,7 @@ class _BoletimTabState extends State<BoletimTab> {
               final hasGrades = media > 0;
               final aprovado = media >= cfg.notaMinima;
               final resultColor = hasGrades
-                  ? (aprovado ? _green : _red)
+                  ? (aprovado ? AppColors.primary : _red)
                   : const Color(0xFF8E8E93);
               final resultLabel =
                   hasGrades ? (aprovado ? 'Aprovado' : 'Reprovado') : '—';
@@ -453,13 +452,13 @@ class _BoletimTabState extends State<BoletimTab> {
                           final nota = notas[tid];
                           final notaD = _toDouble(nota);
                           final cor = notaD > 0
-                              ? (notaD >= cfg.notaMinima ? _green : _red)
+                              ? (notaD >= cfg.notaMinima ? AppColors.primary : _red)
                               : const Color(0xFF8E8E93);
                           return _dCell(_fmtNota(nota), wTerm, color: cor);
                         }),
                         _dCell(mediaStr, wMedia,
                             color: hasGrades
-                                ? (aprovado ? _green : _red)
+                                ? (aprovado ? AppColors.primary : _red)
                                 : const Color(0xFF8E8E93)),
                         SizedBox(
                           width: wResult,

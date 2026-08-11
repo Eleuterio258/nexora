@@ -29,6 +29,7 @@ final class SistemaApiRoutes
             'sistema_pais_save'                     => ['module' => 'sistema-configuracao', 'action' => 'editar_configuracoes'],
             'sistema_moeda_save'                    => ['module' => 'sistema-configuracao', 'action' => 'editar_configuracoes'],
             'sistema_taxa_cambio_save'              => ['module' => 'sistema-configuracao', 'action' => 'editar_configuracoes'],
+            'sistema_branding_save'                 => ['module' => 'sistema-configuracao', 'action' => 'editar_configuracoes'],
             'sistema_email_template_save'           => ['module' => 'sistema-configuracao', 'action' => 'gerir_templates'],
             'sistema_sms_template_save'             => ['module' => 'sistema-configuracao', 'action' => 'gerir_templates'],
             'sistema_integracao_save'               => ['module' => 'sistema-configuracao', 'action' => 'gerir_templates'],

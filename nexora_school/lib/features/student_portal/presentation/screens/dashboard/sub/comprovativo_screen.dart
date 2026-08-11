@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:nexora_school/core/constants/app_colors.dart';
 
 const _navy = Color(0xFF0D1B2A);
-const _green = Color(0xFF00B87A);
 
 class ComprovativoScreen extends StatelessWidget {
   const ComprovativoScreen({super.key, required this.pagamento});
@@ -38,7 +38,7 @@ class ComprovativoScreen extends StatelessWidget {
             onPressed: () {},
           ),
           IconButton(
-            icon: const Icon(Icons.download_outlined, color: _green, size: 22),
+            icon: Icon(Icons.download_outlined, color: AppColors.primary, size: 22),
             onPressed: () {},
           ),
         ],
@@ -123,8 +123,8 @@ class ComprovativoScreen extends StatelessWidget {
                       ),
                       child: Container(
                         margin: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: _green,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -151,10 +151,10 @@ class ComprovativoScreen extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           pagamento.valor,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
-                            color: _green,
+                            color: AppColors.primary,
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -203,7 +203,7 @@ class ComprovativoScreen extends StatelessWidget {
                           icon: Icons.check_circle_outline_rounded,
                           label: 'Estado',
                           value: 'PAGO',
-                          valueColor: _green,
+                          valueColor: AppColors.primary,
                           valueBold: true,
                         ),
 
@@ -251,7 +251,7 @@ class ComprovativoScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _green,
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   elevation: 0,

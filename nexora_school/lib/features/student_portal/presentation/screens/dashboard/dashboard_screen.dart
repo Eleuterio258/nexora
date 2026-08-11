@@ -12,6 +12,7 @@ import 'tabs/boletim_tab.dart';
 import 'tabs/chat_tab.dart';
 import 'tabs/financeiro_tab.dart';
 import 'tabs/perfil_tab.dart';
+import 'package:nexora_school/core/constants/app_colors.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -67,8 +68,6 @@ class _BottomNav extends StatelessWidget {
 
   final int currentIndex;
   final ValueChanged<int> onTap;
-
-  static const _green = Color(0xFF00B87A);
   static const _grey = Color(0xFF8E8E93);
 
   static const _items = [
@@ -107,19 +106,19 @@ class _BottomNav extends StatelessWidget {
                           height: 3,
                           margin: const EdgeInsets.only(bottom: 4),
                           decoration: BoxDecoration(
-                            color: _green,
+                            color: AppColors.primary,
                             borderRadius: BorderRadius.circular(2),
                           ),
                         )
                       else
                         const SizedBox(height: 7),
-                      Icon(item.icon, color: active ? _green : _grey, size: 24),
+                      Icon(item.icon, color: active ? AppColors.primary : _grey, size: 24),
                       const SizedBox(height: 4),
                       Text(
                         item.label,
                         style: TextStyle(
                           fontSize: 11,
-                          color: active ? _green : _grey,
+                          color: active ? AppColors.primary : _grey,
                           fontWeight: active
                               ? FontWeight.w600
                               : FontWeight.normal,

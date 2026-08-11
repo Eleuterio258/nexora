@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nexora_school/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:nexora_school/features/auth/presentation/bloc/auth_event.dart';
 import 'package:nexora_school/features/auth/presentation/bloc/auth_state.dart';
+import 'package:nexora_school/core/constants/app_colors.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -25,8 +26,6 @@ class _LoginViewState extends State<_LoginView> {
   );
   final _passwordController = TextEditingController(text: '1234567890');
   bool _obscurePassword = true;
-
-  static const _green = Color(0xFF00B87A);
 
   @override
   void dispose() {
@@ -147,9 +146,9 @@ class _LoginViewState extends State<_LoginView> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {},
-                      child: const Text(
+                      child: Text(
                         'Esqueci a palavra-passe',
-                        style: TextStyle(color: _green, fontSize: 14),
+                        style: TextStyle(color: AppColors.primary, fontSize: 14),
                       ),
                     ),
                   ),
@@ -163,7 +162,7 @@ class _LoginViewState extends State<_LoginView> {
                         child: ElevatedButton(
                           onPressed: loading ? null : _submit,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _green,
+                            backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(28),
@@ -262,7 +261,7 @@ class _LoginViewState extends State<_LoginView> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _green, width: 1.5),
+        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),

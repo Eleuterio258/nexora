@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nexora_school/core/constants/app_routes.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 const _grey = Color(0xFF8E8E93);
 
@@ -100,12 +99,12 @@ class ClassListScreen extends StatelessWidget {
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: _green.withValues(alpha: 0.08),
+                          color: AppColors.primary.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.filter_list_rounded,
-                          color: _green,
+                          color: AppColors.primary,
                           size: 22,
                         ),
                       ),
@@ -167,10 +166,10 @@ class _TurmaCard extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: _green.withValues(alpha: 0.08),
+                color: AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.groups_rounded, color: _green, size: 26),
+              child: Icon(Icons.groups_rounded, color: AppColors.primary, size: 26),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -234,7 +233,7 @@ class _BlobPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF00B87A).withValues(alpha: 0.06);
+      ..color = AppColors.primary.withValues(alpha: 0.06);
     final path = Path()
       ..moveTo(size.width, 0)
       ..lineTo(size.width * 0.2, 0)

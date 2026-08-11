@@ -9,4 +9,5 @@ abstract final class StorageKeys {
   static const userCargo      = 'user_cargo';
   static const userModulos    = 'user_modulos';
   static const tokenExpiresAt = 'token_expires_at';
+  static const branding       = 'branding';
 }

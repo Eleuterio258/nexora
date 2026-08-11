@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:nexora_school/core/di/injection.dart';
 import '../../cubit/student_biblioteca_cubit.dart';
 import '../../cubit/student_biblioteca_state.dart';
+import 'package:nexora_school/core/constants/app_colors.dart';
 
 const _navy = Color(0xFF0D1B2A);
-const _green = Color(0xFF00B87A);
 
 class BibliotecaScreen extends StatelessWidget {
   const BibliotecaScreen({super.key});
@@ -22,9 +22,9 @@ class BibliotecaScreen extends StatelessWidget {
 class _BibliotecaView extends StatelessWidget {
   const _BibliotecaView();
 
-  static const _statusColors = {
+  static final _statusColors = {
     'emprestado': Color(0xFFF59E0B),
-    'devolvido': Color(0xFF00B87A),
+    'devolvido': AppColors.primary,
     'atrasado': Color(0xFFEF4444),
     'reservado': Color(0xFF6750A4),
   };
@@ -65,7 +65,7 @@ class _BibliotecaView extends StatelessWidget {
       body: BlocBuilder<StudentBibliotecaCubit, StudentBibliotecaState>(
         builder: (context, state) {
           if (state is StudentBibliotecaLoading || state is StudentBibliotecaInitial) {
-            return const Center(child: CircularProgressIndicator(color: _green));
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
           if (state is StudentBibliotecaError) {
             return Center(
@@ -81,8 +81,8 @@ class _BibliotecaView extends StatelessWidget {
                   TextButton(
                     onPressed: () =>
                         context.read<StudentBibliotecaCubit>().load(),
-                    child: const Text('Tentar novamente',
-                        style: TextStyle(color: _green)),
+                    child: Text('Tentar novamente',
+                        style: TextStyle(color: AppColors.primary)),
                   ),
                 ],
               ),
@@ -97,7 +97,7 @@ class _BibliotecaView extends StatelessWidget {
                   children: [
                     Icon(Icons.menu_book_outlined,
                         size: 64,
-                        color: _green.withValues(alpha: 0.3)),
+                        color: AppColors.primary.withValues(alpha: 0.3)),
                     const SizedBox(height: 16),
                     const Text('Sem empréstimos registados',
                         style: TextStyle(

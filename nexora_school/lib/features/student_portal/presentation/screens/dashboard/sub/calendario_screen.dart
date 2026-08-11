@@ -4,9 +4,9 @@ import 'package:nexora_school/core/di/injection.dart';
 import '../../../cubit/student_eventos_cubit.dart';
 import '../../../cubit/student_eventos_state.dart';
 import '../../../../domain/entities/student_evento.dart';
+import 'package:nexora_school/core/constants/app_colors.dart';
 
 const _navy = Color(0xFF0D1B2A);
-const _green = Color(0xFF00B87A);
 
 const _meses = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
 
@@ -54,7 +54,7 @@ class _CalendarioView extends StatelessWidget {
       body: BlocBuilder<StudentEventosCubit, StudentEventosState>(
         builder: (context, state) {
           if (state is StudentEventosLoading || state is StudentEventosInitial) {
-            return const Center(child: CircularProgressIndicator(color: _green));
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
           if (state is StudentEventosError) {
             return Center(
@@ -68,8 +68,8 @@ class _CalendarioView extends StatelessWidget {
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: () => context.read<StudentEventosCubit>().load(),
-                    child: const Text('Tentar novamente',
-                        style: TextStyle(color: _green)),
+                    child: Text('Tentar novamente',
+                        style: TextStyle(color: AppColors.primary)),
                   ),
                 ],
               ),

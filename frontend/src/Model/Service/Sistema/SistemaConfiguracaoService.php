@@ -163,4 +163,30 @@ final class SistemaConfiguracaoService extends NexoraService
 
         return ['ok' => true, 'msg' => 'Integracao criada com sucesso.', 'id' => $response->body['id'] ?? null];
     }
+
+    public function saveBranding(array $payload): array
+    {
+        // Validacao basica de cor hexadecimal (#RRGGBB)
+        $validateHex = static function (?string $color): bool {
+            if ($color === null || $color === '') {
+                return true;
+            }
+            return (bool) preg_match('/^#[0-9A-Fa-f]{6}$/', $color);
+        };
+
+        if (!$validateHex($payload['primary_color'] ?? null)) {
+            throw new OperationException('A cor primaria deve estar no formato #RRGGBB.');
+        }
+        if (!$validateHex($payload['on_primary_color'] ?? null)) {
+            throw new OperationException('A cor sobre primaria deve estar no formato #RRGGBB.');
+        }
+
+        // Remove campos nulos para nao sobrescrever valores existentes acidentalmente
+        $payload = array_filter($payload, static fn(mixed $v): bool => $v !== null);
+
+        $response = $this->gateway->request('POST', '/api/system/branding', $payload);
+        $this->ensureSuccess($response, 'Erro ao guardar o branding.');
+
+        return ['ok' => true, 'msg' => 'Branding guardado com sucesso.'];
+    }
 }

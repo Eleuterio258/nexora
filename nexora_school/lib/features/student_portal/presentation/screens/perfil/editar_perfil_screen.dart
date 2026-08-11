@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nexora_school/core/di/injection.dart';
 import '../../../domain/repositories/student_portal_repository.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 
 class EditarPerfilScreen extends StatefulWidget {
@@ -40,9 +39,9 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Perfil actualizado com sucesso'),
-            backgroundColor: _green,
+            backgroundColor: AppColors.primary,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -136,7 +135,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
                 child: ElevatedButton(
                   onPressed: _loading ? null : _save,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _green,
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -170,10 +169,10 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
           width: 88,
           height: 88,
           decoration: BoxDecoration(
-            color: _green.withValues(alpha: 0.12),
+            color: AppColors.primary.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.person_rounded, color: _green, size: 44),
+          child: Icon(Icons.person_rounded, color: AppColors.primary, size: 44),
         ),
         Positioned(
           bottom: 0,
@@ -181,7 +180,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
           child: Container(
             width: 30,
             height: 30,
-            decoration: const BoxDecoration(color: _green, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
             child: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 16),
           ),
         ),
@@ -210,7 +209,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(color: Color(0xFFADB5BD)),
-            prefixIcon: Icon(icon, color: _green, size: 20),
+            prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
             filled: true,
             fillColor: Colors.white,
             contentPadding:
@@ -225,7 +224,7 @@ class _EditarPerfilScreenState extends State<EditarPerfilScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: _green, width: 1.5),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.5),
             ),
           ),
         ),

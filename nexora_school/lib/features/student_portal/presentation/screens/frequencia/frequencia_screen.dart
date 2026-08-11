@@ -5,8 +5,7 @@ import 'package:nexora_school/features/student_portal/domain/entities/student_pr
 import 'package:nexora_school/features/student_portal/presentation/cubit/student_presencas_cubit.dart';
 import 'package:nexora_school/features/student_portal/presentation/cubit/student_presencas_state.dart';
 import 'faltas_screen.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 const _red = Color(0xFFEF4444);
 const _orange = Color(0xFFF59E0B);
@@ -44,8 +43,8 @@ class FrequenciaScreen extends StatelessWidget {
         body: BlocBuilder<StudentPresencasCubit, StudentPresencasState>(
           builder: (context, state) {
             return switch (state) {
-              StudentPresencasLoading() => const Center(
-                child: CircularProgressIndicator(color: _green),
+              StudentPresencasLoading() => Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
               ),
               StudentPresencasError(:final message) => Center(
                 child: Padding(
@@ -88,7 +87,7 @@ class FrequenciaScreen extends StatelessWidget {
               context,
               MaterialPageRoute(builder: (_) => const FaltasScreen()),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text(
@@ -96,11 +95,11 @@ class FrequenciaScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: _green,
+                    color: AppColors.primary,
                   ),
                 ),
                 SizedBox(width: 4),
-                Icon(Icons.arrow_forward_ios_rounded, size: 12, color: _green),
+                Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.primary),
               ],
             ),
           ),
@@ -126,7 +125,7 @@ class FrequenciaScreen extends StatelessWidget {
   }
 
   Widget _buildSummaryCard(int total, int faltas, int presencas, int pct) {
-    final color = pct >= 75 ? _green : (pct >= 60 ? _orange : _red);
+    final color = pct >= 75 ? AppColors.primary : (pct >= 60 ? _orange : _red);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -199,7 +198,7 @@ class FrequenciaScreen extends StatelessWidget {
     final estado = (r['estado'] ?? '').toString();
     final data = (r['attendance_date'] ?? '').toString();
     final ausente = estado == 'ausente';
-    final color = ausente ? _red : _green;
+    final color = ausente ? _red : AppColors.primary;
 
     return Container(
       padding: const EdgeInsets.all(16),

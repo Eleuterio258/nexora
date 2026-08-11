@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 
 class NotificacoesScreen extends StatefulWidget {
@@ -86,10 +85,10 @@ class _NotificacoesScreenState extends State<NotificacoesScreen> {
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: _green.withValues(alpha: 0.08),
+                              color: AppColors.primary.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Icon(_icons[e.key], color: _green, size: 20),
+                            child: Icon(_icons[e.key], color: AppColors.primary, size: 20),
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -105,7 +104,7 @@ class _NotificacoesScreenState extends State<NotificacoesScreen> {
                           Switch.adaptive(
                             value: e.value,
                             onChanged: (v) => setState(() => _prefs[e.key] = v),
-                            activeTrackColor: _green,
+                            activeTrackColor: AppColors.primary,
                           ),
                         ],
                       ),

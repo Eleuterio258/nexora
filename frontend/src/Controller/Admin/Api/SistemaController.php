@@ -104,4 +104,21 @@ final class SistemaController
 
         return $d->result(fn() => $d->sistema->createExchangeRate($payload));
     }
+
+    public function sistemaBrandingSave(Request $request, AdminApiDependencies $d): ApiResult
+    {
+        $payload = [
+            'logo_url'         => $request->string('logo_url') ?: null,
+            'logo_base64'      => $request->string('logo_base64') ?: null,
+            'primary_color'    => $request->string('primary_color') ?: null,
+            'on_primary_color' => $request->string('on_primary_color') ?: null,
+            'slogan'           => $request->string('slogan') ?: null,
+            'contact_email'    => $request->string('contact_email') ?: null,
+            'contact_phone'    => $request->string('contact_phone') ?: null,
+            'contact_address'  => $request->string('contact_address') ?: null,
+            'escopo'           => 'tenant',
+        ];
+
+        return $d->result(fn() => $d->sistema->saveBranding($payload));
+    }
 }

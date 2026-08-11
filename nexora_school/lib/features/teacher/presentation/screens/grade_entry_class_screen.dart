@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nexora_school/core/constants/app_routes.dart';
-
-const _green = Color(0xFF00B87A);
+import 'package:nexora_school/core/constants/app_colors.dart';
 const _navy = Color(0xFF0D1B2A);
 const _grey = Color(0xFF8E8E93);
 
@@ -130,12 +129,12 @@ class _GradeTurmaCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: hasPendentes
                     ? const Color(0xFFF59E0B).withValues(alpha: 0.10)
-                    : _green.withValues(alpha: 0.08),
+                    : AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 Icons.grade_rounded,
-                color: hasPendentes ? const Color(0xFFF59E0B) : _green,
+                color: hasPendentes ? Color(0xFFF59E0B) : AppColors.primary,
                 size: 26,
               ),
             ),
@@ -166,7 +165,7 @@ class _GradeTurmaCard extends StatelessWidget {
                           : 1.0,
                       backgroundColor: const Color(0xFFEEEEF0),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        hasPendentes ? const Color(0xFFF59E0B) : _green,
+                        hasPendentes ? Color(0xFFF59E0B) : AppColors.primary,
                       ),
                       minHeight: 4,
                     ),
@@ -179,7 +178,7 @@ class _GradeTurmaCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: hasPendentes ? const Color(0xFFF59E0B) : _green,
+                      color: hasPendentes ? Color(0xFFF59E0B) : AppColors.primary,
                     ),
                   ),
                 ],
@@ -202,7 +201,7 @@ class _BlobPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF00B87A).withValues(alpha: 0.06);
+      ..color = AppColors.primary.withValues(alpha: 0.06);
     final path = Path()
       ..moveTo(size.width, 0)
       ..lineTo(size.width * 0.2, 0)

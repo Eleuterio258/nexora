@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:nexora_school/core/constants/app_colors.dart';
 
 const _navy = Color(0xFF0D1B2A);
-const _green = Color(0xFF00B87A);
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
@@ -80,16 +80,16 @@ class _ChatScreenState extends State<ChatScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: _green.withValues(alpha: 0.12),
+                    color: AppColors.primary.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: Text(
                       _initials,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: _green,
+                        color: AppColors.primary,
                       ),
                     ),
                   ),
@@ -102,7 +102,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       width: 10,
                       height: 10,
                       decoration: BoxDecoration(
-                        color: _green,
+                        color: AppColors.primary,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                       ),
@@ -126,7 +126,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   widget.online ? 'Online agora' : widget.sub,
                   style: TextStyle(
                     fontSize: 11,
-                    color: widget.online ? _green : const Color(0xFF8E8E93),
+                    color: widget.online ? AppColors.primary : const Color(0xFF8E8E93),
                   ),
                 ),
               ],
@@ -186,8 +186,8 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Container(
               width: 44,
               height: 44,
-              decoration: const BoxDecoration(
-                color: _green,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -218,7 +218,7 @@ class _Bubble extends StatelessWidget {
           maxWidth: MediaQuery.of(context).size.width * 0.72,
         ),
         decoration: BoxDecoration(
-          color: msg.minha ? _green : Colors.white,
+          color: msg.minha ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
