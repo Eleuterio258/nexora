@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS pos.terminal_funcionarios (
     id              BIGSERIAL PRIMARY KEY,
-    tenant_id       BIGINT NOT NULL REFERENCES public.tenants(id),
+    tenant_id       BIGINT NOT NULL REFERENCES saas.tenants(id),
     terminal_id     BIGINT NOT NULL REFERENCES pos.pos_terminals(id),
     funcionario_id  BIGINT NOT NULL REFERENCES rh.funcionarios(id),
     ativo           BOOLEAN NOT NULL DEFAULT TRUE,
