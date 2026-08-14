@@ -42,6 +42,7 @@ import tech.e258tech.nexora_assiduidade.data.model.ConsentimentoLGPDRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.FaceOverlayView
 import tech.e258tech.nexora_assiduidade.utils.ApiUtils
+import tech.e258tech.nexora_assiduidade.utils.BiometricErrorParser
 import tech.e258tech.nexora_assiduidade.utils.FaceDetectorHelper
 import tech.e258tech.nexora_assiduidade.utils.ImageUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
@@ -445,8 +446,9 @@ class EnrollFacialFragment : Fragment() {
                     ).show()
                     parentFragmentManager.popBackStack()
                 } else {
-                    val msg = ApiUtils.errorMessage(response)
-                    Toast.makeText(context, "Erro: $msg", Toast.LENGTH_LONG).show()
+                    val rawMsg = ApiUtils.errorMessage(response)
+                    val parsed = BiometricErrorParser.parse(rawMsg)
+                    showBiometricErrorDialog(parsed)
                     resetCapture()
                 }
             } catch (e: CancellationException) {
@@ -470,6 +472,23 @@ class EnrollFacialFragment : Fragment() {
         tvProgress.visibility = View.GONE
         updateProgressText()
         btnStartCapture.isEnabled = true
+    }
+
+    private fun showBiometricErrorDialog(parsed: BiometricErrorParser.ParsedError) {
+        context ?: return
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Não foi possível cadastrar o rosto")
+            .setMessage(parsed.userMessage)
+            .setPositiveButton("Tentar novamente") { dialog, _ -> dialog.dismiss() }
+            .setNeutralButton("Ver detalhe técnico") { _, _ ->
+                androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                    .setTitle("Detalhe técnico")
+                    .setMessage(parsed.rawMessage)
+                    .setPositiveButton("OK", null)
+                    .show()
+            }
+            .setCancelable(false)
+            .show()
     }
 
     private fun bitmapToBase64(bitmap: Bitmap): String {

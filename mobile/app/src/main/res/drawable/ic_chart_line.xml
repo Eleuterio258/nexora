@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="60dp"
+    android:viewportWidth="200"
+    android:viewportHeight="60">
+    <!-- linha de tendência -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M0,55 C20,52 35,48 50,42 C65,36 75,38 90,30 C105,22 115,25 130,15 C145,5 160,8 180,4 L200,2"
+        android:strokeColor="#FFD32F2F"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <!-- área preenchida -->
+    <path
+        android:fillColor="#1AD32F2F"
+        android:pathData="M0,55 C20,52 35,48 50,42 C65,36 75,38 90,30 C105,22 115,25 130,15 C145,5 160,8 180,4 L200,2 L200,60 L0,60 Z" />
+</vector>

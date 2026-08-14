@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_login"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingBottom="160dp">
+
+    <!-- Logo PayCore POS -->
+    <ImageView
+        android:layout_width="120dp"
+        android:layout_height="60dp"
+        android:layout_marginTop="40dp"
+        android:contentDescription="PayCore POS"
+        android:scaleType="fitCenter"
+        android:src="@drawable/paycore_pos" />
+
+    <!-- Ilustração principal -->
+    <ImageView
+        android:id="@+id/iv_slide_imagem"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="Ilustração terminais" />
+
+    <!-- Título -->
+    <TextView
+        android:id="@+id/tv_slide_titulo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="center"
+        android:lineSpacingMultiplier="1.15"
+        android:textColor="@color/colorPrimary"
+        android:textSize="26sp"
+        android:textStyle="bold" />
+
+    <!-- Descrição -->
+    <TextView
+        android:id="@+id/tv_slide_descricao"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:layout_marginStart="32dp"
+        android:layout_marginEnd="32dp"
+        android:gravity="center"
+        android:lineSpacingMultiplier="1.5"
+        android:textColor="@color/text_secondary"
+        android:textSize="15sp" />
+
+</LinearLayout>
+

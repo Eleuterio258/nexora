@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    PayCore POS adaptive icon foreground (108×108dp, safe zone 72×72dp centred)
+    Layout: "P" shield left + "PC" initials right, accent cart below
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Red shield / card background centred in safe zone (18..90) -->
+    <path
+        android:fillColor="#CC1B1B"
+        android:pathData="
+          M22,30
+          Q22,26 26,26
+          L82,26
+          Q86,26 86,30
+          L86,72
+          Q86,82 54,84
+          Q22,82 22,72
+          Z" />
+
+    <!-- White 'P' -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="
+          M33,38 L33,70
+          L39,70 L39,58
+          L50,58
+          Q58,58 58,48
+          Q58,38 50,38
+          Z
+          M39,44 L49,44
+          Q52,44 52,48
+          Q52,52 49,52
+          L39,52
+          Z" />
+
+    <!-- White 'C' -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="
+          M75,44
+          Q70,38 62,38
+          Q53,38 53,54
+          Q53,70 62,70
+          Q70,70 75,64
+          L70,60
+          Q67,64 62,64
+          Q59,64 59,54
+          Q59,44 62,44
+          Q67,44 70,48
+          Z" />
+
+    <!-- Small white cart at bottom -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="
+          M42,76 L43,72 L65,72 L63,80 L45,80 Z
+          M45,82 Q45,84 47,84 Q49,84 49,82 Q49,80 47,80 Q45,80 45,82 Z
+          M59,82 Q59,84 61,84 Q63,84 63,82 Q63,80 61,80 Q59,80 59,82 Z
+          M40,72 L38,68 L35,68" />
+
+</vector>

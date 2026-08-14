@@ -1,0 +1,109 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function userRole() {
+      return request.auth.token.role;
+    }
+    function userTenantId() {
+      return request.auth.token.tenantId;
+    }
+    function isSuperAdmin() {
+      return isSignedIn() && userRole() == 'super-admin';
+    }
+    function isAdmin() {
+      return isSignedIn() && userRole() == 'admin';
+    }
+    function isAdminOfTenant(tid) {
+      return isAdmin() && userTenantId() == tid;
+    }
+    function isAdminOrSuperAdmin(tid) {
+      return isSuperAdmin() || isAdminOfTenant(tid);
+    }
+    function isTerminalInTenant(tid) {
+      return isSignedIn()
+        && userRole() == 'terminal'
+        && userTenantId() == tid;
+    }
+    function isTerminalOfTenant(tid, termId) {
+      return isTerminalInTenant(tid)
+        && request.auth.token.terminalId == termId;
+    }
+
+    // ── usuarios ─────────────────────────────────────────────────────────────
+    // Leitura: proprio utilizador, super-admin, ou admin do mesmo tenant
+    // Escrita: super-admin pode criar/editar/apagar directamente do dashboard
+    match /usuarios/{uid} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == uid
+        || isSuperAdmin()
+        || (isAdmin() && resource.data.tenantId == userTenantId())
+      );
+      allow create, update: if isSuperAdmin();
+      allow delete:          if isSuperAdmin();
+    }
+
+    // ── tenants ───────────────────────────────────────────────────────────────
+    // Leitura: super-admin ve todos; admin ve o seu proprio tenant
+    // Escrita: so super-admin pode criar/editar/apagar tenants
+    match /tenants/{tenantId} {
+      allow read:            if isSuperAdmin() || isAdminOfTenant(tenantId);
+      allow create, update:  if isSuperAdmin();
+      allow delete:          if isSuperAdmin();
+
+      // ── categorias ─────────────────────────────────────────────────────────
+      // Terminal: so leitura (precisa das categorias para exibir produtos)
+      // Admin + super-admin: CRUD completo
+      match /categorias/{categoriaId} {
+        allow read: if isAdminOrSuperAdmin(tenantId)
+          || isTerminalInTenant(tenantId);
+
+        allow create, update, delete: if isAdminOrSuperAdmin(tenantId);
+      }
+
+      // ── produtos ───────────────────────────────────────────────────────────
+      // Terminal: so leitura (catalogo de produtos no ponto de venda)
+      // Admin + super-admin: CRUD completo
+      match /produtos/{produtoId} {
+        allow read: if isAdminOrSuperAdmin(tenantId)
+          || isTerminalInTenant(tenantId);
+
+        allow create, update, delete: if isAdminOrSuperAdmin(tenantId);
+      }
+
+      // ── transacoes ─────────────────────────────────────────────────────────
+      // Terminal: pode criar e ler as suas proprias transacoes
+      // Admin + super-admin: CRUD completo (incluindo anular/apagar)
+      match /transacoes/{transacaoId} {
+        allow read: if isAdminOrSuperAdmin(tenantId)
+          || isTerminalInTenant(tenantId);
+
+        allow create: if isAdminOrSuperAdmin(tenantId)
+          || isTerminalInTenant(tenantId);
+
+        allow update, delete: if isAdminOrSuperAdmin(tenantId);
+      }
+
+      // ── terminais ──────────────────────────────────────────────────────────
+      // Terminal: so pode ler o seu proprio documento
+      // Admin + super-admin: CRUD completo
+      match /terminais/{terminalId} {
+        allow read: if isAdminOrSuperAdmin(tenantId)
+          || isTerminalOfTenant(tenantId, terminalId);
+
+        allow create: if isAdminOrSuperAdmin(tenantId)
+          && request.resource.data.keys().hasAll(['nome', 'status', 'codigoAtivacao'])
+          && request.resource.data.status in ['activo', 'inactivo', 'bloqueado'];
+
+        allow update: if isAdminOrSuperAdmin(tenantId)
+          && request.resource.data.status in ['activo', 'inactivo', 'bloqueado'];
+
+        allow delete: if isAdminOrSuperAdmin(tenantId);
+      }
+    }
+  }
+}

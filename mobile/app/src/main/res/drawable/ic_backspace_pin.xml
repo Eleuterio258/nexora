@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp"
+    android:height="28dp"
+    android:viewportWidth="28"
+    android:viewportHeight="28">
+    <!-- Tag/backspace shape -->
+    <path
+        android:fillColor="#FFD32F2F"
+        android:pathData="M11,5 L25,5 Q27,5 27,7 L27,21 Q27,23 25,23 L11,23 Q9,23 3,14 Q9,5 11,5 Z" />
+    <!-- X mark -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M15,11 L21,17 M21,11 L15,17" />
+</vector>

@@ -1,0 +1,24 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.Paycore" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/red_700</item>
+        <item name="colorPrimaryVariant">@color/red_900</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <!-- Secondary brand color. -->
+        <item name="colorSecondary">@color/orange_200</item>
+        <item name="colorSecondaryVariant">@color/orange_700</item>
+        <item name="colorOnSecondary">@color/black</item>
+        <!-- Status bar color. -->
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        <!-- Customize your theme here. -->
+    </style>
+
+    <style name="Theme.Paycore.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/white</item>
+        <!-- Recurso 288dp próprio para o recorte circular do SplashScreen nativo. -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/native_splash_icon</item>
+        <item name="postSplashScreenTheme">@style/Theme.Paycore</item>
+    </style>
+
+</resources>

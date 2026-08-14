@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="5dp"
+    android:clickable="true"
+    android:focusable="true"
+    app:cardBackgroundColor="@color/white"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="0dp"
+    app:rippleColor="@color/divider"
+    app:strokeColor="@color/divider"
+    app:strokeWidth="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Imagem do produto -->
+        <ImageView
+            android:id="@+id/iv_produto_imagem"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:background="@color/background_login"
+            android:scaleType="centerInside"
+            android:padding="8dp" />
+
+        <!-- Nome + Preço + botão "+" -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp">
+
+            <TextView
+                android:id="@+id/tv_produto_nome"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_toStartOf="@+id/btn_adicionar"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:text="Nome do Produto"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_produto_preco"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/tv_produto_nome"
+                android:layout_marginTop="4dp"
+                android:text="0,00 MT"
+                android:textColor="@color/colorPrimary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <!-- Botão "+" círculo vermelho no canto inferior direito -->
+            <FrameLayout
+                android:id="@+id/btn_adicionar"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_alignParentEnd="true"
+                android:layout_alignParentBottom="true"
+                android:background="@drawable/bg_add_button"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="+"
+                    android:textColor="@color/white"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:includeFontPadding="false" />
+            </FrameLayout>
+
+        </RelativeLayout>
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

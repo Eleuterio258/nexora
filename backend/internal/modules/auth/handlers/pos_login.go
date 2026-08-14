@@ -222,7 +222,7 @@ func (h *Handler) issueTerminalTokens(w http.ResponseWriter, r *http.Request, u 
 		scope = scopeStringFromAccess(userAccess)
 		modulos = userAccess.Modulos
 	}
-	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, u.tipo, u.escopo, scope, terminalTokenExpiry, time.Now(), &terminalID, nil)
+	accessToken, _, err := h.signOAuthAccessToken(u.id, u.tenantID, u.membershipID, "terminal", u.escopo, scope, terminalTokenExpiry, time.Now(), &terminalID, nil)
 	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return

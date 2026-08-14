@@ -138,17 +138,19 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Divider(height: 1, color: Color(0xFFEEEEEE)),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              itemCount: _mensagens.length,
-              itemBuilder: (_, i) => _Bubble(msg: _mensagens[i]),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                itemCount: _mensagens.length,
+                itemBuilder: (_, i) => _Bubble(msg: _mensagens[i]),
+              ),
             ),
-          ),
-          _buildInput(),
-        ],
+            _buildInput(),
+          ],
+        ),
       ),
     );
   }

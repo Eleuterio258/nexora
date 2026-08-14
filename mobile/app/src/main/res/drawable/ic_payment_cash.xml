@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="56dp"
+    android:height="40dp"
+    android:viewportWidth="56"
+    android:viewportHeight="40">
+    <!-- Back note -->
+    <path
+        android:fillColor="#FF43A047"
+        android:pathData="M6,8 Q6,5 9,5 L50,5 Q53,5 53,8 L53,30 Q53,33 50,33 L9,33 Q6,33 6,30 Z" />
+    <!-- Front note -->
+    <path
+        android:fillColor="#FF2E7D32"
+        android:pathData="M3,12 Q3,9 6,9 L47,9 Q50,9 50,12 L50,34 Q50,37 47,37 L6,37 Q3,37 3,34 Z" />
+    <!-- Oval on note -->
+    <path
+        android:fillColor="#FF1B5E20"
+        android:pathData="M26,23 m-9,0 a9,6 0 1,0 18,0 a9,6 0 1,0 -18,0" />
+    <!-- Dollar sign -->
+    <path
+        android:fillColor="#FF4CAF50"
+        android:pathData="M26,23 m-4,0 a4,3 0 1,0 8,0 a4,3 0 1,0 -8,0" />
+    <!-- Corner dots -->
+    <path
+        android:fillColor="#FF1B5E20"
+        android:pathData="M8,14 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+    <path
+        android:fillColor="#FF1B5E20"
+        android:pathData="M44,32 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+</vector>

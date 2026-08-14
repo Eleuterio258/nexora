@@ -1,0 +1,107 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingHorizontal="32dp"
+        android:paddingTop="24dp"
+        android:paddingBottom="32dp">
+
+        <!-- Logo centrado grande -->
+        <ImageView
+            android:layout_width="180dp"
+            android:layout_height="180dp"
+            android:contentDescription="PayCore POS"
+            android:src="@drawable/paycore_pos"
+            android:scaleType="fitCenter" />
+
+        <!-- Título -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="Recuperar Senha"
+            android:textColor="@color/text_primary"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <!-- Subtítulo -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:text="Introduza o seu e-mail para receber\nas instruções de recuperação."
+            android:textColor="@color/text_secondary"
+            android:textSize="15sp" />
+
+        <!-- Campo Email -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="36dp"
+            android:background="@drawable/bg_input_rounded"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:contentDescription=""
+                android:src="@drawable/ic_email" />
+
+            <EditText
+                android:id="@+id/et_email_recuperar"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="Email"
+                android:inputType="textEmailAddress"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:textSize="15sp" />
+        </LinearLayout>
+
+        <!-- Botão Enviar Link -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_enviar_link"
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:layout_marginTop="20dp"
+            android:text="Enviar Link"
+            android:textAllCaps="false"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            app:backgroundTint="@color/colorPrimary"
+            app:cornerRadius="12dp"
+            app:elevation="0dp" />
+
+        <!-- Voltar ao Login -->
+        <TextView
+            android:id="@+id/tv_voltar_login"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:padding="8dp"
+            android:text="Voltar ao Login"
+            android:textColor="@color/colorPrimary"
+            android:textSize="15sp" />
+
+    </LinearLayout>
+
+</androidx.core.widget.NestedScrollView>
+

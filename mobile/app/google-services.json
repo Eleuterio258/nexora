@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "673759126705",
+    "project_id": "sbcdsaude-890c1",
+    "storage_bucket": "sbcdsaude-890c1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:673759126705:android:51d1322d9af2daac9d6e90",
+        "android_client_info": {
+          "package_name": "tech.e258tech.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMPZaqcLaT8P9qEU9DU29cDNIxJOIuhgY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:673759126705:android:737be80f1f646ddf9d6e90",
+        "android_client_info": {
+          "package_name": "tech.e258tech.paycore"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMPZaqcLaT8P9qEU9DU29cDNIxJOIuhgY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

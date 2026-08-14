@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="30dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- corpo do telemóvel -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M7,2 L17,2 C17.552,2 18,2.448 18,3 L18,21 C18,21.552 17.552,22 17,22 L7,22 C6.448,22 6,21.552 6,21 L6,3 C6,2.448 6.448,2 7,2 Z" />
+
+    <!-- linha superior (câmara/speaker) -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M9,5 L15,5" />
+
+    <!-- símbolo M-Pesa: seta para cima (envio) -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M12,16 L12,10 M10,12 L12,10 L14,12" />
+
+    <!-- ponto inferior (botão home) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,19 m-1,0 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" />
+
+</vector>

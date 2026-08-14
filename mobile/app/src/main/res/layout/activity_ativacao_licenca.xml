@@ -1,0 +1,225 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingHorizontal="24dp"
+        android:paddingTop="48dp"
+        android:paddingBottom="40dp">
+
+        <!-- Logo PayCore -->
+        <ImageView
+            android:layout_width="150dp"
+            android:layout_height="60dp"
+            android:contentDescription="PayCore"
+            android:scaleType="fitCenter"
+            android:src="@drawable/paycore_pos" />
+
+        <!-- Título -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="Activação de Licença"
+            android:textColor="@color/text_primary"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <!-- Subtítulo -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="36dp"
+            android:gravity="center"
+            android:text="Insira a chave de licença para activar o sistema"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+
+        <!-- Campo Chave de Licença -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:background="@drawable/bg_input_rounded"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:contentDescription=""
+                android:src="@drawable/ic_key"
+                app:tint="@color/colorPrimary" />
+
+            <EditText
+                android:id="@+id/et_chave_licenca"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="XXXX-XXXX-XXXX-XXXX"
+                android:importantForAutofill="no"
+                android:inputType="textCapCharacters"
+                android:letterSpacing="0.1"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_secondary"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                tools:text="A1B2-C3D4-E5F6-G7H8" />
+        </LinearLayout>
+
+        <!-- Mensagem de Erro -->
+        <TextView
+            android:id="@+id/tv_erro_licenca"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_erro"
+            android:padding="12dp"
+            android:textColor="@color/colorError"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <!-- Mensagem de Sucesso -->
+        <TextView
+            android:id="@+id/tv_sucesso_licenca"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_sucesso"
+            android:padding="12dp"
+            android:textColor="@color/colorSuccess"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <!-- ProgressBar -->
+        <ProgressBar
+            android:id="@+id/progress_licenca"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="16dp"
+            android:indeterminate="true"
+            android:progressTint="@color/colorPrimary"
+            android:visibility="gone" />
+
+        <!-- Botão Validar Licença -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_validar_licenca"
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:layout_marginTop="24dp"
+            android:text="Validar Licença"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:backgroundTint="@color/colorPrimary"
+            app:cornerRadius="12dp"
+            app:elevation="0dp"
+            app:icon="@drawable/ic_key"
+            app:iconGravity="textStart"
+            app:iconPadding="10dp"
+            app:iconSize="20dp"
+            app:iconTint="@color/white" />
+
+        <!-- Divisor "ou" -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:alpha="0.3"
+                android:background="@color/divider" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="14dp"
+                android:text="ou"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:alpha="0.3"
+                android:background="@color/divider" />
+        </LinearLayout>
+
+        <!-- Botão Scan QR Code -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_scan_licenca"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:layout_marginTop="14dp"
+            android:text="Scan QR da Licença"
+            android:textAllCaps="false"
+            android:textColor="@color/colorPrimary"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:cornerRadius="12dp"
+            app:elevation="0dp"
+            app:icon="@drawable/ic_barcode_scanner"
+            app:iconGravity="textStart"
+            app:iconPadding="10dp"
+            app:iconSize="20dp"
+            app:iconTint="@color/colorPrimary"
+            app:strokeColor="@color/colorPrimary"
+            app:strokeWidth="1.5dp" />
+
+        <!-- Espaço flexível -->
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Rodapé suporte -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:contentDescription=""
+                android:src="@drawable/ic_headset"
+                app:tint="@color/text_secondary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="Contacte o suporte se não tiver uma chave"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.core.widget.NestedScrollView>
+

@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true">
+
+    <!-- Header -->
+    <LinearLayout
+        android:id="@+id/header_impressora"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="8dp">
+
+        <ImageButton
+            android:id="@+id/btn_voltar"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Voltar"
+            android:src="@drawable/ic_chevron_right"
+            android:rotation="180"
+            android:padding="7dp"
+            app:tint="@color/text_primary" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="Impressora"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <View
+            android:layout_width="36dp"
+            android:layout_height="36dp" />
+
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:alpha="0.5"
+        android:background="@color/divider" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="32dp">
+
+            <!-- Secção: dispositivos -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="24dp"
+                android:paddingTop="24dp"
+                android:paddingBottom="8dp"
+                android:text="Dispositivos Bluetooth"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textAllCaps="true"
+                android:letterSpacing="0.08" />
+
+            <!-- Estado vazio -->
+            <TextView
+                android:id="@+id/tv_sem_dispositivos"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="24dp"
+                android:paddingVertical="16dp"
+                android:text="Nenhum dispositivo Bluetooth vinculado.\nVá às definições do sistema para vincular a impressora."
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+            <!-- Lista de dispositivos -->
+            <RadioGroup
+                android:id="@+id/rg_impressoras"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="8dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginTop="16dp"
+                android:background="@color/divider"
+                android:alpha="0.5" />
+
+            <!-- Impressora guardada -->
+            <TextView
+                android:id="@+id/tv_impressora_atual"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="24dp"
+                android:paddingTop="16dp"
+                android:paddingBottom="4dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <!-- Resultado de operações -->
+            <TextView
+                android:id="@+id/tv_impressora_resultado"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="24dp"
+                android:paddingBottom="16dp"
+                android:textColor="@color/colorPrimary"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <!-- Botão guardar -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_guardar_impressora"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginTop="8dp"
+                android:text="Guardar seleção"
+                android:textAllCaps="false"
+                app:backgroundTint="@color/colorPrimary"
+                app:cornerRadius="8dp"
+                app:elevation="0dp" />
+
+            <!-- Botão testar -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_testar_impressora"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="24dp"
+                android:layout_marginTop="12dp"
+                android:text="Testar impressão"
+                android:textAllCaps="false"
+                android:textColor="@color/colorPrimary"
+                app:cornerRadius="8dp"
+                app:elevation="0dp"
+                app:strokeColor="@color/colorPrimary"
+                app:strokeWidth="1.5dp" />
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>

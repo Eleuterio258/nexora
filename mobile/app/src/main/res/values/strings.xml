@@ -1,0 +1,269 @@
+<resources>
+    <string name="app_name">paycore</string>
+    <string name="app_name_display">PayCore</string>
+
+    <!-- Login -->
+    <string name="login_title">Acesso ao Sistema</string>
+    <string name="login_subtitle">Terminal de Pagamento</string>
+    <string name="login_logo_description">Logo do sistema</string>
+    <string name="login_hint_operador">Email</string>
+    <string name="login_hint_senha">Senha</string>
+    <string name="login_btn_entrar">Entrar</string>
+    <string name="login_btn_biometria">Acessar com Biometria</string>
+    <string name="login_erro_generico">Credenciais invalidas. Verifique e tente novamente.</string>
+    <string name="login_erro_bloqueado">Acesso bloqueado. Contacte o supervisor.</string>
+    <string name="login_erro_tentativas">Tentativas restantes: %d</string>
+    <string name="login_campo_obrigatorio">Campo obrigatorio</string>
+
+    <!-- Registro de Operador -->
+    <string name="registro_titulo">Novo Operador</string>
+    <string name="registro_descricao">Preencha os dados para registar um novo operador neste terminal.</string>
+    <string name="registro_secao_dados">Dados Pessoais</string>
+    <string name="registro_secao_credenciais">Credenciais de Acesso</string>
+    <string name="registro_hint_nome">Nome Completo</string>
+    <string name="registro_hint_id_operador">ID do Operador</string>
+    <string name="registro_helper_id_operador">Ex: msantos (sem espacos, minusculas)</string>
+    <string name="registro_hint_perfil">Perfil / Cargo</string>
+    <string name="registro_hint_pin">PIN (4 a 6 digitos)</string>
+    <string name="registro_helper_pin">Minimo 4 digitos numericos</string>
+    <string name="registro_hint_pin_confirmar">Confirmar PIN</string>
+    <string name="registro_btn_registrar">Registar Operador</string>
+    <string name="registro_btn_voltar">Voltar</string>
+    <string name="registro_link_login">Ja tem acesso? Fazer login</string>
+    <string name="registro_erro_pin_nao_confere">Os PINs nao coincidem</string>
+    <string name="registro_erro_id_existente">ID de operador ja registado</string>
+    <string name="registro_sucesso">Operador registado com sucesso</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_status_rede">Estado da rede</string>
+    <string name="dashboard_status_sync">Estado da sincronizacao</string>
+    <string name="dashboard_turno_label">Turno</string>
+    <string name="dashboard_vendas_label">Vendas</string>
+    <string name="dashboard_montante_label">Montante</string>
+    <string name="dashboard_acoes_titulo">Acoes rapidas</string>
+    <string name="dashboard_nova_venda">Nova Venda</string>
+    <string name="dashboard_historico">Historico</string>
+    <string name="dashboard_fecho_caixa">Fecho de Caixa</string>
+    <string name="dashboard_suporte">Suporte</string>
+    <string name="dashboard_movimento_caixa">Movimento de Caixa</string>
+    <string name="admin_dashboard_subtitulo">Painel administrativo mobile</string>
+    <string name="admin_dashboard_boas_vindas">Gestao do negocio</string>
+    <string name="admin_dashboard_resumo_vendas">Vendas hoje</string>
+    <string name="admin_dashboard_resumo_terminais">Terminais</string>
+    <string name="admin_dashboard_resumo_produtos">Produtos</string>
+    <string name="admin_dashboard_secao_operacoes">Operacoes</string>
+    <string name="admin_dashboard_secao_catalogo">Catalogo</string>
+    <string name="admin_dashboard_secao_configuracao">Configuracao</string>
+    <string name="admin_dashboard_transacoes">Transacoes</string>
+    <string name="admin_dashboard_transacoes_desc">Consultar vendas e aplicar filtros por periodo e estado.</string>
+    <string name="admin_dashboard_relatorios">Relatorios</string>
+    <string name="admin_dashboard_relatorios_desc">Acompanhar desempenho diario, semanal e mensal.</string>
+    <string name="admin_dashboard_caixa">Caixa</string>
+    <string name="admin_dashboard_caixa_desc">Ver historico de aberturas, fechos e totais.</string>
+    <string name="admin_dashboard_produtos">Produtos</string>
+    <string name="admin_dashboard_produtos_desc">Gerir catalogo, preco, stock e disponibilidade.</string>
+    <string name="admin_dashboard_categorias">Categorias</string>
+    <string name="admin_dashboard_categorias_desc">Organizar categorias e estrutura do catalogo.</string>
+    <string name="admin_dashboard_terminais">Terminais</string>
+    <string name="admin_dashboard_terminais_desc">Listar terminais, ativacao e estado de operacao.</string>
+    <string name="admin_dashboard_utilizadores">Utilizadores</string>
+    <string name="admin_dashboard_utilizadores_desc">Criar contas e ajustar permissoes do tenant.</string>
+    <string name="admin_dashboard_descontos">Descontos</string>
+    <string name="admin_dashboard_descontos_desc">Configurar regras promocionais e descontos ativos.</string>
+    <string name="admin_dashboard_em_breve">Pagina em preparacao: %1$s</string>
+
+    <!-- Nova Venda -->
+    <string name="nova_venda_titulo">Nova Venda</string>
+    <string name="nova_venda_hint_item">Pesquisar ou adicionar item</string>
+    <string name="nova_venda_btn_adicionar">+</string>
+    <string name="nova_venda_vazio">Nenhum item adicionado</string>
+    <string name="nova_venda_subtotal">Subtotal</string>
+    <string name="nova_venda_desconto">Desconto</string>
+    <string name="nova_venda_total">Total</string>
+    <string name="nova_venda_btn_pagar">Pagar</string>
+    <string name="nova_venda_remover_item">Remover item</string>
+
+    <!-- Pagamento -->
+    <string name="pagamento_titulo">Pagamento</string>
+    <string name="pagamento_label_total">Total a pagar</string>
+    <string name="pagamento_escolha_metodo">Escolha o metodo de pagamento</string>
+    <string name="pagamento_metodo_cartao">Cartao</string>
+    <string name="pagamento_metodo_nfc">NFC / Contactless</string>
+    <string name="pagamento_metodo_qr">QR Code</string>
+    <string name="pagamento_metodo_dinheiro">Dinheiro</string>
+    <string name="pagamento_aguardando">Aguardando resposta do terminal...</string>
+    <string name="pagamento_btn_cancelar">Cancelar Transacao</string>
+
+    <!-- Comprovativo -->
+    <string name="comprovativo_status">Estado da transacao</string>
+    <string name="comprovativo_referencia">Referencia</string>
+    <string name="comprovativo_nsu">NSU</string>
+    <string name="comprovativo_data_hora">Data / Hora</string>
+    <string name="comprovativo_metodo">Metodo</string>
+    <string name="comprovativo_operador">Operador</string>
+    <string name="comprovativo_valor">Valor</string>
+    <string name="comprovativo_btn_imprimir">Imprimir Comprovativo</string>
+    <string name="comprovativo_btn_nova_venda">Nova Venda</string>
+    <string name="comprovativo_btn_inicio">Voltar ao Inicio</string>
+
+    <!-- Historico -->
+    <string name="historico_titulo">Historico de Transacoes</string>
+    <string name="historico_hint_pesquisa">Pesquisar por referencia ou NSU</string>
+    <string name="historico_filtro_todos">Todos</string>
+    <string name="historico_filtro_aprovados">Aprovados</string>
+    <string name="historico_filtro_recusados">Recusados</string>
+    <string name="historico_filtro_estornos">Estornos</string>
+    <string name="historico_filtro_hoje">Hoje</string>
+    <string name="historico_vazio">Nenhuma transacao encontrada</string>
+    <string name="historico_item_status">Status da transacao</string>
+
+    <!-- Fecho de Caixa -->
+    <string name="fecho_titulo">Fecho de Caixa</string>
+    <string name="fecho_secao_turno">Informacoes do Turno</string>
+    <string name="fecho_secao_totais">Totais por Metodo de Pagamento</string>
+    <string name="fecho_operador">Operador</string>
+    <string name="fecho_abertura">Abertura</string>
+    <string name="fecho_terminal">Terminal</string>
+    <string name="fecho_cartao_debito">Cartao Debito</string>
+    <string name="fecho_cartao_credito">Cartao Credito</string>
+    <string name="fecho_nfc">NFC / Contactless</string>
+    <string name="fecho_qr">QR Code</string>
+    <string name="fecho_dinheiro">Dinheiro</string>
+    <string name="fecho_total_geral">Total Geral</string>
+    <string name="fecho_btn_fechar">Fechar Turno</string>
+
+    <!-- Sincronizacao -->
+    <string name="sync_titulo">Sincronizacao</string>
+    <string name="sync_status_conexao">Estado da Conexao</string>
+    <string name="sync_secao_estado">Estado da Sincronizacao</string>
+    <string name="sync_ultimo_sync">Ultimo sync</string>
+    <string name="sync_pendencias">Pendencias</string>
+    <string name="sync_enviados">Eventos enviados</string>
+    <string name="sync_secao_config">Configuracoes</string>
+    <string name="sync_intervalo">Intervalo automatico</string>
+    <string name="sync_btn_sincronizar">Sincronizar Agora</string>
+
+    <!-- Configuracoes e Suporte -->
+    <string name="config_titulo">Configuracoes e Suporte</string>
+    <string name="config_secao_terminal">Terminal</string>
+    <string name="config_id_terminal">ID Terminal</string>
+    <string name="config_serial">Serial</string>
+    <string name="config_tenant">Tenant</string>
+    <string name="config_ambiente">Ambiente</string>
+    <string name="config_secao_app">Aplicacao</string>
+    <string name="config_versao">Versao</string>
+    <string name="config_ultima_atualizacao">Ultima atualizacao</string>
+    <string name="config_secao_conectividade">Conectividade</string>
+    <string name="config_rede">Rede</string>
+    <string name="config_api_url">Servidor API</string>
+    <string name="config_btn_testar_conexao">Testar Conexao</string>
+    <string name="config_secao_suporte">Suporte</string>
+    <string name="config_btn_ver_logs">Ver Logs Tecnicos</string>
+    <string name="config_btn_suporte">Contactar Suporte</string>
+    <string name="config_btn_logout">Terminar Sessao</string>
+
+    <!-- Login de Terminal -->
+    <string name="login_terminal_titulo">Login do Terminal</string>
+    <string name="login_terminal_subtitulo">Insira o número de série e código de ativação\npara acessar o terminal</string>
+    <string name="login_terminal_label_serial">Número de Série</string>
+    <string name="login_terminal_label_codigo">Código de Ativação</string>
+    <string name="login_terminal_hint_serial">Ex: TERM001</string>
+    <string name="login_terminal_hint_codigo">Código de ativação</string>
+    <string name="login_terminal_helper">O código de ativação é fornecido pelo administrador ao registar o terminal</string>
+    <string name="login_terminal_btn">Entrar</string>
+    <string name="login_terminal_info">Este terminal deve estar ativo no sistema para realizar o login</string>
+    <string name="login_terminal_ajuda">Precisa de ajuda?</string>
+    <!-- QR de activação de terminal (ecrã de criação, lido pelo login) -->
+    <string name="admin_terminal_qr_ajuda">Leia este código no terminal, no ecrã de login</string>
+    <string name="admin_terminal_qr_desc">Código QR de activação do terminal</string>
+    <string name="login_terminal_erro_serial_obrigatorio">Número de série é obrigatório</string>
+    <string name="login_terminal_erro_codigo_obrigatorio">Código de ativação é obrigatório</string>
+    <string name="login_terminal_erro_credenciais">Credenciais inválidas. Verifique e tente novamente.</string>
+    <string name="login_terminal_erro_terminal_inativo">Terminal não está ativo. Contacte o administrador.</string>
+    <string name="login_terminal_erro_generico">Erro ao realizar login. Tente novamente.</string>
+    <string name="login_terminal_sucesso">Login realizado com sucesso!</string>
+    <string name="login_terminal_btn_qr">Scan QR Code</string>
+    <string name="login_terminal_btn_logout">Desassociar Terminal</string>
+    <string name="login_terminal_btn_sair_conta">Sair da conta</string>
+    <string name="login_terminal_qr_sem_camara">Sem acesso à câmara não é possível ler o QR. Introduza os códigos manualmente ou permita a câmara nas definições.</string>
+    <string name="login_terminal_qr_prompt">Aponte a câmera para o QR Code do terminal</string>
+    <string name="login_terminal_qr_invalido">QR Code inválido. Use o QR gerado pelo painel administrativo.</string>
+
+    <!-- Selecao de Modo -->
+    <string name="selecao_titulo">Como pretende entrar?</string>
+    <string name="selecao_terminal_titulo">Terminal de Venda (POS)</string>
+    <string name="selecao_terminal_desc">Processar vendas, pagamentos e historico</string>
+    <string name="selecao_admin_titulo">Painel Administrativo</string>
+    <string name="selecao_admin_desc">Gerir produtos, utilizadores e relatorios</string>
+    <string name="selecao_btn_sair">Sair da conta</string>
+
+    <!-- Splash -->
+    <string name="splash_tagline">payments · control · reliability</string>
+
+    <!-- Ativacao do Terminal -->
+    <string name="ativacao_titulo">Ativacao do Terminal</string>
+    <string name="ativacao_descricao">Associe este terminal a um estabelecimento utilizando o codigo de ativacao ou QR Code fornecido pelo administrador.</string>
+    <string name="ativacao_secao_codigo">Codigo de Ativacao</string>
+    <string name="ativacao_hint_codigo">Codigo de ativacao</string>
+    <string name="ativacao_helper_codigo">Ex: ACT-1234-5678 (fornecido pelo portal)</string>
+    <string name="ativacao_btn_codigo">Ativar com Codigo</string>
+    <string name="ativacao_ou">OU</string>
+    <string name="ativacao_secao_qr">QR Code</string>
+    <string name="ativacao_descricao_qr">Aponte a camera ao QR Code de ativacao gerado pelo portal administrativo.</string>
+    <string name="ativacao_btn_qr">Ler QR Code de Ativacao</string>
+    <string name="ativacao_info_suporte">Em caso de duvida, contacte o suporte tecnico.</string>
+
+    <!-- Abertura de Caixa -->
+    <string name="abertura_titulo">Abertura de Caixa</string>
+    <string name="abertura_secao_turno">Informacoes do Turno</string>
+    <string name="abertura_operador">Operador</string>
+    <string name="abertura_terminal">Terminal</string>
+    <string name="abertura_data_hora">Data / Hora</string>
+    <string name="abertura_secao_fundo">Fundo de Caixa Inicial</string>
+    <string name="abertura_hint_fundo">Valor do fundo inicial</string>
+    <string name="abertura_helper_fundo">Dinheiro disponivel no inicio do turno</string>
+    <string name="abertura_nota_fundo">O valor sera registado para conferencia no fecho de caixa.</string>
+    <string name="abertura_btn_abrir">Abrir Caixa</string>
+
+    <!-- Detalhe da Transacao -->
+    <string name="detalhe_titulo">Detalhe da Transacao</string>
+    <string name="detalhe_secao_transacao">Dados da Transacao</string>
+    <string name="detalhe_autorizacao">Autorizacao</string>
+    <string name="detalhe_estorno_info">Elegibilidade de estorno</string>
+    <string name="detalhe_btn_reimprimir">Reimprimir Comprovativo</string>
+    <string name="detalhe_btn_estornar">Solicitar Estorno</string>
+
+    <!-- Estorno / Cancelamento -->
+    <string name="estorno_titulo">Estorno</string>
+    <string name="estorno_aviso">Esta operacao e irreversivel. O valor sera devolvido ao cliente apos processamento.</string>
+    <string name="estorno_secao_original">Transacao Original</string>
+    <string name="estorno_valor_original">Valor Original</string>
+    <string name="estorno_secao_tipo">Tipo de Estorno</string>
+    <string name="estorno_hint_tipo">Tipo de estorno</string>
+    <string name="estorno_hint_valor">Valor a estornar</string>
+    <string name="estorno_helper_valor">Apenas para estorno parcial</string>
+    <string name="estorno_hint_motivo">Motivo</string>
+    <string name="estorno_secao_supervisor">Autorizacao do Supervisor</string>
+    <string name="estorno_hint_pin_supervisor">PIN do Supervisor</string>
+    <string name="estorno_btn_confirmar">Confirmar Estorno</string>
+
+    <string-array name="tipos_estorno">
+        <item>Estorno Total</item>
+        <item>Estorno Parcial</item>
+    </string-array>
+
+    <string-array name="motivos_estorno">
+        <item>Solicitacao do cliente</item>
+        <item>Produto devolvido</item>
+        <item>Erro na cobranca</item>
+        <item>Transacao duplicada</item>
+        <item>Outro</item>
+    </string-array>
+
+    <!-- Perfis disponíveis (para o dropdown) -->
+    <string-array name="perfis_operador">
+        <item>Operador de Caixa</item>
+        <item>Supervisor</item>
+        <item>Administrador</item>
+    </string-array>
+</resources>

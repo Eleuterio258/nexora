@@ -1,0 +1,286 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingHorizontal="24dp"
+        android:paddingTop="48dp"
+        android:paddingBottom="40dp">
+
+        <!-- Logo PayCore -->
+        <ImageView
+            android:layout_width="150dp"
+            android:layout_height="60dp"
+            android:contentDescription="PayCore"
+            android:scaleType="fitCenter"
+            android:src="@drawable/paycore_pos" />
+
+        <!-- Título -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="@string/login_terminal_titulo"
+            android:textColor="@color/text_primary"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <!-- Subtítulo -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="36dp"
+            android:gravity="center"
+            android:text="@string/login_terminal_subtitulo"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+
+        <!-- Campo Número de Série -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:background="@drawable/bg_input_rounded"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:contentDescription=""
+                android:src="@drawable/ic_terminal"
+                app:tint="@color/colorPrimary" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_serial_number"
+                style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                app:boxBackgroundColor="@android:color/transparent"
+                app:boxBackgroundMode="none"
+                app:boxStrokeWidth="0dp"
+                app:boxStrokeWidthFocused="0dp"
+                app:hintEnabled="false">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_serial_number"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@android:color/transparent"
+                    android:fontFamily="monospace"
+                    android:hint="@string/login_terminal_hint_serial"
+                    android:inputType="textCapCharacters"
+                    android:maxLines="1"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_secondary"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    tools:text="TRM-000123" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <!-- Campo Código de Activação -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_input_rounded"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:contentDescription=""
+                android:src="@drawable/ic_lock"
+                app:tint="@color/colorPrimary" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_activation_code"
+                style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                app:boxBackgroundColor="@android:color/transparent"
+                app:boxBackgroundMode="none"
+                app:boxStrokeWidth="0dp"
+                app:boxStrokeWidthFocused="0dp"
+                app:endIconMode="password_toggle"
+                app:endIconDrawable="@drawable/ic_eye_off"
+                app:endIconTint="@color/text_secondary"
+                app:hintEnabled="false">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_activation_code"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@android:color/transparent"
+                    android:hint="@string/login_terminal_hint_codigo"
+                    android:inputType="textPassword"
+                    android:maxLines="1"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_secondary"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    tools:text="••••••" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </LinearLayout>
+
+        <!-- Mensagem de Ajuda -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="@string/login_terminal_helper"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <!-- Mensagem de Erro -->
+        <TextView
+            android:id="@+id/tv_erro_login"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_erro"
+            android:padding="12dp"
+            android:textColor="@color/colorError"
+            android:textSize="13sp"
+            android:visibility="gone"
+            tools:text="Código inválido. Tente novamente."
+            tools:visibility="visible" />
+
+        <!-- Mensagem de Sucesso -->
+        <TextView
+            android:id="@+id/tv_sucesso_login"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_sucesso"
+            android:padding="12dp"
+            android:textColor="@color/colorSuccess"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <!-- ProgressBar -->
+        <ProgressBar
+            android:id="@+id/progress_login"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="16dp"
+            android:indeterminate="true"
+            android:progressTint="@color/colorPrimary"
+            android:visibility="gone" />
+
+        <!-- Botão Activar Terminal -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_login_terminal"
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:layout_marginTop="24dp"
+            android:text="@string/login_terminal_btn"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:backgroundTint="@color/colorPrimary"
+            app:cornerRadius="12dp"
+            app:elevation="0dp"
+            app:icon="@drawable/ic_login"
+            app:iconGravity="textStart"
+            app:iconPadding="10dp"
+            app:iconSize="20dp"
+            app:iconTint="@color/white" />
+
+        <!-- Divisor "ou" -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:alpha="0.3"
+                android:background="@color/divider" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="14dp"
+                android:text="ou"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:alpha="0.3"
+                android:background="@color/divider" />
+        </LinearLayout>
+
+        <!-- Botão Scan QR Code -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_scan_qr"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:layout_marginTop="14dp"
+            android:text="@string/login_terminal_btn_qr"
+            android:textAllCaps="false"
+            android:textColor="@color/colorPrimary"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            app:cornerRadius="12dp"
+            app:elevation="0dp"
+            app:icon="@drawable/ic_barcode_scanner"
+            app:iconGravity="textStart"
+            app:iconPadding="10dp"
+            app:iconSize="20dp"
+            app:iconTint="@color/colorPrimary"
+            app:strokeColor="@color/colorPrimary"
+            app:strokeWidth="1.5dp" />
+
+        <!-- Info e Ajuda -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:gravity="center"
+            android:text="@string/login_terminal_info"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tv_ajuda"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:text="@string/login_terminal_ajuda"
+            android:textColor="@color/colorPrimary"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+</androidx.core.widget.NestedScrollView>
+

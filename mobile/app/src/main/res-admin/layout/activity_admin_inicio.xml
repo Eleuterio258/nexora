@@ -1,0 +1,393 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white"
+    android:orientation="vertical">
+
+    <!-- HEADER -->
+    <LinearLayout
+        android:id="@+id/header_inicio"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/white"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="12dp">
+
+        <ImageButton
+            android:id="@+id/btn_admin_logout"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Sair"
+            android:src="@drawable/ic_logout"
+            app:tint="@color/text_primary" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="Painel Administrativo"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <FrameLayout
+            android:layout_width="28dp"
+            android:layout_height="28dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:contentDescription=""
+                android:src="@drawable/ic_nav_notification"
+                app:tint="@color/text_primary" />
+
+            <View
+                android:layout_width="7dp"
+                android:layout_height="7dp"
+                android:layout_gravity="top|end"
+                android:background="@drawable/bg_icon_red_circle" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp"
+        android:background="@color/divider" android:alpha="0.4" />
+
+    <!-- CONTEÚDO -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="16dp">
+
+            <!-- HERO -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="20dp"
+                android:paddingTop="16dp"
+                android:paddingBottom="16dp">
+
+                <FrameLayout
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bg_icon_avatar">
+
+                    <ImageView
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:layout_gravity="center"
+                        android:contentDescription=""
+                        android:src="@drawable/ic_person_outline"
+                        app:tint="#FF9E9E9E" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tv_inicio_boas_vindas"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        tools:text="Admin Demo" />
+
+                    <TextView
+                        android:id="@+id/tv_inicio_tenant"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        tools:text="PayCore" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:contentDescription=""
+                    android:src="@drawable/ic_chevron_right"
+                    app:tint="@color/text_secondary" />
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp"
+                android:background="@color/divider" android:alpha="0.4" />
+
+            <!-- STATS -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="180dp"
+                android:orientation="horizontal"
+                android:paddingHorizontal="20dp"
+                android:paddingTop="20dp"
+                android:paddingBottom="12dp">
+
+                <!-- Vendas hoje -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1.1"
+                    android:orientation="vertical">
+
+                    <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp">
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_gravity="center"
+                            android:contentDescription=""
+                            android:src="@drawable/ic_transactions"
+                            app:tint="@color/colorPrimary" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="Vendas hoje"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tv_inicio_vendas_valor"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="@color/text_primary"
+                        android:textSize="24sp"
+                        android:textStyle="bold"
+                        tools:text="MT 0,00" />
+                </LinearLayout>
+
+                <!-- Terminais + Produtos -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="20dp"
+                    android:layout_weight="0.9"
+                    android:orientation="vertical">
+
+                    <!-- Terminais -->
+                    <LinearLayout
+                        android:id="@+id/card_inicio_terminais"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingBottom="14dp">
+
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp">
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:layout_gravity="center"
+                                android:contentDescription=""
+                                android:src="@drawable/ic_terminal_monitor" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Terminais" android:textColor="@color/text_secondary" android:textSize="10sp" />
+                            <TextView android:id="@+id/tv_inicio_terminais_valor" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/text_primary" android:textSize="18sp" android:textStyle="bold" tools:text="3" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ativos" android:textColor="@color/text_secondary" android:textSize="10sp" />
+                        </LinearLayout>
+
+                        <ImageView android:layout_width="14dp" android:layout_height="14dp" android:contentDescription="" android:src="@drawable/ic_chevron_right" app:tint="@color/text_secondary" />
+                    </LinearLayout>
+
+                    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" android:alpha="0.4" />
+
+                    <!-- Produtos -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingTop="14dp">
+
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp">
+                            <ImageView
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:layout_gravity="center"
+                                android:contentDescription=""
+                                android:src="@drawable/ic_tab_produtos"
+                                app:tint="@color/colorTeal" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Produtos" android:textColor="@color/text_secondary" android:textSize="10sp" />
+                            <TextView android:id="@+id/tv_inicio_produtos_valor" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="@color/text_primary" android:textSize="18sp" android:textStyle="bold" tools:text="256" />
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="cadastrados" android:textColor="@color/text_secondary" android:textSize="10sp" />
+                        </LinearLayout>
+
+                        <ImageView android:layout_width="14dp" android:layout_height="14dp" android:contentDescription="" android:src="@drawable/ic_chevron_right" app:tint="@color/text_secondary" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" android:alpha="0.4" />
+
+            <!-- OPERAÇÕES -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="20dp" android:paddingTop="18dp" android:paddingBottom="4dp">
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="Operações" android:textColor="@color/text_primary" android:textSize="15sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingHorizontal="12dp" android:paddingVertical="8dp">
+
+                <LinearLayout
+                    android:id="@+id/card_inicio_transacoes"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp" android:layout_weight="1"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true" android:focusable="true"
+                    android:gravity="center" android:orientation="vertical" android:paddingVertical="18dp">
+                    <ImageView android:layout_width="40dp" android:layout_height="40dp" android:contentDescription="" android:src="@drawable/ic_transactions" app:tint="@color/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:gravity="center" android:text="Transacões" android:textColor="@color/text_primary" android:textSize="12sp" android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/card_inicio_relatorios"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp" android:layout_weight="1"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true" android:focusable="true"
+                    android:gravity="center" android:orientation="vertical" android:paddingVertical="18dp">
+                    <ImageView android:layout_width="40dp" android:layout_height="40dp" android:contentDescription="" android:src="@drawable/ic_reports" app:tint="@color/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:gravity="center" android:text="Relatórios" android:textColor="@color/text_primary" android:textSize="12sp" android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/card_inicio_caixa"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp" android:layout_weight="1"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true" android:focusable="true"
+                    android:gravity="center" android:orientation="vertical" android:paddingVertical="18dp">
+                    <ImageView android:layout_width="40dp" android:layout_height="40dp" android:contentDescription="" android:src="@drawable/ic_cash_drawer" app:tint="@color/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:gravity="center" android:text="Caixa" android:textColor="@color/text_primary" android:textSize="12sp" android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" android:alpha="0.4" />
+
+            <!-- CATÁLOGO -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="20dp" android:paddingTop="18dp" android:paddingBottom="4dp">
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="Catálogo" android:textColor="@color/text_primary" android:textSize="15sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingHorizontal="12dp" android:paddingVertical="8dp">
+
+                <LinearLayout
+                    android:id="@+id/card_inicio_produtos"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp" android:layout_weight="1"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true" android:focusable="true"
+                    android:gravity="center_vertical" android:orientation="horizontal" android:padding="16dp">
+                    <ImageView android:layout_width="32dp" android:layout_height="32dp" android:contentDescription="" android:src="@drawable/ic_tab_produtos" app:tint="@color/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:text="Produtos" android:textColor="@color/text_primary" android:textSize="13sp" android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/card_inicio_categorias"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp" android:layout_weight="1"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true" android:focusable="true"
+                    android:gravity="center_vertical" android:orientation="horizontal" android:padding="16dp">
+                    <ImageView android:layout_width="32dp" android:layout_height="32dp" android:contentDescription="" android:src="@drawable/ic_categories" app:tint="@color/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:text="Categorias" android:textColor="@color/text_primary" android:textSize="13sp" android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/divider" android:alpha="0.4" />
+
+            <!-- CONFIGURAÇÕES -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="20dp" android:paddingTop="18dp" android:paddingBottom="4dp">
+                <ImageView android:layout_width="16dp" android:layout_height="16dp" android:contentDescription="" android:src="@drawable/ic_nav_settings" app:tint="@color/colorPrimary" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="Configurações" android:textColor="@color/text_primary" android:textSize="15sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingHorizontal="12dp" android:paddingVertical="8dp">
+
+                <LinearLayout
+                    android:id="@+id/card_inicio_impressora"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp" android:layout_weight="1"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true" android:focusable="true"
+                    android:gravity="center_vertical" android:orientation="horizontal" android:padding="16dp">
+                    <ImageView android:layout_width="32dp" android:layout_height="32dp" android:contentDescription="" android:src="@drawable/ic_payment_cash" app:tint="@color/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:text="Impressora" android:textColor="@color/text_primary" android:textSize="13sp" android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/card_inicio_broadcast"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp" android:layout_weight="1"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true" android:focusable="true"
+                    android:gravity="center_vertical" android:orientation="horizontal" android:padding="16dp">
+                    <ImageView android:layout_width="32dp" android:layout_height="32dp" android:contentDescription="" android:src="@drawable/ic_nav_notification" app:tint="@color/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:text="Notificar todos" android:textColor="@color/text_primary" android:textSize="13sp" android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/card_inicio_utilizadores"
+                    android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp" android:layout_weight="1"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true" android:focusable="true"
+                    android:gravity="center_vertical" android:orientation="horizontal" android:padding="16dp">
+                    <ImageView android:layout_width="32dp" android:layout_height="32dp" android:contentDescription="" android:src="@drawable/ic_nav_user" app:tint="@color/colorPrimary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:text="Utilizadores" android:textColor="@color/text_primary" android:textSize="13sp" android:textStyle="bold" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>

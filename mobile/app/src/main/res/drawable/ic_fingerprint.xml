@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <!-- Outer arc top -->
+    <path
+        android:strokeColor="#FFD32F2F"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M8,12 Q8,4 16,4 Q24,4 24,12" />
+    <!-- Middle arc -->
+    <path
+        android:strokeColor="#FFD32F2F"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M5,15 Q4,7 16,7 Q28,7 27,15 Q27,22 24,26" />
+    <!-- Center line -->
+    <path
+        android:strokeColor="#FFD32F2F"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M16,11 Q20,11 20,16 Q20,22 16,26 Q14,28 12,27" />
+    <!-- Inner arc -->
+    <path
+        android:strokeColor="#FFD32F2F"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M11,14 Q11,10 16,10" />
+    <!-- Bottom arc -->
+    <path
+        android:strokeColor="#FFD32F2F"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M8,19 Q8,28 16,28 Q20,28 22,25" />
+    <!-- Left vertical -->
+    <path
+        android:strokeColor="#FFD32F2F"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M11,17 L11,21" />
+</vector>
