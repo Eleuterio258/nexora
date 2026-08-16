@@ -11,7 +11,7 @@ use E258Tech\Model\Service\Crm\ActivityService;
 use E258Tech\Model\Service\Crm\LeadService;
 use E258Tech\Model\Service\Crm\OpportunityService;
 use E258Tech\Model\Service\Customer\CustomerService;
-use E258Tech\Model\Service\Invoicing\InvoicingService;
+use E258Tech\Model\Service\Faturacao\FaturacaoService;
 use E258Tech\Model\Service\Pos\PosService;
 use E258Tech\Model\Service\Product\ProductService;
 use E258Tech\Model\Service\Purchase\PurchaseService;
@@ -50,7 +50,7 @@ final readonly class AdminApiDependencies
         public AuthorizationAdminService $authorization,
         public CompanyAdminService $companies,
         public CustomerService $customers,
-        public InvoicingService $invoicing,
+        public FaturacaoService $faturacao,
         public ProductService $products,
         public PosService $pos,
         public SistemaConfiguracaoService $sistema,

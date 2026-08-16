@@ -27,10 +27,13 @@
         <a href="/settings/invoice-layout" class="nav-item <?= ($active ?? '') === 'settings-invoice-layout' ? 'active' : '' ?>"><span>▧</span>Layout da fatura</a>
         <a href="/reports" class="nav-item <?= ($active ?? '') === 'reports' ? 'active' : '' ?>"><span>↗</span>Relatórios</a>
       </nav>
+      <?php $authSession = new \PHC\Infrastructure\Auth\AuthSession(); ?>
       <div class="sidebar-foot">
-        <span class="avatar">AM</span>
-        <span><b>António Matola</b><small>Administrador</small></span>
-        <button title="Definições">•••</button>
+        <span class="avatar"><?= \PHC\Presentation\View\Html::e(mb_strtoupper(mb_substr($authSession->userName() ?? '?', 0, 1))) ?></span>
+        <span><b><?= \PHC\Presentation\View\Html::e($authSession->userName() ?? 'Sessão local') ?></b><small>Nexora</small></span>
+        <form method="post" action="/logout" style="display:contents">
+          <button type="submit" title="Sair">⏻</button>
+        </form>
       </div>
     </aside>
 

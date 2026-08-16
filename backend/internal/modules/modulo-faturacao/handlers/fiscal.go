@@ -76,6 +76,7 @@ func (h *Handler) AdicionarItemFaturaFiscal(w http.ResponseWriter, r *http.Reque
 
 func (h *Handler) EmitirFaturaFiscal(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
+	invoiceIDStr := chi.URLParam(r, "id")
 	tx, _ := h.db.Begin(r.Context())
 	defer tx.Rollback(r.Context())
 	var count int
@@ -83,7 +84,7 @@ func (h *Handler) EmitirFaturaFiscal(w http.ResponseWriter, r *http.Request) {
 		SELECT COUNT(*) FROM faturacao.invoice_items i
 		JOIN faturacao.invoices f ON f.id=i.invoice_id
 		WHERE f.id=$1 AND f.tenant_id=$2 AND f.status='rascunho'`,
-		chi.URLParam(r, "id"), user.TenantID).Scan(&count)
+		invoiceIDStr, user.TenantID).Scan(&count)
 	if err != nil || count == 0 {
 		jsonErr(w, "Fatura em rascunho sem itens nao pode ser emitida", http.StatusConflict)
 		return
@@ -91,18 +92,59 @@ func (h *Handler) EmitirFaturaFiscal(w http.ResponseWriter, r *http.Request) {
 	var exemptions int
 	err = tx.QueryRow(r.Context(), `
 		SELECT impostos.fn_aplicar_isencoes_fatura($1,$2)`,
-		user.TenantID, chi.URLParam(r, "id")).Scan(&exemptions)
+		user.TenantID, invoiceIDStr).Scan(&exemptions)
+
+	// FR (fatura-recibo) e VD (venda a dinheiro) ficam pagas no momento da
+	// emissão, em vez de "emitida" à espera de um recibo separado — gera-se
+	// logo o recibo correspondente, mantendo o mesmo rasto de auditoria que
+	// um recibo criado manualmente. O total é lido depois de aplicar
+	// isenções, para o recibo bater certo com o valor final da fatura.
+	var tipo string
+	var total float64
 	if err == nil {
-		tag, updateErr := tx.Exec(r.Context(), `
-			UPDATE faturacao.invoices SET status='emitida',emitida_em=NOW()
-			 WHERE id=$1 AND tenant_id=$2 AND status='rascunho'`,
-			chi.URLParam(r, "id"), user.TenantID)
-		err = updateErr
-		if err == nil && tag.RowsAffected() == 0 {
-			jsonErr(w, "Fatura em rascunho nao encontrada", http.StatusNotFound)
+		err = tx.QueryRow(r.Context(), `
+			SELECT tipo, total FROM faturacao.invoices
+			 WHERE id=$1 AND tenant_id=$2 AND status='rascunho' FOR UPDATE`,
+			invoiceIDStr, user.TenantID).Scan(&tipo, &total)
+	}
+	if err != nil {
+		jsonErr(w, "Fatura em rascunho nao encontrada", http.StatusNotFound)
+		return
+	}
+
+	novoStatus := "emitida"
+	pagaNaEmissao := tipo == "FR" || tipo == "VD"
+	if pagaNaEmissao {
+		novoStatus = "paga"
+	}
+	tag, err := tx.Exec(r.Context(), `
+		UPDATE faturacao.invoices
+		   SET status=$1, valor_pago=CASE WHEN $1='paga' THEN $2 ELSE valor_pago END, emitida_em=NOW()
+		 WHERE id=$3 AND tenant_id=$4 AND status='rascunho'`,
+		novoStatus, total, invoiceIDStr, user.TenantID)
+	if err != nil || tag.RowsAffected() == 0 {
+		jsonErr(w, "Fatura em rascunho nao encontrada", http.StatusNotFound)
+		return
+	}
+
+	if pagaNaEmissao {
+		numeroRecibo, serieID, serieErr := proximoNumeroSerie(r.Context(), tx, user.TenantID, "RB")
+		if serieErr != nil {
+			jsonErr(w, "Não existe nenhuma série activa configurada para Recibos. Configure em Faturação > Séries Documentais.", http.StatusUnprocessableEntity)
+			return
+		}
+		invoiceID, _ := strconv.ParseInt(invoiceIDStr, 10, 64)
+		observacoes := fmt.Sprintf("Recibo automático — fatura %s emitida com pagamento imediato.", tipo)
+		if _, err = tx.Exec(r.Context(), `
+			INSERT INTO faturacao.invoice_receipts
+			  (tenant_id, invoice_id, numero, serie_id, valor, payment_method_id, referencia, observacoes)
+			VALUES ($1,$2,$3,$4,$5,NULL,NULL,$6)`,
+			user.TenantID, invoiceID, numeroRecibo, serieID, total, observacoes); err != nil {
+			jsonErr(w, "Nao foi possivel gerar o recibo automatico", http.StatusInternalServerError)
 			return
 		}
 	}
+
 	if err != nil || tx.Commit(r.Context()) != nil {
 		jsonErr(w, "Nao foi possivel emitir a fatura", http.StatusInternalServerError)
 		return

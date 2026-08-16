@@ -59,9 +59,32 @@ var metodosPagamentoValidos = map[string]bool{
 
 func (h *Handler) ListarTerminais(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
+	q := r.URL.Query()
+	limit, offset := pageParams(r)
+
+	where := "tenant_id=$1 AND deleted_at IS NULL"
+	args := []any{user.TenantID}
+
+	if v := q.Get("ativo"); v != "" {
+		args = append(args, v == "true")
+		where += " AND activo=$" + strconv.Itoa(len(args))
+	}
+	if v := q.Get("warehouse_id"); v != "" {
+		if wid, err := strconv.ParseInt(v, 10, 64); err == nil {
+			args = append(args, wid)
+			where += " AND warehouse_id=$" + strconv.Itoa(len(args))
+		}
+	}
+	if v := q.Get("caixa_id"); v != "" {
+		if cid, err := strconv.ParseInt(v, 10, 64); err == nil {
+			args = append(args, cid)
+			where += " AND caixa_id=$" + strconv.Itoa(len(args))
+		}
+	}
+
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT id, codigo, nome, warehouse_id, caixa_id, activo
-		  FROM pos_terminals WHERE tenant_id=$1 ORDER BY nome`, user.TenantID)
+		  FROM pos_terminals WHERE `+where+` ORDER BY nome LIMIT $`+strconv.Itoa(len(args)+1)+` OFFSET $`+strconv.Itoa(len(args)+2), append(args, limit, offset)...)
 	defer rows.Close()
 	type Row struct {
 		ID          int64  `json:"id"`
@@ -219,7 +242,7 @@ func (h *Handler) alterarEstadoTerminal(w http.ResponseWriter, r *http.Request, 
 	var t Row
 	err := h.db.QueryRow(r.Context(), `
 		UPDATE pos_terminals SET activo=$1, updated_at=NOW()
-		 WHERE id=$2 AND tenant_id=$3
+		 WHERE id=$2 AND tenant_id=$3 AND deleted_at IS NULL
 		 RETURNING id, codigo, nome, warehouse_id, caixa_id, activo`,
 		activo, id, user.TenantID).Scan(&t.ID, &t.Codigo, &t.Nome, &t.WarehouseID, &t.CaixaID, &t.Activo)
 	if err == pgx.ErrNoRows {
@@ -241,6 +264,171 @@ func (h *Handler) ActivarTerminal(w http.ResponseWriter, r *http.Request) {
 // DesactivarTerminal marca o terminal como inactivo (soft-delete do cliente).
 func (h *Handler) DesactivarTerminal(w http.ResponseWriter, r *http.Request) {
 	h.alterarEstadoTerminal(w, r, false)
+}
+
+// ObterTerminal devolve um terminal pelo ID.
+func (h *Handler) ObterTerminal(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+
+	type Row struct {
+		ID          int64      `json:"id"`
+		Codigo      string     `json:"codigo"`
+		Nome        string     `json:"nome"`
+		WarehouseID *int64     `json:"warehouse_id"`
+		CaixaID     *int64     `json:"caixa_id"`
+		UserID      *int64     `json:"user_id"`
+		Activo      bool       `json:"activo"`
+		CreatedAt   time.Time  `json:"created_at"`
+		UpdatedAt   time.Time  `json:"updated_at"`
+		DeletedAt   *time.Time `json:"deleted_at,omitempty"`
+	}
+	var t Row
+	err := h.db.QueryRow(r.Context(), `
+		SELECT id, codigo, nome, warehouse_id, caixa_id, user_id, activo, created_at, updated_at, deleted_at
+		  FROM pos_terminals
+		 WHERE id=$1 AND tenant_id=$2 AND deleted_at IS NULL`, id, user.TenantID).
+		Scan(&t.ID, &t.Codigo, &t.Nome, &t.WarehouseID, &t.CaixaID, &t.UserID, &t.Activo, &t.CreatedAt, &t.UpdatedAt, &t.DeletedAt)
+	if err == pgx.ErrNoRows {
+		jsonErr(w, "Terminal não encontrado", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, t, http.StatusOK)
+}
+
+// ActualizarTerminal actualiza nome, warehouse_id e caixa_id de um terminal.
+func (h *Handler) ActualizarTerminal(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+
+	var body struct {
+		Nome        string `json:"nome"`
+		WarehouseID *int64 `json:"warehouse_id"`
+		CaixaID     *int64 `json:"caixa_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Nome == "" {
+		jsonErr(w, "nome é obrigatório", http.StatusBadRequest)
+		return
+	}
+
+	tag, err := h.db.Exec(r.Context(), `
+		UPDATE pos_terminals
+		   SET nome=$1, warehouse_id=$2, caixa_id=$3, updated_at=NOW()
+		 WHERE id=$4 AND tenant_id=$5 AND deleted_at IS NULL`,
+		body.Nome, body.WarehouseID, body.CaixaID, id, user.TenantID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		jsonErr(w, "Terminal não encontrado", http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ArquivarTerminal faz soft-delete de um terminal (apenas se não tiver sessões).
+func (h *Handler) ArquivarTerminal(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+
+	var temSessoes bool
+	err := h.db.QueryRow(r.Context(), `
+		SELECT EXISTS(SELECT 1 FROM pos_sessions WHERE terminal_id=$1)`, id).Scan(&temSessoes)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	if temSessoes {
+		jsonErr(w, "Não é possível remover terminal com sessões associadas", http.StatusConflict)
+		return
+	}
+
+	ctx := r.Context()
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	var userID *int64
+	if err := tx.QueryRow(ctx, `
+		UPDATE pos_terminals
+		   SET activo=false, deleted_at=NOW(), updated_at=NOW()
+		 WHERE id=$1 AND tenant_id=$2 AND deleted_at IS NULL
+		 RETURNING user_id`, id, user.TenantID).Scan(&userID); err != nil {
+		if err == pgx.ErrNoRows {
+			jsonErr(w, "Terminal não encontrado", http.StatusNotFound)
+			return
+		}
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	// Desactiva a conta sintética associada ao terminal, se existir.
+	if userID != nil {
+		if _, err := tx.Exec(ctx, `
+			UPDATE auth.users SET estado='inactivo', updated_at=NOW()
+			 WHERE id=$1 AND tipo='funcionario'`, *userID); err != nil {
+			jsonErr(w, "Erro interno ao desactivar conta do terminal", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ObterSessaoAtivaDoTerminal devolve a sessão aberta de um terminal específico.
+func (h *Handler) ObterSessaoAtivaDoTerminal(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+
+	// Garante que o terminal existe e pertence ao tenant.
+	var existe bool
+	if err := h.db.QueryRow(r.Context(), `
+		SELECT EXISTS(SELECT 1 FROM pos_terminals WHERE id=$1 AND tenant_id=$2 AND deleted_at IS NULL)`,
+		id, user.TenantID).Scan(&existe); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	if !existe {
+		jsonErr(w, "Terminal não encontrado", http.StatusNotFound)
+		return
+	}
+
+	type Row struct {
+		ID            int64     `json:"id"`
+		UserID        int64     `json:"user_id"`
+		FuncionarioID *int64    `json:"funcionario_id"`
+		Status        string    `json:"status"`
+		OpeningAmount float64   `json:"opening_amount"`
+		OpenedAt      time.Time `json:"opened_at"`
+	}
+	var s Row
+	err := h.db.QueryRow(r.Context(), `
+		SELECT id, user_id, funcionario_id, status, opening_amount, opened_at
+		  FROM pos_sessions
+		 WHERE tenant_id=$1 AND terminal_id=$2 AND status='aberta'
+		 LIMIT 1`, user.TenantID, id).
+		Scan(&s.ID, &s.UserID, &s.FuncionarioID, &s.Status, &s.OpeningAmount, &s.OpenedAt)
+	if err == pgx.ErrNoRows {
+		jsonOK(w, map[string]any{"sessao": nil}, http.StatusOK)
+		return
+	}
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, s, http.StatusOK)
 }
 
 // ── Catálogo POS ────────────────────────────────────────────────────────────

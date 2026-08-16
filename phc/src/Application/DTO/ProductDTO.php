@@ -27,7 +27,7 @@ final readonly class ProductDTO
             $product->code(),
             $product->name(),
             $product->unit(),
-            $product->price(),
+            $product->price()->toFloat(),
             $product->tax()->percentage(),
             $product->stock(),
             $product->isActive()

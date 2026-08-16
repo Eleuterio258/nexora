@@ -255,7 +255,7 @@ class LoginActivity : AppCompatActivity() {
                     userName = me.nome,
                     userEmail = me.email,
                     userRole = role,
-                    employeeCode = me.email,
+                    employeeCode = me.em ail,
                     modulos = modulos
                 )
                 Toast.makeText(

@@ -4,7 +4,11 @@ use PHC\Presentation\View\Html;
 /** @var \PHC\Application\DTO\CustomerDTO[] $customers */
 /** @var \PHC\Application\DTO\ProductDTO[] $products */
 /** @var \PHC\Application\DTO\SeriesDTO[] $series */
+/** @var \PHC\Domain\ValueObject\CompanyInfo|null $company */
 /** @var string|null $error */
+
+$companyName = $company?->name() !== '' && $company?->name() !== null ? $company->name() : 'Empresa não configurada';
+$companyNuit = $company?->nuit() !== '' && $company?->nuit() !== null ? 'NUIT ' . $company->nuit() : 'NUIT não configurado';
 
 $today = date('Y-m-d');
 $dueDate = date('Y-m-d', strtotime('+30 days'));
@@ -106,8 +110,8 @@ $types = [
 
     <aside class="document-summary">
       <div class="summary-company">
-        <span class="company-icon">N</span>
-        <div><b>Nexora, Lda.</b><small>NUIT 400123456</small></div>
+        <span class="company-icon"><?= Html::e(mb_strtoupper(mb_substr($companyName, 0, 1))) ?></span>
+        <div><b><?= Html::e($companyName) ?></b><small><?= Html::e($companyNuit) ?></small></div>
       </div>
       <dl>
         <div><dt>Subtotal</dt><dd id="subtotalValue">0,00 MT</dd></div>

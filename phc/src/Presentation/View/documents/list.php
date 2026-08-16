@@ -23,8 +23,10 @@ $filters = [
     <h1>Documentos</h1>
     <p>Consulte e gira todos os documentos de venda.</p>
   </div>
-  <a href="/documents/new" class="btn primary">＋ Novo documento</a>
+  <a href="/documents/new" id="newDocumentBtn" class="btn primary">＋ Novo documento</a>
 </div>
+
+<div id="documentModalRoot"></div>
 
 <article class="panel data-panel">
   <div class="table-tools">
@@ -82,3 +84,112 @@ $filters = [
   </div>
   <div class="table-footer"><span><?= count($documents) ?> registos</span><span>1 página</span></div>
 </article>
+
+<script>
+(function () {
+  var modalRoot = document.getElementById('documentModalRoot');
+  var trigger = document.getElementById('newDocumentBtn');
+  var escHandler = null;
+
+  function openModal(html) {
+    modalRoot.innerHTML = html;
+    document.body.style.overflow = 'hidden';
+    bindModalEvents();
+  }
+
+  function closeModal() {
+    modalRoot.innerHTML = '';
+    document.body.style.overflow = '';
+    if (escHandler) { document.removeEventListener('keydown', escHandler); escHandler = null; }
+  }
+
+  function showModalError(message) {
+    var toast = modalRoot.querySelector('.toast.error');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.className = 'toast error';
+      toast.style.cssText = 'position:fixed;top:20px;right:20px;z-index:200';
+      modalRoot.appendChild(toast);
+    }
+    toast.textContent = message;
+  }
+
+  function bindModalEvents() {
+    var backdrop = modalRoot.querySelector('.modal-backdrop');
+    if (!backdrop) return;
+
+    backdrop.addEventListener('click', function (e) {
+      if (e.target === backdrop) closeModal();
+    });
+
+    var closeBtn = modalRoot.querySelector('.modal-head-actions .icon-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        closeModal();
+      });
+    }
+
+    escHandler = function (e) {
+      if (e.key === 'Escape') closeModal();
+    };
+    document.addEventListener('keydown', escHandler);
+
+    var form = modalRoot.querySelector('#documentForm');
+    if (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var formData = new FormData(form);
+        var submitter = e.submitter;
+        var isDraft = !!(submitter && submitter.name === 'draft');
+        if (submitter && submitter.name) formData.append(submitter.name, submitter.value);
+
+        // Abrir a aba já aqui, dentro do gesto de clique — se só abrirmos
+        // depois do fetch responder, o browser trata como pop-up não
+        // solicitado e bloqueia-a. "Guardar rascunho" não emite, por isso
+        // não abre PDF nenhum.
+        var pdfWindow = isDraft ? null : window.open('', '_blank');
+
+        fetch('/documents', {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          body: formData
+        })
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (data.success) {
+              if (pdfWindow && data.pdfUrl) {
+                pdfWindow.location = data.pdfUrl;
+              } else if (pdfWindow) {
+                pdfWindow.close();
+              }
+              window.location.reload();
+            } else {
+              if (pdfWindow) pdfWindow.close();
+              showModalError(data.error || 'Erro ao gravar o documento.');
+            }
+          })
+          .catch(function () {
+            if (pdfWindow) pdfWindow.close();
+            showModalError('Erro de ligação ao gravar o documento.');
+          });
+      });
+    }
+  }
+
+  if (trigger) {
+    trigger.addEventListener('click', function (e) {
+      e.preventDefault();
+      fetch('/documents/new', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.text();
+        })
+        .then(openModal)
+        .catch(function () {
+          window.location.href = '/documents/new';
+        });
+    });
+  }
+})();
+</script>

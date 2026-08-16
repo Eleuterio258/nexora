@@ -54,7 +54,7 @@
 
     $recrutamentoOpen  = in_array($ap, ['recrutamento_dashboard','pipeline','relatorios','vagas','vaga_form','candidaturas','candidatura_ver','recrutamento_configuracao','recrutamento_contactos'], true);
     $crmOpen           = in_array($ap, ['leads','lead_form','crm_leads_pipeline','oportunidades','oportunidade_form','crm_pipeline'], true);
-    $faturacaoOpen     = in_array($ap, ['faturacao_series','orcamentos','orcamento_form','encomendas','faturas','fatura_form','fatura_detalhe','recibos','notas_credito'], true);
+    $faturacaoOpen     = in_array($ap, ['faturacao_series','orcamentos','orcamento_form','orcamento_proforma','encomendas','faturas','fatura_form','fatura_detalhe','fatura_proforma','recibos','notas_credito'], true);
     $posOpen           = in_array($ap, ['pos','pos_dashboard','pos_vendas','pos_venda_ver','pos_terminais','pos_catalogo','pos_relatorios','pos_devolucoes'], true);
     $sistemaOpen       = in_array($ap, ['sistema_geral','sistema_templates','sistema_logs'], true);
     $rhOpen            = str_starts_with($ap, 'rh_');
@@ -205,13 +205,13 @@
                         <a href="<?= htmlspecialchars($app->routes->path('faturacao_series')) ?>" class="adm-nav-item <?= $ap === 'faturacao_series' ? 'active' : '' ?>">
                             <i class="fa-solid fa-list-ol fa-fw"></i> Séries
                         </a>
-                        <a href="<?= htmlspecialchars($app->routes->path('orcamentos')) ?>" class="adm-nav-item <?= in_array($ap, ['orcamentos','orcamento_form'], true) ? 'active' : '' ?>">
+                        <a href="<?= htmlspecialchars($app->routes->path('orcamentos')) ?>" class="adm-nav-item <?= in_array($ap, ['orcamentos','orcamento_form','orcamento_proforma'], true) ? 'active' : '' ?>">
                             <i class="fa-solid fa-file-lines fa-fw"></i> Orçamentos
                         </a>
                         <a href="<?= htmlspecialchars($app->routes->path('encomendas')) ?>" class="adm-nav-item <?= $ap === 'encomendas' ? 'active' : '' ?>">
                             <i class="fa-solid fa-box fa-fw"></i> Encomendas
                         </a>
-                        <a href="<?= htmlspecialchars($app->routes->path('faturas')) ?>" class="adm-nav-item <?= in_array($ap, ['faturas','fatura_form'], true) ? 'active' : '' ?>">
+                        <a href="<?= htmlspecialchars($app->routes->path('faturas')) ?>" class="adm-nav-item <?= in_array($ap, ['faturas','fatura_form','fatura_detalhe','fatura_proforma'], true) ? 'active' : '' ?>">
                             <i class="fa-solid fa-credit-card fa-fw"></i> Faturas
                         </a>
                         <a href="<?= htmlspecialchars($app->routes->path('recibos')) ?>" class="adm-nav-item <?= $ap === 'recibos' ? 'active' : '' ?>">

@@ -10,14 +10,14 @@ final readonly class Money
 {
     public function __construct(
         private int $cents,
-        private string $currency = 'MT'
+        private string $currency = 'MZN'
     ) {
         if ($this->cents < 0) {
             throw new InvalidArgumentException('O valor monetário não pode ser negativo.');
         }
     }
 
-    public static function fromFloat(float $amount, string $currency = 'MT'): self
+    public static function fromFloat(float $amount, string $currency = 'MZN'): self
     {
         return new self((int) round($amount * 100), $currency);
     }
@@ -71,7 +71,15 @@ final readonly class Money
 
     public function format(): string
     {
-        return number_format($this->toFloat(), 2, ',', '.') . ' ' . $this->currency;
+        return number_format($this->toFloat(), 2, ',', '.') . ' ' . $this->displaySymbol();
+    }
+
+    private function displaySymbol(): string
+    {
+        return match ($this->currency) {
+            'MZN' => 'MT',
+            default => $this->currency,
+        };
     }
 
     private function assertSameCurrency(self $other): void

@@ -55,6 +55,7 @@ return [
             'emitir_encomendas'   => 'Emitir Encomendas',
             'emitir_faturas'      => 'Emitir Faturas',
             'emitir_notas_credito' => 'Emitir Notas de Crédito',
+            'cancelar_documentos' => 'Cancelar Documentos',
             'configurar_series'   => 'Configurar Séries de Faturação',
         ],
     ],

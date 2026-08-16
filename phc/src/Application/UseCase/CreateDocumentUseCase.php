@@ -79,7 +79,7 @@ final class CreateDocumentUseCase
         $this->documents->save($document);
 
         if ($status->value() === 'pending') {
-            $customer->increaseBalance($totals->total->toFloat());
+            $customer->increaseBalance($totals->total);
             $this->customers->save($customer);
         }
 

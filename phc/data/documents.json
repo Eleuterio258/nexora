@@ -1,5 +1,62 @@
 [
     {
+        "id": 8,
+        "type": "FR",
+        "number": "FR A\/2026-000016",
+        "customerId": 2,
+        "date": "2026-08-14",
+        "dueDate": "2026-08-14",
+        "subtotal": 50000,
+        "discount": 0,
+        "tax": 6640,
+        "total": 56640,
+        "status": "paid",
+        "notes": "",
+        "reference": "",
+        "lines": [
+            {
+                "productId": 1,
+                "description": "Consultoria de gestão",
+                "quantity": 1,
+                "price": 2500,
+                "discount": 0,
+                "tax": 16
+            },
+            {
+                "productId": 2,
+                "description": "Licença Software ERP — Mensal",
+                "quantity": 1,
+                "price": 18500,
+                "discount": 0,
+                "tax": 16
+            },
+            {
+                "productId": 4,
+                "description": "Instalação e parametrização",
+                "quantity": 1,
+                "price": 12000,
+                "discount": 0,
+                "tax": 16
+            },
+            {
+                "productId": 6,
+                "description": "Formação de utilizadores",
+                "quantity": 1,
+                "price": 8500,
+                "discount": 0,
+                "tax": 0
+            },
+            {
+                "productId": 6,
+                "description": "Formação de utilizadores",
+                "quantity": 1,
+                "price": 8500,
+                "discount": 0,
+                "tax": 16
+            }
+        ]
+    },
+    {
         "id": 7,
         "type": "PP",
         "number": "PP PP\/2026-000001",

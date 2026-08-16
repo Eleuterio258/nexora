@@ -28,7 +28,7 @@ use PHC\Presentation\View\Html;
                 <span><b><?= Html::e($c->name) ?></b><small><?= Html::e($c->email) ?></small></span>
               </div>
             </td>
-            <td><?= Html::e($c->taxId) ?></td>
+            <td><?= Html::e($c->nuit) ?></td>
             <td><?= Html::e($c->phone) ?></td>
             <td><?= Html::e($c->city) ?></td>
             <td><b><?= Html::money($c->balance) ?></b></td>

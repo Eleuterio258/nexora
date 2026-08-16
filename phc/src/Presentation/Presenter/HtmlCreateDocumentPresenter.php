@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHC\Presentation\Presenter;
 
 use PHC\Application\Presenter\CreateDocumentPresenterInterface;
+use PHC\Domain\ValueObject\CompanyInfo;
 
 final class HtmlCreateDocumentPresenter implements CreateDocumentPresenterInterface
 {
@@ -12,7 +13,7 @@ final class HtmlCreateDocumentPresenter implements CreateDocumentPresenterInterf
     {
     }
 
-    public function present(array $customers, array $products, array $series, ?string $error = null): string
+    public function present(array $customers, array $products, array $series, ?CompanyInfo $company = null, ?string $error = null, bool $partialOnly = false): string
     {
         $title = 'Novo documento';
         $active = 'documents';
@@ -20,6 +21,12 @@ final class HtmlCreateDocumentPresenter implements CreateDocumentPresenterInterf
         ob_start();
         require $this->viewDirectory . '/documents/form.php';
         $content = ob_get_clean();
+
+        // Pedido via fetch() do modal: só o fragmento, sem sidebar/topbar —
+        // quem já está em /documents injecta isto directamente no DOM.
+        if ($partialOnly) {
+            return $content;
+        }
 
         ob_start();
         require $this->viewDirectory . '/layout.php';

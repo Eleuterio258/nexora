@@ -1,7 +1,9 @@
 <?php
 
-declare(strict_types=1);
+declare (strict_types = 1);
 
+use PHC\Infrastructure\Auth\AuthSession;
+use PHC\Presentation\Controller\AuthController;
 use PHC\Presentation\Controller\CustomerController;
 use PHC\Presentation\Controller\DashboardController;
 use PHC\Presentation\Controller\DocumentController;
@@ -15,7 +17,27 @@ use PHC\Presentation\Router;
 /** @var array<string, mixed> $container */
 $container = require __DIR__ . '/dependencies.php';
 
+$authSession = $container[AuthSession::class];
+
+// Todas as rotas exigem sessão real contra a API, excepto o próprio login.
+// A verificação usa o path pedido directamente porque acontece antes do
+// Router (que só resolve rotas registadas, não decide acesso).
+$requestPath = rtrim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/', '/') ?: '/';
+if (!$authSession->isAuthenticated() && $requestPath !== '/login') {
+    header('Location: /login');
+    exit;
+}
+
 $router = new Router();
+
+$authController = new AuthController(
+    $container[\PHC\Infrastructure\Http\ApiClient::class],
+    $authSession,
+    $container['viewDir']
+);
+$router->get('/login', fn() => $authController->showLogin());
+$router->post('/login', fn() => $authController->login());
+$router->post('/logout', fn() => $authController->logout());
 
 $router->get('/', fn() => (new DashboardController(
     $container[\PHC\Application\UseCase\GetDashboardUseCase::class],
@@ -27,12 +49,18 @@ $documentController = new DocumentController(
     $container[\PHC\Application\UseCase\CreateDocumentUseCase::class],
     $container[\PHC\Application\UseCase\PreviewDocumentUseCase::class],
     $container[\PHC\Application\UseCase\GenerateDocumentPdfUseCase::class],
+    // Cliente e Produto vêm da API (pedido explícito) — o
+    // CreateDocumentUseCase continua a validar customer_id/product_id
+    // contra o JSON local, por isso GRAVAR com um cliente ou artigo real
+    // vai falhar com "não encontrado" até o Nível 3b (escrita via API)
+    // avançar.
     $container[\PHC\Application\UseCase\ListCustomersUseCase::class],
     $container[\PHC\Application\UseCase\ListProductsUseCase::class],
     $container[\PHC\Application\UseCase\ListSeriesUseCase::class],
     $container[\PHC\Application\UseCase\GetInvoiceLayoutSettingsUseCase::class],
     $container[\PHC\Application\Presenter\DocumentListPresenterInterface::class],
-    $container[\PHC\Application\Presenter\CreateDocumentPresenterInterface::class]
+    $container[\PHC\Application\Presenter\CreateDocumentPresenterInterface::class],
+    $container[\PHC\Domain\Service\CompanyInfoProviderInterface::class]
 );
 
 $router->get('/documents', fn() => $documentController->index());
@@ -76,4 +104,45 @@ $router->get('/export/documents', fn() => (new ExportController(
     $container[\PHC\Application\UseCase\ExportDocumentsUseCase::class]
 ))->documents());
 
-$router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
+try {
+    $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
+} catch (\PHC\Infrastructure\Http\ApiException $e) {
+    if (!$e->isUnauthorized()) {
+        http_response_code(502);
+        echo 'Erro ao comunicar com a API: ' . \PHC\Presentation\View\Html::e($e->getMessage());
+        exit;
+    }
+
+    // access_token expirado ou inválido a meio da sessão: tenta renovar
+    // com o refresh_token guardado, sem obrigar a reintroduzir a
+    // password. Se o refresh também falhar (ex.: refresh_token expirado
+    // ou sessão nunca chegou a ter um), força novo login. O parâmetro
+    // _refreshed evita ciclo infinito caso o token novo continue a ser
+    // rejeitado por outro motivo.
+    $alreadyTriedRefresh = isset($_GET['_refreshed']);
+    $refreshToken = $authSession->refreshToken();
+    $renewed = false;
+    if (!$alreadyTriedRefresh && $refreshToken !== null) {
+        try {
+            $apiClient = $container[\PHC\Infrastructure\Http\ApiClient::class];
+            $response = $apiClient->post('/api/auth/refresh', ['refresh_token' => $refreshToken]);
+            $newAccessToken = (string) ($response['access_token'] ?? '');
+            if ($newAccessToken !== '') {
+                $authSession->updateAccessToken($newAccessToken);
+                $renewed = true;
+            }
+        } catch (\PHC\Infrastructure\Http\ApiException) {
+            $renewed = false;
+        }
+    }
+
+    if ($renewed) {
+        $separator = str_contains($_SERVER['REQUEST_URI'], '?') ? '&' : '?';
+        header('Location: ' . $_SERVER['REQUEST_URI'] . $separator . '_refreshed=1');
+        exit;
+    }
+
+    $authSession->clear();
+    header('Location: /login');
+    exit;
+}

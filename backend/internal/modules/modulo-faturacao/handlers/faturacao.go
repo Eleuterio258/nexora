@@ -504,9 +504,15 @@ func (h *Handler) CriarFatura(w http.ResponseWriter, r *http.Request) {
 	if body.Tipo != nil && *body.Tipo != "" {
 		tipo = *body.Tipo
 	}
-	if tipo != "normal" && tipo != "proforma" {
-		jsonErr(w, "tipo é inválido", http.StatusBadRequest)
-		return
+	// normal (FT), FR e VD usam série documental própria com numeração
+	// fiscal sequencial; proforma é meramente informativa e não consome
+	// nenhuma série (ver ramo abaixo).
+	tiposComSerie := map[string]string{"normal": "FT", "FR": "FR", "VD": "VD"}
+	if tipo != "proforma" {
+		if _, ok := tiposComSerie[tipo]; !ok {
+			jsonErr(w, "tipo é inválido", http.StatusBadRequest)
+			return
+		}
 	}
 
 	ctx := r.Context()
@@ -520,11 +526,11 @@ func (h *Handler) CriarFatura(w http.ResponseWriter, r *http.Request) {
 	var id int64
 	var numero string
 
-	if tipo == "normal" {
+	if serieTipo, ok := tiposComSerie[tipo]; ok {
 		var serieID int64
-		numero, serieID, err = proximoNumeroSerie(ctx, tx, user.TenantID, "FT")
+		numero, serieID, err = proximoNumeroSerie(ctx, tx, user.TenantID, serieTipo)
 		if err != nil {
-			jsonErr(w, "Não existe nenhuma série activa configurada para Faturas. Configure em Faturação > Séries Documentais.", http.StatusUnprocessableEntity)
+			jsonErr(w, "Não existe nenhuma série activa configurada para este tipo de fatura. Configure em Faturação > Séries Documentais.", http.StatusUnprocessableEntity)
 			return
 		}
 		err = tx.QueryRow(ctx, `
@@ -654,6 +660,11 @@ func (h *Handler) AdicionarItemFatura(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]any{"id": iid, "total": total, "imposto_valor": impostoValor}, http.StatusCreated)
 }
 
+// EmitirFatura e AdicionarItemFatura (abaixo) não estão ligadas a nenhuma
+// rota — foram substituídas por EmitirFaturaFiscal/AdicionarItemFaturaFiscal
+// em fiscal.go, que aplicam isenções fiscais, geram lançamento contabilístico
+// e registam auditoria legal. Mantidas apenas por compatibilidade; a lógica
+// de FR/VD pagas na emissão vive em EmitirFaturaFiscal.
 func (h *Handler) EmitirFatura(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	id := chi.URLParam(r, "id")

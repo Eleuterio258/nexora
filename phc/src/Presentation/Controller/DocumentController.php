@@ -18,6 +18,7 @@ use PHC\Application\UseCase\ListCustomersUseCase;
 use PHC\Application\UseCase\ListProductsUseCase;
 use PHC\Application\UseCase\ListSeriesUseCase;
 use PHC\Application\UseCase\PreviewDocumentUseCase;
+use PHC\Domain\Service\CompanyInfoProviderInterface;
 
 final class DocumentController
 {
@@ -31,7 +32,8 @@ final class DocumentController
         private ListSeriesUseCase $listSeriesUseCase,
         private GetInvoiceLayoutSettingsUseCase $layoutSettingsUseCase,
         private DocumentListPresenterInterface $listPresenter,
-        private CreateDocumentPresenterInterface $createPresenter
+        private CreateDocumentPresenterInterface $createPresenter,
+        private CompanyInfoProviderInterface $companyInfoProvider
     ) {
     }
 
@@ -49,8 +51,9 @@ final class DocumentController
         $customers = $this->listCustomersUseCase->execute();
         $products = $this->listProductsUseCase->execute();
         $series = $this->listSeriesUseCase->execute();
+        $company = $this->companyInfoProvider->getPrimary();
 
-        echo $this->createPresenter->present($customers, $products, $series);
+        echo $this->createPresenter->present($customers, $products, $series, $company, null, $this->isAjax());
     }
 
     public function preview(): void
@@ -110,16 +113,46 @@ final class DocumentController
             draft: isset($_POST['draft'])
         );
 
+        $ajax = $this->isAjax();
+
         try {
-            $this->createUseCase->execute($request);
+            $document = $this->createUseCase->execute($request);
+            if ($ajax) {
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => true,
+                    'redirect' => '/documents',
+                    'id' => $document->id,
+                    'pdfUrl' => '/documents/pdf?id=' . $document->id,
+                ]);
+                return;
+            }
             header('Location: /documents');
             exit;
         } catch (\Throwable $e) {
+            if ($ajax) {
+                header('Content-Type: application/json');
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+                return;
+            }
             $customers = $this->listCustomersUseCase->execute();
             $products = $this->listProductsUseCase->execute();
             $series = $this->listSeriesUseCase->execute();
-            echo $this->createPresenter->present($customers, $products, $series, $e->getMessage());
+            $company = $this->companyInfoProvider->getPrimary();
+            echo $this->createPresenter->present($customers, $products, $series, $company, $e->getMessage());
         }
+    }
+
+    /**
+     * O JS do modal marca os seus pedidos com este header — permite servir
+     * só o fragmento do formulário (sem layout) e responder em JSON ao
+     * gravar, sem exigir um endpoint separado nem partir a navegação directa
+     * para quem aceder a /documents/new sem JavaScript.
+     */
+    private function isAjax(): bool
+    {
+        return strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
     }
 
     /**

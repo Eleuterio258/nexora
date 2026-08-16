@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace PHC\Domain\Entity;
 
+use PHC\Domain\ValueObject\Money;
+
 final class Customer
 {
     public function __construct(
         private int $id,
         private string $code,
         private string $name,
-        private string $taxId,
+        private string $nuit,
         private string $phone,
         private string $email,
         private string $city,
-        private float $balance = 0.0
+        private Money $balance = new Money(0)
     ) {
     }
 
@@ -33,9 +35,9 @@ final class Customer
         return $this->name;
     }
 
-    public function taxId(): string
+    public function nuit(): string
     {
-        return $this->taxId;
+        return $this->nuit;
     }
 
     public function phone(): string
@@ -53,19 +55,19 @@ final class Customer
         return $this->city;
     }
 
-    public function balance(): float
+    public function balance(): Money
     {
         return $this->balance;
     }
 
-    public function increaseBalance(float $amount): void
+    public function increaseBalance(Money $amount): void
     {
-        $this->balance += $amount;
+        $this->balance = $this->balance->add($amount);
     }
 
-    public function decreaseBalance(float $amount): void
+    public function decreaseBalance(Money $amount): void
     {
-        $this->balance -= $amount;
+        $this->balance = $this->balance->subtract($amount);
     }
 
     public function toArray(): array
@@ -74,11 +76,11 @@ final class Customer
             'id' => $this->id,
             'code' => $this->code,
             'name' => $this->name,
-            'taxId' => $this->taxId,
+            'nuit' => $this->nuit,
             'phone' => $this->phone,
             'email' => $this->email,
             'city' => $this->city,
-            'balance' => $this->balance,
+            'balance' => $this->balance->toFloat(),
         ];
     }
 
@@ -88,11 +90,11 @@ final class Customer
             (int) $data['id'],
             $data['code'],
             $data['name'],
-            $data['taxId'],
+            $data['nuit'],
             $data['phone'],
             $data['email'],
             $data['city'],
-            (float) ($data['balance'] ?? 0.0)
+            Money::fromFloat((float) ($data['balance'] ?? 0.0))
         );
     }
 }

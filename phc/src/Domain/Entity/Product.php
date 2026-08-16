@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHC\Domain\Entity;
 
+use PHC\Domain\ValueObject\Money;
 use PHC\Domain\ValueObject\TaxRate;
 
 final class Product
@@ -13,7 +14,7 @@ final class Product
         private string $code,
         private string $name,
         private string $unit,
-        private float $price,
+        private Money $price,
         private TaxRate $tax,
         private ?int $stock,
         private bool $active = true
@@ -40,7 +41,7 @@ final class Product
         return $this->unit;
     }
 
-    public function price(): float
+    public function price(): Money
     {
         return $this->price;
     }
@@ -67,7 +68,7 @@ final class Product
             'code' => $this->code,
             'name' => $this->name,
             'unit' => $this->unit,
-            'price' => $this->price,
+            'price' => $this->price->toFloat(),
             'tax' => $this->tax->percentage(),
             'stock' => $this->stock,
             'active' => $this->active,
@@ -81,7 +82,7 @@ final class Product
             $data['code'],
             $data['name'],
             $data['unit'],
-            (float) $data['price'],
+            Money::fromFloat((float) $data['price']),
             TaxRate::fromFloat((float) $data['tax']),
             isset($data['stock']) && $data['stock'] !== null ? (int) $data['stock'] : null,
             (bool) ($data['active'] ?? true)
