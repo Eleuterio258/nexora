@@ -18,11 +18,11 @@
         }
         $cliente = $resp['body'];
 
-        $contactos  = $app->nexora->call('GET', "/api/clientes/$id/contactos")['body'] ?? [];
-        $enderecos  = $app->nexora->call('GET', "/api/clientes/$id/enderecos")['body'] ?? [];
-        $pagamentos = $app->nexora->call('GET', "/api/clientes/$id/pagamentos", null, ['limit' => 50])['body'] ?? [];
-        $historico  = $app->nexora->call('GET', "/api/clientes/$id/historico", null, ['limit' => 50])['body'] ?? [];
-        $saldo      = $app->nexora->call('GET', "/api/clientes/$id/saldo")['body'] ?? [];
+        $contactos  = $app->nexora->call('GET', "/api/clientes/$idHash/contactos")['body'] ?? [];
+        $enderecos  = $app->nexora->call('GET', "/api/clientes/$idHash/enderecos")['body'] ?? [];
+        $pagamentos = $app->nexora->call('GET', "/api/clientes/$idHash/pagamentos", null, ['limit' => 50])['body'] ?? [];
+        $historico  = $app->nexora->call('GET', "/api/clientes/$idHash/historico", null, ['limit' => 50])['body'] ?? [];
+        $saldo      = $app->nexora->call('GET', "/api/clientes/$idHash/saldo")['body'] ?? [];
     }
 
     $gruposResp = $app->nexora->call('GET', '/api/clientes/grupos');

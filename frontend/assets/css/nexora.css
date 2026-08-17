@@ -47,6 +47,17 @@
     --adm-sidebar-w: 240px;
     --adm-header-h: 60px;
 
+    /* Branding do tenant — sobrescritos em runtime pelo layouts/top.php a
+       partir de GET /api/system/branding. Os defaults abaixo reproduzem o
+       tema original (grafite + verde), por isso um tenant sem branding
+       configurado fica exactamente como antes.
+       O fundo NÃO é derivado do branding: o texto do sidebar é branco com
+       opacidade, e uma cor clara vinda do tenant deixaria a nav ilegível. */
+    --adm-sidebar-bg:          #111827;             /* = --adm-gray-900 */
+    --adm-sidebar-accent:      #10b981;             /* = --adm-green */
+    --adm-sidebar-on-accent:   #ffffff;
+    --adm-sidebar-accent-soft: rgba(16,185,129,.15);
+
     --adm-bg:   #f1f5f9;
     --adm-text-xs:  0.75rem;
     --adm-text-sm:  0.8125rem;
@@ -80,7 +91,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .adm-sidebar {
     width: var(--adm-sidebar-w);
     min-height: 100vh;
-    background: var(--adm-gray-900);
+    background: var(--adm-sidebar-bg);
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -148,8 +159,8 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 .adm-nav-item:hover { background: rgba(255,255,255,.08); color: var(--adm-white); }
 .adm-nav-item.active {
-    background: rgba(16,185,129,.15);
-    color: var(--adm-green);
+    background: var(--adm-sidebar-accent-soft);
+    color: var(--adm-sidebar-accent);
 }
 .adm-nav-item svg { flex-shrink:0; opacity:.8; }
 .adm-nav-item.active svg { opacity:1; }

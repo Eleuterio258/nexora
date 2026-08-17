@@ -10,17 +10,37 @@ object ApiUtils {
 
     fun bearerToken(token: String): String = "Bearer $token"
 
-    /** true se o backend recusou o pedido por falta de permissão RBAC (auth.permissoes_cargo). */
+    /** true se o backend recusou o pedido com 403. */
     fun isForbidden(response: Response<*>): Boolean = response.code() == 403
 
     fun errorMessage(response: Response<*>): String {
+        val detalhe = detalheDoErro(response)
+        if (detalhe != null) {
+            return detalhe
+        }
+
+        // Um 403 sem detalhe no corpo e, na pratica, RBAC: o middleware
+        // RequirePermission do ERP corta o pedido antes de chegar ao handler.
+        // Quando o corpo traz mensagem, o 403 pode ser outra coisa
+        // completamente — consentimento LGPD em falta, metodo facial
+        // desactivado no tenant, ou o FaceClock a recusar o enrollment (o ERP
+        // propaga o status dele) — e nesses casos dizer "sem permissao"
+        // esconde o motivo real ao gestor.
         if (isForbidden(response)) {
             return "Sem permissão para este ecrã."
         }
 
+        return "Falha na comunicacao com o servidor."
+    }
+
+    /**
+     * Extrai a mensagem de erro do corpo da resposta, ou null se o corpo
+     * estiver vazio ou não trouxer mensagem utilizável.
+     */
+    private fun detalheDoErro(response: Response<*>): String? {
         val body = response.errorBody()?.string().orEmpty()
         if (body.isBlank()) {
-            return "Falha na comunicacao com o servidor."
+            return null
         }
 
         return runCatching {
@@ -29,9 +49,7 @@ object ApiUtils {
             // do Nexora ERP (Go) — desde 2026-07-13 varios ecras falam
             // directamente com o ERP, por isso tem de aceitar os dois.
             json.get("detail")?.asString ?: json.get("error")?.asString
-        }.getOrNull().orEmpty().ifBlank {
-            "Falha na comunicacao com o servidor."
-        }
+        }.getOrNull()?.takeIf { it.isNotBlank() }
     }
 
     /**
