@@ -32,7 +32,7 @@ from app.services.device_registry import get_device_public_key
 from app.services.embedding_models import get_model_version
 from app.services.suspicious_activity import record_verify_failure, record_verify_success
 from app.security.facial_verification import issue_facial_verification_token
-from app.erp_client import erp_client, ERPResponseError, ERPUnavailableError
+from app.erp_client import erp_client
 from app.utils import utc_now
 
 log = logging.getLogger(__name__)
@@ -104,23 +104,6 @@ async def _perform_enrollment(
     para o proximo item).
     """
     require_self_or_manager(actor, erp_user_id)
-
-    try:
-        await erp_client.validar_consentimento_ativo(erp_user_id)
-    except ERPUnavailableError as exc:
-        raise _EnrollmentError(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            f"ERP indisponivel para validar consentimento: {exc}",
-        ) from exc
-    except ERPResponseError as exc:
-        if exc.status_code == status.HTTP_404_NOT_FOUND:
-            raise _EnrollmentError(
-                status.HTTP_403_FORBIDDEN,
-                "Consentimento LGPD activo nao encontrado para este utilizador.",
-            ) from exc
-        raise _EnrollmentError(
-            exc.status_code, f"Erro ao validar consentimento: {exc.detail}"
-        ) from exc
 
     approved_embeddings: list[list[float]] = []
     approved_quality_scores: list[float] = []

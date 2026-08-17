@@ -1218,37 +1218,4 @@ final class RecursosHumanosService extends NexoraService
         ];
     }
 
-    public function getConsentimentoAtivo(int $funcionarioId): ?array
-    {
-        if ($funcionarioId <= 0) {
-            throw new OperationException('Funcionário inválido.');
-        }
-
-        $response = $this->gateway->request('GET', "/api/rh/funcionarios/$funcionarioId/consentimento");
-        if ($response->status === 404) {
-            return null;
-        }
-        $this->ensureSuccess($response, 'Erro ao verificar consentimento.');
-
-        return $response->body ?? null;
-    }
-
-    public function criarConsentimento(int $funcionarioId): array
-    {
-        if ($funcionarioId <= 0) {
-            throw new OperationException('Funcionário inválido.');
-        }
-
-        $response = $this->gateway->request('POST', "/api/rh/funcionarios/$funcionarioId/consentimento", [
-            'termo_versao' => 'v1',
-            'termo_hash' => 'sha256-termo-v1',
-        ]);
-        $this->ensureSuccess($response, 'Erro ao registar consentimento.');
-
-        return [
-            'ok' => true,
-            'msg' => 'Consentimento registado com sucesso.',
-            'id' => $response->body['id'] ?? null,
-        ];
-    }
 }

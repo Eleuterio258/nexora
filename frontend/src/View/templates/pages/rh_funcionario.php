@@ -1480,19 +1480,7 @@
     <div class="adm-card adm-mb-6">
         <div class="adm-card-header"><h2 class="adm-card-title">Cadastrar Rosto</h2></div>
         <div class="adm-card-body">
-            <div id="bio-consent-warning" class="adm-alert adm-alert--warning" style="display:none;margin-bottom:var(--adm-sp-4)">
-                <strong>Consentimento LGPD em falta.</strong>
-                <p style="margin:var(--adm-sp-2) 0">O funcionário ainda não deu consentimento para recolha de dados biométricos. É obrigatório registar o consentimento antes de cadastrar o rosto.</p>
-                <button class="adm-btn adm-btn-primary adm-btn-sm" type="button" onclick="registarConsentimento()">
-                    Registar Consentimento
-                </button>
-            </div>
-
-            <div id="bio-consent-ok" class="adm-alert adm-alert--success" style="display:none;margin-bottom:var(--adm-sp-4)">
-                ✅ Consentimento LGPD activo registado em <span id="bio-consent-data"></span>.
-            </div>
-
-            <div id="bio-enroll-area" style="display:none">
+            <div id="bio-enroll-area">
                 <p class="adm-text-muted adm-mb-4">Capture 3 fotos do rosto do funcionário para registo biométrico. Certifique-se de boa iluminação e de que o rosto está centrado.</p>
 
                 <div style="display:flex;gap:var(--adm-sp-4);flex-wrap:wrap;margin-bottom:var(--adm-sp-4)">
@@ -2398,74 +2386,6 @@ async function submitBiometria() {
     }
 }
 
-// ── Consentimento LGPD ─────────────────────────────────────────
-let bioConsentimentoAtivo = false;
-
-async function checkConsentimento() {
-    try {
-        const res = await fetch('/nexora/api/rh_consentimento_get?funcionario_id=' + FUNC_ID);
-        const data = await res.json();
-        bioConsentimentoAtivo = data.ok === true;
-        renderConsentimentoState(data.consentimento);
-    } catch (err) {
-        bioConsentimentoAtivo = false;
-        renderConsentimentoState(null);
-    }
-}
-
-function renderConsentimentoState(consentimento) {
-    const warningEl = document.getElementById('bio-consent-warning');
-    const okEl = document.getElementById('bio-consent-ok');
-    const enrollArea = document.getElementById('bio-enroll-area');
-
-    if (consentimento && consentimento.id) {
-        warningEl.style.display = 'none';
-        okEl.style.display = 'block';
-        enrollArea.style.display = 'block';
-        const dataAceite = consentimento.aceite_em ? new Date(consentimento.aceite_em).toLocaleString('pt-PT') : '';
-        document.getElementById('bio-consent-data').textContent = dataAceite;
-    } else {
-        warningEl.style.display = 'block';
-        okEl.style.display = 'none';
-        enrollArea.style.display = 'none';
-    }
-}
-
-async function registarConsentimento() {
-    const btn = document.querySelector('#bio-consent-warning button');
-    if (btn) btn.disabled = true;
-
-    try {
-        const res = await fetch('/nexora/api/rh_consentimento_save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ funcionario_id: FUNC_ID, csrf: CSRF })
-        });
-        const data = await res.json();
-        if (data.ok) {
-            showToast('Consentimento registado com sucesso.');
-            await checkConsentimento();
-        } else {
-            showToast(data.erro || 'Erro ao registar consentimento.', 'error');
-            if (btn) btn.disabled = false;
-        }
-    } catch (err) {
-        showToast('Erro de ligação.', 'error');
-        if (btn) btn.disabled = false;
-    }
-}
-
-// Verifica consentimento quando a tab biometria é activada
-document.addEventListener('DOMContentLoaded', () => {
-    const bioTabBtn = document.querySelector('#mainTabs .adm-tab[data-tab="biometria"]');
-    if (bioTabBtn) {
-        bioTabBtn.addEventListener('click', checkConsentimento);
-    }
-    // Se entrar directamente com #biometria, verifica também
-    if (location.hash === '#biometria') {
-        setTimeout(checkConsentimento, 100);
-    }
-});
 </script>
 
 <?php include dirname(__DIR__) . '/layouts/bottom.php'; ?>
