@@ -20,8 +20,11 @@ class Settings:
     biometric_quality_threshold: float = float(
         os.getenv("BIOMETRIC_QUALITY_THRESHOLD", "0.55")
     )
+    # 0.68 e o equivalente ao antigo 0.60: os pesos da heuristica de liveness
+    # somavam 0.85 e passaram a somar 1.0, o que sobe todos os scores por
+    # 1/0.85 — manter 0.60 tornaria o gate mais permissivo do que era.
     biometric_liveness_threshold: float = float(
-        os.getenv("BIOMETRIC_LIVENESS_THRESHOLD", "0.60")
+        os.getenv("BIOMETRIC_LIVENESS_THRESHOLD", "0.68")
     )
     biometric_match_threshold: float = float(
         os.getenv("BIOMETRIC_MATCH_THRESHOLD", "0.85")

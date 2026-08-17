@@ -31,11 +31,25 @@ class LivenessModel(ABC):
 class HeuristicLivenessModel(LivenessModel):
     """Heuristica de imagem unica usada ate agora (textura/FFT/cor)."""
 
+    # Os pesos originais eram 0.35 / 0.30 / 0.20, que somam 0.85 — o score()
+    # nunca podia atingir o 1.0 que o contrato de LivenessModel promete, e o
+    # tecto real ficava em 0.85. Normalizados aqui pela soma (17), o que
+    # preserva exactamente a ponderacao relativa 7:6:4 entre os tres sinais e
+    # corrige so a escala.
+    _W_TEXTURE = 7 / 17    # 0.4118
+    _W_FREQUENCY = 6 / 17  # 0.3529
+    _W_COLOR = 4 / 17      # 0.2353
+
     def score(self, img_bgr: "np.ndarray") -> float:
         texture = self._texture_score(img_bgr)
         frequency = self._frequency_score(img_bgr)
         color = self._color_variance_score(img_bgr)
-        return round((texture * 0.35) + (frequency * 0.30) + (color * 0.20), 4)
+        return round(
+            (texture * self._W_TEXTURE)
+            + (frequency * self._W_FREQUENCY)
+            + (color * self._W_COLOR),
+            4,
+        )
 
     @staticmethod
     def _texture_score(img_bgr: "np.ndarray") -> float:
