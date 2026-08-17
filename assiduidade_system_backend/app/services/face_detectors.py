@@ -62,9 +62,11 @@ class BlazeFaceDetector(FaceDetector):
         result = _get_face_detector().detect(mp_image)
 
         detections: list[FaceDetectionResult] = []
-        if result.face_detections:
+        # O DetectionResult das MediaPipe Tasks expõe `detections`; não existe
+        # `face_detections` (esse é o nome da solução legada mp.solutions).
+        if result.detections:
             height, width = img_bgr.shape[:2]
-            for detection in result.face_detections:
+            for detection in result.detections:
                 bbox = detection.bounding_box
                 x = bbox.origin_x / width
                 y = bbox.origin_y / height
