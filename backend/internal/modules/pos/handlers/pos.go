@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 	mw "nexora/internal/middleware"
+	authModels "nexora/internal/modules/auth/models"
 	"nexora/internal/modules/recursos-humanos/service/funcionario"
 	"nexora/internal/shared/adapters"
 	"nexora/internal/ws"
@@ -517,17 +518,62 @@ func (h *Handler) ListarSessoes(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 	q := r.URL.Query()
 	limit, offset := pageParams(r)
+
 	where := "tenant_id=$1"
 	args := []any{user.TenantID}
+
 	if v := q.Get("status"); v != "" {
 		args = append(args, v)
 		where += " AND status=$" + strconv.Itoa(len(args))
 	}
+	if v := q.Get("terminal_id"); v != "" {
+		if tid, err := strconv.ParseInt(v, 10, 64); err == nil {
+			args = append(args, tid)
+			where += " AND terminal_id=$" + strconv.Itoa(len(args))
+		}
+	}
+	if v := q.Get("user_id"); v != "" {
+		if uid, err := strconv.ParseInt(v, 10, 64); err == nil {
+			args = append(args, uid)
+			where += " AND user_id=$" + strconv.Itoa(len(args))
+		}
+	}
+	if v := q.Get("funcionario_id"); v != "" {
+		if fid, err := strconv.ParseInt(v, 10, 64); err == nil {
+			args = append(args, fid)
+			where += " AND funcionario_id=$" + strconv.Itoa(len(args))
+		}
+	}
+	if v := q.Get("data_inicio"); v != "" {
+		args = append(args, v)
+		where += " AND opened_at >= $" + strconv.Itoa(len(args))
+	}
+	if v := q.Get("data_fim"); v != "" {
+		args = append(args, v+" 23:59:59")
+		where += " AND opened_at <= $" + strconv.Itoa(len(args))
+	}
+
+	// Operadores normais só veem as próprias sessões, a menos que sejam supervisores
+	// ou tenham permissão de relatórios (superadmin bypass implícito no middleware).
+	access, err := authModels.LoadUserAccess(r.Context(), h.db, user.ID, user.MembershipID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	if !access.Can("pos", "supervisionar") && !access.Can("pos", "relatorios") {
+		args = append(args, user.ID)
+		where += " AND user_id=$" + strconv.Itoa(len(args))
+	}
+
 	args = append(args, limit, offset)
 	n := len(args)
-	rows, _ := h.db.Query(r.Context(),
+	rows, err := h.db.Query(r.Context(),
 		"SELECT id, terminal_id, user_id, opened_at, closed_at, opening_amount, closing_amount, status "+
 			"FROM pos_sessions WHERE "+where+" ORDER BY opened_at DESC LIMIT $"+strconv.Itoa(n-1)+" OFFSET $"+strconv.Itoa(n), args...)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
 	defer rows.Close()
 	type Row struct {
 		ID            int64      `json:"id"`
@@ -600,6 +646,13 @@ func (h *Handler) AbrirSessao(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Não permitir que o mesmo operador tenha duas sessões abertas simultaneamente.
+	var sessaoUsuarioAberta int64
+	if err := h.db.QueryRow(r.Context(), `SELECT id FROM pos_sessions WHERE tenant_id=$1 AND user_id=$2 AND status='aberta'`, user.TenantID, user.ID).Scan(&sessaoUsuarioAberta); err == nil {
+		jsonErr(w, fmt.Sprintf("Operador já tem uma sessão de caixa aberta (#%d)", sessaoUsuarioAberta), http.StatusConflict)
+		return
+	}
+
 	var id int64
 	err = h.db.QueryRow(r.Context(), `
 		INSERT INTO pos_sessions (tenant_id, terminal_id, user_id, funcionario_id, opening_amount)
@@ -668,6 +721,65 @@ func (h *Handler) ObterSessaoAtual(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "Não existe nenhuma sessão de caixa aberta", http.StatusNotFound)
 		return
 	}
+	jsonOK(w, s, http.StatusOK)
+}
+
+// ObterSessaoPorID devolve o detalhe de uma sessão de caixa específica.
+// O dono da sessão pode sempre visualizar; outros utilizadores precisam de
+// permissão de supervisão ou relatórios (garantido pelo middleware).
+func (h *Handler) ObterSessaoPorID(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+
+	type Row struct {
+		ID            int64      `json:"id"`
+		TerminalID    int64      `json:"terminal_id"`
+		TerminalNome  string     `json:"terminal_nome"`
+		UserID        int64      `json:"user_id"`
+		OperadorNome  string     `json:"operador_nome"`
+		FuncionarioID *int64     `json:"funcionario_id"`
+		OpenedAt      time.Time  `json:"opened_at"`
+		ClosedAt      *time.Time `json:"closed_at"`
+		OpeningAmount float64    `json:"opening_amount"`
+		ClosingAmount *float64   `json:"closing_amount"`
+		Status        string     `json:"status"`
+		CreatedAt     time.Time  `json:"created_at"`
+	}
+	var s Row
+	err := h.db.QueryRow(r.Context(), `
+		SELECT s.id, s.terminal_id, COALESCE(t.nome,''), s.user_id, COALESCE(u.nome,''),
+		       s.funcionario_id, s.opened_at, s.closed_at, s.opening_amount, s.closing_amount,
+		       s.status, s.created_at
+		  FROM pos_sessions s
+		  LEFT JOIN pos_terminals t ON t.id = s.terminal_id AND t.tenant_id = s.tenant_id
+		  LEFT JOIN auth.users u ON u.id = s.user_id
+		 WHERE s.id=$1 AND s.tenant_id=$2`, id, user.TenantID).
+		Scan(&s.ID, &s.TerminalID, &s.TerminalNome, &s.UserID, &s.OperadorNome,
+			&s.FuncionarioID, &s.OpenedAt, &s.ClosedAt, &s.OpeningAmount, &s.ClosingAmount,
+			&s.Status, &s.CreatedAt)
+	if err == pgx.ErrNoRows {
+		jsonErr(w, "Sessão não encontrada", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	// Dono pode sempre ver; outros utilizadores só chegam aqui se o middleware
+	// permitiu (ver / supervisionar / relatorios).
+	if s.UserID != user.ID && user.Tipo != "superadmin" {
+		access, err := authModels.LoadUserAccess(r.Context(), h.db, user.ID, user.MembershipID)
+		if err != nil {
+			jsonErr(w, "Erro interno", http.StatusInternalServerError)
+			return
+		}
+		if !access.Can("pos", "supervisionar") && !access.Can("pos", "relatorios") {
+			jsonErr(w, "Sem permissão para visualizar esta sessão", http.StatusForbidden)
+			return
+		}
+	}
+
 	jsonOK(w, s, http.StatusOK)
 }
 
@@ -752,9 +864,24 @@ func (h *Handler) FecharSessao(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var openingAmount float64
-	if err := h.db.QueryRow(r.Context(), `SELECT opening_amount FROM pos_sessions WHERE id=$1 AND tenant_id=$2 AND status='aberta'`, id, user.TenantID).Scan(&openingAmount); err != nil {
+	var sessaoUserID int64
+	if err := h.db.QueryRow(r.Context(), `SELECT opening_amount, user_id FROM pos_sessions WHERE id=$1 AND tenant_id=$2 AND status='aberta'`, id, user.TenantID).Scan(&openingAmount, &sessaoUserID); err != nil {
 		jsonErr(w, "Sessão de caixa não encontrada ou já fechada", http.StatusNotFound)
 		return
+	}
+
+	// Apenas o dono da sessão pode fechar. Supervisores podem fechar sessões de
+	// outros operadores desde que tenham permissão adequada.
+	if sessaoUserID != user.ID && user.Tipo != "superadmin" {
+		access, err := authModels.LoadUserAccess(r.Context(), h.db, user.ID, user.MembershipID)
+		if err != nil {
+			jsonErr(w, "Erro interno", http.StatusInternalServerError)
+			return
+		}
+		if !access.Can("pos", "supervisionar_pos") && !access.Can("pos", "fechar_outra_sessao") {
+			jsonErr(w, "Sem permissão para fechar sessão de outro operador", http.StatusForbidden)
+			return
+		}
 	}
 
 	detalhamentoMetodos, totalNumerario, err := h.detalharPagamentosSessao(r.Context(), id)
@@ -958,6 +1085,26 @@ func (h *Handler) ListarVendas(w http.ResponseWriter, r *http.Request) {
 			where += " AND " + f + "=$" + strconv.Itoa(len(args))
 		}
 	}
+	if v := q.Get("terminal_id"); v != "" {
+		if tid, err := strconv.ParseInt(v, 10, 64); err == nil {
+			args = append(args, tid)
+			where += " AND terminal_id=$" + strconv.Itoa(len(args))
+		}
+	}
+	if v := q.Get("user_id"); v != "" {
+		if uid, err := strconv.ParseInt(v, 10, 64); err == nil {
+			args = append(args, uid)
+			where += " AND created_by=$" + strconv.Itoa(len(args))
+		}
+	}
+	if v := q.Get("data_inicio"); v != "" {
+		args = append(args, v)
+		where += " AND sold_at >= $" + strconv.Itoa(len(args))
+	}
+	if v := q.Get("data_fim"); v != "" {
+		args = append(args, v+" 23:59:59")
+		where += " AND sold_at <= $" + strconv.Itoa(len(args))
+	}
 	// Busca livre por número do documento, client_reference (terminal
 	// offline) ou referência de pagamento (pos_sale_payments.referencia,
 	// ex.: ID de transação Mobile Money) — as três condições em OR, porque
@@ -969,13 +1116,30 @@ func (h *Handler) ListarVendas(w http.ResponseWriter, r *http.Request) {
 		where += " AND (numero ILIKE $" + n + " OR client_reference ILIKE $" + n +
 			" OR EXISTS (SELECT 1 FROM pos_sale_payments p WHERE p.pos_sale_id = pos_sales.id AND p.referencia ILIKE $" + n + "))"
 	}
+
+	// Operadores normais só veem as próprias vendas, a menos que sejam supervisores
+	// ou tenham permissão de relatórios.
+	access, err := authModels.LoadUserAccess(r.Context(), h.db, user.ID, user.MembershipID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	if !access.Can("pos", "supervisionar") && !access.Can("pos", "relatorios") {
+		args = append(args, user.ID)
+		where += " AND created_by=$" + strconv.Itoa(len(args))
+	}
+
 	countArgs := make([]any, len(args))
 	copy(countArgs, args)
 	args = append(args, limit, offset)
 	n := len(args)
-	rows, _ := h.db.Query(r.Context(),
+	rows, err := h.db.Query(r.Context(),
 		"SELECT id, numero, pos_session_id, terminal_id, customer_id, status, subtotal, desconto_total, imposto_total, total, valor_recebido, troco, moeda, sold_at, created_at "+
 			"FROM pos_sales WHERE "+where+" ORDER BY created_at DESC LIMIT $"+strconv.Itoa(n-1)+" OFFSET $"+strconv.Itoa(n), args...)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
 	defer rows.Close()
 	type Row struct {
 		ID            int64      `json:"id"`
@@ -1292,15 +1456,30 @@ func (h *Handler) ObterVenda(w http.ResponseWriter, r *http.Request) {
 		Troco         float64    `json:"troco"`
 		SoldAt        *time.Time `json:"sold_at"`
 		CreatedAt     time.Time  `json:"created_at"`
+		CreatedBy     int64      `json:"created_by"`
 	}
 	err := h.db.QueryRow(r.Context(), `
-		SELECT id, numero, pos_session_id, terminal_id, customer_id, status, moeda, subtotal, desconto_total, imposto_total, total, valor_recebido, troco, sold_at, created_at
+		SELECT id, numero, pos_session_id, terminal_id, customer_id, status, moeda, subtotal, desconto_total, imposto_total, total, valor_recebido, troco, sold_at, created_at, created_by
 		  FROM pos_sales WHERE id=$1 AND tenant_id=$2`, id, user.TenantID).
-		Scan(&s.ID, &s.Numero, &s.PosSessionID, &s.TerminalID, &s.CustomerID, &s.Status, &s.Moeda, &s.Subtotal, &s.DescontoTotal, &s.ImpostoTotal, &s.Total, &s.ValorRecebido, &s.Troco, &s.SoldAt, &s.CreatedAt)
+		Scan(&s.ID, &s.Numero, &s.PosSessionID, &s.TerminalID, &s.CustomerID, &s.Status, &s.Moeda, &s.Subtotal, &s.DescontoTotal, &s.ImpostoTotal, &s.Total, &s.ValorRecebido, &s.Troco, &s.SoldAt, &s.CreatedAt, &s.CreatedBy)
 	if err != nil {
 		jsonErr(w, "Venda não encontrada", http.StatusNotFound)
 		return
 	}
+
+	// Dono da venda pode sempre ver; outros precisam de supervisão/relatórios.
+	if s.CreatedBy != user.ID && user.Tipo != "superadmin" {
+		access, err := authModels.LoadUserAccess(r.Context(), h.db, user.ID, user.MembershipID)
+		if err != nil {
+			jsonErr(w, "Erro interno", http.StatusInternalServerError)
+			return
+		}
+		if !access.Can("pos", "supervisionar") && !access.Can("pos", "relatorios") {
+			jsonErr(w, "Sem permissão para visualizar esta venda", http.StatusForbidden)
+			return
+		}
+	}
+
 	rows, _ := h.db.Query(r.Context(), `
 		SELECT id, product_id, product_variant_id, descricao, quantidade, preco_unitario, desconto_valor, imposto_valor, subtotal, total, quantidade_devolvida
 		  FROM pos_sale_items WHERE pos_sale_id=$1 ORDER BY id`, id)
@@ -1351,8 +1530,13 @@ func (h *Handler) CancelarVenda(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Reason string `json:"reason"`
 	}
-	// corpo é opcional — nem todos os clientes enviam motivo
-	json.NewDecoder(r.Body).Decode(&body)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		body.Reason = ""
+	}
+	if strings.TrimSpace(body.Reason) == "" {
+		jsonErr(w, " motivo é obrigatório para cancelar uma venda", http.StatusBadRequest)
+		return
+	}
 
 	ctx := r.Context()
 	tx, err := h.db.Begin(ctx)
@@ -1362,10 +1546,24 @@ func (h *Handler) CancelarVenda(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(ctx)
 
-	var terminalID int64
-	if err := tx.QueryRow(ctx, `SELECT terminal_id FROM pos_sales WHERE id=$1 AND tenant_id=$2 AND status='concluida' FOR UPDATE`, id, user.TenantID).Scan(&terminalID); err != nil {
+	var terminalID, createdBy int64
+	if err := tx.QueryRow(ctx, `SELECT terminal_id, created_by FROM pos_sales WHERE id=$1 AND tenant_id=$2 AND status='concluida' FOR UPDATE`, id, user.TenantID).Scan(&terminalID, &createdBy); err != nil {
 		jsonErr(w, "Venda não encontrada ou já cancelada", http.StatusNotFound)
 		return
+	}
+
+	// Apenas o dono da venda pode cancelar. Supervisores podem cancelar vendas
+	// de outros operadores desde que tenham permissão adequada.
+	if createdBy != user.ID && user.Tipo != "superadmin" {
+		access, err := authModels.LoadUserAccess(ctx, h.db, user.ID, user.MembershipID)
+		if err != nil {
+			jsonErr(w, "Erro interno", http.StatusInternalServerError)
+			return
+		}
+		if !access.Can("pos", "supervisionar_pos") {
+			jsonErr(w, "Sem permissão para cancelar venda de outro operador", http.StatusForbidden)
+			return
+		}
 	}
 	var warehouseID *int64
 	if err := tx.QueryRow(ctx, `SELECT warehouse_id FROM pos_terminals WHERE id=$1`, terminalID).Scan(&warehouseID); err != nil || warehouseID == nil {

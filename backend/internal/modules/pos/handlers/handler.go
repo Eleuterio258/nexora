@@ -1,27 +1,45 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
 	"nexora/internal/push"
 	"nexora/internal/shared/contracts"
 	"nexora/internal/ws"
 )
 
+// DB define a interface mínima de pool de BD usada pelo módulo. Permite usar
+// tanto *pgxpool.Pool (produção) como pgxmock (testes).
+type DB interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
+// dbQuerier é implementado tanto pelo pool como por pgx.Tx e permite que os
+// helpers críticos participem na mesma transação.
+type dbQuerier interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
+
 type Handler struct {
-	db         *pgxpool.Pool
+	db         DB
 	cfg        *config.Config
 	wsHub      *ws.Hub
 	push       *push.Service
 	accounting contracts.AccountingPort
 }
 
-func New(db *pgxpool.Pool, cfg *config.Config, wsHub *ws.Hub, pushSvc *push.Service, accounting contracts.AccountingPort) *Handler {
+func New(db DB, cfg *config.Config, wsHub *ws.Hub, pushSvc *push.Service, accounting contracts.AccountingPort) *Handler {
 	return &Handler{db: db, cfg: cfg, wsHub: wsHub, push: pushSvc, accounting: accounting}
 }
 

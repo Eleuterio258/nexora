@@ -151,13 +151,18 @@ final class PosService extends NexoraService
         ];
     }
 
-    public function cancelSale(int $id): array
+    public function cancelSale(int $id, string $reason = ''): array
     {
         if ($id <= 0) {
             throw new OperationException('Venda invalida.');
         }
 
-        $response = $this->gateway->request('POST', "/api/pos/sales/$id/cancelar");
+        $payload = [];
+        if ($reason !== '') {
+            $payload['reason'] = $reason;
+        }
+
+        $response = $this->gateway->request('POST', "/api/pos/sales/$id/cancelar", $payload);
         $this->ensureSuccess($response, 'Erro ao cancelar a venda.');
 
         return ['ok' => true];
@@ -178,5 +183,187 @@ final class PosService extends NexoraService
         $this->ensureSuccess($response, 'Erro ao pesquisar produtos.');
 
         return $response->body ?? [];
+    }
+
+    // ── Terminais ───────────────────────────────────────────────────────────
+
+    public function listTerminais(array $filters = []): array
+    {
+        $query = http_build_query($filters);
+        $response = $this->gateway->request('GET', '/api/pos/terminais' . ($query ? '?' . $query : ''));
+        $this->ensureSuccess($response, 'Erro ao listar terminais.');
+        return $response->body ?? [];
+    }
+
+    public function getTerminal(int $id): array
+    {
+        $response = $this->gateway->request('GET', "/api/pos/terminais/$id");
+        $this->ensureSuccess($response, 'Erro ao obter terminal.');
+        return $response->body ?? [];
+    }
+
+    public function updateTerminal(int $id, array $payload): array
+    {
+        if (trim((string) ($payload['nome'] ?? '')) === '') {
+            throw new OperationException('O nome do terminal e obrigatorio.');
+        }
+
+        $response = $this->gateway->request('PUT', "/api/pos/terminais/$id", $payload);
+        $this->ensureSuccess($response, 'Erro ao actualizar o terminal.');
+
+        return ['ok' => true];
+    }
+
+    public function deleteTerminal(int $id): array
+    {
+        $response = $this->gateway->request('DELETE', "/api/pos/terminais/$id");
+        $this->ensureSuccess($response, 'Erro ao remover o terminal.');
+
+        return ['ok' => true];
+    }
+
+    public function toggleTerminal(int $id, bool $active): array
+    {
+        $action = $active ? 'activar' : 'desactivar';
+        $response = $this->gateway->request('POST', "/api/pos/terminais/$id/$action");
+        $this->ensureSuccess($response, 'Erro ao alterar estado do terminal.');
+
+        return ['ok' => true];
+    }
+
+    // ── Sessões ─────────────────────────────────────────────────────────────
+
+    public function listSessoes(array $filters = []): array
+    {
+        $query = http_build_query($filters);
+        $response = $this->gateway->request('GET', '/api/pos/sessoes' . ($query ? '?' . $query : ''));
+        $this->ensureSuccess($response, 'Erro ao listar sessoes.');
+        return $response->body ?? [];
+    }
+
+    public function getSessao(int $id): array
+    {
+        $response = $this->gateway->request('GET', "/api/pos/sessoes/$id");
+        $this->ensureSuccess($response, 'Erro ao obter sessao.');
+        return $response->body ?? [];
+    }
+
+    public function getSessaoAtual(): array
+    {
+        $response = $this->gateway->request('GET', '/api/pos/sessoes/atual');
+        $this->ensureSuccess($response, 'Erro ao obter sessao actual.');
+        return $response->body ?? [];
+    }
+
+    public function getFechoSessao(int $id): array
+    {
+        $response = $this->gateway->request('GET', "/api/pos/sessoes/$id/fecho");
+        $this->ensureSuccess($response, 'Erro ao obter fecho de caixa.');
+        return $response->body ?? [];
+    }
+
+    // ── Vendas ──────────────────────────────────────────────────────────────
+
+    public function listVendas(array $filters = []): array
+    {
+        $query = http_build_query($filters);
+        $response = $this->gateway->request('GET', '/api/pos/sales' . ($query ? '?' . $query : ''));
+        $this->ensureSuccess($response, 'Erro ao listar vendas.');
+        return $response->body ?? [];
+    }
+
+    public function getVenda(int $id): array
+    {
+        $response = $this->gateway->request('GET', "/api/pos/sales/$id");
+        $this->ensureSuccess($response, 'Erro ao obter venda.');
+        return $response->body ?? [];
+    }
+
+
+
+    public function getRecibo(int $id): array
+    {
+        $response = $this->gateway->request('GET', "/api/pos/sales/$id/recibo");
+        $this->ensureSuccess($response, 'Erro ao obter recibo.');
+        return $response->body ?? [];
+    }
+
+    // ── Catálogo POS ────────────────────────────────────────────────────────
+
+    public function listCatalogo(): array
+    {
+        $response = $this->gateway->request('GET', '/api/pos/catalogo');
+        $this->ensureSuccess($response, 'Erro ao listar catálogo POS.');
+        return $response->body ?? [];
+    }
+
+    // ── Descontos POS ───────────────────────────────────────────────────────
+
+    public function listDescontos(): array
+    {
+        $response = $this->gateway->request('GET', '/api/pos/descontos');
+        $this->ensureSuccess($response, 'Erro ao listar descontos.');
+        return $response->body ?? [];
+    }
+
+    public function createDesconto(array $payload): array
+    {
+        if (trim((string) ($payload['nome'] ?? '')) === '') {
+            throw new OperationException('O nome do desconto é obrigatório.');
+        }
+        if (($payload['valor'] ?? -1) < 0) {
+            throw new OperationException('O valor do desconto é inválido.');
+        }
+
+        $response = $this->gateway->request('POST', '/api/pos/descontos', $payload);
+        $this->ensureSuccess($response, 'Erro ao criar desconto.');
+
+        return ['ok' => true, 'id' => $response->body['id'] ?? null];
+    }
+
+    public function updateDesconto(int $id, array $payload): array
+    {
+        if ($id <= 0) {
+            throw new OperationException('Desconto inválido.');
+        }
+
+        $response = $this->gateway->request('PUT', "/api/pos/descontos/$id", $payload);
+        $this->ensureSuccess($response, 'Erro ao actualizar desconto.');
+
+        return ['ok' => true];
+    }
+
+    public function deleteDesconto(int $id): array
+    {
+        if ($id <= 0) {
+            throw new OperationException('Desconto inválido.');
+        }
+
+        $response = $this->gateway->request('DELETE', "/api/pos/descontos/$id");
+        $this->ensureSuccess($response, 'Erro ao remover desconto.');
+
+        return ['ok' => true];
+    }
+
+    // ── Configuração POS ────────────────────────────────────────────────────
+
+    public function getConfiguracao(): array
+    {
+        $response = $this->gateway->request('GET', '/api/pos/configuracao');
+        $this->ensureSuccess($response, 'Erro ao obter configuração POS.');
+        return $response->body ?? [];
+    }
+
+    public function saveConfiguracao(array $payload): array
+    {
+        $iva = (float) ($payload['iva_padrao'] ?? 17);
+        if ($iva < 0 || $iva > 100) {
+            throw new OperationException('IVA padrão inválido.');
+        }
+
+        $response = $this->gateway->request('PUT', '/api/pos/configuracao', $payload);
+        $this->ensureSuccess($response, 'Erro ao guardar configuração POS.');
+
+        return ['ok' => true];
     }
 }

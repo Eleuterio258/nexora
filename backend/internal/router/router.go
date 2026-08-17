@@ -1881,41 +1881,51 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(mw.RequirePermission(db, "pos", "operar_pos"))
 			r.Get("/produtos", pos.BuscarProdutos)
-			r.Route("/sessoes", func(r chi.Router) {
-				r.Get("/", pos.ListarSessoes)
-				r.With(mw.RequireHumanOperator()).Post("/", pos.AbrirSessao)
-				r.Get("/atual", pos.ObterSessaoAtual)
-				r.With(mw.RequireHumanOperator()).Post("/{id}/fechar", pos.FecharSessao)
-				r.Get("/{id}/fecho", pos.ObterFechoSessao)
-				r.Get("/{id}/movimentacoes", pos.ListarMovimentosCaixa)
-				r.With(mw.RequirePermission(db, "pos", "supervisionar_pos"), mw.RequireHumanOperator()).
-					Post("/{id}/movimentacoes", pos.RegistarMovimentoCaixa)
-			})
+			r.Get("/sessoes/atual", pos.ObterSessaoAtual)
 			r.Route("/sales", func(r chi.Router) {
-				r.With(mw.RequirePermission(db, "pos", "operar_pos"), mw.RequireHumanOperator()).
+				r.Use(mw.RequireAuth(cfg.JWTSecret, db, oauthKeys), mw.EnforceTenantHost(tenantHosts))
+
+				r.With(mw.RequirePermission(db, "pos", "registar_venda"), mw.RequireHumanOperator()).
 					Post("/", pos.CriarVenda)
+
 				r.With(mw.RequirePermissionAny(db, []authModels.Permission{
 					{Modulo: "pos", Acao: "operar_pos"},
 					{Modulo: "pos", Acao: "ver_vendas"},
+					{Modulo: "pos", Acao: "supervisionar"},
+					{Modulo: "pos", Acao: "relatorios"},
 				})).
 					Get("/{id}", pos.ObterVenda)
-				r.With(mw.RequirePermission(db, "pos", "supervisionar_pos"), mw.RequireHumanOperator()).
+
+				r.With(mw.RequirePermissionAny(db, []authModels.Permission{
+					{Modulo: "pos", Acao: "cancelar_venda"},
+					{Modulo: "pos", Acao: "supervisionar_pos"},
+				}), mw.RequireHumanOperator()).
 					Post("/{id}/cancelar", pos.CancelarVenda)
+
 				r.With(mw.RequirePermission(db, "pos", "supervisionar_pos"), mw.RequireHumanOperator()).
 					Post("/{id}/estorno-parcial", pos.EstornoParcialVenda)
+
 				r.With(mw.RequirePermissionAny(db, []authModels.Permission{
 					{Modulo: "pos", Acao: "operar_pos"},
 					{Modulo: "pos", Acao: "ver_vendas"},
+					{Modulo: "pos", Acao: "supervisionar"},
+					{Modulo: "pos", Acao: "relatorios"},
 				})).
 					Get("/{id}/estornos", pos.ListarEstornosVenda)
+
 				r.With(mw.RequirePermissionAny(db, []authModels.Permission{
 					{Modulo: "pos", Acao: "operar_pos"},
 					{Modulo: "pos", Acao: "ver_vendas"},
+					{Modulo: "pos", Acao: "supervisionar"},
+					{Modulo: "pos", Acao: "relatorios"},
 				})).
 					Get("/{id}/recibo", pos.ObterRecibo)
+
 				r.With(mw.RequirePermissionAny(db, []authModels.Permission{
 					{Modulo: "pos", Acao: "operar_pos"},
 					{Modulo: "pos", Acao: "ver_vendas"},
+					{Modulo: "pos", Acao: "supervisionar"},
+					{Modulo: "pos", Acao: "relatorios"},
 				})).
 					Get("/", pos.ListarVendas)
 			})
@@ -1936,8 +1946,14 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Route("/terminais", func(r chi.Router) {
 				r.Get("/", pos.ListarTerminais)
 				r.Post("/", pos.CriarTerminal)
-				r.Post("/{id}/activar", pos.ActivarTerminal)
-				r.Post("/{id}/desactivar", pos.DesactivarTerminal)
+				r.Route("/{id}", func(r chi.Router) {
+					r.Get("/", pos.ObterTerminal)
+					r.Put("/", pos.ActualizarTerminal)
+					r.Delete("/", pos.ArquivarTerminal)
+					r.Post("/activar", pos.ActivarTerminal)
+					r.Post("/desactivar", pos.DesactivarTerminal)
+					r.Get("/sessao-activa", pos.ObterSessaoAtivaDoTerminal)
+				})
 			})
 		})
 
@@ -1960,6 +1976,53 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				r.Put("/{id}", pos.AtualizarDesconto)
 				r.Delete("/{id}", pos.RemoverDesconto)
 			})
+		})
+
+		// Configuração POS
+		r.Group(func(r chi.Router) {
+			r.Use(mw.RequirePermission(db, "pos", "configurar"))
+			r.Get("/configuracao", pos.ObterConfiguracaoPOS)
+			r.Put("/configuracao", pos.GuardarConfiguracaoPOS)
+		})
+
+		// Sessões de caixa
+		r.Route("/sessoes", func(r chi.Router) {
+			r.Use(mw.RequireAuth(cfg.JWTSecret, db, oauthKeys), mw.EnforceTenantHost(tenantHosts))
+
+			r.With(mw.RequirePermissionAny(db, []authModels.Permission{
+				{Modulo: "pos", Acao: "ver"},
+				{Modulo: "pos", Acao: "supervisionar"},
+				{Modulo: "pos", Acao: "relatorios"},
+			})).Get("/", pos.ListarSessoes)
+
+			r.With(mw.RequirePermission(db, "pos", "abrir_sessao"), mw.RequireHumanOperator()).
+				Post("/", pos.AbrirSessao)
+
+			r.With(mw.RequirePermissionAny(db, []authModels.Permission{
+				{Modulo: "pos", Acao: "ver"},
+				{Modulo: "pos", Acao: "supervisionar"},
+				{Modulo: "pos", Acao: "relatorios"},
+			})).Get("/{id}", pos.ObterSessaoPorID)
+
+			r.With(mw.RequirePermissionAny(db, []authModels.Permission{
+				{Modulo: "pos", Acao: "fechar_sessao"},
+				{Modulo: "pos", Acao: "supervisionar_pos"},
+				{Modulo: "pos", Acao: "fechar_outra_sessao"},
+			}), mw.RequireHumanOperator()).
+				Post("/{id}/fechar", pos.FecharSessao)
+
+			r.With(mw.RequirePermissionAny(db, []authModels.Permission{
+				{Modulo: "pos", Acao: "ver"},
+				{Modulo: "pos", Acao: "relatorios"},
+			})).Get("/{id}/fecho", pos.ObterFechoSessao)
+
+			r.With(mw.RequirePermissionAny(db, []authModels.Permission{
+				{Modulo: "pos", Acao: "ver"},
+				{Modulo: "pos", Acao: "supervisionar"},
+			})).Get("/{id}/movimentacoes", pos.ListarMovimentosCaixa)
+
+			r.With(mw.RequirePermission(db, "pos", "movimentar_caixa"), mw.RequireHumanOperator()).
+				Post("/{id}/movimentacoes", pos.RegistarMovimentoCaixa)
 		})
 
 		// Relatórios POS — vendas por período/operador/terminal/método, top

@@ -228,7 +228,10 @@ A função `auth.criar_cargos_padrao(tenant_id)` cria automaticamente estes carg
 | **Director Financeiro** | `financeiro:*`, `contabilidade:*`, `tesouraria:*`, `impostos:*`, `faturacao:*`, `centros-custo:ver,criar,editar,relatorios`, `multi-moeda:ver,criar,editar,configurar` | Supervisão total da área financeira. |
 | **Contabilista** | `contabilidade:ver,criar,editar,relatorios,exportar`, `impostos:ver,criar,relatorios`, `financeiro:ver,relatorios` | Lançamentos contabilísticos, declarações fiscais. |
 | **Tesoureiro** | `tesouraria:ver,criar,editar,apagar,exportar,relatorios`, `financeiro:ver,editar` | Caixa, bancos, conciliação. |
-| **Caixa** | `pos:ver,criar,editar,relatorios`, `tesouraria:ver` | Operações de ponto de venda. |
+| **Caixa** | `pos:operar_pos,abrir_sessao,fechar_sessao,registar_venda,processar_devolucao,movimentar_caixa,aplicar_desconto`, `tesouraria:ver` | Operações de ponto de venda. |
+| **Caixa Sénior** | `pos:operar_pos,abrir_sessao,fechar_sessao,registar_venda,cancelar_venda,processar_devolucao,movimentar_caixa,aplicar_desconto`, `tesouraria:ver` | Operações de ponto de venda com permissão para cancelar vendas. |
+| **Supervisor POS** | `pos:ver,relatorios,supervisionar,fechar_outra_sessao` | Supervisão de vários caixas e relatórios. |
+| **Administrador POS** | `pos:*` | Configuração de terminais, catálogo e descontos do POS. |
 | **Responsável de Faturação** | `faturacao:ver,criar,editar,relatorios,exportar`, `clientes:ver` | Emissão e gestão de faturas. |
 | **Analista Financeiro** | `financeiro:ver,relatorios,exportar`, `contabilidade:ver,relatorios`, `centros-custo:ver,relatorios` | Análise financeira e reporting. |
 

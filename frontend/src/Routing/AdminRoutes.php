@@ -5,6 +5,7 @@ namespace E258Tech\Routing;
 
 use E258Tech\Routing\Pages\ComercialPageRoutes;
 use E258Tech\Routing\Pages\FinanceiroPageRoutes;
+use E258Tech\Routing\Pages\PosPageRoutes;
 use E258Tech\Routing\Pages\RhPageRoutes;
 use E258Tech\Routing\Pages\SistemaPageRoutes;
 
@@ -17,6 +18,7 @@ final class AdminRoutes
         return self::$pages ??= array_merge(
             ComercialPageRoutes::pages(),
             FinanceiroPageRoutes::pages(),
+            PosPageRoutes::pages(),
             RhPageRoutes::pages(),
             SistemaPageRoutes::pages(),
         );

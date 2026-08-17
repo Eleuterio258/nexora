@@ -20,6 +20,7 @@ use E258Tech\Http\ServerRequest;
 use E258Tech\Model\Service\PayCore\DashboardService;
 use E258Tech\Model\Service\PayCore\PosCashDrawerService;
 use E258Tech\Model\Service\PayCore\PosDiscountService;
+use E258Tech\Model\Service\Pos\PosService;
 use E258Tech\Model\Service\PayCore\CustomerService;
 use E258Tech\Model\Service\PayCore\FileUploadService;
 use E258Tech\Model\Service\PayCore\InvoicingService;
@@ -57,6 +58,7 @@ final readonly class ApplicationContainer
     public OpenVacanciesCounter $openVacancies;
     public DashboardService $payCoreDashboard;
     public PosCashDrawerService $payCoreCashDrawer;
+    public PosService $pos;
     public PosTransactionReportService $payCoreTransactionReport;
     public PosPaymentService $payCorePayment;
     public PosDiscountService $payCoreDiscount;
@@ -118,6 +120,7 @@ final readonly class ApplicationContainer
         $this->adminDownload = new AdminDownloadController($this->guard, $this->request, $this->nexora);
         $this->payCoreDashboard = new DashboardService($this->nexora);
         $this->payCoreCashDrawer = new PosCashDrawerService($this->nexora);
+        $this->pos = new PosService($this->nexora);
         $this->payCoreTransactionReport = new PosTransactionReportService($this->nexora);
         $this->payCorePayment = new PosPaymentService($this->nexora);
         $this->payCoreDiscount = new PosDiscountService($this->nexora);
