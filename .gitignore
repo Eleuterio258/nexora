@@ -149,6 +149,14 @@ nexora-erp/coverage/
 nexora-erp/infra/traefik/acme/acme.json
 
 # ═══════════════════════════════════════════════════════════════
+# NEXORAGIS — .NET (NexoraGis/NexoraGis/)
+# ═══════════════════════════════════════════════════════════════
+NexoraGis/NexoraGis/**/obj/
+NexoraGis/NexoraGis/**/bin/
+.vs/
+*.user
+
+# ═══════════════════════════════════════════════════════════════
 # INFRA / Docker
 # ═══════════════════════════════════════════════════════════════
 .env

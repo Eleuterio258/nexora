@@ -1,0 +1,69 @@
+name: NexoraGis CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "NexoraGis/NexoraGis/**"
+      - ".github/workflows/nexoragis-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "NexoraGis/NexoraGis/**"
+      - ".github/workflows/nexoragis-ci.yml"
+
+defaults:
+  run:
+    working-directory: NexoraGis/NexoraGis
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: nexoragis
+          POSTGRES_USER: nexoragis
+          POSTGRES_PASSWORD: nexoragis_ci_pw
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexoragis -d nexoragis"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NEXORAGIS_CONNECTION_STRING: "Host=localhost;Port=5432;Database=nexoragis;Username=nexoragis;Password=nexoragis_ci_pw"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Install dotnet-ef
+        run: dotnet tool install --global dotnet-ef
+
+      - name: Apply migrations
+        run: dotnet ef database update --project src/NexoraGis.Infrastructure --startup-project src/NexoraGis.Api
+
+      - name: Test
+        run: dotnet test --no-restore --configuration Release --logger "trx;LogFileName=test-results.trx"
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: "**/test-results.trx"

@@ -1,0 +1,70 @@
+name: nexoragis
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: nexoragis-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nexoragis}
+      POSTGRES_USER: ${POSTGRES_USER:-nexoragis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexoragis_dev_pw}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - nexoragis_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nexoragis} -d ${POSTGRES_DB:-nexoragis}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: nexoragis-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-nexoragis}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-nexoragis_dev_pw}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - nexoragis_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  geoserver:
+    image: kartoza/geoserver:2.25.2
+    container_name: nexoragis-geoserver
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GEOSERVER_ADMIN_USER: ${GEOSERVER_ADMIN_USER:-admin}
+      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_ADMIN_PASSWORD:-nexoragis_dev_pw}
+      GEOWEBCACHE_CACHE_DIR: /opt/geoserver_data/gwc
+    ports:
+      - "${GEOSERVER_PORT:-8600}:8080"
+    volumes:
+      - nexoragis_geoserver_data:/opt/geoserver_data
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexoragis-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - nexoragis_redis_data:/data
+
+volumes:
+  nexoragis_db_data:
+  nexoragis_minio_data:
+  nexoragis_geoserver_data:
+  nexoragis_redis_data:

@@ -1,0 +1,123 @@
+ID,Fase,Epico,Tarefa,Inicio,Fim,Duracao_Dias,Dependencias,Responsavel,Status
+1,Fase 1 - Fundacao,Ambiente,Configurar repositorio e estrutura de solucao,2026-09-01,2026-09-01,1,,Tech Lead,Nao Iniciado
+2,Fase 1 - Fundacao,Ambiente,Configurar Docker Compose,2026-09-02,2026-09-03,2,1,DevOps,Nao Iniciado
+3,Fase 1 - Fundacao,Ambiente,Configurar CI/CD,2026-09-04,2026-09-07,2,2,DevOps,Nao Iniciado
+4,Fase 1 - Fundacao,Ambiente,Configurar logging e monitoramento,2026-09-08,2026-09-08,1,2,DevOps,Nao Iniciado
+5,Fase 1 - Fundacao,Base de Dados,Criar schema SQL completo,2026-09-01,2026-09-03,3,,DBA,Nao Iniciado
+6,Fase 1 - Fundacao,Base de Dados,Configurar EF Core + Npgsql + PostGIS,2026-09-04,2026-09-08,3,5,Backend,Nao Iniciado
+7,Fase 1 - Fundacao,Base de Dados,Criar migrations iniciais,2026-09-09,2026-09-10,2,6,Backend,Nao Iniciado
+8,Fase 1 - Fundacao,Base de Dados,Seed de dados de Mocambique,2026-09-11,2026-09-14,2,5,DBA,Nao Iniciado
+9,Fase 1 - Fundacao,Base de Dados,Criar views e funcoes auxiliares,2026-09-15,2026-09-16,2,7,DBA,Nao Iniciado
+10,Fase 1 - Fundacao,Autenticacao,Implementar Identity/Autenticacao JWT,2026-09-09,2026-09-11,3,,Backend,Nao Iniciado
+11,Fase 1 - Fundacao,Autenticacao,Implementar RBAC por perfil,2026-09-12,2026-09-16,3,10,Backend,Nao Iniciado
+12,Fase 1 - Fundacao,Autenticacao,Middleware de autorizacao por recurso,2026-09-17,2026-09-18,2,11,Backend,Nao Iniciado
+13,Fase 1 - Fundacao,Autenticacao,Gestao de organizacoes (multi-tenant),2026-09-19,2026-09-22,2,12,Backend,Nao Iniciado
+14,Fase 2 - Territorial e Projetos,Divisao Administrativa,CRUD de divisoes administrativas,2026-09-23,2026-09-25,3,5,Backend+Frontend,Nao Iniciado
+15,Fase 2 - Territorial e Projetos,Divisao Administrativa,Hierarquia recursiva,2026-09-26,2026-09-29,2,14,Backend,Nao Iniciado
+16,Fase 2 - Territorial e Projetos,Divisao Administrativa,Importacao de limites administrativos,2026-09-30,2026-10-02,3,15,Backend,Nao Iniciado
+17,Fase 2 - Territorial e Projetos,Divisao Administrativa,Visualizacao hierarquica no frontend,2026-10-03,2026-10-06,2,14,Frontend,Nao Iniciado
+18,Fase 2 - Territorial e Projetos,Divisao Administrativa,Filtros por zona urbana/rural,2026-10-07,2026-10-07,1,17,Frontend,Nao Iniciado
+19,Fase 2 - Territorial e Projetos,Gestao de Projetos,CRUD de projetos territoriais,2026-10-08,2026-10-10,3,13,Backend+Frontend,Nao Iniciado
+20,Fase 2 - Territorial e Projetos,Gestao de Projetos,Associacao a divisao administrativa,2026-10-11,2026-10-11,1,19+14,Backend,Nao Iniciado
+21,Fase 2 - Territorial e Projetos,Gestao de Projetos,Gestao de equipe tecnica,2026-10-12,2026-10-13,2,19,Backend+Frontend,Nao Iniciado
+22,Fase 2 - Territorial e Projetos,Gestao de Projetos,Workflow de estados do projeto,2026-10-14,2026-10-15,2,19,Backend,Nao Iniciado
+23,Fase 2 - Territorial e Projetos,Gestao de Projetos,Upload de documentos do projeto,2026-10-16,2026-10-17,2,19,Backend,Nao Iniciado
+24,Fase 3 - Cadastro,Parcelas,CRUD de parcelas,2026-10-20,2026-10-24,4,19,Backend+Frontend,Nao Iniciado
+25,Fase 3 - Cadastro,Parcelas,Calculos espaciais automaticos,2026-10-27,2026-10-28,2,24,Backend,Nao Iniciado
+26,Fase 3 - Cadastro,Parcelas,Associacao a divisao administrativa,2026-10-29,2026-10-29,1,24+14,Backend,Nao Iniciado
+27,Fase 3 - Cadastro,Parcelas,Estados e uso do solo,2026-10-30,2026-10-31,2,24,Backend,Nao Iniciado
+28,Fase 3 - Cadastro,Parcelas,Pesquisa espacial e por atributos,2026-11-03,2026-11-05,3,24,Backend+Frontend,Nao Iniciado
+29,Fase 3 - Cadastro,Parcelas,Validacoes de geometria,2026-11-06,2026-11-07,2,24,Backend,Nao Iniciado
+30,Fase 3 - Cadastro,Edificacoes e Lotes,CRUD de edificacoes,2026-11-10,2026-11-12,3,24,Backend+Frontend,Nao Iniciado
+31,Fase 3 - Cadastro,Edificacoes e Lotes,CRUD de lotes,2026-11-13,2026-11-14,2,24,Backend,Nao Iniciado
+32,Fase 3 - Cadastro,Edificacoes e Lotes,Multiplas edificacoes por parcela,2026-11-17,2026-11-17,1,30,Backend,Nao Iniciado
+33,Fase 3 - Cadastro,Entidades,CRUD de entidades,2026-11-18,2026-11-20,3,,Backend+Frontend,Nao Iniciado
+34,Fase 3 - Cadastro,Entidades,Relacao parcela-entidade,2026-11-21,2026-11-24,2,33+24,Backend,Nao Iniciado
+35,Fase 3 - Cadastro,Entidades,Protecao de dados pessoais,2026-11-25,2026-11-26,2,34,Backend,Nao Iniciado
+36,Fase 3 - Cadastro,Infraestruturas e Equipamentos,CRUD de infraestruturas,2026-11-27,2026-12-02,4,19,Backend+Frontend,Nao Iniciado
+37,Fase 3 - Cadastro,Infraestruturas e Equipamentos,CRUD de equipamentos publicos,2026-12-03,2026-12-05,3,19,Backend+Frontend,Nao Iniciado
+38,Fase 3 - Cadastro,Infraestruturas e Equipamentos,Catalogo de tipos e subtipos,2026-12-08,2026-12-09,2,36+37,Backend,Nao Iniciado
+39,Fase 4 - Campo e Sincronizacao,App Android,Setup do projeto Flutter/Android,2026-12-10,2026-12-12,3,,Mobile,Nao Iniciado
+40,Fase 4 - Campo e Sincronizacao,App Android,Autenticacao e selecao de projeto,2026-12-15,2026-12-16,2,39+10,Mobile,Nao Iniciado
+41,Fase 4 - Campo e Sincronizacao,App Android,Mapa offline,2026-12-17,2026-12-22,4,40,Mobile,Nao Iniciado
+42,Fase 4 - Campo e Sincronizacao,App Android,Recolha de geometria,2026-12-23,2026-12-26,4,41,Mobile,Nao Iniciado
+43,Fase 4 - Campo e Sincronizacao,App Android,Recolha de fotos e videos,2026-12-29,2026-12-30,2,42,Mobile,Nao Iniciado
+44,Fase 4 - Campo e Sincronizacao,App Android,Formularios de campo,2026-12-31,2027-01-02,3,42,Mobile,Nao Iniciado
+45,Fase 4 - Campo e Sincronizacao,App Android,Funcionamento offline,2027-01-05,2027-01-08,4,44,Mobile,Nao Iniciado
+46,Fase 4 - Campo e Sincronizacao,Sincronizacao,Endpoint /api/v1/sync,2027-01-09,2027-01-13,3,45,Backend,Nao Iniciado
+47,Fase 4 - Campo e Sincronizacao,Sincronizacao,Validacao de dados sincronizados,2027-01-14,2027-01-16,3,46,Backend,Nao Iniciado
+48,Fase 4 - Campo e Sincronizacao,Sincronizacao,Resolucao de conflitos de sincronizacao,2027-01-19,2027-01-21,3,47,Backend+Frontend,Nao Iniciado
+49,Fase 4 - Campo e Sincronizacao,Sincronizacao,Fila de sincronizacao,2027-01-22,2027-01-23,2,46,Backend,Nao Iniciado
+50,Fase 4 - Campo e Sincronizacao,GNSS/RTK e Drones,Registo de pontos de levantamento,2027-01-26,2027-01-27,2,46,Backend,Nao Iniciado
+51,Fase 4 - Campo e Sincronizacao,GNSS/RTK e Drones,Integracao com apps GNSS externas,2027-01-28,2027-01-30,3,50,Mobile,Nao Iniciado
+52,Fase 4 - Campo e Sincronizacao,GNSS/RTK e Drones,Registo de produtos de drone,2027-02-02,2027-02-04,3,50,Backend+Frontend,Nao Iniciado
+53,Fase 5 - Plano e Analise,Plano,CRUD de planos e versoes,2027-02-05,2027-02-09,3,19,Backend+Frontend,Nao Iniciado
+54,Fase 5 - Plano e Analise,Plano,Historico de versoes,2027-02-10,2027-02-11,2,53,Backend,Nao Iniciado
+55,Fase 5 - Plano e Analise,Plano,Associar plano a projeto,2027-02-12,2027-02-12,1,53,Backend,Nao Iniciado
+56,Fase 5 - Plano e Analise,Zoneamento,CRUD de zonas,2027-02-13,2027-02-17,3,53,Backend+Frontend,Nao Iniciado
+57,Fase 5 - Plano e Analise,Zoneamento,Parametros urbanisticos,2027-02-18,2027-02-19,2,56,Backend,Nao Iniciado
+58,Fase 5 - Plano e Analise,Zoneamento,Estilos de camada por zona,2027-02-20,2027-02-23,2,56,Frontend,Nao Iniciado
+59,Fase 5 - Plano e Analise,Zoneamento,Associar zona a parcelas,2027-02-24,2027-02-24,1,56+24,Backend,Nao Iniciado
+60,Fase 5 - Plano e Analise,Analise Espacial,Ferramentas de medicao,2027-02-25,2027-02-27,3,,Frontend,Nao Iniciado
+61,Fase 5 - Plano e Analise,Analise Espacial,Buffers e intersecoes,2027-03-02,2027-03-04,3,60,Backend+Frontend,Nao Iniciado
+62,Fase 5 - Plano e Analise,Analise Espacial,Identificacao de parcelas afetadas,2027-03-05,2027-03-09,3,61,Backend,Nao Iniciado
+63,Fase 5 - Plano e Analise,Analise Espacial,Estatisticas territoriais,2027-03-10,2027-03-11,2,62,Backend+Frontend,Nao Iniciado
+64,Fase 5 - Plano e Analise,Motor de Conflitos,Detecao de uso incompativel,2027-03-12,2027-03-16,3,59,Backend,Nao Iniciado
+65,Fase 5 - Plano e Analise,Motor de Conflitos,Detecao de construcoes em zonas condicionadas,2027-03-17,2027-03-19,3,64,Backend,Nao Iniciado
+66,Fase 5 - Plano e Analise,Motor de Conflitos,Registo e gestao de conflitos,2027-03-20,2027-03-23,2,65,Backend+Frontend,Nao Iniciado
+67,Fase 5 - Plano e Analise,Motor de Conflitos,Notificacoes de conflito,2027-03-24,2027-03-25,2,66,Backend,Nao Iniciado
+68,Fase 6 - Workflow e Auditoria,Aprovacao,Workflow de aprovacao,2027-03-26,2027-03-30,4,24+53,Backend,Nao Iniciado
+69,Fase 6 - Workflow e Auditoria,Aprovacao,Notificacoes entre atores,2027-03-31,2027-04-01,2,68,Backend,Nao Iniciado
+70,Fase 6 - Workflow e Auditoria,Aprovacao,Dashboard de tarefas pendentes,2027-04-02,2027-04-03,2,69,Frontend,Nao Iniciado
+71,Fase 6 - Workflow e Auditoria,Versionamento e Auditoria,Versionamento de geometrias,2027-04-06,2027-04-08,3,68,Backend,Nao Iniciado
+72,Fase 6 - Workflow e Auditoria,Versionamento e Auditoria,Reconstrucao historica,2027-04-09,2027-04-10,2,71,Backend,Nao Iniciado
+73,Fase 6 - Workflow e Auditoria,Versionamento e Auditoria,Logs de auditoria,2027-04-13,2027-04-14,2,71,Backend,Nao Iniciado
+74,Fase 6 - Workflow e Auditoria,Versionamento e Auditoria,Interface de consulta de auditoria,2027-04-15,2027-04-16,2,73,Frontend,Nao Iniciado
+75,Fase 7 - Publicacao e WebGIS,GeoServer,Configurar GeoServer via Docker,2027-04-17,2027-04-18,2,2,DevOps,Nao Iniciado
+76,Fase 7 - Publicacao e WebGIS,GeoServer,Publicar camadas automaticamente,2027-04-20,2027-04-23,4,75+36+56,Backend,Nao Iniciado
+77,Fase 7 - Publicacao e WebGIS,GeoServer,Servicos WMS/WFS/WMTS,2027-04-24,2027-04-27,2,76,Backend,Nao Iniciado
+78,Fase 7 - Publicacao e WebGIS,GeoServer,Estilos SLD por camada,2027-04-28,2027-04-29,2,77,DBA,Nao Iniciado
+79,Fase 7 - Publicacao e WebGIS,WebGIS Tecnico,WebGIS tecnico,2027-04-30,2027-05-06,5,77,Frontend,Nao Iniciado
+80,Fase 7 - Publicacao e WebGIS,WebGIS Publico,WebGIS publico,2027-05-07,2027-05-11,3,79,Frontend,Nao Iniciado
+81,Fase 7 - Publicacao e WebGIS,WebGIS,Visualizacao de camadas,2027-05-12,2027-05-14,3,79,Frontend,Nao Iniciado
+82,Fase 7 - Publicacao e WebGIS,WebGIS,Pesquisa e identificacao,2027-05-15,2027-05-19,3,79,Frontend,Nao Iniciado
+83,Fase 7 - Publicacao e WebGIS,WebGIS,Ferramentas de desenho e medicao,2027-05-20,2027-05-22,2,81,Frontend,Nao Iniciado
+84,Fase 7 - Publicacao e WebGIS,WebGIS,Impressao de mapas,2027-05-23,2027-05-27,3,83,Frontend,Nao Iniciado
+85,Fase 7 - Publicacao e WebGIS,Catalogo de Camadas,CRUD do catalogo de camadas,2027-05-28,2027-06-01,3,,Backend+Frontend,Nao Iniciado
+86,Fase 7 - Publicacao e WebGIS,Catalogo de Camadas,Gestao de visibilidade e acesso publico,2027-06-02,2027-06-03,2,85,Backend,Nao Iniciado
+87,Fase 8 - Relatorios e Fiscalizacao,Dashboard,Indicadores territoriais,2027-06-04,2027-06-08,3,,Frontend,Nao Iniciado
+88,Fase 8 - Relatorios e Fiscalizacao,Dashboard,Graficos e mapas interativos,2027-06-09,2027-06-11,3,87,Frontend,Nao Iniciado
+89,Fase 8 - Relatorios e Fiscalizacao,Dashboard,Filtros por projeto e divisao,2027-06-12,2027-06-15,2,88,Frontend,Nao Iniciado
+90,Fase 8 - Relatorios e Fiscalizacao,Relatorios,Ficha cadastral e ficha de parcela,2027-06-16,2027-06-19,4,24,Backend+Frontend,Nao Iniciado
+91,Fase 8 - Relatorios e Fiscalizacao,Relatorios,Plantas de localizacao/enquadramento,2027-06-22,2027-06-24,3,90,Backend,Nao Iniciado
+92,Fase 8 - Relatorios e Fiscalizacao,Relatorios,Mapas tematicos,2027-06-25,2027-06-29,3,91,Backend,Nao Iniciado
+93,Fase 8 - Relatorios e Fiscalizacao,Relatorios,Relatorios de levantamento/conflitos/evolucao,2027-06-30,2027-07-03,4,92,Backend,Nao Iniciado
+94,Fase 8 - Relatorios e Fiscalizacao,Fiscalizacao,Modulo de fiscalizacao na app de campo,2027-07-06,2027-07-09,4,45+24,Mobile,Nao Iniciado
+95,Fase 8 - Relatorios e Fiscalizacao,Fiscalizacao,Consulta comparativa,2027-07-10,2027-07-14,3,94,Mobile,Nao Iniciado
+96,Fase 8 - Relatorios e Fiscalizacao,Fiscalizacao,Registo de ocorrencias,2027-07-15,2027-07-16,2,94,Mobile,Nao Iniciado
+97,Fase 8 - Relatorios e Fiscalizacao,Fiscalizacao,Workflow de resolucao de ocorrencias,2027-07-17,2027-07-20,2,96,Backend+Mobile,Nao Iniciado
+98,Fase 9 - Integracoes,Importacao/Exportacao,Importar Shapefile/GeoJSON/GeoPackage/KML/CSV,2027-07-21,2027-07-24,4,24,Backend,Nao Iniciado
+99,Fase 9 - Integracoes,Importacao/Exportacao,Importar DXF/DWG,2027-07-27,2027-07-29,3,98,Backend,Nao Iniciado
+100,Fase 9 - Integracoes,Importacao/Exportacao,Exportar GeoJSON/Shapefile/GeoPackage/KML/PDF/Excel,2027-07-30,2027-08-03,3,98,Backend,Nao Iniciado
+101,Fase 9 - Integracoes,Importacao/Exportacao,Importacao de ortofotos e rasters,2027-08-04,2027-08-06,3,100,Backend,Nao Iniciado
+102,Fase 9 - Integracoes,Integracoes Externas,Design da API de integracao,2027-08-07,2027-08-10,2,,Tech Lead,Nao Iniciado
+103,Fase 9 - Integracoes,Integracoes Externas,Integracao com cadastro predial,2027-08-11,2027-08-13,3,102,Backend,Nao Iniciado
+104,Fase 9 - Integracoes,Integracoes Externas,Integracao com sistemas municipais/fiscais,2027-08-14,2027-08-18,3,102,Backend,Nao Iniciado
+105,Fase 9 - Integracoes,Integracoes Externas,Webhooks e notificacoes,2027-08-19,2027-08-20,2,104,Backend,Nao Iniciado
+106,Fase 9 - Integracoes,Performance,Otimizacao de queries espaciais,2027-08-21,2027-08-25,3,,DBA,Nao Iniciado
+107,Fase 9 - Integracoes,Performance,Cache de camadas frequentes,2027-08-26,2027-08-27,2,106,Backend,Nao Iniciado
+108,Fase 9 - Integracoes,Performance,Paginacao e streaming de grandes datasets,2027-08-28,2027-08-31,2,106,Backend,Nao Iniciado
+109,Fase 9 - Integracoes,Performance,Testes de carga,2027-09-01,2027-09-02,2,108,QA,Nao Iniciado
+110,Fase 10 - Testes e Entrega,Testes,Testes unitarios da API,2027-09-03,2027-09-09,5,,QA+Backend,Nao Iniciado
+111,Fase 10 - Testes e Entrega,Testes,Testes de integracao,2027-09-10,2027-09-15,4,110,QA+Backend,Nao Iniciado
+112,Fase 10 - Testes e Entrega,Testes,Testes end-to-end do WebGIS,2027-09-16,2027-09-19,4,111,QA+Frontend,Nao Iniciado
+113,Fase 10 - Testes e Entrega,Testes,Testes da app de campo,2027-09-20,2027-09-22,3,112,QA+Mobile,Nao Iniciado
+114,Fase 10 - Testes e Entrega,Testes,Testes de carga e stress,2027-09-23,2027-09-24,2,113,QA,Nao Iniciado
+115,Fase 10 - Testes e Entrega,Documentacao,Documentacao da API (Swagger/OpenAPI),2027-09-25,2027-09-26,2,,Backend,Nao Iniciado
+116,Fase 10 - Testes e Entrega,Documentacao,Manual do utilizador,2027-09-27,2027-10-02,4,115,UX/Frontend,Nao Iniciado
+117,Fase 10 - Testes e Entrega,Documentacao,Manual de administracao,2027-10-03,2027-10-06,2,116,DevOps,Nao Iniciado
+118,Fase 10 - Testes e Entrega,Documentacao,Documentacao tecnica de deployment,2027-10-07,2027-10-08,2,117,DevOps,Nao Iniciado
+119,Fase 10 - Testes e Entrega,Entrega,Ambiente de producao,2027-10-09,2027-10-13,3,118,DevOps,Nao Iniciado
+120,Fase 10 - Testes e Entrega,Entrega,Migracao de dados piloto,2027-10-14,2027-10-15,2,119,DBA,Nao Iniciado
+121,Fase 10 - Testes e Entrega,Entrega,Treino dos utilizadores,2027-10-16,2027-10-20,3,120,Tech Lead,Nao Iniciado
+122,Fase 10 - Testes e Entrega,Entrega,Suporte pos-implantacao,2027-10-21,2027-10-30,7,121,Toda Equipa,Nao Iniciado

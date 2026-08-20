@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/NexoraGis.Api/NexoraGis.Api.csproj" />
+    <Project Path="src/NexoraGis.Application/NexoraGis.Application.csproj" />
+    <Project Path="src/NexoraGis.Domain/NexoraGis.Domain.csproj" />
+    <Project Path="src/NexoraGis.Infrastructure/NexoraGis.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NexoraGis.Api.IntegrationTests/NexoraGis.Api.IntegrationTests.csproj" />
+    <Project Path="tests/NexoraGis.Application.Tests/NexoraGis.Application.Tests.csproj" />
+    <Project Path="tests/NexoraGis.Domain.Tests/NexoraGis.Domain.Tests.csproj" />
+  </Folder>
+</Solution>
