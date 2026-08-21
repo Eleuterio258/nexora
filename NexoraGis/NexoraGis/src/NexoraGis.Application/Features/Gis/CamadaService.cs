@@ -8,7 +8,7 @@ using NexoraGis.Domain.Repositories;
 
 namespace NexoraGis.Application.Features.Gis;
 
-public class CamadaService(
+public partial class CamadaService(
     IRepository<Camada> camadas, IRepository<Projeto> projetos, IGeoServerPublisher geoServer, IUnitOfWork unitOfWork)
 {
     private static readonly TipoCamada[] DroneProductTypes = [TipoCamada.Ortofoto, TipoCamada.ModeloTerreno, TipoCamada.Pontos];
@@ -38,6 +38,9 @@ public class CamadaService(
     {
         if (string.IsNullOrWhiteSpace(request.Nome))
             return Result.Failure<CamadaDto>(Error.Validation("Camada.Invalid", "Nome é obrigatório."));
+
+        if (ValidateSistemaCoordenadas(request.SistemaCoordenadas) is { IsFailure: true } srsError)
+            return Result.Failure<CamadaDto>(srsError.Error);
 
         if (request.ProjetoId is not null && !await projetos.ExistsAsync(request.ProjetoId.Value, ct))
             return Result.Failure<CamadaDto>(Error.Validation("Camada.ProjetoNotFound", "Projeto indicado não existe."));
@@ -73,6 +76,9 @@ public class CamadaService(
         if (string.IsNullOrWhiteSpace(request.Nome))
             return Result.Failure<CamadaDto>(Error.Validation("Camada.Invalid", "Nome é obrigatório."));
 
+        if (ValidateSistemaCoordenadas(request.SistemaCoordenadas) is { IsFailure: true } srsError)
+            return Result.Failure<CamadaDto>(srsError.Error);
+
         Apply(camada, request);
         camada.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -93,17 +99,15 @@ public class CamadaService(
             return Result.Failure<CamadaDto>(Error.Validation(
                 "Camada.NoTabelaFonte", "A camada não tem tabela de origem definida — não é possível publicar no GeoServer."));
 
-        string sld;
-        try
-        {
-            sld = SldGenerator.SimplePolygonStyle(camada.Nome, string.IsNullOrWhiteSpace(corHex) ? "#3388ff" : corHex);
-        }
-        catch (ArgumentException ex)
-        {
-            return Result.Failure<CamadaDto>(Error.Validation("Camada.InvalidCorHex", ex.Message));
-        }
+        var cor = string.IsNullOrWhiteSpace(corHex) ? "#3388ff" : corHex;
+        if (!SldGenerator.IsValidHexColor(cor))
+            return Result.Failure<CamadaDto>(Error.Validation(
+                "Camada.InvalidCorHex", $"Cor inválida: '{cor}'. Tem de ser um hex de 6 dígitos (ex: #3388ff)."));
 
-        var publishResult = await geoServer.PublishLayerAsync(camada.Nome, camada.TabelaFonte, sld, ct);
+        // O simbolizador é escolhido pelo publisher, que consegue perguntar ao
+        // GeoServer qual é a geometria real da camada.
+        var publishResult = await geoServer.PublishLayerAsync(
+            camada.Nome, camada.TabelaFonte, camada.SistemaCoordenadas, cor, ct);
         if (publishResult.IsFailure)
             return Result.Failure<CamadaDto>(publishResult.Error);
 
@@ -142,6 +146,21 @@ public class CamadaService(
         camada.Visivel = request.Visivel;
         camada.Publica = request.Publica;
     }
+
+    /// <summary>
+    /// O valor vai directamente para o campo <c>srs</c> do featuretype do
+    /// GeoServer, que só aceita a forma "AUTORIDADE:código" — texto livre como
+    /// "WGS84" fazia a publicação falhar já do lado do GeoServer.
+    /// </summary>
+    private static Result ValidateSistemaCoordenadas(string? srs) =>
+        string.IsNullOrWhiteSpace(srs) || SrsRegex().IsMatch(srs)
+            ? Result.Success()
+            : Result.Failure(Error.Validation(
+                "Camada.InvalidSistemaCoordenadas",
+                $"Sistema de coordenadas inválido: '{srs}'. Usar a forma EPSG:<código> (ex: EPSG:4326)."));
+
+    [System.Text.RegularExpressions.GeneratedRegex("^EPSG:[0-9]{4,6}$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
+    private static partial System.Text.RegularExpressions.Regex SrsRegex();
 
     private static Error NotFound(Guid id) => Error.NotFound("Camada.NotFound", $"Camada '{id}' não encontrada.");
 

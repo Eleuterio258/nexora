@@ -10,7 +10,12 @@ namespace NexoraGis.Application.Common;
 /// </summary>
 public interface IGeoServerPublisher
 {
-    Task<Result> PublishLayerAsync(string layerName, string tableName, string? sld, CancellationToken ct = default);
+    /// <param name="srs">Sistema de referência da camada (ex: "EPSG:4326"). Vem da
+    /// <c>Camada</c>; fixá-lo em 4326 partia qualquer camada projectada.</param>
+    /// <param name="corHex">Cor do estilo gerado (hex de 6 dígitos). O SLD é
+    /// construído pelo publisher, depois de saber qual é mesmo a geometria da
+    /// camada — quem chama não tem essa informação.</param>
+    Task<Result> PublishLayerAsync(string layerName, string tableName, string srs, string? corHex, CancellationToken ct = default);
 
     Task<Result> UnpublishLayerAsync(string layerName, CancellationToken ct = default);
 }

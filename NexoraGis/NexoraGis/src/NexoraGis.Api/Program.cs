@@ -36,9 +36,25 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
                              | ForwardedHeaders.XForwardedProto
                              | ForwardedHeaders.XForwardedHost;
+
+    // Só as redes indicadas podem forjar estes cabeçalhos. A rede `backend` do
+    // Docker é partilhada com dezenas de containers, e qualquer um deles fala
+    // com a porta 8080 desta API — aceitar X-Forwarded-* de todos deixaria
+    // qualquer vizinho falsificar IP de cliente, esquema e host.
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
+    foreach (var network in builder.Configuration.GetValue("ForwardedHeaders:KnownNetworks", "172.16.0.0/12")!
+                                   .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+        var parts = network.Split('/');
+        options.KnownIPNetworks.Add(new System.Net.IPNetwork(System.Net.IPAddress.Parse(parts[0]), int.Parse(parts[1])));
+    }
 });
+
+// Sem isto qualquer excepção não tratada sobe até ao Kestrel e o cliente recebe
+// uma resposta vazia; com ProblemDetails recebe um corpo RFC 9457 coerente com
+// o resto da API.
+builder.Services.AddProblemDetails();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -113,6 +129,7 @@ else
     await BootstrapSeeder.SeedAsync(db, passwordHasher, app.Configuration, app.Logger);
 }
 
+app.UseExceptionHandler();
 app.UseForwardedHeaders();
 
 // Atrás do Traefik é ele que faz o 80 -> 443; o container só ouve em HTTP e o

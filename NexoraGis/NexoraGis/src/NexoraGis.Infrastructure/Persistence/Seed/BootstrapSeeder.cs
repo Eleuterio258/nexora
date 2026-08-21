@@ -19,6 +19,21 @@ public static class BootstrapSeeder
 {
     public const string SectionName = "Bootstrap";
 
+    /// <summary>
+    /// Garante a regra ('administrador','*','*'). Devolve true se a acrescentou
+    /// (por gravar). O claim "perfil" do JWT vai em snake_case, daí o ToWireString().
+    /// </summary>
+    private static async Task<bool> EnsurePermissaoAdministradorAsync(AppDbContext db, CancellationToken ct)
+    {
+        var perfil = PerfilUtilizador.Administrador.ToWireString();
+
+        if (await db.Permissoes.AnyAsync(p => p.Perfil == perfil || p.Perfil == "*", ct))
+            return false;
+
+        db.Permissoes.Add(new Permissao { Perfil = perfil, Recurso = "*", Acao = "*" });
+        return true;
+    }
+
     public static async Task SeedAsync(
         AppDbContext db,
         IPasswordHasher passwordHasher,
@@ -32,9 +47,25 @@ public static class BootstrapSeeder
         if (string.IsNullOrWhiteSpace(password))
             return;
 
+        // A permissão é semeada à parte da organização de propósito: uma base
+        // que já tenha organização mas ainda não tenha regras deixaria o RBAC
+        // vazio, e o PermissionAuthorizationHandler falha fechado — 403 em todos
+        // os endpoints, incluindo ao administrador, sem forma de corrigir pela
+        // aplicação (não há endpoint de gestão de permissões).
+        var permissaoSemeada = await EnsurePermissaoAdministradorAsync(db, ct);
+
         if (await db.Organizacoes.AnyAsync(ct))
         {
-            logger?.LogInformation("Bootstrap ignorado: já existe pelo menos uma organização.");
+            if (permissaoSemeada)
+            {
+                await db.SaveChangesAsync(ct);
+                logger?.LogInformation("Bootstrap: permissão de administrador em falta foi semeada.");
+            }
+            else
+            {
+                logger?.LogInformation("Bootstrap ignorado: já existe pelo menos uma organização.");
+            }
+
             return;
         }
 
@@ -57,19 +88,6 @@ public static class BootstrapSeeder
             Perfil = PerfilUtilizador.Administrador
         };
         db.Utilizadores.Add(admin);
-
-        // Sem esta linha o RBAC (territorial.permissao) fica vazio e o próprio
-        // administrador leva 403 em todos os endpoints — o handler só autoriza
-        // o que estiver na tabela. O claim "perfil" vai em snake_case.
-        if (!await db.Permissoes.AnyAsync(ct))
-        {
-            db.Permissoes.Add(new Permissao
-            {
-                Perfil = PerfilUtilizador.Administrador.ToWireString(),
-                Recurso = "*",
-                Acao = "*"
-            });
-        }
 
         await db.SaveChangesAsync(ct);
         logger?.LogInformation(

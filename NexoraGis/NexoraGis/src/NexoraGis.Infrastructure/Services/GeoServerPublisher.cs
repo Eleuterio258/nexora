@@ -19,7 +19,7 @@ public class GeoServerPublisher(HttpClient http, IOptions<GeoServerOptions> opti
 {
     private readonly GeoServerOptions _options = options.Value;
 
-    public async Task<Result> PublishLayerAsync(string layerName, string tableName, string? sld, CancellationToken ct = default)
+    public async Task<Result> PublishLayerAsync(string layerName, string tableName, string srs, string? corHex, CancellationToken ct = default)
     {
         try
         {
@@ -29,11 +29,19 @@ public class GeoServerPublisher(HttpClient http, IOptions<GeoServerOptions> opti
             var dsResult = await EnsureDataStoreAsync(ct);
             if (dsResult.IsFailure) return dsResult;
 
-            var ftResult = await EnsureFeatureTypeAsync(layerName, tableName, ct);
+            var ftResult = await EnsureFeatureTypeAsync(layerName, tableName, srs, ct);
             if (ftResult.IsFailure) return ftResult;
 
-            if (!string.IsNullOrWhiteSpace(sld))
+            if (!string.IsNullOrWhiteSpace(corHex))
+            {
+                // O estilo só é gerado depois de o featuretype existir, porque é
+                // do GeoServer que vem a geometria real da camada (nome da coluna
+                // e binding JTS). Gerar antes obrigava a adivinhar, e adivinhar
+                // errado produz um estilo que não desenha nada.
+                var (geometryColumn, geometryBinding) = await ReadDefaultGeometryAsync(layerName, ct);
+                var sld = SldGenerator.StyleForGeometry(layerName, corHex, geometryBinding, geometryColumn);
                 await TryApplyStyleAsync(layerName, sld, ct);
+            }
 
             return Result.Success();
         }
@@ -111,7 +119,7 @@ public class GeoServerPublisher(HttpClient http, IOptions<GeoServerOptions> opti
             : Result.Failure(Error.Failure("GeoServer.DataStoreFailed", $"Não foi possível criar o datastore '{_options.DataStore}' (HTTP {(int)response.StatusCode})."));
     }
 
-    private async Task<Result> EnsureFeatureTypeAsync(string layerName, string tableName, CancellationToken ct)
+    private async Task<Result> EnsureFeatureTypeAsync(string layerName, string tableName, string srs, CancellationToken ct)
     {
         var exists = await SendAsync(HttpMethod.Get,
             $"/workspaces/{_options.Workspace}/datastores/{_options.DataStore}/featuretypes/{layerName}.json", null, ct);
@@ -119,7 +127,7 @@ public class GeoServerPublisher(HttpClient http, IOptions<GeoServerOptions> opti
 
         var body = JsonSerializer.Serialize(new
         {
-            featureType = new { name = layerName, nativeName = tableName, title = layerName, srs = "EPSG:4326" }
+            featureType = new { name = layerName, nativeName = tableName, title = layerName, srs }
         });
 
         var response = await SendAsync(HttpMethod.Post, $"/workspaces/{_options.Workspace}/datastores/{_options.DataStore}/featuretypes", body, ct);
@@ -128,13 +136,61 @@ public class GeoServerPublisher(HttpClient http, IOptions<GeoServerOptions> opti
             : Result.Failure(Error.Failure("GeoServer.FeatureTypeFailed", $"Não foi possível publicar a camada '{layerName}' (HTTP {(int)response.StatusCode})."));
     }
 
+    /// <summary>
+    /// Nome e binding JTS da primeira coluna de geometria que o GeoServer expõe
+    /// para a camada — é essa que ele usa como geometria por omissão. Devolve
+    /// (null, null) se não conseguir ler, e nesse caso o estilo sai sem
+    /// &lt;Geometry&gt;, que é o comportamento seguro.
+    /// </summary>
+    private async Task<(string? Column, string? Binding)> ReadDefaultGeometryAsync(string layerName, CancellationToken ct)
+    {
+        try
+        {
+            var response = await SendAsync(HttpMethod.Get,
+                $"/workspaces/{_options.Workspace}/datastores/{_options.DataStore}/featuretypes/{layerName}.json", null, ct);
+
+            if (!response.IsSuccessStatusCode)
+                return (null, null);
+
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+
+            if (!document.RootElement.TryGetProperty("featureType", out var featureType) ||
+                !featureType.TryGetProperty("attributes", out var attributes) ||
+                !attributes.TryGetProperty("attribute", out var list))
+                return (null, null);
+
+            foreach (var attribute in list.EnumerateArray())
+            {
+                var binding = attribute.TryGetProperty("binding", out var b) ? b.GetString() : null;
+
+                if (binding?.StartsWith("org.locationtech.jts.geom.", StringComparison.Ordinal) == true)
+                    return (attribute.TryGetProperty("name", out var n) ? n.GetString() : null, binding);
+            }
+
+            return (null, null);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Não foi possível ler a geometria da camada '{Layer}' — o estilo sai sem <Geometry>.", layerName);
+            return (null, null);
+        }
+    }
+
     private async Task TryApplyStyleAsync(string layerName, string sld, CancellationToken ct)
     {
         try
         {
             var styleName = $"{layerName}_style";
             var createStyle = await SendAsync(HttpMethod.Post, "/styles?name=" + styleName, null, ct, sld, "application/vnd.ogc.sld+xml");
-            if (!createStyle.IsSuccessStatusCode) return;
+
+            if (!createStyle.IsSuccessStatusCode)
+            {
+                // O POST falha quando o estilo já existe, e sem este PUT uma
+                // republicação nunca corrigia um estilo errado — ficava lá o da
+                // primeira publicação para sempre.
+                var updateStyle = await SendAsync(HttpMethod.Put, $"/styles/{styleName}", null, ct, sld, "application/vnd.ogc.sld+xml");
+                if (!updateStyle.IsSuccessStatusCode) return;
+            }
 
             var setDefault = JsonSerializer.Serialize(new { layer = new { defaultStyle = new { name = styleName } } });
             await SendAsync(HttpMethod.Put, $"/layers/{_options.Workspace}:{layerName}", setDefault, ct);

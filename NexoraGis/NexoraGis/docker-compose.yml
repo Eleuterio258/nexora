@@ -25,7 +25,7 @@ services:
     # Só no loopback: é por aqui que o GeoServer do host chega ao PostGIS
     # (a datastore criada pela API aponta para 127.0.0.1:${POSTGRES_PORT}).
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5434}:5432"
+      - "127.0.0.1:${POSTGRES_LOCAL_PORT:-5435}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
@@ -43,6 +43,12 @@ services:
     image: nexoragis-api:latest
     container_name: nexoragis-api
     restart: unless-stopped
+    depends_on:
+      # Só conta quando o profile `extras` sobe a base local; com o Postgres
+      # partilhado (o caso normal) o serviço nem existe no arranque.
+      db:
+        condition: service_healthy
+        required: false
     extra_hosts:
       # GeoServer e qualquer outro serviço que corra directamente no host.
       - "host.docker.internal:host-gateway"
@@ -75,7 +81,7 @@ services:
       GeoServer__DbSchema: ${GEOSERVER_DB_SCHEMA:-cadastro}
       # Db* é visto a partir do GeoServer, que corre no host — daí o loopback.
       GeoServer__DbHost: ${GEOSERVER_DB_HOST:-127.0.0.1}
-      GeoServer__DbPort: ${POSTGRES_PORT:-5434}
+      GeoServer__DbPort: ${POSTGRES_PORT:-5432}
       GeoServer__DbName: ${POSTGRES_DB:-nexoragis}
       GeoServer__DbUser: ${POSTGRES_USER:-postgres}
       GeoServer__DbPassword: ${POSTGRES_PASSWORD}

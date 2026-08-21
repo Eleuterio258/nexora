@@ -14,6 +14,16 @@ public static class DevDataSeeder
 {
     public static async Task SeedAsync(AppDbContext db, IPasswordHasher passwordHasher, CancellationToken ct = default)
     {
+        // Mesmo raciocínio do BootstrapSeeder: a permissão é semeada mesmo que a
+        // organização já exista, senão uma base de dev criada antes desta
+        // alteração fica presa em 403 para sempre.
+        var perfilAdmin = PerfilUtilizador.Administrador.ToWireString();
+        if (!await db.Permissoes.AnyAsync(p => p.Perfil == perfilAdmin || p.Perfil == "*", ct))
+        {
+            db.Permissoes.Add(new Permissao { Perfil = perfilAdmin, Recurso = "*", Acao = "*" });
+            await db.SaveChangesAsync(ct);
+        }
+
         if (await db.Organizacoes.AnyAsync(ct))
             return;
 
