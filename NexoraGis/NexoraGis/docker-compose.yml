@@ -9,7 +9,12 @@
 name: nexoragis
 
 services:
+  # Base local opcional. Por omissao o NexoraGis usa o Postgres partilhado da
+  # maquina (container `postgres`), que desde 2026-08-21 tem PostGIS. Este
+  # servico so sobe com --profile extras, para trabalhar offline; nesse caso
+  # poe-se POSTGRES_HOST=nexoragis-db no .env.
   db:
+    profiles: ["extras"]
     image: postgis/postgis:16-3.4
     container_name: nexoragis-db
     restart: unless-stopped
@@ -38,16 +43,13 @@ services:
     image: nexoragis-api:latest
     container_name: nexoragis-api
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     extra_hosts:
       # GeoServer e qualquer outro serviço que corra directamente no host.
       - "host.docker.internal:host-gateway"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       BehindReverseProxy: "true"
-      ConnectionStrings__Default: "Host=db;Port=5432;Database=${POSTGRES_DB:-nexoragis};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD};SSL Mode=Disable"
+      ConnectionStrings__Default: "Host=${POSTGRES_HOST:-postgres};Port=${POSTGRES_INTERNAL_PORT:-5432};Database=${POSTGRES_DB:-nexoragis};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD};SSL Mode=Disable"
       Database__MigrateOnStartup: "true"
 
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?define JWT_SIGNING_KEY no .env}

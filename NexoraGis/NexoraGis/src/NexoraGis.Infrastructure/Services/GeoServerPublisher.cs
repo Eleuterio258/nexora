@@ -12,8 +12,7 @@ namespace NexoraGis.Infrastructure.Services;
 /// <summary>
 /// Cliente REST do GeoServer (backlog 7.1.2). Cria workspace/datastore
 /// PostGIS/featuretype de forma idempotente (confirma se já existem antes de
-/// criar). Não verificado contra uma instância real do GeoServer nesta
-/// sessão — se o GeoServer não estiver acessível, os métodos falham com
+/// criar). Se o GeoServer não estiver acessível, os métodos falham com
 /// Result.Failure em vez de lançar exceção, para não derrubar o resto da API.
 /// </summary>
 public class GeoServerPublisher(HttpClient http, IOptions<GeoServerOptions> options, ILogger<GeoServerPublisher> logger) : IGeoServerPublisher
@@ -149,7 +148,10 @@ public class GeoServerPublisher(HttpClient http, IOptions<GeoServerOptions> opti
     private async Task<HttpResponseMessage> SendAsync(
         HttpMethod method, string path, string? jsonBody, CancellationToken ct, string? rawBody = null, string? rawContentType = null)
     {
-        var request = new HttpRequestMessage(method, path);
+        // O BaseAddress termina em /geoserver/rest/ — um path com "/" à cabeça
+        // seria tratado como absoluto e apagaria esse prefixo, mandando o pedido
+        // para a raiz do GeoServer (404 em tudo).
+        var request = new HttpRequestMessage(method, path.TrimStart('/'));
         request.Headers.Authorization = new AuthenticationHeaderValue(
             "Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password}")));
 
