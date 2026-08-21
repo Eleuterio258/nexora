@@ -1,6 +1,8 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using NexoraGis.Api.Authorization;
@@ -23,6 +25,20 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 
 builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
+
+// Em container a API corre em HTTP puro atrás do Traefik. Sem isto o pedido
+// chega como http/IP-da-bridge: o UseHttpsRedirection abaixo entraria em ciclo
+// de redirect e os logs registariam sempre o IP do proxy. As redes conhecidas
+// são limpas porque o Traefik está numa bridge Docker (não é loopback), e a
+// lista por omissão só confia em 127.0.0.1.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+                             | ForwardedHeaders.XForwardedProto
+                             | ForwardedHeaders.XForwardedHost;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -67,17 +83,45 @@ builder.Services.AddHostedService<SyncQueueWorker>();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// Fora de Development o schema é aplicado por opção explícita (Database__MigrateOnStartup),
+// para o container não mexer numa base gerida à mão sem se pedir.
+if (app.Configuration.GetValue("Database:MigrateOnStartup", false))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
+}
+
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue("OpenApi:Expose", false))
 {
     app.MapOpenApi();
+}
 
+if (app.Environment.IsDevelopment())
+{
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
     await DevDataSeeder.SeedAsync(db, passwordHasher);
 }
+else
+{
+    // Só corre se Bootstrap__AdminPassword estiver definida; ver BootstrapSeeder.
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+    await BootstrapSeeder.SeedAsync(db, passwordHasher, app.Configuration, app.Logger);
+}
 
-app.UseHttpsRedirection();
+app.UseForwardedHeaders();
+
+// Atrás do Traefik é ele que faz o 80 -> 443; o container só ouve em HTTP e o
+// UseHttpsRedirection limitava-se a avisar "Failed to determine the https port"
+// a cada health check.
+if (!app.Configuration.GetValue("BehindReverseProxy", false))
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 
