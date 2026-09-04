@@ -539,7 +539,19 @@ func cleanExpiredSessions(db *pgxpool.Pool) {
 
 // generateMonthlyFees emite propinas mensais para matrículas activas com base
 // nos planos de propinas (school_fee_plans) onde periodicidade='mensal'.
-// Só cria uma propina por matrícula/plano se ainda não existir para o mês corrente.
+//
+// O plano aplicável é escolhido pelo ano lectivo da matrícula. Como não existe
+// ligação matrícula→plano no schema (o classe_nivel do plano é texto livre que
+// não casa com school_classes.nivel), este job só factura quando a escolha é
+// inequívoca: exactamente um plano mensal activo no ano lectivo. Onde houver
+// mais do que um, salta e regista aviso — cabe ao operador gerar por
+// FeeService.GenerateFromPlan, escolhendo explicitamente o plano.
+//
+// Até 2026-09 o join era só por tenant_id, um produto cartesiano de todos os
+// planos por todas as matrículas. O `numero` não incluía o plano, por isso a
+// constraint uq_school_fees(tenant_id, numero) rejeitava todas as linhas menos
+// a primeira e o job facturava toda a gente ao plano que calhasse na ordem do
+// join, despejando um erro de chave duplicada por cada linha rejeitada.
 func generateMonthlyFees(db *pgxpool.Pool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -549,19 +561,30 @@ func generateMonthlyFees(db *pgxpool.Pool) {
 	// Vencimento: dia configurado no plano, ou último dia do mês
 	anoMes := fmt.Sprintf("%d-%02d", now.Year(), now.Month())
 
+	logAmbiguousFeePlans(ctx, db)
+
 	rows, err := db.Query(ctx, `
-		SELECT fp.id, fp.tenant_id, fp.nome, fp.valor, fp.moeda, fp.dia_vencimento,
+		WITH planos_mensais AS (
+		    SELECT fp.id, fp.tenant_id, fp.school_year_id, fp.nome, fp.valor,
+		           fp.moeda, fp.dia_vencimento,
+		           COUNT(*) OVER (PARTITION BY fp.tenant_id, fp.school_year_id) planos_no_ano
+		      FROM gestao_escolar.school_fee_plans fp
+		     WHERE fp.periodicidade = 'mensal'
+		       AND fp.activo = TRUE
+		       AND fp.school_year_id IS NOT NULL
+		)
+		SELECT p.id, p.tenant_id, p.nome, p.valor, p.moeda, p.dia_vencimento,
 		       e.id enrollment_id, e.student_id
-		  FROM gestao_escolar.school_fee_plans fp
+		  FROM planos_mensais p
 		  JOIN gestao_escolar.school_enrollments e
-		         ON e.tenant_id = fp.tenant_id
+		         ON e.tenant_id      = p.tenant_id
+		        AND e.school_year_id = p.school_year_id
 		        AND e.status = 'activa'
-		 WHERE fp.periodicidade = 'mensal'
-		   AND fp.activo = TRUE
+		 WHERE p.planos_no_ano = 1
 		   AND NOT EXISTS (
 		       SELECT 1 FROM gestao_escolar.school_fees sf
 		        WHERE sf.enrollment_id = e.id
-		          AND sf.fee_plan_id   = fp.id
+		          AND sf.fee_plan_id   = p.id
 		          AND sf.mes_referencia = $1
 		   )`, mesRef)
 	if err != nil {
@@ -570,39 +593,81 @@ func generateMonthlyFees(db *pgxpool.Pool) {
 	}
 	defer rows.Close()
 
-	var created int
+	type propina struct {
+		planID, tenantID, enrollmentID, studentID int64
+		nome, moeda                               string
+		valor                                     float64
+		diaVenc                                   *int
+	}
+	var pendentes []propina
 	for rows.Next() {
-		var planID, tenantID, enrollmentID, studentID int64
-		var nome, moeda string
-		var valor float64
-		var diaVenc *int
-		if err := rows.Scan(&planID, &tenantID, &nome, &valor, &moeda, &diaVenc, &enrollmentID, &studentID); err != nil {
+		var p propina
+		if err := rows.Scan(&p.planID, &p.tenantID, &p.nome, &p.valor, &p.moeda, &p.diaVenc, &p.enrollmentID, &p.studentID); err != nil {
 			continue
 		}
+		pendentes = append(pendentes, p)
+	}
+	if err := rows.Err(); err != nil {
+		log.Printf("[background] generate-monthly-fees: iterar: %v", err)
+		return
+	}
+
+	var created int
+	for _, p := range pendentes {
 		dia := 28
-		if diaVenc != nil && *diaVenc >= 1 && *diaVenc <= 28 {
-			dia = *diaVenc
+		if p.diaVenc != nil && *p.diaVenc >= 1 && *p.diaVenc <= 28 {
+			dia = *p.diaVenc
 		}
 		dataVenc := fmt.Sprintf("%s-%02d", anoMes, dia)
-		descricao := fmt.Sprintf("%s — %s", nome, mesRef)
-		numero := fmt.Sprintf("PROP-%d-%s-%d", tenantID, mesRef, enrollmentID)
+		descricao := fmt.Sprintf("%s — %s", p.nome, mesRef)
+		// O plano entra no número: sem ele duas propinas do mesmo mês para a
+		// mesma matrícula colidem em uq_school_fees(tenant_id, numero).
+		numero := fmt.Sprintf("PROP-%d-%s-%d-%d", p.tenantID, mesRef, p.planID, p.enrollmentID)
 
-		_, err := db.Exec(ctx, `
+		tag, err := db.Exec(ctx, `
 			INSERT INTO gestao_escolar.school_fees
 				(tenant_id, enrollment_id, student_id, fee_plan_id, numero, descricao,
 				 mes_referencia, data_vencimento, valor_total, moeda, status, emitida_em)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'emitida',NOW())`,
-			tenantID, enrollmentID, studentID, planID, numero, descricao,
-			mesRef, dataVenc, valor, moeda)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'emitida',NOW())
+			ON CONFLICT (tenant_id, numero) DO NOTHING`,
+			p.tenantID, p.enrollmentID, p.studentID, p.planID, numero, descricao,
+			mesRef, dataVenc, p.valor, p.moeda)
 		if err != nil {
 			log.Printf("[background] generate-monthly-fees: insert: %v", err)
 			continue
 		}
-		created++
+		created += int(tag.RowsAffected())
 	}
 
 	if created > 0 {
 		log.Printf("[background] generate-monthly-fees: %d propinas emitidas (%s)", created, mesRef)
+	}
+}
+
+// logAmbiguousFeePlans avisa sobre anos lectivos com mais do que um plano
+// mensal activo. generateMonthlyFees salta-os por não conseguir decidir qual
+// aplicar a cada matrícula.
+func logAmbiguousFeePlans(ctx context.Context, db *pgxpool.Pool) {
+	rows, err := db.Query(ctx, `
+		SELECT tenant_id, school_year_id, COUNT(*)
+		  FROM gestao_escolar.school_fee_plans
+		 WHERE periodicidade = 'mensal'
+		   AND activo = TRUE
+		   AND school_year_id IS NOT NULL
+		 GROUP BY tenant_id, school_year_id
+		HAVING COUNT(*) > 1`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var tenantID, schoolYearID int64
+		var planos int
+		if err := rows.Scan(&tenantID, &schoolYearID, &planos); err != nil {
+			continue
+		}
+		log.Printf("[background] generate-monthly-fees: tenant %d, ano lectivo %d tem %d planos mensais activos — nenhuma propina gerada automaticamente; use a geração por plano", tenantID, schoolYearID, planos)
 	}
 }
 
