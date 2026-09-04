@@ -83,8 +83,14 @@ services:
       OUTBOX_POLL_INTERVAL_SECONDS: ${OUTBOX_POLL_INTERVAL_SECONDS:-5}
       OUTBOX_LEASE_SECONDS: ${OUTBOX_LEASE_SECONDS:-300}
       NEXORA_CREDENTIAL_ENCRYPTION_KEY: ${NEXORA_CREDENTIAL_ENCRYPTION_KEY:-change-me-nexora-credential-encryption-key}
+    # Quem corre `alembic upgrade head` é a controle-api (entrypoint.sh). O
+    # worker espera pelo healthcheck dela para arrancar já com o schema em
+    # head — antes disto os dois entrypoints migravam em paralelo e o worker
+    # rebentava no arranque a criar outbox_events. Não depende do redis: o
+    # app/workers/outbox.py só fala com o Postgres e com o ERP.
     depends_on:
-      - redis
+      controle-api:
+        condition: service_healthy
     networks:
       - backend
 
