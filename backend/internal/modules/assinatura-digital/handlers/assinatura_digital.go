@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -403,7 +404,7 @@ func (h *Handler) gerarConvites(ctx context.Context, docID, tenantID int64) {
 		corpo := fmt.Sprintf(
 			"Olá %s, foi convidado(a) a assinar um documento. Aceda a %s para confirmar a sua identidade e assinar.\n\nEste convite expira em %d dias.",
 			s.nome, acesso, conviteValidadeDias)
-		h.notif.Send(ctx, contracts.Notification{
+		if err := h.notif.Send(ctx, contracts.Notification{
 			TenantID:       tenantID,
 			CanalTipo:      "email",
 			Destinatario:   *s.email,
@@ -411,7 +412,9 @@ func (h *Handler) gerarConvites(ctx context.Context, docID, tenantID int64) {
 			Corpo:          corpo,
 			ReferenciaTipo: "assinatura-digital.convite",
 			ReferenciaID:   &s.id,
-		})
+		}); err != nil {
+			log.Printf("[assinatura-digital] notificar convite: %v", err)
+		}
 	}
 }
 

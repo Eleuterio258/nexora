@@ -66,6 +66,7 @@ class TestBatchEnroll:
     def test_batch_enroll_multiple_users_succeed(
         self, client, db_session, fake_redis, admin_credential, monkeypatch
     ):
+        from app import erp_client as erp_client_module
         from app.routers import biometric as biometric_router
 
         monkeypatch.setattr(biometric_router, "assess_capture_quality", lambda *args, **kwargs: (0.95, None))
@@ -76,7 +77,7 @@ class TestBatchEnroll:
             return {"id": "fake"}
 
         monkeypatch.setattr(
-            biometric_router.erp_client, "validar_consentimento_ativo", _fake_validar_consentimento
+            erp_client_module.erp_client, "validar_consentimento_ativo", _fake_validar_consentimento
         )
 
         cred, secret = admin_credential
@@ -100,6 +101,7 @@ class TestBatchEnroll:
     def test_batch_enroll_one_failure_does_not_block_others(
         self, client, db_session, fake_redis, admin_credential, monkeypatch
     ):
+        from app import erp_client as erp_client_module
         from app.routers import biometric as biometric_router
 
         call_count = {"n": 0}
@@ -122,7 +124,7 @@ class TestBatchEnroll:
             return {"id": "fake"}
 
         monkeypatch.setattr(
-            biometric_router.erp_client, "validar_consentimento_ativo", _fake_validar_consentimento
+            erp_client_module.erp_client, "validar_consentimento_ativo", _fake_validar_consentimento
         )
 
         cred, secret = admin_credential

@@ -24,10 +24,14 @@ type AuditoriaEntry struct {
 	EstadoNovo     *string
 }
 
-// RegistarAuditoria grava uma entrada em rh.auditoria_assiduidade. Falhas de
-// auditoria nunca devem impedir a operação de negócio que a originou — os
-// chamadores devem tratar o erro apenas para log, não para abortar.
-func RegistarAuditoria(ctx context.Context, db DB, e AuditoriaEntry) error {
+// RegistarAuditoria grava uma entrada em rh.auditoria_assiduidade. Por
+// omissão, uma falha de auditoria não deve impedir a operação de negócio que
+// a originou — a maioria dos chamadores trata o erro apenas para log, não
+// para abortar. A excepção é um chamador para o qual a auditoria é
+// obrigatória (ex.: Service.registarEvento, que corre dentro da mesma
+// transação do evento e propaga este erro de propósito, revertendo também o
+// evento — Fase 0, item 4 de docs/analise-transactional-outbox-backends.md).
+func RegistarAuditoria(ctx context.Context, db DBTX, e AuditoriaEntry) error {
 	_, err := db.Exec(ctx, `
 		INSERT INTO rh.auditoria_assiduidade (
 			tenant_id, tabela, registo_id, operacao, campo,

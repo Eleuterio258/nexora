@@ -9,6 +9,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
+
+	"nexora/internal/modules/recursos-humanos/service/assiduidade"
 )
 
 const (
@@ -33,8 +35,12 @@ type facialVerificationClaims struct {
 
 // consumeFacialVerification valida a assinatura e os vinculos do comprovativo
 // e grava o jti. A restricao UNIQUE impede replay concorrente entre replicas.
+//
+// db recebe a transacao do chamador: o comprovativo so fica definitivamente
+// consumido se o commit dessa transacao incluir tambem o registo do ponto.
 func (h *Handler) consumeFacialVerification(
 	ctx context.Context,
+	db assiduidade.DBTX,
 	rawToken string,
 	userID, tenantID int64,
 	deviceID string,
@@ -47,7 +53,7 @@ func (h *Handler) consumeFacialVerification(
 	}
 
 	var consumedJTI string
-	err = h.db.QueryRow(ctx, `
+	err = db.QueryRow(ctx, `
 		INSERT INTO rh.facial_verification_uses
 		  (jti, tenant_id, user_id, device_id, expires_at)
 		VALUES ($1, $2, $3, $4, $5)
@@ -62,7 +68,7 @@ func (h *Handler) consumeFacialVerification(
 		return nil, fmt.Errorf("registar consumo do comprovativo: %w", err)
 	}
 
-	_, _ = h.db.Exec(ctx, `DELETE FROM rh.facial_verification_uses WHERE expires_at < $1`, time.Now().Add(-24*time.Hour))
+	_, _ = db.Exec(ctx, `DELETE FROM rh.facial_verification_uses WHERE expires_at < $1`, time.Now().Add(-24*time.Hour))
 	return claims, nil
 }
 

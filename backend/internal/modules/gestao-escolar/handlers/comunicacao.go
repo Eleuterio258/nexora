@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -53,60 +54,61 @@ func (h *Handler) PublicarMensagemEscolar(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Notificar destinatários da mensagem em background (capturar variáveis antes do go)
-	tenantID, msgTitulo, audType, audID := u.TenantID, titulo, audienceType, audienceID
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
+	// Notificar destinatários da mensagem — síncrono desde a Fase 3 de
+	// docs/analise-transactional-outbox-backends.md: h.notification.Send só
+	// grava a mensagem (rápido), a entrega real é feita pelo dispatcher
+	// persistente (internal/background/jobs.go), por isso já não há razão
+	// para uma goroutine correr à solta depois da resposta — que arriscava
+	// perder-se num restart/deploy a meio (achado OUT-08 do documento).
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
 
-		// Preferir portal_email; fallback para auth.users.email
-		var query string
-		var args []any
-		switch audType {
-		case "todos":
-			query = `SELECT COALESCE(NULLIF(s.portal_email,''), u.email) email, s.id
-				  FROM gestao_escolar.school_students s
-				  LEFT JOIN auth.users u ON u.id = s.user_id
-				 WHERE s.tenant_id = $1 AND s.estado = 'activo'
-				   AND COALESCE(NULLIF(s.portal_email,''), u.email) IS NOT NULL`
-			args = []any{tenantID}
-		case "turma":
-			if audID == nil {
-				return
-			}
+	// Preferir portal_email; fallback para auth.users.email
+	var query string
+	var args []any
+	switch audienceType {
+	case "todos":
+		query = `SELECT COALESCE(NULLIF(s.portal_email,''), u.email) email, s.id
+			  FROM gestao_escolar.school_students s
+			  LEFT JOIN auth.users u ON u.id = s.user_id
+			 WHERE s.tenant_id = $1 AND s.estado = 'activo'
+			   AND COALESCE(NULLIF(s.portal_email,''), u.email) IS NOT NULL`
+		args = []any{u.TenantID}
+	case "turma":
+		if audienceID != nil {
 			query = `SELECT COALESCE(NULLIF(s.portal_email,''), u.email) email, s.id
 				  FROM gestao_escolar.school_enrollments e
 				  JOIN gestao_escolar.school_students s ON s.id = e.student_id
 				  LEFT JOIN auth.users u ON u.id = s.user_id
 				 WHERE e.class_id = $1 AND e.tenant_id = $2 AND e.status = 'activa'
 				   AND COALESCE(NULLIF(s.portal_email,''), u.email) IS NOT NULL`
-			args = []any{*audID, tenantID}
-		default:
-			return
+			args = []any{*audienceID, u.TenantID}
 		}
+	}
 
-		rows, err := h.db.Query(ctx, query, args...)
-		if err != nil {
-			return
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var email string
-			var studentID int64
-			if rows.Scan(&email, &studentID) == nil && h.notification != nil {
-				sid := studentID
-				h.notification.Send(ctx, contracts.Notification{
-					TenantID:       tenantID,
-					CanalTipo:      "email",
-					Destinatario:   email,
-					Assunto:        fmt.Sprintf("Comunicado: %s", msgTitulo),
-					Corpo:          fmt.Sprintf("Foi publicado um novo comunicado escolar: \"%s\". Aceda ao portal para ler a mensagem completa.", msgTitulo),
-					ReferenciaTipo: "escolar.mensagem",
-					ReferenciaID:   &sid,
-				})
+	if query != "" && h.notification != nil {
+		if rows, err := h.db.Query(ctx, query, args...); err == nil {
+			for rows.Next() {
+				var email string
+				var studentID int64
+				if rows.Scan(&email, &studentID) == nil {
+					sid := studentID
+					if err := h.notification.Send(ctx, contracts.Notification{
+						TenantID:       u.TenantID,
+						CanalTipo:      "email",
+						Destinatario:   email,
+						Assunto:        fmt.Sprintf("Comunicado: %s", titulo),
+						Corpo:          fmt.Sprintf("Foi publicado um novo comunicado escolar: \"%s\". Aceda ao portal para ler a mensagem completa.", titulo),
+						ReferenciaTipo: "escolar.mensagem",
+						ReferenciaID:   &sid,
+					}); err != nil {
+						log.Printf("[gestao-escolar] notificar comunicado: %v", err)
+					}
+				}
 			}
+			rows.Close()
 		}
-	}()
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }

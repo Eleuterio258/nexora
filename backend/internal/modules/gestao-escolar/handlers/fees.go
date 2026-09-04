@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -178,36 +179,36 @@ func (h *Handler) RegistarPagamentoEscolarV2(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Notificação de confirmação de pagamento ao aluno (assíncrona)
+	// Notificação de confirmação de pagamento ao aluno — síncrona desde a
+	// Fase 3 (h.notification.Send só grava a mensagem, a entrega real é do
+	// dispatcher persistente em internal/background/jobs.go).
 	if h.notification != nil && input.StudentID != 0 {
-		tenantID, studentID, valor, moeda, feeID := input.TenantID, input.StudentID, input.Valor, input.Moeda, input.SchoolFeeID
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			var email, descricao string
-			_ = h.db.QueryRow(ctx, `
-				SELECT COALESCE(NULLIF(s.portal_email,''), COALESCE(u.email,'')),
-				       COALESCE(f.descricao,'')
-				  FROM gestao_escolar.school_students s
-				  LEFT JOIN auth.users u ON u.id = s.user_id
-				  LEFT JOIN gestao_escolar.school_fees f ON f.id = $3
-				 WHERE s.id = $1 AND s.tenant_id = $2`,
-				studentID, tenantID, feeID,
-			).Scan(&email, &descricao)
-			if email == "" {
-				return
-			}
-			sid := studentID
-			h.notification.Send(ctx, contracts.Notification{
-				TenantID:       tenantID,
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		var email, descricao string
+		_ = h.db.QueryRow(ctx, `
+			SELECT COALESCE(NULLIF(s.portal_email,''), COALESCE(u.email,'')),
+			       COALESCE(f.descricao,'')
+			  FROM gestao_escolar.school_students s
+			  LEFT JOIN auth.users u ON u.id = s.user_id
+			  LEFT JOIN gestao_escolar.school_fees f ON f.id = $3
+			 WHERE s.id = $1 AND s.tenant_id = $2`,
+			input.StudentID, input.TenantID, input.SchoolFeeID,
+		).Scan(&email, &descricao)
+		if email != "" {
+			sid := input.StudentID
+			if err := h.notification.Send(ctx, contracts.Notification{
+				TenantID:       input.TenantID,
 				CanalTipo:      "email",
 				Destinatario:   email,
 				Assunto:        "Pagamento recebido com sucesso",
-				Corpo:          fmt.Sprintf("O seu pagamento de %.2f %s referente a \"%s\" foi registado com sucesso. Obrigado!", valor, moeda, descricao),
+				Corpo:          fmt.Sprintf("O seu pagamento de %.2f %s referente a \"%s\" foi registado com sucesso. Obrigado!", input.Valor, input.Moeda, descricao),
 				ReferenciaTipo: "escolar.pagamento",
 				ReferenciaID:   &sid,
-			})
-		}()
+			}); err != nil {
+				log.Printf("[gestao-escolar] notificar pagamento: %v", err)
+			}
+		}
 	}
 
 	jsonOK(w, input, http.StatusCreated)

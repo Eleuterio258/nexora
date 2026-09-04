@@ -1,15 +1,18 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import PlainTextResponse
+from sqlalchemy.orm import Session
 
 from app.biometric_metrics import biometric_metrics
+from app.database import get_db
 from app.erp_sync_metrics import erp_sync_metrics
+from app.outbox_metrics import query_outbox_metrics
 
 
 router = APIRouter(tags=["Monitoring"])
 
 
 @router.get("/metrics", response_class=PlainTextResponse)
-def metrics(request: Request) -> str:
+def metrics(request: Request, db: Session = Depends(get_db)) -> str:
     metric_state = request.app.state.metrics
     total_requests = metric_state["http_requests_total"]
     avg_duration = 0.0
@@ -37,5 +40,6 @@ def metrics(request: Request) -> str:
 
     lines.extend(biometric_metrics.to_prometheus_format())
     lines.extend(erp_sync_metrics.to_prometheus_format())
+    lines.extend(query_outbox_metrics(db))
 
     return "\n".join(lines) + "\n"

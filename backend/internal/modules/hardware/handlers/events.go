@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
 	"nexora/internal/modules/hardware/adapters"
 	"nexora/internal/modules/hardware/models"
@@ -242,6 +243,14 @@ func (h *Handler) ListarEventos(w http.ResponseWriter, r *http.Request) {
 		AttendanceID *int64     `json:"attendance_id"`
 		ErrorMessage *string    `json:"error_message"`
 		CreatedAt    time.Time  `json:"created_at"`
+		// Attempts/PermanentFailure/AvailableAt (Fase 5 de
+		// docs/analise-transactional-outbox-backends.md) distinguem, para
+		// um evento ainda não processado, "a aguardar a próxima tentativa
+		// automática" de "esgotou as tentativas ou falhou de vez — precisa
+		// de replay manual" (ver ReprocessarEvento/ReprocessarNaoProcessados).
+		Attempts         int       `json:"attempts"`
+		PermanentFailure bool      `json:"permanent_failure"`
+		AvailableAt      time.Time `json:"available_at"`
 	}
 
 	countArgs := make([]any, len(args))
@@ -250,7 +259,8 @@ func (h *Handler) ListarEventos(w http.ResponseWriter, r *http.Request) {
 
 	query := `
 		SELECT e.id, e.device_id, d.nome, e.event_type, e.employee_no, e.event_time,
-		       e.processed, e.processed_at, e.presenca_id, e.attendance_id, e.error_message, e.created_at
+		       e.processed, e.processed_at, e.presenca_id, e.attendance_id, e.error_message, e.created_at,
+		       e.attempts, e.permanent_failure, e.available_at
 		  FROM hardware.device_events e
 		  JOIN hardware.devices d ON d.id = e.device_id
 		 WHERE ` + where + `
@@ -269,7 +279,8 @@ func (h *Handler) ListarEventos(w http.ResponseWriter, r *http.Request) {
 		var e row
 		var errMsg *string
 		if err := rows.Scan(&e.ID, &e.DeviceID, &e.DeviceName, &e.EventType, &e.EmployeeNo, &e.EventTime,
-			&e.Processed, &e.ProcessedAt, &e.PresencaID, &e.AttendanceID, &errMsg, &e.CreatedAt); err == nil {
+			&e.Processed, &e.ProcessedAt, &e.PresencaID, &e.AttendanceID, &errMsg, &e.CreatedAt,
+			&e.Attempts, &e.PermanentFailure, &e.AvailableAt); err == nil {
 			if errMsg != nil && *errMsg != "" {
 				e.ErrorMessage = errMsg
 			}
@@ -293,6 +304,52 @@ func (h *Handler) ListarEventos(w http.ResponseWriter, r *http.Request) {
 			"pages": (total + limit - 1) / limit,
 		},
 	}, http.StatusOK)
+}
+
+// ReprocessarEvento repõe um evento como elegível para o job de retry
+// automático (internal/background/jobs.go) tentar de novo — mesmo com
+// permanent_failure=TRUE ou já com as tentativas esgotadas. "Seguro" porque
+// não corre processEntity aqui: só marca a linha; é o job de retry que a
+// processa a seguir, com a mesma dedupe/lease de sempre. Um evento já
+// processed=TRUE nunca pode ser reposto por este caminho — replay nunca
+// duplica uma marcação de assiduidade já confirmada. Fase 5, item 4, de
+// docs/analise-transactional-outbox-backends.md.
+func (h *Handler) ReprocessarEvento(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	id := chi.URLParam(r, "id")
+	tag, err := h.db.Exec(r.Context(), `
+		UPDATE hardware.device_events
+		   SET attempts = 0, permanent_failure = FALSE, error_message = NULL,
+		       available_at = NOW(), locked_at = NULL, locked_by = NULL
+		 WHERE id = $1 AND tenant_id = $2 AND processed = FALSE`,
+		id, user.TenantID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		jsonErr(w, "Evento não encontrado ou já processado", http.StatusNotFound)
+		return
+	}
+	jsonOK(w, map[string]any{"ok": true}, http.StatusOK)
+}
+
+// ReprocessarNaoProcessados repõe, em lote, todos os eventos não
+// processados do tenant como elegíveis para retry automático — mesmo
+// racional de ReprocessarEvento.
+func (h *Handler) ReprocessarNaoProcessados(w http.ResponseWriter, r *http.Request) {
+	user := mw.GetUser(r)
+	tag, err := h.db.Exec(r.Context(), `
+		UPDATE hardware.device_events
+		   SET attempts = 0, permanent_failure = FALSE, error_message = NULL,
+		       available_at = NOW(), locked_at = NULL, locked_by = NULL
+		 WHERE tenant_id = $1 AND processed = FALSE`,
+		user.TenantID)
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]any{"reprocessados": tag.RowsAffected()}, http.StatusOK)
 }
 
 // loadDeviceConfigs carrega as configurações de um dispositivo.

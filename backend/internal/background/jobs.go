@@ -3,25 +3,71 @@ package background
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
+	hardwareservice "nexora/internal/modules/hardware/service"
 	"nexora/internal/modules/recursos-humanos/service/assiduidade"
+	"nexora/internal/pkg/nexorapay"
+	"nexora/internal/push"
 	"nexora/internal/shared/contracts"
 	"nexora/internal/storage"
 )
 
+// notificationDB é a interface mínima usada pelo dispatcher de notificações
+// — tanto *pgxpool.Pool (produção) como pgxmock (testes) a implementam, sem
+// precisar de uma BD real para testar claim/lease/finalize.
+type notificationDB interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
+
+// pushSender é a interface mínima do serviço de push usada pelo dispatcher
+// — satisfeita por *push.Service; permite testar o case "push" com um stub,
+// sem precisar de credenciais FCM reais (Fase 3 de
+// docs/analise-transactional-outbox-backends.md).
+type pushSender interface {
+	Enabled() bool
+	SendOne(ctx context.Context, token, title, body string, data map[string]string) error
+}
+
 // StartJobs lança os jobs em background e retorna quando ctx é cancelado.
-func StartJobs(ctx context.Context, db *pgxpool.Pool, notif contracts.NotificationPort, cfg *config.Config, store storage.Provider) {
+func StartJobs(ctx context.Context, db *pgxpool.Pool, notif contracts.NotificationPort, pushSvc *push.Service, paySvc *nexorapay.PaymentService, hwProcessor *hardwareservice.Processor, cfg *config.Config, store storage.Provider) {
 	mailer := newMailer(cfg)
 	sms := newSMSSender(cfg)
+	workerID := notificationWorkerID()
 
 	// Despacho de notificações pendentes — a cada 30s
 	go runInterval(ctx, "dispatch-notifications", 30*time.Second, func() {
-		dispatchNotifications(db, mailer, sms, store)
+		dispatchNotifications(db, mailer, sms, pushSvc, store, workerID)
+	})
+
+	// Reconciliação de pagamentos ambíguos (payment_intents em
+	// pending/processing/unknown vencidos) — a cada 2min. Fase 4 de
+	// docs/analise-transactional-outbox-backends.md, item 5.
+	go runInterval(ctx, "reconciliar-pagamentos", 2*time.Minute, func() {
+		if paySvc == nil {
+			return
+		}
+		reconcilePaymentIntents(paySvc, workerID)
+	})
+
+	// Retry automático de hardware.device_events não processados (falhas
+	// transitórias — employee_no ainda não mapeado, funcionário inactivo,
+	// etc.) — a cada 1min. Fase 5 de
+	// docs/analise-transactional-outbox-backends.md, item 1.
+	go runInterval(ctx, "retry-hardware-events", time.Minute, func() {
+		if hwProcessor == nil {
+			return
+		}
+		retryHardwareEvents(hwProcessor, workerID)
 	})
 
 	// Reminders de cobranças escolares — diário
@@ -66,6 +112,82 @@ func StartJobs(ctx context.Context, db *pgxpool.Pool, notif contracts.Notificati
 	})
 }
 
+// ── reconciliação de pagamentos ──────────────────────────────────────────────
+
+const paymentLeaseTimeout = 5 * time.Minute
+
+// paymentReconciler é a interface mínima usada pelo job de reconciliação —
+// satisfeita por *nexorapay.PaymentService; permite testar com um stub, sem
+// precisar de credenciais Nexora Pay reais.
+type paymentReconciler interface {
+	RecoverExpiredLeases(ctx context.Context, leaseTimeout time.Duration) (int64, error)
+	ClaimForReconciliation(ctx context.Context, workerID string, limit int) ([]nexorapay.PaymentIntent, error)
+	Reconcile(ctx context.Context, intent nexorapay.PaymentIntent) error
+}
+
+// reconcilePaymentIntents resolve payment_intents ambíguos (pending/
+// processing/unknown vencidos): recupera leases expiradas, reserva um lote
+// atomicamente (mesmo padrão de claimPendingNotifications) e reconcilia cada
+// um — consulta o estado no gateway quando já se conhece o
+// gateway_transaction_id, ou reenvia o POST original com a mesma
+// idempotency_key quando não se conhece. Fase 4, item 5, de
+// docs/analise-transactional-outbox-backends.md.
+func reconcilePaymentIntents(svc paymentReconciler, workerID string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	if _, err := svc.RecoverExpiredLeases(ctx, paymentLeaseTimeout); err != nil {
+		log.Printf("[background] reconciliar-pagamentos: recuperar leases expiradas: %v", err)
+	}
+
+	intents, err := svc.ClaimForReconciliation(ctx, workerID, 50)
+	if err != nil {
+		log.Printf("[background] reconciliar-pagamentos: reservar intents: %v", err)
+		return
+	}
+	for _, intent := range intents {
+		if err := svc.Reconcile(ctx, intent); err != nil {
+			log.Printf("[background] reconciliar-pagamentos: reconciliar intent %s: %v", intent.ID, err)
+		}
+	}
+}
+
+const hardwareEventLeaseTimeout = 5 * time.Minute
+
+// hardwareRetrier é a interface mínima do processor de hardware usada pelo
+// job de retry — satisfeita por *hardware/service.Processor; permite testar
+// com um stub, sem precisar de BD real. Fase 5 de
+// docs/analise-transactional-outbox-backends.md, item 1.
+type hardwareRetrier interface {
+	RecoverExpiredLeases(ctx context.Context, leaseTimeout time.Duration) (int64, error)
+	ClaimForRetry(ctx context.Context, workerID string, limit int) ([]hardwareservice.DeviceEventRetry, error)
+	Retry(ctx context.Context, ev hardwareservice.DeviceEventRetry) error
+}
+
+// retryHardwareEvents resolve hardware.device_events não processados e não
+// permanentemente falhados: recupera leases expiradas, reserva um lote
+// atomicamente e chama Retry (que repete processEntity a partir do
+// NormalizedEvent persistido) por cada um.
+func retryHardwareEvents(p hardwareRetrier, workerID string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	if _, err := p.RecoverExpiredLeases(ctx, hardwareEventLeaseTimeout); err != nil {
+		log.Printf("[background] retry-hardware-events: recuperar leases expiradas: %v", err)
+	}
+
+	events, err := p.ClaimForRetry(ctx, workerID, 50)
+	if err != nil {
+		log.Printf("[background] retry-hardware-events: reservar eventos: %v", err)
+		return
+	}
+	for _, ev := range events {
+		if err := p.Retry(ctx, ev); err != nil {
+			log.Printf("[background] retry-hardware-events: reprocessar evento %d: %v", ev.ID, err)
+		}
+	}
+}
+
 // ── helpers de agendamento ────────────────────────────────────────────────────
 
 // runDaily executa fn após 30s de warm-up e depois a cada 24h.
@@ -107,54 +229,181 @@ func runInterval(ctx context.Context, name string, interval time.Duration, fn fu
 }
 
 // ── dispatch de notificações ─────────────────────────────────────────────────
+//
+// Fase 2 de docs/analise-transactional-outbox-backends.md: reserva atómica
+// (item 4), lease com recuperação (item 3), backoff exponencial (item 5) e
+// todos os UPDATE de estado com erro verificado e logado (item 6).
 
-// dispatchNotifications lê mensagens pendentes e envia por email ou SMS.
-// Até 3 tentativas por mensagem; após isso marca como 'falhou'.
-func dispatchNotifications(db *pgxpool.Pool, mailer *sesMailer, sms smsSender, store storage.Provider) {
-	if !mailer.enabled() && sms == nil {
+// notificationMaxAttempts é o tecto de tentativas antes de uma mensagem
+// passar a 'falha' (dead-letter). notificationLeaseTimeout é quanto tempo
+// uma mensagem pode ficar 'processando' antes de se considerar que o worker
+// que a reservou morreu a meio do envio e a reserva ser recuperada.
+const (
+	notificationMaxAttempts  = 6
+	notificationLeaseTimeout = 5 * time.Minute
+)
+
+// notificationBackoff é o atraso antes da próxima tentativa, indexado por
+// número de tentativas já feitas (1ª posição = depois da 1ª falha). Mais
+// curta que o outbox FaceClock→ERP (Fase 1): email/SMS são canais menos
+// críticos e o próprio documento não fixa números para este item.
+var notificationBackoff = []time.Duration{
+	1 * time.Minute,
+	5 * time.Minute,
+	20 * time.Minute,
+	1 * time.Hour,
+	4 * time.Hour,
+	12 * time.Hour,
+}
+
+// notificationBackoffFor devolve o atraso para a tentativa `attempts`
+// (1-based); fica fixo no último valor da tabela além do seu tamanho.
+func notificationBackoffFor(attempts int) time.Duration {
+	idx := min(max(attempts-1, 0), len(notificationBackoff)-1)
+	return notificationBackoff[idx]
+}
+
+// notificationWorkerID identifica este processo nas colunas locked_by —
+// necessário porque, a partir da Fase 2 item 7, o dispatcher pode correr
+// tanto dentro da API como num binário separado (cmd/worker), por vezes os
+// dois ao mesmo tempo por má configuração; o claim atómico abaixo é o que
+// torna isso seguro. Mesmo padrão do worker Python da Fase 1 (hostname+pid).
+func notificationWorkerID() string {
+	host, _ := os.Hostname()
+	return fmt.Sprintf("%s-%d", host, os.Getpid())
+}
+
+type notificationClaim struct {
+	id              int64
+	canalTipo       string
+	destinatario    string
+	assunto         string
+	corpo           string
+	tentativas      int
+	anexoStorageKey string
+	anexoNome       string
+	payload         []byte
+}
+
+// recoverExpiredNotificationLeases devolve a 'pendente' mensagens presas em
+// 'processando' cujo lease expirou (worker morto a meio do envio).
+func recoverExpiredNotificationLeases(ctx context.Context, db notificationDB, leaseTimeout time.Duration) {
+	tag, err := db.Exec(ctx, `
+		UPDATE notifications.notification_messages
+		   SET status='pendente', locked_at=NULL, locked_by=NULL
+		 WHERE status='processando' AND locked_at < NOW() - ($1 * INTERVAL '1 second')`,
+		leaseTimeout.Seconds())
+	if err != nil {
+		log.Printf("[background] dispatch-notifications: recuperar leases expiradas: %v", err)
+		return
+	}
+	if n := tag.RowsAffected(); n > 0 {
+		log.Printf("[background] dispatch-notifications: %d lease(s) expirada(s) recuperada(s)", n)
+	}
+}
+
+// claimPendingNotifications reserva até `limit` mensagens pendentes e
+// vencidas para workerID, numa única instrução SQL — o SELECT ... FOR UPDATE
+// SKIP LOCKED e o UPDATE que marca 'processando' fazem parte da mesma
+// operação atómica (ver docs/analise-transactional-outbox-backends.md,
+// secção 29.3), sem a janela que antes permitia duas réplicas do dispatcher
+// seleccionarem e enviarem a mesma mensagem.
+func claimPendingNotifications(ctx context.Context, db notificationDB, workerID string, limit int) ([]notificationClaim, error) {
+	rows, err := db.Query(ctx, `
+		WITH candidatos AS (
+			SELECT id
+			  FROM notifications.notification_messages
+			 WHERE status = 'pendente' AND available_at <= NOW()
+			 ORDER BY available_at, created_at, id
+			 LIMIT $1
+			 FOR UPDATE SKIP LOCKED
+		)
+		UPDATE notifications.notification_messages m
+		   SET status = 'processando', locked_at = NOW(), locked_by = $2
+		  FROM candidatos c
+		 WHERE m.id = c.id
+		RETURNING m.id, m.canal_tipo, m.destinatario, m.assunto, m.corpo, m.tentativas,
+		          COALESCE(m.anexo_storage_key,''), COALESCE(m.anexo_nome,''), m.payload`,
+		limit, workerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var claims []notificationClaim
+	for rows.Next() {
+		var c notificationClaim
+		if err := rows.Scan(&c.id, &c.canalTipo, &c.destinatario, &c.assunto, &c.corpo, &c.tentativas,
+			&c.anexoStorageKey, &c.anexoNome, &c.payload); err != nil {
+			continue
+		}
+		claims = append(claims, c)
+	}
+	return claims, rows.Err()
+}
+
+// finalizeNotification grava o resultado do envio de uma mensagem já
+// reservada: sucesso fecha em 'enviado'; falha com tentativas esgotadas vai
+// para 'falha' (dead-letter); falha com tentativas ainda disponíveis volta a
+// 'pendente' com available_at adiado pelo backoff exponencial. Todo o Exec é
+// verificado e logado — nunca mais `_, _ = db.Exec(...)`.
+func finalizeNotification(ctx context.Context, db notificationDB, m notificationClaim, sendErr error) {
+	if sendErr == nil {
+		if _, err := db.Exec(ctx, `
+			UPDATE notifications.notification_messages
+			   SET status='enviado', enviado_em=NOW(), tentativas=$1, erro=NULL,
+			       locked_at=NULL, locked_by=NULL
+			 WHERE id=$2`,
+			m.tentativas+1, m.id); err != nil {
+			log.Printf("[background] dispatch-notifications: marcar enviada id=%d: %v", m.id, err)
+		}
+		return
+	}
+
+	novasTentativas := m.tentativas + 1
+	if novasTentativas >= notificationMaxAttempts {
+		if _, err := db.Exec(ctx, `
+			UPDATE notifications.notification_messages
+			   SET status='falha', tentativas=$1, erro=$2, locked_at=NULL, locked_by=NULL
+			 WHERE id=$3`,
+			novasTentativas, sendErr.Error(), m.id); err != nil {
+			log.Printf("[background] dispatch-notifications: marcar falha id=%d: %v", m.id, err)
+		}
+		return
+	}
+
+	if _, err := db.Exec(ctx, `
+		UPDATE notifications.notification_messages
+		   SET status='pendente', tentativas=$1, erro=$2,
+		       available_at=NOW() + ($3 * INTERVAL '1 second'),
+		       locked_at=NULL, locked_by=NULL
+		 WHERE id=$4`,
+		novasTentativas, sendErr.Error(), notificationBackoffFor(novasTentativas).Seconds(), m.id); err != nil {
+		log.Printf("[background] dispatch-notifications: agendar retry id=%d: %v", m.id, err)
+	}
+}
+
+// dispatchNotifications lê mensagens pendentes e envia por email, SMS ou
+// push (Fase 3 de docs/analise-transactional-outbox-backends.md).
+func dispatchNotifications(db notificationDB, mailer *sesMailer, sms smsSender, pushSvc pushSender, store storage.Provider, workerID string) {
+	pushEnabled := pushSvc != nil && pushSvc.Enabled()
+	if !mailer.enabled() && sms == nil && !pushEnabled {
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	rows, err := db.Query(ctx, `
-		SELECT id, canal_tipo, destinatario, assunto, corpo, tentativas,
-		       COALESCE(anexo_storage_key,''), COALESCE(anexo_nome,'')
-		  FROM notifications.notification_messages
-		 WHERE status = 'pendente' AND tentativas < 3
-		 ORDER BY created_at
-		 LIMIT 50
-		 FOR UPDATE SKIP LOCKED`)
+	recoverExpiredNotificationLeases(ctx, db, notificationLeaseTimeout)
+
+	claims, err := claimPendingNotifications(ctx, db, workerID, 50)
 	if err != nil {
-		log.Printf("[background] dispatch-notifications: query: %v", err)
+		log.Printf("[background] dispatch-notifications: reservar mensagens: %v", err)
 		return
 	}
-	defer rows.Close()
-
-	type msg struct {
-		id              int64
-		canalTipo       string
-		destinatario    string
-		assunto         string
-		corpo           string
-		tentativas      int
-		anexoStorageKey string
-		anexoNome       string
-	}
-	var msgs []msg
-	for rows.Next() {
-		var m msg
-		if err := rows.Scan(&m.id, &m.canalTipo, &m.destinatario, &m.assunto, &m.corpo, &m.tentativas,
-			&m.anexoStorageKey, &m.anexoNome); err != nil {
-			continue
-		}
-		msgs = append(msgs, m)
-	}
-	rows.Close()
 
 	var sent, failed int
-	for _, m := range msgs {
+	for _, m := range claims {
 		var sendErr error
 		switch m.canalTipo {
 		case "email":
@@ -165,35 +414,25 @@ func dispatchNotifications(db *pgxpool.Pool, mailer *sesMailer, sms smsSender, s
 			}
 		case "sms":
 			sendErr = sms.send(m.destinatario, m.corpo)
+		case "push":
+			var data map[string]string
+			if len(m.payload) > 0 {
+				if err := json.Unmarshal(m.payload, &data); err != nil {
+					log.Printf("[background] dispatch-notifications: payload invalido id=%d: %v", m.id, err)
+				}
+			}
+			sendErr = pushSvc.SendOne(ctx, m.destinatario, m.assunto, m.corpo, data)
 		default:
-			// Canais não suportados (push, whatsapp) são marcados como falha.
+			// Canais não suportados (whatsapp) são marcados como falha.
 			sendErr = fmt.Errorf("canal %s não suportado", m.canalTipo)
 		}
 
 		if sendErr != nil {
 			failed++
-			novasTentativas := m.tentativas + 1
-			novoStatus := "pendente"
-			if novasTentativas >= 3 {
-				// "falha", não "falhou" — é o valor aceite por
-				// notification_messages_status_check (ver baseline schema);
-				// "falhou" violava a constraint e o erro ficava silencioso
-				// (Exec com resultado descartado), por isso nunca se notava.
-				novoStatus = "falha"
-			}
-			_, _ = db.Exec(ctx, `
-				UPDATE notifications.notification_messages
-				   SET tentativas=$1, status=$2, erro=$3
-				 WHERE id=$4`,
-				novasTentativas, novoStatus, sendErr.Error(), m.id)
 		} else {
 			sent++
-			_, _ = db.Exec(ctx, `
-				UPDATE notifications.notification_messages
-				   SET status='enviado', enviado_em=NOW(), tentativas=$1, erro=NULL
-				 WHERE id=$2`,
-				m.tentativas+1, m.id)
 		}
+		finalizeNotification(ctx, db, m, sendErr)
 	}
 
 	if sent > 0 || failed > 0 {
@@ -250,19 +489,23 @@ func notifCobrancasVencidas(db *pgxpool.Pool, notif contracts.NotificationPort) 
 		sid := studentID
 
 		if emailAluno != "" {
-			notif.Send(ctx, contracts.Notification{
+			if err := notif.Send(ctx, contracts.Notification{
 				TenantID: tenantID, CanalTipo: "email",
 				Destinatario: emailAluno, Assunto: "Cobrança em atraso — acção necessária",
 				Corpo: corpo, ReferenciaTipo: "escolar.cobranca.vencimento", ReferenciaID: &sid,
-			})
+			}); err != nil {
+				log.Printf("[background] notifCobrancasVencidas: enfileirar para aluno: %v", err)
+			}
 			sent++
 		}
 		if emailEncarregado != "" && emailEncarregado != emailAluno {
-			notif.Send(ctx, contracts.Notification{
+			if err := notif.Send(ctx, contracts.Notification{
 				TenantID: tenantID, CanalTipo: "email",
 				Destinatario: emailEncarregado, Assunto: "Cobrança do seu educando em atraso",
 				Corpo: "Encarregado, " + corpo, ReferenciaTipo: "escolar.cobranca.vencimento", ReferenciaID: &sid,
-			})
+			}); err != nil {
+				log.Printf("[background] notifCobrancasVencidas: enfileirar para encarregado: %v", err)
+			}
 			sent++
 		}
 

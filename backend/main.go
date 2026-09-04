@@ -13,6 +13,9 @@ import (
 	"nexora/internal/background"
 	"nexora/internal/db"
 	hardwaremqtt "nexora/internal/modules/hardware/mqtt"
+	hardwareservice "nexora/internal/modules/hardware/service"
+	"nexora/internal/pkg/nexorapay"
+	"nexora/internal/push"
 	"nexora/internal/router"
 	"nexora/internal/shared/adapters"
 	"nexora/internal/storage"
@@ -46,8 +49,13 @@ func main() {
 		log.Fatalf("[nexora] storage init: %v", err)
 	}
 
-	// Arrancar jobs recorrentes (notificações, reminders, etc.)
-	background.StartJobs(ctx, pool, adapters.NewNotificationAdapter(pool), cfg, store)
+	// Arrancar jobs recorrentes (notificações, reminders, etc.) — a menos que
+	// tenham sido movidos para um worker separado (cmd/worker), ver
+	// RUN_BACKGROUND_JOBS / Fase 2 de docs/analise-transactional-outbox-backends.md.
+	if cfg.RunBackgroundJobs {
+		paySvc := nexorapay.NewPaymentService(pool, nexorapay.NewClient(cfg.NexoraPayBaseURL, cfg.NexoraPayAPIKey, cfg.NexoraPayPublicKey))
+		background.StartJobs(ctx, pool, adapters.NewNotificationAdapter(pool), push.New(pool, cfg.FirebaseCredentialsFile), paySvc, hardwareservice.NewProcessor(pool), cfg, store)
+	}
 
 	// Worker MQTT do módulo hardware — opcional, só liga se MQTT_BROKER_URL estiver definida.
 	var mqttWorker *hardwaremqtt.Worker

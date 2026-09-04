@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -871,7 +872,7 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		// Email real via fila de notificações (notifications.notification_messages,
 		// despachada por internal/background.dispatchNotifications) — mesmo padrão
 		// já usado pelo convite de assinatura digital. Nunca bloqueia a resposta:
-		// NotificationAdapter.Send só regista a falha em log.
+		// uma falha ao enfileirar só é registada em log.
 		if h.notif != nil {
 			link := token
 			if h.cfg.PasswordResetBaseURL != "" {
@@ -881,7 +882,7 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 				"Olá %s,\n\nRecebemos um pedido para repor a password da sua conta. Aceda a %s para escolher uma password nova. Este link expira em 1 hora.\n\nSe não foi você a pedir, ignore este email — a sua password actual continua válida.",
 				nome, link,
 			)
-			h.notif.Send(r.Context(), contracts.Notification{
+			if err := h.notif.Send(r.Context(), contracts.Notification{
 				TenantID:       tenantID,
 				CanalTipo:      "email",
 				Destinatario:   body.Email,
@@ -889,7 +890,9 @@ func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 				Corpo:          corpo,
 				ReferenciaTipo: "auth.password_reset",
 				ReferenciaID:   &uid,
-			})
+			}); err != nil {
+				log.Printf("[auth] notificar recuperação de password: %v", err)
+			}
 		}
 	}
 	w.WriteHeader(http.StatusNoContent)

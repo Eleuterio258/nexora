@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -175,31 +176,30 @@ func (h *Handler) CriarMatriculaV2(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Notificar encarregados do aluno sobre a matrícula (capturar variáveis antes do go)
-	studentID, tenantID, numero := enrollment.StudentID, enrollment.TenantID, enrollment.Numero
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		rows, err := h.db.Query(ctx, `
-			SELECT g.email FROM gestao_escolar.school_guardians g
-			WHERE g.student_id = $1 AND g.tenant_id = $2 AND g.email <> ''`,
-			studentID, tenantID)
-		if err != nil {
-			return
-		}
-		defer rows.Close()
+	// Notificar encarregados do aluno sobre a matrícula — síncrono desde a
+	// Fase 3 (h.notification.Send só grava a mensagem, a entrega real é do
+	// dispatcher persistente em internal/background/jobs.go).
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	if rows, err := h.db.Query(ctx, `
+		SELECT g.email FROM gestao_escolar.school_guardians g
+		WHERE g.student_id = $1 AND g.tenant_id = $2 AND g.email <> ''`,
+		enrollment.StudentID, enrollment.TenantID); err == nil {
 		for rows.Next() {
 			var email string
 			if rows.Scan(&email) == nil && h.notification != nil {
-				h.notification.Send(ctx, contracts.Notification{
-					TenantID:     tenantID,
+				if err := h.notification.Send(ctx, contracts.Notification{
+					TenantID:     enrollment.TenantID,
 					CanalTipo:    "email",
 					Destinatario: email,
-					Corpo:        fmt.Sprintf("Matricula n.%s confirmada com sucesso.", numero),
-				})
+					Corpo:        fmt.Sprintf("Matricula n.%s confirmada com sucesso.", enrollment.Numero),
+				}); err != nil {
+					log.Printf("[gestao-escolar] notificar matricula: %v", err)
+				}
 			}
 		}
-	}()
+		rows.Close()
+	}
 
 	jsonOK(w, enrollment, http.StatusCreated)
 }

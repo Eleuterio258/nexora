@@ -36,6 +36,7 @@ import (
 	tesH "nexora/internal/modules/tesouraria/handlers"
 	utilH "nexora/internal/modules/utilizadores/handlers"
 	"nexora/internal/pkg/antivirus"
+	"nexora/internal/pkg/nexorapay"
 	"nexora/internal/push"
 	"nexora/internal/storage"
 
@@ -79,6 +80,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 
 	wsHub := ws.NewHub()
 	pushSvc := push.New(db, cfg.FirebaseCredentialsFile)
+	paySvc := nexorapay.NewPaymentService(db, nexorapay.NewClient(cfg.NexoraPayBaseURL, cfg.NexoraPayAPIKey, cfg.NexoraPayPublicKey))
 
 	oauthKeys, err := oauthkeys.NewProvider(cfg.OAuthSigningKeysDir, cfg.OAuthAllowGeneratedKey)
 	if err != nil {
@@ -100,7 +102,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 		Approval:     adapters.NewApprovalAdapter(db),
 		SysConfig:    adapters.NewSystemConfigAdapter(db),
 		Signature:    adapters.NewSignatureAdapter(db),
-	})
+	}, paySvc)
 	prod := prodH.New(db, cfg)
 	stock := stockH.New(db, cfg)
 	impostos := impH.New(db, cfg, store)
@@ -108,7 +110,7 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 	recrutRealtime := recrutH.NewRealtimeServer(db, cfg.JWTSecret)
 	idh := idhash.New(cfg.IDHashSalt)
 	crm := crmH.New(db, cfg)
-	pos := posH.New(db, cfg, wsHub, pushSvc, adapters.NewAccountingAdapter(db))
+	pos := posH.New(db, cfg, wsHub, pushSvc, adapters.NewAccountingAdapter(db), paySvc)
 	rh := rhH.New(db, cfg, store, adapters.NewSignatureAdapter(db), adapters.NewLegalAuditAdapter(db))
 	centros := centrosH.New(db, cfg)
 	logistica := logH.New(db, cfg)
@@ -2720,6 +2722,8 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "notificacoes", "gerir_notificacoes"))
 				r.Post("/", notif.EnviarNotificacao)
+				r.Post("/{id}/reprocessar", notif.ReprocessarMensagem)
+				r.Post("/reprocessar-falhas", notif.ReprocessarFalhas)
 			})
 		})
 
@@ -3091,6 +3095,10 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 
 			r.With(mw.RequirePermission(db, "hardware", "ver_eventos")).
 				Get("/events", hardware.ListarEventos)
+			r.With(mw.RequirePermission(db, "hardware", "gerir_eventos")).
+				Post("/events/{id}/reprocessar", hardware.ReprocessarEvento)
+			r.With(mw.RequirePermission(db, "hardware", "gerir_eventos")).
+				Post("/events/reprocessar-nao-processados", hardware.ReprocessarNaoProcessados)
 
 			r.Get("/drivers", hardware.ListarDrivers)
 

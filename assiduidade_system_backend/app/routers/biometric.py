@@ -30,9 +30,9 @@ from app.services.biometric import (
 from app.services.audit_log import record_audit_event
 from app.services.device_registry import get_device_public_key
 from app.services.embedding_models import get_model_version
+from app.services.outbox import enqueue as enqueue_outbox_event
 from app.services.suspicious_activity import record_verify_failure, record_verify_success
 from app.security.facial_verification import issue_facial_verification_token
-from app.erp_client import erp_client
 from app.utils import utc_now
 
 log = logging.getLogger(__name__)
@@ -349,15 +349,30 @@ async def verify_biometric(
         if active_template.status != TemplateStatus.PENDING_REENROLL:
             old_model_version = active_template.model_version
             active_template.status = TemplateStatus.PENDING_REENROLL
-            db.commit()
-            # So notifica na 1a transicao, para nao espalhar o webhook a cada
-            # tentativa de verify enquanto o template estiver pendente.
-            await erp_client.notify_reenroll_required(
-                erp_user_id=erp_user_id,
+            # Enfileira o aviso ao ERP na MESMA transaccao da mudanca de
+            # estado (Transactional Outbox — Fase 1 de
+            # docs/analise-transactional-outbox-backends.md). A entrega fica
+            # a cargo de app/workers/outbox.py, com retry/backoff; se o
+            # commit abaixo falhar, nem o estado nem o evento ficam gravados.
+            # A chave de deduplicacao garante um so evento por template+nova
+            # versao mesmo que este bloco corra mais de uma vez.
+            enqueue_outbox_event(
+                db,
                 tenant_id=actor.tenant_id,
-                old_model_version=old_model_version,
-                new_model_version=current_model_version,
+                event_type="biometric.reenroll_required.v1",
+                aggregate_type="face_template",
+                aggregate_id=active_template.id,
+                payload={
+                    "erp_user_id": erp_user_id,
+                    "tenant_id": actor.tenant_id,
+                    "old_model_version": old_model_version,
+                    "new_model_version": current_model_version,
+                },
+                deduplication_key=(
+                    f"reenroll:{actor.tenant_id}:{active_template.id}:{current_model_version}"
+                ),
             )
+            db.commit()
         biometric_metrics.record_verify_rejection(
             "model_version_mismatch", 0.0, liveness_score, liveness_passed=True
         )

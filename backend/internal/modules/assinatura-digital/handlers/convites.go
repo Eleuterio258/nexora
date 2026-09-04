@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"net/http"
 	"strings"
@@ -181,7 +182,7 @@ func (h *Handler) EnviarOTP(w http.ResponseWriter, r *http.Request) {
 			destinatario = *c.SigTelefone
 			assunto = "Código OTP"
 		}
-		h.notif.Send(r.Context(), contracts.Notification{
+		if err := h.notif.Send(r.Context(), contracts.Notification{
 			TenantID:       c.TenantID,
 			CanalTipo:      canal,
 			Destinatario:   destinatario,
@@ -189,7 +190,9 @@ func (h *Handler) EnviarOTP(w http.ResponseWriter, r *http.Request) {
 			Corpo:          corpo,
 			ReferenciaTipo: "assinatura-digital.otp",
 			ReferenciaID:   &c.SignatarioID,
-		})
+		}); err != nil {
+			log.Printf("[assinatura-digital] notificar OTP: %v", err)
+		}
 	}
 
 	jsonOK(w, map[string]any{"ok": true, "msg": "Código enviado", "canal": canal}, http.StatusOK)

@@ -107,9 +107,13 @@ type SchoolReceipt struct {
 
 // ── Notificações ────────────────────────────────────────────────────────────
 
-// NotificationPort envia notificações a utilizadores do ERP.
+// NotificationPort envia notificações a utilizadores do ERP. Send devolve
+// erro (Fase 2 de docs/analise-transactional-outbox-backends.md, item 6) —
+// a maioria dos chamadores continua a tratá-lo apenas para log, já que uma
+// notificação é best-effort e não deve travar o fluxo de negócio que a
+// originou.
 type NotificationPort interface {
-	Send(ctx context.Context, n Notification)
+	Send(ctx context.Context, n Notification) error
 }
 
 // Notification dados de uma notificação.
@@ -128,6 +132,12 @@ type Notification struct {
 	// anexar. AnexoNome é o nome de ficheiro apresentado ao destinatário.
 	AnexoStorageKey string
 	AnexoNome       string
+
+	// Payload é dados adicionais específicos do canal — hoje só usado por
+	// canal_tipo="push" (o `data` do FCM, entregue junto do título/corpo).
+	// Gravado na coluna jsonb já existente em notification_messages (Fase 3
+	// de docs/analise-transactional-outbox-backends.md).
+	Payload map[string]any
 }
 
 // ── Recursos Humanos ────────────────────────────────────────────────────────

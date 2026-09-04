@@ -66,6 +66,11 @@ class Settings:
     erp_api_key: str = os.getenv("ERP_API_KEY", "")
     erp_timeout_seconds: int = int(os.getenv("ERP_TIMEOUT_SECONDS", "10"))
     erp_reenroll_webhook_url: str = os.getenv("ERP_REENROLL_WEBHOOK_URL", "")
+    # Transactional Outbox (app/workers/outbox.py) — ver
+    # docs/analise-transactional-outbox-backends.md, Fase 1.
+    outbox_batch_size: int = int(os.getenv("OUTBOX_BATCH_SIZE", "50"))
+    outbox_poll_interval_seconds: float = float(os.getenv("OUTBOX_POLL_INTERVAL_SECONDS", "5"))
+    outbox_lease_seconds: int = int(os.getenv("OUTBOX_LEASE_SECONDS", "300"))
     image_download_timeout_seconds: int = int(
         os.getenv("IMAGE_DOWNLOAD_TIMEOUT_SECONDS", "10")
     )

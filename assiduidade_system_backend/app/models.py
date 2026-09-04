@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Numeric, String, Text
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 try:
@@ -88,6 +88,47 @@ class DevicePublicKey(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class OutboxEvent(Base):
+    """Transactional Outbox: eventos que o FaceClock precisa de entregar ao
+    ERP com garantia de entrega. Gravado na mesma transacao SQLAlchemy que a
+    alteracao de negocio que o originou (ex.: FaceTemplate.status a mudar
+    para PENDING_REENROLL) — um worker separado (app/workers/outbox.py) e
+    quem entrega, nunca o pedido HTTP que gerou o evento.
+
+    Ver docs/analise-transactional-outbox-backends.md, secoes 4 e 28.
+    """
+
+    __tablename__ = "outbox_events"
+    __table_args__ = (
+        UniqueConstraint("deduplication_key", name="uq_outbox_deduplication_key"),
+        Index("ix_outbox_pending", "status", "available_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    event_type: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    aggregate_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    aggregate_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    schema_version: Mapped[int] = mapped_column(default=1, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    deduplication_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    # pending | processing | published | dead — validado em Python
+    # (app/services/outbox.py), sem CHECK constraint para manter o fallback
+    # SQLite dos testes simples.
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    attempts: Mapped[int] = mapped_column(default=0, nullable=False)
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    locked_by: Mapped[str | None] = mapped_column(String(100))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
 
 class BiometricAuditLog(Base):

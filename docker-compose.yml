@@ -23,6 +23,7 @@ services:
       # Nexora-Pay corre como serviço externo independente
       NEXORA_PAY_BASE_URL: ${NEXORA_PAY_BASE_URL:-https://pay.e258tech.tech}
       NEXORA_PAY_API_KEY: ${NEXORA_PAY_API_KEY}
+      NEXORA_PAY_PUBLIC_KEY: ${NEXORA_PAY_PUBLIC_KEY}
       NEXORA_PAY_SERVICE_ACCOUNT: ${NEXORA_PAY_SERVICE_ACCOUNT:-gestao-escolar}
       # Object storage — o MinIO já existe na rede `backend`.
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-minio}
@@ -89,6 +90,42 @@ services:
       - "traefik.http.routers.nexora-api-http.middlewares=e258tech-https"
       - "traefik.http.middlewares.e258tech-https.redirectscheme.scheme=https"
       - "traefik.http.middlewares.e258tech-https.redirectscheme.permanent=true"
+
+  # ── Worker Go (jobs em background) ──────────────────────────────
+  # Opcional: por omissão a API já corre estes jobs (RUN_BACKGROUND_JOBS=true
+  # por defeito). Para separar, ligue este serviço E ponha
+  # RUN_BACKGROUND_JOBS=false no serviço `api` acima — caso contrário os dois
+  # despacham notificações em paralelo (seguro, graças à reserva atómica em
+  # internal/background/jobs.go, mas desperdiça trabalho). Ver Fase 2, item 7,
+  # de docs/analise-transactional-outbox-backends.md.
+  worker:
+    build: ./backend
+    container_name: nexora-worker
+    command: ["./nexora-worker"]
+    restart: unless-stopped
+    profiles:
+      - worker
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DATABASE_URL: ${DATABASE_URL}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-minio}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-nexoraerp}
+      MINIO_USE_SSL: ${MINIO_USE_SSL:-false}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      SES_REGION: ${SES_REGION:-us-east-1}
+      SES_FROM: ${SES_FROM:-noreply@e258tech.tech}
+      SES_FROM_NAME: ${SES_FROM_NAME:-Nexora ERP}
+      SMS_PROVIDER: ${SMS_PROVIDER:-noop}
+      SMS_TWILIO_SID: ${SMS_TWILIO_SID:-}
+      SMS_TWILIO_TOKEN: ${SMS_TWILIO_TOKEN:-}
+      SMS_TWILIO_FROM: ${SMS_TWILIO_FROM:-}
+    networks:
+      - backend
 
   # ── Frontend PHP ──────────────────────────────────────────────
   web:

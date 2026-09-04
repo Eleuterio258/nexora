@@ -28,7 +28,8 @@ RUN mkdir -p "$TORCH_HOME" && \
 
 COPY . .
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY entrypoint-worker.sh /entrypoint-worker.sh
+RUN chmod +x /entrypoint.sh /entrypoint-worker.sh
 
 RUN useradd -m appuser && chown -R appuser:appuser /app
 USER appuser

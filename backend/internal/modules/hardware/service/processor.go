@@ -4,27 +4,37 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgconn"
 	"nexora/internal/modules/hardware/models"
 	"nexora/internal/modules/recursos-humanos/service/assiduidade"
 	"nexora/internal/modules/recursos-humanos/service/funcionario"
 	"nexora/internal/pkg/tenantid"
 )
 
+// DBTX é a interface mínima de acesso à BD usada por este pacote — tanto
+// *pgxpool.Pool (produção) como pgxmock (testes) a implementam (mesmo
+// padrão de assiduidade.DBTX / push.DBTX / nexorapay.DBTX).
+type DBTX interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
+
 // Processor contém a lógica de processamento de eventos normalizados.
 type Processor struct {
-	db          *pgxpool.Pool
+	db          DBTX
 	assiduidade *assiduidade.Service
 	funcionario *funcionario.Service
 }
 
 // NewProcessor cria um novo processor.
-func NewProcessor(db *pgxpool.Pool) *Processor {
+func NewProcessor(db DBTX) *Processor {
 	return &Processor{
 		db:          db,
 		assiduidade: assiduidade.NewService(db),
@@ -38,71 +48,228 @@ type ProcessResult struct {
 	PresencaID   *int64
 	AttendanceID *int64
 	ErrorMessage string
+	// Permanent distingue uma falha de configuração (tenant sem empresa
+	// associada, método de assiduidade desactivado, credential_type sem
+	// mapeamento) — que não se resolve sozinha, não vale a pena o job de
+	// retry (Fase 5, item 1) voltar a tentar — de uma falha que pode
+	// legitimamente deixar de o ser com o tempo (employee_no ainda não
+	// mapeado, funcionário inactivo, erro transitório a gravar o evento).
+	Permanent bool
+}
+
+// deviceEventMaxAttempts e deviceEventBackoff espelham
+// notificationMaxAttempts/notificationBackoff (internal/background/jobs.go)
+// — mais curto: um evento de assiduidade por mapear vale a pena retomar em
+// minutos, não horas.
+const deviceEventMaxAttempts = 5
+
+var deviceEventBackoff = []time.Duration{
+	1 * time.Minute,
+	5 * time.Minute,
+	15 * time.Minute,
+	30 * time.Minute,
+	1 * time.Hour,
+}
+
+func deviceEventBackoffFor(attempts int) time.Duration {
+	idx := min(max(attempts-1, 0), len(deviceEventBackoff)-1)
+	return deviceEventBackoff[idx]
 }
 
 // Process grava o evento bruto e processa-o de acordo com o mapeamento do dispositivo.
 func (p *Processor) Process(ctx context.Context, deviceID, tenantID int64, event *models.NormalizedEvent) (int64, ProcessResult, error) {
 	raw, _ := json.Marshal(event.RawPayload)
 	eventHash := hashEvent(deviceID, event.EmployeeNo, event.EventTime, raw)
+	// normalized_payload guarda o NormalizedEvent já normalizado pelo
+	// adapter (CredentialType, Direction, coordenadas, etc.) — ao contrário
+	// de raw_payload (só os bytes brutos originais, para debug), é isto que
+	// permite ao job de retry (Fase 5, item 1) e ao replay manual (item 4)
+	// repetir processEntity mais tarde sem precisar do pedido original.
+	normalizedPayload, _ := json.Marshal(event)
 
 	// Insere de forma atómica: ON CONFLICT evita a janela entre "verificar
 	// duplicado" e "inserir" (dois pedidos concorrentes com o mesmo
 	// event_hash — ex.: retry do dispositivo a colidir com o pedido
 	// original — já não fazem a segunda chamada falhar com erro de
-	// constraint UNIQUE; devolve o evento já existente como processado).
+	// constraint UNIQUE; devolve o estado real do evento já existente).
 	var eventID int64
 	var inserted bool
 	err := p.db.QueryRow(ctx, `
 		INSERT INTO hardware.device_events
-		  (tenant_id, device_id, event_type, employee_no, event_time, event_hash, raw_payload)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		  (tenant_id, device_id, event_type, employee_no, event_time, event_hash, raw_payload, normalized_payload)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (event_hash) DO NOTHING
 		RETURNING id, TRUE`,
 		tenantID, deviceID, event.EventType, event.EmployeeNo,
-		event.EventTime, eventHash, raw,
+		event.EventTime, eventHash, raw, normalizedPayload,
 	).Scan(&eventID, &inserted)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			var existingID int64
+			var processed bool
+			var errorMessage *string
 			if scanErr := p.db.QueryRow(ctx, `
-				SELECT id FROM hardware.device_events WHERE event_hash = $1`,
+				SELECT id, processed, error_message FROM hardware.device_events WHERE event_hash = $1`,
 				eventHash,
-			).Scan(&existingID); scanErr == nil {
-				return existingID, ProcessResult{Processed: true}, nil
+			).Scan(&existingID, &processed, &errorMessage); scanErr == nil {
+				result := ProcessResult{Processed: processed}
+				if errorMessage != nil {
+					result.ErrorMessage = *errorMessage
+				}
+				return existingID, result, nil
 			}
 		}
 		return 0, ProcessResult{ErrorMessage: "erro ao registar evento"}, err
 	}
 
 	result := p.processEntity(ctx, tenantID, deviceID, event, eventID)
+	if err := p.finalizeEvent(ctx, eventID, 0, result); err != nil {
+		log.Printf("[hardware] gravar resultado do evento %d: %v", eventID, err)
+	}
+	return eventID, result, nil
+}
 
-	// Atualiza evento com resultado.
+// finalizeEvent grava o resultado de uma tentativa de processamento
+// (Process ou Retry) — attemptsBefore é o valor de "attempts" já gravado na
+// BD antes desta tentativa (0 na primeira chamada de Process, o valor
+// devolvido por ClaimForRetry nas seguintes).
+func (p *Processor) finalizeEvent(ctx context.Context, eventID int64, attemptsBefore int, result ProcessResult) error {
 	if result.Processed {
-		_, _ = p.db.Exec(ctx, `
+		_, err := p.db.Exec(ctx, `
 			UPDATE hardware.device_events
 			   SET processed = TRUE, processed_at = NOW(),
-			       presenca_id = $1, attendance_id = $2, error_message = $3
+			       presenca_id = $1, attendance_id = $2, error_message = $3,
+			       locked_at = NULL, locked_by = NULL
 			 WHERE id = $4`,
-			result.PresencaID, result.AttendanceID, result.ErrorMessage, eventID,
+			result.PresencaID, result.AttendanceID, nullIfEmptyString(result.ErrorMessage), eventID,
 		)
-	} else if result.ErrorMessage != "" {
-		_, _ = p.db.Exec(ctx, `
-			UPDATE hardware.device_events SET error_message = $1 WHERE id = $2`,
-			result.ErrorMessage, eventID,
-		)
+		return err
 	}
 
-	return eventID, result, nil
+	if result.Permanent {
+		_, err := p.db.Exec(ctx, `
+			UPDATE hardware.device_events
+			   SET error_message = $1, permanent_failure = TRUE,
+			       locked_at = NULL, locked_by = NULL
+			 WHERE id = $2`,
+			result.ErrorMessage, eventID,
+		)
+		return err
+	}
+
+	attempts := attemptsBefore + 1
+	_, err := p.db.Exec(ctx, `
+		UPDATE hardware.device_events
+		   SET error_message = $1, attempts = $2,
+		       available_at = NOW() + ($3 * INTERVAL '1 second'),
+		       locked_at = NULL, locked_by = NULL
+		 WHERE id = $4`,
+		nullIfEmptyString(result.ErrorMessage), attempts, deviceEventBackoffFor(attempts).Seconds(), eventID,
+	)
+	return err
+}
+
+func nullIfEmptyString(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+// deviceEventLeaseTimeout é quanto tempo um evento pode ficar reservado
+// (locked_at) antes de se considerar que o worker que o reservou morreu a
+// meio da tentativa e a reserva ser recuperada.
+const deviceEventLeaseTimeout = 5 * time.Minute
+
+// DeviceEventRetry é uma linha de hardware.device_events reservada para
+// nova tentativa de processamento — Fase 5, item 1, de
+// docs/analise-transactional-outbox-backends.md.
+type DeviceEventRetry struct {
+	ID                int64
+	TenantID          int64
+	DeviceID          int64
+	NormalizedPayload []byte
+	Attempts          int
+}
+
+// RecoverExpiredLeases devolve à disponibilidade de retry os eventos cujo
+// lease expirou (worker morto a meio da tentativa) — não mexe em
+// processed/permanent_failure, só liberta a reserva.
+func (p *Processor) RecoverExpiredLeases(ctx context.Context, leaseTimeout time.Duration) (int64, error) {
+	tag, err := p.db.Exec(ctx, `
+		UPDATE hardware.device_events
+		   SET locked_at = NULL, locked_by = NULL
+		 WHERE locked_at IS NOT NULL AND locked_at < NOW() - ($1 * INTERVAL '1 second')`,
+		leaseTimeout.Seconds())
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+// ClaimForRetry reserva até `limit` eventos não processados, não
+// permanentemente falhados e vencidos, para workerID — mesmo padrão de
+// claimPendingNotifications (internal/background/jobs.go) e
+// PaymentService.ClaimForReconciliation
+// (internal/pkg/nexorapay/service.go): UPDATE ... FROM (SELECT ... FOR
+// UPDATE SKIP LOCKED) RETURNING, atómico, sem tocar em
+// processed/permanent_failure — só locked_at/locked_by.
+func (p *Processor) ClaimForRetry(ctx context.Context, workerID string, limit int) ([]DeviceEventRetry, error) {
+	rows, err := p.db.Query(ctx, `
+		WITH candidatos AS (
+			SELECT id
+			  FROM hardware.device_events
+			 WHERE processed = FALSE AND permanent_failure = FALSE
+			   AND available_at <= NOW()
+			   AND locked_at IS NULL
+			 ORDER BY available_at, created_at, id
+			 LIMIT $1
+			 FOR UPDATE SKIP LOCKED
+		)
+		UPDATE hardware.device_events e
+		   SET locked_at = NOW(), locked_by = $2
+		  FROM candidatos c
+		 WHERE e.id = c.id
+		RETURNING e.id, e.tenant_id, e.device_id, COALESCE(e.normalized_payload, '{}'::jsonb), e.attempts`,
+		limit, workerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var retries []DeviceEventRetry
+	for rows.Next() {
+		var r DeviceEventRetry
+		if err := rows.Scan(&r.ID, &r.TenantID, &r.DeviceID, &r.NormalizedPayload, &r.Attempts); err != nil {
+			continue
+		}
+		retries = append(retries, r)
+	}
+	return retries, rows.Err()
+}
+
+// Retry desserializa o NormalizedEvent persistido em normalized_payload e
+// chama processEntity outra vez, gravando o resultado com a mesma lógica
+// de Process — usado pelo job de retry automático (internal/background/jobs.go)
+// e disponível para o replay manual (item 4) reprocessar sem precisar do
+// pedido HTTP/MQTT original.
+func (p *Processor) Retry(ctx context.Context, ev DeviceEventRetry) error {
+	var event models.NormalizedEvent
+	if err := json.Unmarshal(ev.NormalizedPayload, &event); err != nil {
+		return fmt.Errorf("desserializar normalized_payload do evento %d: %w", ev.ID, err)
+	}
+	result := p.processEntity(ctx, ev.TenantID, ev.DeviceID, &event, ev.ID)
+	return p.finalizeEvent(ctx, ev.ID, ev.Attempts, result)
 }
 
 func (p *Processor) processEntity(ctx context.Context, tenantID, deviceID int64, event *models.NormalizedEvent, eventID int64) ProcessResult {
 	saasTenantID, err := tenantid.ResolveSaas(ctx, p.db, tenantID)
 	if err != nil {
-		return ProcessResult{ErrorMessage: "dispositivo sem empresa/tenant associado correctamente"}
+		return ProcessResult{ErrorMessage: "dispositivo sem empresa/tenant associado correctamente", Permanent: true}
 	}
 
 	if activo, motivo := p.metodoAssiduidadeActivo(ctx, saasTenantID, event.CredentialType); !activo {
-		return ProcessResult{ErrorMessage: motivo}
+		return ProcessResult{ErrorMessage: motivo, Permanent: true}
 	}
 
 	var mapping struct {
@@ -149,7 +316,10 @@ func (p *Processor) processEntity(ctx context.Context, tenantID, deviceID int64,
 		return ProcessResult{Processed: true, AttendanceID: &aid}
 
 	default:
-		return ProcessResult{ErrorMessage: "entity_type não suportado"}
+		// Mapeamento existe mas com um entity_type que este processor não
+		// sabe tratar — problema de dados/config em hardware.device_users,
+		// não algo que se resolva sozinho com o tempo.
+		return ProcessResult{ErrorMessage: "entity_type não suportado", Permanent: true}
 	}
 }
 

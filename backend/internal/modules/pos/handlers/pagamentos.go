@@ -6,11 +6,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -29,10 +28,19 @@ import (
 
 // IniciarPagamento inicia um pagamento móvel via Nexora-Pay.
 // Body: {"provider":"mpesa","msisdn":"258841234567","amount":123.45}
+//
+// O pedido fica registado em integration.payment_intents (via
+// h.paySvc.Initiate) ANTES de chamar o gateway, com o próprio id do intent
+// como Idempotency-Key — Fase 4 de
+// docs/analise-transactional-outbox-backends.md: uma falha de rede a meio
+// da chamada fica marcada 'unknown' e é resolvida depois pelo job de
+// reconciliação (internal/background/jobs.go), em vez de se perder
+// silenciosamente como acontecia com a chave antiga derivada de
+// time.Now().
 func (h *Handler) IniciarPagamento(w http.ResponseWriter, r *http.Request) {
 	user := mw.GetUser(r)
 
-	if h.cfg.NexoraPayAPIKey == "" {
+	if h.cfg.NexoraPayAPIKey == "" || h.cfg.NexoraPayPublicKey == "" || h.paySvc == nil {
 		jsonErr(w, "Pagamento móvel não configurado", http.StatusServiceUnavailable)
 		return
 	}
@@ -50,47 +58,50 @@ func (h *Handler) IniciarPagamento(w http.ResponseWriter, r *http.Request) {
 		body.Provider = "mpesa"
 	}
 
-	pay := nexorapay.NewClient(h.cfg.NexoraPayBaseURL, h.cfg.NexoraPayAPIKey)
-
-	idempotencyKey := fmt.Sprintf("pos-%d-%d", user.TenantID, time.Now().UnixNano())
 	thirdPartyRef := fmt.Sprintf("POS-%d-%d", user.TenantID, time.Now().Unix())
 	txRef := fmt.Sprintf("POS%d", time.Now().Unix()%1e8)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 130*time.Second) // ligeiramente > timeout M-Pesa
 	defer cancel()
 
-	resp, status, err := pay.Post(ctx, "/v1/payments", idempotencyKey, map[string]any{
-		"provider":             body.Provider,
-		"serviceAccount":       "pos",
-		"transactionReference": txRef,
-		"thirdPartyReference":  thirdPartyRef,
-		"msisdn":               body.MSISDN,
-		"amount":               fmt.Sprintf("%.2f", body.Amount),
+	intent, err := h.paySvc.Initiate(ctx, nexorapay.InitiateInput{
+		TenantID: user.TenantID, SourceModule: "pos",
+		Provider: body.Provider, ServiceAccount: "pos",
+		MSISDN: body.MSISDN, Amount: body.Amount, Moeda: "MZN",
+		TransactionRef: txRef, ThirdPartyRef: thirdPartyRef,
+		CreatedBy: &user.ID,
 	})
 	if err != nil {
-		jsonErr(w, "Erro ao contactar o gateway de pagamento", http.StatusBadGateway)
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
-	if status != http.StatusCreated && status != http.StatusOK {
+	if intent.Status == nexorapay.IntentFailed {
 		errMsg := "Erro no gateway de pagamento"
-		if e, ok := resp["error"].(map[string]any); ok {
-			if m, ok := e["message"].(string); ok {
-				errMsg = m
-			}
+		if intent.Erro != nil {
+			errMsg = *intent.Erro
 		}
 		jsonErr(w, errMsg, http.StatusUnprocessableEntity)
 		return
 	}
 
-	data, _ := resp["data"].(map[string]any)
-	gatewayTxnID, _ := data["gatewayTransactionId"].(string)
-	responseCode, _ := data["responseCode"].(string)
+	var gatewayTxnID, responseCode string
+	if intent.GatewayTransactionID != nil {
+		gatewayTxnID = *intent.GatewayTransactionID
+	}
+	if intent.ResponseCode != nil {
+		responseCode = *intent.ResponseCode
+	}
+	mensagem := "Pedido de pagamento enviado. Verifique o telemóvel para confirmar."
+	if intent.Status == nexorapay.IntentUnknown {
+		mensagem = "Não foi possível confirmar o envio ao gateway. Vamos verificar automaticamente — tente consultar o estado dentro de instantes."
+	}
 
 	jsonOK(w, map[string]any{
 		"gateway_txn_id": gatewayTxnID,
 		"response_code":  responseCode,
 		"provider":       body.Provider,
-		"mensagem":       "Pedido de pagamento enviado. Verifique o telemóvel para confirmar.",
+		"status":         intent.Status,
+		"mensagem":       mensagem,
 	}, http.StatusAccepted)
 }
 
@@ -121,12 +132,12 @@ func (h *Handler) StatusPagamento(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.cfg.NexoraPayAPIKey == "" {
+	if h.cfg.NexoraPayAPIKey == "" || h.cfg.NexoraPayPublicKey == "" {
 		jsonErr(w, "Pagamento móvel não configurado", http.StatusServiceUnavailable)
 		return
 	}
 
-	pay := nexorapay.NewClient(h.cfg.NexoraPayBaseURL, h.cfg.NexoraPayAPIKey)
+	pay := nexorapay.NewClient(h.cfg.NexoraPayBaseURL, h.cfg.NexoraPayAPIKey, h.cfg.NexoraPayPublicKey)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
@@ -154,9 +165,15 @@ func (h *Handler) StatusPagamento(w http.ResponseWriter, r *http.Request) {
 // WebhookPagamento recebe a confirmação assíncrona do Nexora-Pay (push, em
 // vez de a app ter de fazer poll a StatusPagamento até o gateway lá ter
 // resultado). Endpoint público (sem RequireAuth — o gateway externo não tem
-// um token nosso), por isso o tenant nunca vem de mw.GetUser: extrai-se de
-// thirdPartyReference, que IniciarPagamento já gera no formato
-// "POS-<tenantId>-<unixSeconds>" precisamente para isto.
+// um token nosso).
+//
+// Passa por integration.inbox_events (h.paySvc.ProcessCallback) antes de
+// tocar em qualquer tabela de negócio — Fase 4, item 4, de
+// docs/analise-transactional-outbox-backends.md: um callback repetido
+// deduplica em vez de reprocessar sempre os campos como acontecia com o
+// UPSERT antigo. O tenant_id deixou de vir do parsing de
+// thirdPartyReference (frágil) — vem do próprio payment_intent, encontrado
+// por gateway_transaction_id, que o ERP gerou e confiou ao gateway.
 func (h *Handler) WebhookPagamento(w http.ResponseWriter, r *http.Request) {
 	rawBody, err := io.ReadAll(io.LimitReader(r.Body, 2<<20))
 	if err != nil {
@@ -190,40 +207,54 @@ func (h *Handler) WebhookPagamento(w http.ResponseWriter, r *http.Request) {
 		jsonErr(w, "gatewayTransactionId em falta", http.StatusBadRequest)
 		return
 	}
-	tenantID, ok := tenantIDDeThirdPartyRef(thirdPartyRef)
-	if !ok {
-		jsonErr(w, "thirdPartyReference inválida ou em falta", http.StatusBadRequest)
+
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	result, err := h.paySvc.WithTx(tx).ProcessCallback(r.Context(), nexorapay.CallbackInput{
+		GatewayTransactionID: gatewayTxnID,
+		Status:               status,
+		TransactionStatus:    txnStatus,
+		RawPayload:           rawBody,
+	})
+	if errors.Is(err, nexorapay.ErrIntentNotFound) {
+		// Nada que o ERP reconheça — não há tenant_id de confiança para
+		// gravar, e não vale a pena o gateway repetir a entrega. Responde
+		// 204 na mesma (idempotente do ponto de vista do gateway).
+		jsonOK(w, map[string]any{"ok": true}, http.StatusOK)
+		return
+	}
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
 
-	if _, err := h.db.Exec(r.Context(), `
-		INSERT INTO pos_payment_confirmations
-		  (tenant_id, gateway_txn_id, third_party_reference, provider, status, transaction_status, payload)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)
-		ON CONFLICT (tenant_id, gateway_txn_id) DO UPDATE
-		   SET status=EXCLUDED.status, transaction_status=EXCLUDED.transaction_status,
-		       payload=EXCLUDED.payload, confirmed_at=NOW()`,
-		tenantID, gatewayTxnID, thirdPartyRef, provider, status, txnStatus, rawBody,
-	); err != nil {
+	if !result.Duplicate {
+		tenantID := result.Intent.TenantID
+		if _, err := tx.Exec(r.Context(), `
+			INSERT INTO pos_payment_confirmations
+			  (tenant_id, gateway_txn_id, third_party_reference, provider, status, transaction_status, payload)
+			VALUES ($1,$2,$3,$4,$5,$6,$7)
+			ON CONFLICT (tenant_id, gateway_txn_id) DO UPDATE
+			   SET status=EXCLUDED.status, transaction_status=EXCLUDED.transaction_status,
+			       payload=EXCLUDED.payload, confirmed_at=NOW()`,
+			tenantID, gatewayTxnID, thirdPartyRef, provider, status, txnStatus, rawBody,
+		); err != nil {
+			jsonErr(w, "Erro interno", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// tenantIDDeThirdPartyRef extrai o tenant_id de uma referência no formato
-// "POS-<tenantId>-<unixSeconds>" (ver IniciarPagamento).
-func tenantIDDeThirdPartyRef(ref string) (int64, bool) {
-	partes := strings.Split(ref, "-")
-	if len(partes) != 3 || partes[0] != "POS" {
-		return 0, false
-	}
-	id, err := strconv.ParseInt(partes[1], 10, 64)
-	if err != nil || id <= 0 {
-		return 0, false
-	}
-	return id, true
 }
 
 // assinaturaWebhookValida verifica HMAC-SHA256 no formato "sha256=<hex>" —

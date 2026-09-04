@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
 	"nexora/internal/modules/gestao-escolar/repositories"
+	"nexora/internal/pkg/nexorapay"
 	"nexora/internal/shared/contracts"
 	"nexora/internal/storage"
 )
@@ -37,6 +38,7 @@ type Handler struct {
 	approval     contracts.ApprovalPort
 	sysConfig    contracts.SystemConfigPort
 	signature    contracts.SignaturePort
+	paySvc       *nexorapay.PaymentService
 }
 
 // Ports agrupa todos os ports de integração para injecção no Handler.
@@ -55,7 +57,7 @@ type Ports struct {
 }
 
 // New cria um novo handler do módulo escolar com os ports injectados.
-func New(db *pgxpool.Pool, cfg *config.Config, ports Ports) *Handler {
+func New(db *pgxpool.Pool, cfg *config.Config, ports Ports, paySvc *nexorapay.PaymentService) *Handler {
 	return &Handler{
 		db:             db,
 		cfg:            cfg,
@@ -79,6 +81,7 @@ func New(db *pgxpool.Pool, cfg *config.Config, ports Ports) *Handler {
 		approval:       ports.Approval,
 		sysConfig:      ports.SysConfig,
 		signature:      ports.Signature,
+		paySvc:         paySvc,
 	}
 }
 

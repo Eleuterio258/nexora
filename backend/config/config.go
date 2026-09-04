@@ -26,6 +26,16 @@ type Config struct {
 	Port       string
 	CORSOrigin string
 
+	// RunBackgroundJobs controla se este processo corre os jobs recorrentes
+	// (background.StartJobs — dispatch de notificações, reminders, etc.).
+	// Default true preserva o comportamento anterior à Fase 2 (jobs dentro
+	// do processo da API). Um operador que separe o dispatcher para
+	// cmd/worker deve pôr RUN_BACKGROUND_JOBS=false na API, para não correrem
+	// dois dispatchers em simultâneo — a reserva atómica em
+	// internal/background/jobs.go torna isso seguro mesmo que aconteça, mas
+	// desperdiça trabalho.
+	RunBackgroundJobs bool
+
 	// Avatar
 	AvatarMaxMB int64
 	AvatarDir   string
@@ -51,6 +61,7 @@ type Config struct {
 	// Nexora-Pay — gateway de pagamento (M-Pesa, eMola, mKesh)
 	NexoraPayBaseURL        string
 	NexoraPayAPIKey         string
+	NexoraPayPublicKey      string
 	NexoraPayServiceAccount string
 
 	// Email transaccional — API nativa do AWS SES; credenciais AWS pela
@@ -221,6 +232,7 @@ func Load() *Config {
 		JWTRefreshExpiresIn: parseDuration(env("JWT_REFRESH_EXPIRES_IN", "7d")),
 		Port:                env("PORT", "8080"),
 		CORSOrigin:          env("CORS_ORIGIN", "*"),
+		RunBackgroundJobs:   envBool("RUN_BACKGROUND_JOBS", true),
 		AvatarMaxMB:         envInt("AVATAR_MAX_MB", 2),
 		AvatarDir:           env("AVATAR_DIR", "./avatars"),
 
@@ -231,8 +243,9 @@ func Load() *Config {
 		IDHashSalt:              env("JWT_SECRET", "change-me-secret"),
 		GatewayWebhookSecret:    env("GATEWAY_WEBHOOK_SECRET", ""),
 		FirebaseCredentialsFile: env("FIREBASE_CREDENTIALS_FILE", "./config/e258tech-d439e.json"),
-		NexoraPayBaseURL:        env("NEXORA_PAY_BASE_URL", "http://nexora-pay:3000"),
+		NexoraPayBaseURL:        env("NEXORA_PAY_BASE_URL", "http://nexora-backend:3000"),
 		NexoraPayAPIKey:         env("NEXORA_PAY_API_KEY", ""),
+		NexoraPayPublicKey:      env("NEXORA_PAY_PUBLIC_KEY", ""),
 		NexoraPayServiceAccount: env("NEXORA_PAY_SERVICE_ACCOUNT", "gestao-escolar"),
 
 		SESRegion:   env("SES_REGION", "us-east-1"),

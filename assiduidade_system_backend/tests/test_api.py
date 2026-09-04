@@ -152,6 +152,7 @@ class TestBiometric:
     def test_enroll_and_verify_with_mocked_pipeline(
         self, client, db_session, fake_redis, system_credential, monkeypatch
     ):
+        from app import erp_client as erp_client_module
         from app.routers import biometric as biometric_router
 
         fixed_embedding = [0.5] * 512
@@ -164,7 +165,7 @@ class TestBiometric:
             return {"id": "fake"}
 
         monkeypatch.setattr(
-            biometric_router.erp_client, "validar_consentimento_ativo", _fake_validar_consentimento
+            erp_client_module.erp_client, "validar_consentimento_ativo", _fake_validar_consentimento
         )
 
         cred, secret = system_credential
@@ -211,9 +212,11 @@ class TestBiometric:
         assert response.status_code == 200
         assert response.json()["reason"] == "user_not_enrolled"
 
-    def test_model_version_mismatch_notifies_erp_webhook_once(
+    def test_model_version_mismatch_enqueues_outbox_event_once(
         self, client, db_session, fake_redis, system_credential, monkeypatch
     ):
+        from app import erp_client as erp_client_module
+        from app.models import OutboxEvent
         from app.routers import biometric as biometric_router
 
         user_uuid = str(uuid.uuid4())
@@ -226,7 +229,7 @@ class TestBiometric:
             return {"id": "fake"}
 
         monkeypatch.setattr(
-            biometric_router.erp_client, "validar_consentimento_ativo", _fake_validar_consentimento
+            erp_client_module.erp_client, "validar_consentimento_ativo", _fake_validar_consentimento
         )
 
         cred, secret = system_credential
@@ -239,13 +242,6 @@ class TestBiometric:
         # Simula uma mudanca de modelo de embedding depois do enrolamento.
         monkeypatch.setattr(biometric_router, "get_model_version", lambda: "arcface-v2")
 
-        notify_calls = []
-
-        async def _fake_notify(**kwargs):
-            notify_calls.append(kwargs)
-
-        monkeypatch.setattr(biometric_router.erp_client, "notify_reenroll_required", _fake_notify)
-
         verify_payload = {"user_id": user_uuid, "device_id": str(uuid.uuid4()), "image_base64": "fake"}
 
         headers, body = _sign(secret, cred.access_key_id, "POST", "/api/v1/biometric/verify", payload=verify_payload)
@@ -255,14 +251,17 @@ class TestBiometric:
         # A 1a transicao para PENDING_REENROLL ja tira o template de ACTIVE,
         # por isso a 2a tentativa cai em user_not_enrolled — nao ha um 2o
         # "model_version_mismatch" possivel para o mesmo template, o que por
-        # construcao ja garante que o webhook so dispara uma vez.
+        # construcao ja garante que o evento so e enfileirado uma vez.
         headers, body = _sign(secret, cred.access_key_id, "POST", "/api/v1/biometric/verify", payload=verify_payload)
         response = client.post("/api/v1/biometric/verify", content=body, headers=headers)
         assert response.json()["reason"] == "user_not_enrolled"
 
-        assert len(notify_calls) == 1
-        assert notify_calls[0]["erp_user_id"] == user_uuid
-        assert notify_calls[0]["new_model_version"] == "arcface-v2"
+        events = db_session.query(OutboxEvent).filter_by(event_type="biometric.reenroll_required.v1").all()
+        assert len(events) == 1
+        assert events[0].payload["erp_user_id"] == user_uuid
+        assert events[0].payload["new_model_version"] == "arcface-v2"
+        assert events[0].status == "pending"
+        assert events[0].aggregate_type == "face_template"
 
 
 # ============================================================

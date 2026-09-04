@@ -15,12 +15,13 @@ import (
 
 // Client faz chamadas HTTP ao nexora-pay com X-API-Key.
 type Client struct {
-	baseURL string
-	apiKey  string
+	baseURL   string
+	apiKey    string
+	publicKey string
 }
 
-func NewClient(baseURL, apiKey string) *Client {
-	return &Client{baseURL: baseURL, apiKey: apiKey}
+func NewClient(baseURL, apiKey, publicKey string) *Client {
+	return &Client{baseURL: baseURL, apiKey: apiKey, publicKey: publicKey}
 }
 
 func (c *Client) Post(ctx context.Context, path string, idempotencyKey string, body any) (map[string]any, int, error) {
@@ -31,6 +32,7 @@ func (c *Client) Post(ctx context.Context, path string, idempotencyKey string, b
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-API-Key", c.apiKey)
+	req.Header.Set("X-Public-Key", c.publicKey)
 	if idempotencyKey != "" {
 		req.Header.Set("Idempotency-Key", idempotencyKey)
 	}
@@ -51,6 +53,7 @@ func (c *Client) Get(ctx context.Context, path string) (map[string]any, int, err
 		return nil, 0, err
 	}
 	req.Header.Set("X-API-Key", c.apiKey)
+	req.Header.Set("X-Public-Key", c.publicKey)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, 0, err

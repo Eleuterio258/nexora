@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -39,6 +40,11 @@ type reenrollRequiredRequest struct {
 	TenantID        string `json:"tenant_id"`
 	OldModelVersion string `json:"old_model_version"`
 	NewModelVersion string `json:"new_model_version"`
+	// EventID identifica o evento do outbox do FaceClock (Fase 1 de
+	// docs/analise-transactional-outbox-backends.md). Opcional por
+	// tolerância: sem ele, o pedido cai no comportamento anterior
+	// (deduplicação só pelo `WHERE NOT EXISTS` de notif_colaborador).
+	EventID string `json:"event_id"`
 }
 
 // POST /api/hardware/assiduidade/biometria/reenroll-required
@@ -87,24 +93,108 @@ func (h *Handler) NotificarReenrollDevice(w http.ResponseWriter, r *http.Request
 		"device_nome":         device.Nome,
 	})
 
-	// user_id fica NULL: o actor é um dispositivo, não uma conta de utilizador,
-	// e audit_logs.user_id é lido/indexado como auth.users.id. A identificação
-	// do dispositivo vai em `detalhes`.
-	if _, err := h.db.Exec(r.Context(), `
-		INSERT INTO auditoria.audit_logs (tenant_id, user_id, modulo, entidade, entidade_id, acao, detalhes, ip_address)
-		VALUES ($1, NULL, 'recursos-humanos', 'biometria_facial', $2, 'reenroll_required', $3, $4)`,
-		tenantID, funcionarioID, detalhes, r.RemoteAddr,
-	); err != nil {
+	// Inbox + auditoria + aviso ao colaborador entram na mesma transação: um
+	// webhook aceite tem de deixar todas as linhas gravadas, ou nenhuma —
+	// nunca uma auditoria órfã sem o aviso correspondente (Fase 0, item 5), e
+	// nunca uma duplicação de ambas quando o worker do outbox reenvia o
+	// mesmo evento (Fase 1, item 6, de
+	// docs/analise-transactional-outbox-backends.md).
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	result, err := processReenrollWebhook(r.Context(), tx, reenrollWebhookInput{
+		TenantID:      tenantID,
+		FuncionarioID: funcionarioID,
+		ErpUserID:     erpUserID,
+		EventID:       body.EventID,
+		Detalhes:      detalhes,
+		RemoteAddr:    r.RemoteAddr,
+	})
+	if err != nil {
 		jsonErr(w, "Erro interno", http.StatusInternalServerError)
 		return
 	}
 
-	// Aviso ao colaborador. O `WHERE NOT EXISTS` torna a operação idempotente:
-	// se o FaceClock repetir a notificação (retry, ou o template voltar a
-	// transitar para PENDING_REENROLL depois de outro enrolamento falhado),
-	// não se acumulam avisos por ler sobre o mesmo assunto.
+	if err := tx.Commit(r.Context()); err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w, map[string]any{
+		"funcionario_id": funcionarioID,
+		"event_id":       body.EventID,
+		"duplicate":      result.Duplicate,
+		"notificado":     result.Notified,
+	}, http.StatusAccepted)
+}
+
+// reenrollWebhookInput agrupa os dados já validados/resolvidos pelo handler
+// (tenant do device, funcionário, corpo do pedido) que processReenrollWebhook
+// precisa para gravar inbox + auditoria + aviso.
+type reenrollWebhookInput struct {
+	TenantID      int64
+	FuncionarioID int64
+	ErpUserID     int64
+	EventID       string
+	Detalhes      []byte
+	RemoteAddr    string
+}
+
+type reenrollWebhookResult struct {
+	Duplicate bool
+	Notified  bool
+}
+
+// processReenrollWebhook grava, numa única unidade de trabalho, a
+// deduplicação por event_id (integration.inbox_events), a auditoria
+// (auditoria.audit_logs) e o aviso ao colaborador (notif_colaborador).
+// Recebe pgx.Tx directamente (não *pgxpool.Pool) para poder ser testado com
+// pgxmock sem precisar de um Handler completo — mesmo padrão de
+// internal/modules/recursos-humanos/service/assiduidade (DBTX/NewServiceWithTx,
+// Fase 0).
+func processReenrollWebhook(ctx context.Context, tx pgx.Tx, in reenrollWebhookInput) (reenrollWebhookResult, error) {
+	// Deduplicação forte por event_id: um evento já visto (mesmo
+	// source_service+event_id) não repete auditoria nem notificação, por
+	// mais vezes que o worker do FaceClock o reenvie. TenantID já vem do
+	// device autenticado (resolveSaasTenantID), nunca do corpo do pedido —
+	// mesma garantia já aplicada a FuncionarioID.
+	if in.EventID != "" {
+		var inboxID int64
+		err := tx.QueryRow(ctx, `
+			INSERT INTO integration.inbox_events (source_service, event_id, event_type, tenant_id, payload)
+			VALUES ('faceclock', $1, 'biometric.reenroll_required.v1', $2, $3)
+			ON CONFLICT (source_service, event_id) DO NOTHING
+			RETURNING id`,
+			in.EventID, in.TenantID, in.Detalhes,
+		).Scan(&inboxID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return reenrollWebhookResult{Duplicate: true}, nil
+		}
+		if err != nil {
+			return reenrollWebhookResult{}, err
+		}
+	}
+
+	// user_id fica NULL: o actor é um dispositivo, não uma conta de
+	// utilizador, e audit_logs.user_id é lido/indexado como auth.users.id. A
+	// identificação do dispositivo vai em `detalhes`.
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO auditoria.audit_logs (tenant_id, user_id, modulo, entidade, entidade_id, acao, detalhes, ip_address)
+		VALUES ($1, NULL, 'recursos-humanos', 'biometria_facial', $2, 'reenroll_required', $3, $4)`,
+		in.TenantID, in.FuncionarioID, in.Detalhes, in.RemoteAddr,
+	); err != nil {
+		return reenrollWebhookResult{}, err
+	}
+
+	// Aviso ao colaborador. O `WHERE NOT EXISTS` continua a existir como
+	// segunda camada de idempotência (cobre também o caso sem event_id): não
+	// se acumulam avisos por ler sobre o mesmo assunto.
 	var notificacaoID int64
-	err = h.db.QueryRow(r.Context(), `
+	notifErr := tx.QueryRow(ctx, `
 		INSERT INTO notif_colaborador (tenant_id, user_id, tipo, titulo, corpo, link)
 		SELECT $1, $2, 'biometria_reenroll',
 		       'Registo facial desactualizado',
@@ -116,17 +206,13 @@ func (h *Handler) NotificarReenrollDevice(w http.ResponseWriter, r *http.Request
 		          AND tipo = 'biometria_reenroll' AND NOT lida
 		 )
 		RETURNING id`,
-		tenantID, erpUserID,
+		in.TenantID, in.ErpUserID,
 	).Scan(&notificacaoID)
 
 	// Zero linhas = já existia um aviso por ler; não é erro.
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		jsonErr(w, "Erro interno", http.StatusInternalServerError)
-		return
+	if notifErr != nil && !errors.Is(notifErr, pgx.ErrNoRows) {
+		return reenrollWebhookResult{}, notifErr
 	}
 
-	jsonOK(w, map[string]any{
-		"funcionario_id": funcionarioID,
-		"notificado":     err == nil,
-	}, http.StatusAccepted)
+	return reenrollWebhookResult{Notified: notifErr == nil}, nil
 }

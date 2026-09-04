@@ -46,7 +46,7 @@ func (h *Handler) EnviarFaturaEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	refID := id
-	h.notification.Send(r.Context(), contracts.Notification{
+	if err := h.notification.Send(r.Context(), contracts.Notification{
 		TenantID:        user.TenantID,
 		CanalTipo:       "email",
 		Destinatario:    clienteEmail,
@@ -56,7 +56,10 @@ func (h *Handler) EnviarFaturaEmail(w http.ResponseWriter, r *http.Request) {
 		ReferenciaID:    &refID,
 		AnexoStorageKey: invoicePDFKey(user.TenantID, id),
 		AnexoNome:       fmt.Sprintf("factura-%s.pdf", numero),
-	})
+	}); err != nil {
+		jsonErr(w, "Erro ao enfileirar o envio do e-mail", http.StatusInternalServerError)
+		return
+	}
 
 	jsonOK(w, map[string]any{"ok": true}, http.StatusOK)
 }
@@ -97,7 +100,7 @@ func (h *Handler) EnviarNotaCreditoEmail(w http.ResponseWriter, r *http.Request)
 	}
 
 	refID := id
-	h.notification.Send(r.Context(), contracts.Notification{
+	if err := h.notification.Send(r.Context(), contracts.Notification{
 		TenantID:        user.TenantID,
 		CanalTipo:       "email",
 		Destinatario:    clienteEmail,
@@ -107,7 +110,10 @@ func (h *Handler) EnviarNotaCreditoEmail(w http.ResponseWriter, r *http.Request)
 		ReferenciaID:    &refID,
 		AnexoStorageKey: creditNotePDFKey(user.TenantID, id),
 		AnexoNome:       fmt.Sprintf("nota-credito-%s.pdf", numero),
-	})
+	}); err != nil {
+		jsonErr(w, "Erro ao enfileirar o envio do e-mail", http.StatusInternalServerError)
+		return
+	}
 
 	jsonOK(w, map[string]any{"ok": true}, http.StatusOK)
 }

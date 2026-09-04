@@ -162,6 +162,66 @@ func TestRegistarEvento_EstadoForcadoParaCorrecao(t *testing.T) {
 	}
 }
 
+// Fase 0, item 4: evento e auditoria são atómicos — se o INSERT em
+// rh.auditoria_assiduidade falhar, RegistarEvento tem de devolver erro em vez
+// de devolver o evento como se a auditoria tivesse sido gravada.
+func TestRegistarEvento_FalhaNaAuditoriaPropagaErro(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mock.Close()
+
+	svc := NewService(mock)
+	ocorridoEm := time.Date(2026, 7, 20, 7, 55, 0, 0, time.UTC)
+
+	mock.ExpectQuery("SELECT id FROM rh.tipos_evento").
+		WithArgs(int64(1), "entrada").
+		WillReturnRows(pgxmock.NewRows([]string{"id"}).AddRow(int64(100)))
+
+	expectedHash := hashEventoAssiduidade(1, 10, 100, "manual", nil, ocorridoEm)
+	mock.ExpectQuery("SELECT id, tenant_id, funcionario_id").
+		WithArgs(int64(1), expectedHash).
+		WillReturnError(pgx.ErrNoRows)
+
+	anyArgs := make([]any, 24)
+	for i := range anyArgs {
+		anyArgs[i] = pgxmock.AnyArg()
+	}
+	mock.ExpectQuery("INSERT INTO rh.eventos_assiduidade").
+		WithArgs(anyArgs...).
+		WillReturnRows(pgxmock.NewRows(eventoRowColumns()).
+			AddRow(
+				int64(701), int64(1), int64(10), int64(100), (*int64)(nil),
+				ocorridoEm, ocorridoEm, "manual", (*int64)(nil), (*int64)(nil), (*int64)(nil),
+				(*float64)(nil), (*float64)(nil), (*int64)(nil), (*bool)(nil),
+				(*string)(nil), (*string)(nil), "valido", (*int64)(nil), (*string)(nil), (*string)(nil),
+				(*int64)(nil), (*int64)(nil), (*string)(nil), (*string)(nil), models.StringPtr("hash-novo-2"),
+				ocorridoEm, ocorridoEm,
+			))
+	auditArgs := make([]any, 14)
+	for i := range auditArgs {
+		auditArgs[i] = pgxmock.AnyArg()
+	}
+	mock.ExpectExec("INSERT INTO rh.auditoria_assiduidade").
+		WithArgs(auditArgs...).
+		WillReturnError(errors.New("violação de constraint"))
+
+	_, err = svc.RegistarEvento(context.Background(), 1, RegistarEventoInput{
+		FuncionarioID:    10,
+		TipoEventoCodigo: "entrada",
+		OcorridoEm:       ocorridoEm,
+		Origem:           "manual",
+	})
+	if err == nil {
+		t.Fatal("RegistarEvento err = nil, want erro propagado da auditoria")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("expectations not met: %v", err)
+	}
+}
+
 // Um método explicitamente desactivado na configuração do tenant é recusado —
 // é o que dá efeito real ao ecrã de configuração de assiduidade sobre os
 // métodos que não passam pelo FaceClock (PIN, QR, NFC, manual...).

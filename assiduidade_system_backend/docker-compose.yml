@@ -62,6 +62,32 @@ services:
       retries: 5
       start_period: 30s
 
+  outbox-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: assiduidade-outbox-worker
+    entrypoint: /entrypoint-worker.sh
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:admin@pg:5432/faceclock}
+      ERP_BASE_URL: ${ERP_BASE_URL:-https://api.nexora.e258tech.tech}
+      ERP_API_KEY: ${ERP_API_KEY:-}
+      ERP_TIMEOUT_SECONDS: ${ERP_TIMEOUT_SECONDS:-10}
+      ERP_REENROLL_WEBHOOK_URL: ${ERP_REENROLL_WEBHOOK_URL:-}
+      OUTBOX_BATCH_SIZE: ${OUTBOX_BATCH_SIZE:-50}
+      OUTBOX_POLL_INTERVAL_SECONDS: ${OUTBOX_POLL_INTERVAL_SECONDS:-5}
+      OUTBOX_LEASE_SECONDS: ${OUTBOX_LEASE_SECONDS:-300}
+      NEXORA_CREDENTIAL_ENCRYPTION_KEY: ${NEXORA_CREDENTIAL_ENCRYPTION_KEY:-change-me-nexora-credential-encryption-key}
+    depends_on:
+      - redis
+    networks:
+      - backend
+
 networks:
   backend:
     external: true

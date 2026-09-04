@@ -50,6 +50,7 @@ class TestExportTemplates:
     def test_export_returns_ciphertext_and_metadata(
         self, client, db_session, fake_redis, system_credential, monkeypatch
     ):
+        from app import erp_client as erp_client_module
         from app.routers import biometric as biometric_router
 
         monkeypatch.setattr(biometric_router, "assess_capture_quality", lambda *args, **kwargs: (0.95, None))
@@ -60,7 +61,7 @@ class TestExportTemplates:
             return {"id": "fake"}
 
         monkeypatch.setattr(
-            biometric_router.erp_client, "validar_consentimento_ativo", _fake_validar_consentimento
+            erp_client_module.erp_client, "validar_consentimento_ativo", _fake_validar_consentimento
         )
 
         cred, secret = system_credential
@@ -92,6 +93,7 @@ class TestExportTemplates:
         assert raw.startswith(b"enc:v2:") or raw.startswith(b"enc:v1:")
 
     def test_export_isolated_by_tenant(self, client, db_session, fake_redis, monkeypatch):
+        from app import erp_client as erp_client_module
         from app.routers import biometric as biometric_router
 
         monkeypatch.setattr(biometric_router, "assess_capture_quality", lambda *args, **kwargs: (0.95, None))
@@ -102,7 +104,7 @@ class TestExportTemplates:
             return {"id": "fake"}
 
         monkeypatch.setattr(
-            biometric_router.erp_client, "validar_consentimento_ativo", _fake_validar_consentimento
+            erp_client_module.erp_client, "validar_consentimento_ativo", _fake_validar_consentimento
         )
 
         cred_a, secret_a = create_credential(

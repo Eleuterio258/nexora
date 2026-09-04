@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -61,16 +62,18 @@ func (h *Handler) userIDDoCandidato(ctx context.Context, candidatoID int64) (int
 	return *userID, nil
 }
 
-// notificarCandidatoPush envia um push ao candidato da candidatura quando o
-// recrutador (ou o sistema) lhe deixa uma nova mensagem/nota. Falhas aqui
-// nunca devem impedir a operação que a chamou — por isso não devolve erro,
-// apenas ignora silenciosamente (o Service já regista falhas em log).
+// notificarCandidatoPush enfileira um push ao candidato da candidatura
+// quando o recrutador (ou o sistema) lhe deixa uma nova mensagem/nota. A
+// entrega real fica a cargo do dispatcher persistente
+// (internal/background/jobs.go) — Falhas ao enfileirar aqui nunca devem
+// impedir a operação que a chamou, por isso não devolve erro.
 func (h *Handler) notificarCandidatoPush(ctx context.Context, candidaturaID int64, autor, conteudo string) {
+	var tenantID int64
 	var candidatoID *int64
 	var vagaTitulo string
 	if err := h.db.QueryRow(ctx, `
-		SELECT candidato_id, vaga_titulo FROM recrutamento.candidaturas WHERE id=$1`,
-		candidaturaID).Scan(&candidatoID, &vagaTitulo); err != nil || candidatoID == nil {
+		SELECT tenant_id, candidato_id, vaga_titulo FROM recrutamento.candidaturas WHERE id=$1`,
+		candidaturaID).Scan(&tenantID, &candidatoID, &vagaTitulo); err != nil || candidatoID == nil {
 		return
 	}
 
@@ -84,8 +87,10 @@ func (h *Handler) notificarCandidatoPush(ctx context.Context, candidaturaID int6
 		corpo = corpo[:137] + "..."
 	}
 
-	h.push.SendToUser(ctx, userID, "Nova mensagem — "+vagaTitulo, corpo, map[string]string{
+	if _, err := h.push.EnqueueToUser(ctx, tenantID, userID, "Nova mensagem — "+vagaTitulo, corpo, map[string]string{
 		"tipo":           "candidatura_mensagem",
 		"candidatura_id": strconv.FormatInt(candidaturaID, 10),
-	})
+	}); err != nil {
+		log.Printf("[recrutamento] enfileirar push de mensagem: %v", err)
+	}
 }

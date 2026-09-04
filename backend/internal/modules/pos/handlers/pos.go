@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -1426,9 +1427,11 @@ func (h *Handler) CriarVenda(w http.ResponseWriter, r *http.Request) {
 		h.wsHub.SendEvent(user.ID, ws.EvtPagamentoRecebido, map[string]any{"venda_id": id, "valor": valorRecebido})
 	}
 	if h.push != nil {
-		h.push.SendToUser(ctx, user.ID, "Venda concluída",
+		if _, err := h.push.EnqueueToUser(ctx, user.TenantID, user.ID, "Venda concluída",
 			fmt.Sprintf("Venda %s registada — %.2f %s", numero, totalGeral, "MZN"),
-			map[string]string{"tipo": "venda_criada", "venda_id": strconv.FormatInt(id, 10)})
+			map[string]string{"tipo": "venda_criada", "venda_id": strconv.FormatInt(id, 10)}); err != nil {
+			log.Printf("[pos] enfileirar push de venda: %v", err)
+		}
 	}
 
 	jsonOK(w, map[string]any{

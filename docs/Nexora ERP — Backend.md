@@ -76,7 +76,7 @@ Plataforma: `auth`, `utilizadores`, `empresas`, `auditoria`, `seguranca`, `notif
 | `GATEWAY_WEBHOOK_SECRET` | — | Validação de webhooks da gateway de pagamentos |
 | `FIREBASE_CREDENTIALS_FILE` | `./config/e258tech-d439e.json` | Credenciais do Firebase Admin SDK (push notifications) |
 | `NEXORA_PAY_BASE_URL` | `http://nexora-pay:3000` | Gateway Nexora-Pay (M-Pesa/eMola/mKesh) |
-| `NEXORA_PAY_API_KEY` / `NEXORA_PAY_SERVICE_ACCOUNT` | — / `gestao-escolar` | Credenciais da gateway |
+| `NEXORA_PAY_API_KEY` / `NEXORA_PAY_PUBLIC_KEY` / `NEXORA_PAY_SERVICE_ACCOUNT` | — / — / `gestao-escolar` | Par de chaves e conta de serviço da gateway |
 | `SES_REGION` / `SES_FROM` / `SES_FROM_NAME` | `us-east-1` / — / `Nexora ERP` | Envio de email via AWS SES (credenciais AWS pela cadeia standard do SDK, não por env var própria) |
 | `STORAGE_PROVIDER` | `minio` (alt. `local`) | Provider de storage de ficheiros |
 | `STORAGE_LOCAL_DIR` / `STORAGE_PUBLIC_URL` | `./uploads` / — | Storage local |

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -78,29 +79,26 @@ func (h *Handler) PublicarAvaliacao(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Notificar alunos da turma quando avaliação é publicada
+	// Notificar alunos da turma quando avaliação é publicada — síncrono
+	// desde a Fase 3 (h.notification.Send só grava a mensagem, a entrega
+	// real é do dispatcher persistente em internal/background/jobs.go).
 	if body.Publicado {
-		tenantID, gradeItemID := u.TenantID, id
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer cancel()
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
 
-			var classID int64
-			var disciplina, turma string
-			_ = h.db.QueryRow(ctx, `
-				SELECT g.class_id, COALESCE(s.nome,''), COALESCE(c.nome,'')
-				FROM gestao_escolar.school_grade_items g
-				LEFT JOIN gestao_escolar.school_subjects s ON s.id = g.subject_id
-				LEFT JOIN gestao_escolar.school_classes c ON c.id = g.class_id
-				WHERE g.id = $1 AND g.tenant_id = $2`, gradeItemID, tenantID,
-			).Scan(&classID, &disciplina, &turma)
+		var classID int64
+		var disciplina, turma string
+		_ = h.db.QueryRow(ctx, `
+			SELECT g.class_id, COALESCE(s.nome,''), COALESCE(c.nome,'')
+			FROM gestao_escolar.school_grade_items g
+			LEFT JOIN gestao_escolar.school_subjects s ON s.id = g.subject_id
+			LEFT JOIN gestao_escolar.school_classes c ON c.id = g.class_id
+			WHERE g.id = $1 AND g.tenant_id = $2`, id, u.TenantID,
+		).Scan(&classID, &disciplina, &turma)
 
-			if classID == 0 {
-				return
-			}
-
+		if classID != 0 {
 			// Notificar alunos e encarregados principais da turma
-			rows, err := h.db.Query(ctx, `
+			if rows, err := h.db.Query(ctx, `
 				SELECT COALESCE(NULLIF(st.portal_email,''), u.email) email_aluno,
 				       st.id student_id,
 				       COALESCE(g.portal_email, '') email_enc
@@ -111,36 +109,38 @@ func (h *Handler) PublicarAvaliacao(w http.ResponseWriter, r *http.Request) {
 				         ON g.student_id = st.id AND g.principal = true AND g.portal_ativo = true
 				 WHERE e.class_id = $1 AND e.tenant_id = $2 AND e.status = 'activa'
 				   AND COALESCE(NULLIF(st.portal_email,''), u.email) IS NOT NULL`,
-				classID, tenantID)
-			if err != nil {
-				return
-			}
-			defer rows.Close()
-			for rows.Next() {
-				var emailAluno, emailEnc string
-				var studentID int64
-				if rows.Scan(&emailAluno, &studentID, &emailEnc) != nil || h.notification == nil {
-					continue
-				}
-				sid := studentID
-				corpo := fmt.Sprintf("As notas de %s foram publicadas para a turma %s. Aceda ao portal para consultar o boletim.", disciplina, turma)
+				classID, u.TenantID); err == nil {
+				for rows.Next() {
+					var emailAluno, emailEnc string
+					var studentID int64
+					if rows.Scan(&emailAluno, &studentID, &emailEnc) != nil || h.notification == nil {
+						continue
+					}
+					sid := studentID
+					corpo := fmt.Sprintf("As notas de %s foram publicadas para a turma %s. Aceda ao portal para consultar o boletim.", disciplina, turma)
 
-				if emailAluno != "" {
-					h.notification.Send(ctx, contracts.Notification{
-						TenantID: tenantID, CanalTipo: "email", Destinatario: emailAluno,
-						Assunto: fmt.Sprintf("Notas publicadas: %s", disciplina),
-						Corpo:   corpo, ReferenciaTipo: "escolar.notas", ReferenciaID: &sid,
-					})
+					if emailAluno != "" {
+						if err := h.notification.Send(ctx, contracts.Notification{
+							TenantID: u.TenantID, CanalTipo: "email", Destinatario: emailAluno,
+							Assunto: fmt.Sprintf("Notas publicadas: %s", disciplina),
+							Corpo:   corpo, ReferenciaTipo: "escolar.notas", ReferenciaID: &sid,
+						}); err != nil {
+							log.Printf("[gestao-escolar] notificar notas (aluno): %v", err)
+						}
+					}
+					if emailEnc != "" && emailEnc != emailAluno {
+						if err := h.notification.Send(ctx, contracts.Notification{
+							TenantID: u.TenantID, CanalTipo: "email", Destinatario: emailEnc,
+							Assunto: fmt.Sprintf("Notas do seu educando publicadas: %s", disciplina),
+							Corpo:   "Encarregado, " + corpo, ReferenciaTipo: "escolar.notas", ReferenciaID: &sid,
+						}); err != nil {
+							log.Printf("[gestao-escolar] notificar notas (encarregado): %v", err)
+						}
+					}
 				}
-				if emailEnc != "" && emailEnc != emailAluno {
-					h.notification.Send(ctx, contracts.Notification{
-						TenantID: tenantID, CanalTipo: "email", Destinatario: emailEnc,
-						Assunto: fmt.Sprintf("Notas do seu educando publicadas: %s", disciplina),
-						Corpo:   "Encarregado, " + corpo, ReferenciaTipo: "escolar.notas", ReferenciaID: &sid,
-					})
-				}
+				rows.Close()
 			}
-		}()
+		}
 	}
 
 	w.WriteHeader(http.StatusNoContent)

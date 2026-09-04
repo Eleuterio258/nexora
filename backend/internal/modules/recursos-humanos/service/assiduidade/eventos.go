@@ -54,6 +54,24 @@ type RegistarEventoInput struct {
 // por dia civil. Isto mantém RegistarEvento uma escrita "burra", conforme a
 // separação bruto/calculado pedida no requisito (secção 13).
 func (s *Service) RegistarEvento(ctx context.Context, tenantID int64, in RegistarEventoInput) (*models.EventoAssiduidade, error) {
+	var ev *models.EventoAssiduidade
+	err := s.withTx(ctx, func(s *Service) error {
+		var err error
+		ev, err = s.registarEvento(ctx, tenantID, in)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ev, nil
+}
+
+// registarEvento contém a implementação de RegistarEvento; corre sempre
+// dentro da unidade de trabalho aberta por withTx, para que o INSERT do
+// evento e o da auditoria (rh.auditoria_assiduidade) sejam atómicos: uma
+// falha na auditoria reverte também o evento, em vez de deixar um evento
+// gravado sem o correspondente registo de auditoria (Fase 0, item 4).
+func (s *Service) registarEvento(ctx context.Context, tenantID int64, in RegistarEventoInput) (*models.EventoAssiduidade, error) {
 	tipoEventoID, err := s.resolverTipoEventoID(ctx, tenantID, in.TipoEventoCodigo)
 	if err != nil {
 		return nil, err
@@ -146,18 +164,22 @@ func (s *Service) RegistarEvento(ctx context.Context, tenantID int64, in Regista
 		return nil, err
 	}
 
-	if valorNovo, jsonErr := json.Marshal(ev); jsonErr == nil {
-		_ = RegistarAuditoria(ctx, s.db, AuditoriaEntry{
-			TenantID:    tenantID,
-			Tabela:      "eventos_assiduidade",
-			RegistoID:   ev.ID,
-			Operacao:    "INSERT",
-			ValorNovo:   valorNovo,
-			AlteradoPor: in.RegistadoPor,
-			Motivo:      in.Motivo,
-			IPOrigem:    in.IPOrigem,
-			EstadoNovo:  &ev.Estado,
-		})
+	valorNovo, err := json.Marshal(ev)
+	if err != nil {
+		return nil, fmt.Errorf("serializar evento para auditoria: %w", err)
+	}
+	if err := RegistarAuditoria(ctx, s.db, AuditoriaEntry{
+		TenantID:    tenantID,
+		Tabela:      "eventos_assiduidade",
+		RegistoID:   ev.ID,
+		Operacao:    "INSERT",
+		ValorNovo:   valorNovo,
+		AlteradoPor: in.RegistadoPor,
+		Motivo:      in.Motivo,
+		IPOrigem:    in.IPOrigem,
+		EstadoNovo:  &ev.Estado,
+	}); err != nil {
+		return nil, fmt.Errorf("registar auditoria do evento: %w", err)
 	}
 
 	return &ev, nil

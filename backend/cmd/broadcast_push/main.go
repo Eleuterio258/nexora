@@ -55,9 +55,11 @@ func main() {
 
 	fmt.Printf("Candidatos encontrados no tenant %d: %d\n", *tenantID, len(userIDs))
 	for _, id := range userIDs {
-		pushSvc.SendToUser(ctx, id, *title, *body, map[string]string{
+		if _, err := pushSvc.EnqueueToUser(ctx, *tenantID, id, *title, *body, map[string]string{
 			"tipo": "broadcast_candidaturas",
-		})
+		}); err != nil {
+			log.Printf("erro ao enfileirar para user_id=%d: %v", id, err)
+		}
 	}
-	fmt.Println("Concluído.")
+	fmt.Println("Notificações enfileiradas — entrega feita pelo dispatcher persistente (internal/background.StartJobs).")
 }

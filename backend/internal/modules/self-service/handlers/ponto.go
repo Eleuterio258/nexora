@@ -176,6 +176,18 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 	var qrLocationID *string
 	var nfcTagID *int64
 
+	// A partir daqui, todas as escritas (consumo de QR, consumo do
+	// comprovativo facial e o próprio evento) participam da mesma
+	// transação: uma prova só fica consumida se o ponto também ficar
+	// gravado, e vice-versa.
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		jsonErr(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+	txSvc := assiduidade.NewServiceWithTx(tx)
+
 	if body.Metodo == "nfc" {
 		tagUID, _ := body.Dados["nfc_tag_id"].(string)
 		tagUID = strings.ToUpper(strings.TrimSpace(tagUID))
@@ -185,7 +197,7 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var id int64
-		err := h.db.QueryRow(r.Context(), `
+		err := tx.QueryRow(r.Context(), `
 			SELECT id
 			  FROM rh.nfc_tags
 			 WHERE tenant_id=$1 AND funcionario_id=$2
@@ -210,7 +222,7 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		qr, err := svc.ValidarEUsarQRToken(r.Context(), user.TenantID, qrCode)
+		qr, err := txSvc.ValidarEUsarQRToken(r.Context(), user.TenantID, qrCode)
 		if err != nil {
 			switch {
 			case errors.Is(err, assiduidade.ErrQRExpirado):
@@ -255,7 +267,7 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 		verificationToken, _ := body.Dados["verification_token"].(string)
 		clientDeviceID, _ := body.Dados["device_id"].(string)
 		claims, err := h.consumeFacialVerification(
-			r.Context(), verificationToken, user.ID, user.TenantID, clientDeviceID,
+			r.Context(), tx, verificationToken, user.ID, user.TenantID, clientDeviceID,
 		)
 		if err != nil {
 			switch {
@@ -281,7 +293,7 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 
 	tipoEvento := body.TipoEventoCodigo
 	if tipoEvento == "" {
-		tipoEvento = svc.InferirEntradaOuSaida(r.Context(), user.TenantID, colab.ID, agora)
+		tipoEvento = txSvc.InferirEntradaOuSaida(r.Context(), user.TenantID, colab.ID, agora)
 	}
 
 	origem := cfg.Origem
@@ -309,7 +321,7 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 		observacoes = &merged
 	}
 
-	ev, err := svc.RegistarEvento(r.Context(), user.TenantID, assiduidade.RegistarEventoInput{
+	ev, err := txSvc.RegistarEvento(r.Context(), user.TenantID, assiduidade.RegistarEventoInput{
 		FuncionarioID:    colab.ID,
 		TipoEventoCodigo: tipoEvento,
 		MetodoCodigo:     &metodo,
@@ -331,6 +343,11 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 			jsonErr(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		jsonErr(w, "Erro ao registar o ponto", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
 		jsonErr(w, "Erro ao registar o ponto", http.StatusInternalServerError)
 		return
 	}

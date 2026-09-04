@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"nexora/config"
+	"nexora/internal/pkg/nexorapay"
 	"nexora/internal/push"
 	"nexora/internal/shared/contracts"
 	"nexora/internal/ws"
@@ -37,10 +38,11 @@ type Handler struct {
 	wsHub      *ws.Hub
 	push       *push.Service
 	accounting contracts.AccountingPort
+	paySvc     *nexorapay.PaymentService
 }
 
-func New(db DB, cfg *config.Config, wsHub *ws.Hub, pushSvc *push.Service, accounting contracts.AccountingPort) *Handler {
-	return &Handler{db: db, cfg: cfg, wsHub: wsHub, push: pushSvc, accounting: accounting}
+func New(db DB, cfg *config.Config, wsHub *ws.Hub, pushSvc *push.Service, accounting contracts.AccountingPort, paySvc *nexorapay.PaymentService) *Handler {
+	return &Handler{db: db, cfg: cfg, wsHub: wsHub, push: pushSvc, accounting: accounting, paySvc: paySvc}
 }
 
 func jsonOK(w http.ResponseWriter, v any, status int) {

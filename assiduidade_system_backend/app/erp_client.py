@@ -65,6 +65,11 @@ class ERPClient:
             headers["X-API-Key"] = self.api_key
         return headers
 
+    def device_headers(self) -> dict[str, str]:
+        """Wrapper público de _device_headers para o worker do outbox
+        (app/services/outbox.py), que corre fora desta classe."""
+        return self._device_headers()
+
     def _is_configured(self) -> bool:
         return bool(self.base_url)
 
