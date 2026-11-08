@@ -20,7 +20,6 @@ import (
 	"nexora/config"
 	"nexora/internal/background"
 	"nexora/internal/db"
-	hardwareservice "nexora/internal/modules/hardware/service"
 	"nexora/internal/pkg/nexorapay"
 	"nexora/internal/push"
 	"nexora/internal/shared/adapters"
@@ -57,7 +56,7 @@ func main() {
 	paySvc := nexorapay.NewPaymentService(pool, nexorapay.NewClient(cfg.NexoraPayBaseURL, cfg.NexoraPayAPIKey, cfg.NexoraPayPublicKey))
 
 	log.Println("[nexora-worker] a arrancar jobs em background")
-	background.StartJobs(ctx, pool, adapters.NewNotificationAdapter(pool), push.New(pool, cfg.FirebaseCredentialsFile), paySvc, hardwareservice.NewProcessor(pool), cfg, store)
+	background.StartJobs(ctx, pool, adapters.NewNotificationAdapter(pool), push.New(pool, cfg.FirebaseCredentialsFile), paySvc, cfg, store)
 
 	<-ctx.Done()
 	log.Println("[nexora-worker] sinal recebido, a parar")

@@ -166,18 +166,6 @@ func (r *FeeRepository) CreatePayment(ctx context.Context, p *models.SchoolPayme
 	return tx.Commit(ctx)
 }
 
-// CreateTreasuryMovement mantido por compatibilidade — prefer usar TreasuryPort.
-// Delega ao adaptador via fee service; este método pode ser removido quando
-// todos os callers migrarem para o port.
-func (r *FeeRepository) CreateTreasuryMovement(ctx context.Context, tenantID int64, contaBancariaID *int64, valor float64, descricao, referencia string, dataMovimento time.Time) error {
-	_, err := r.db.Exec(ctx, `
-		INSERT INTO tesouraria.movements
-		(tenant_id, reference_type, reference_id, bank_account_id, tipo, valor, moeda, referencia, descricao, data_movimento)
-		VALUES ($1,'escolar',NULL,$2,'recebimento',$3,'MZN',$4,$5,$6)`,
-		tenantID, contaBancariaID, valor, referencia, descricao, dataMovimento)
-	return err
-}
-
 // FinancialConfig configuração financeira do módulo escolar por tenant.
 type FinancialConfig struct {
 	ContaBancariaID              *int64
@@ -214,60 +202,6 @@ func (r *FeeRepository) GetFinancialConfig(ctx context.Context, tenantID int64) 
 		return nil, nil
 	}
 	return &cfg, err
-}
-
-// CreateFinancialReceivable cria conta a receber e regista o pagamento no módulo Financeiro.
-// Chamado apenas quando school_financial_config.criar_movimento_financeiro=true.
-func (r *FeeRepository) CreateFinancialReceivable(ctx context.Context, tenantID, schoolFeeID int64, descricao string, valor float64, dataVencimento time.Time, createdBy *int64) error {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	// 1. Criar conta a receber com origem_tipo='escolar'
-	var arID int64
-	err = tx.QueryRow(ctx, `
-		INSERT INTO financeiro.accounts_receivable
-		(tenant_id, numero, origem_tipo, origem_id, descricao, valor_total,
-		 data_emissao, data_vencimento, status)
-		VALUES ($1, 'ESC-'||$2, 'escolar', $2, $3, $4, CURRENT_DATE, $5, 'pendente')
-		ON CONFLICT DO NOTHING
-		RETURNING id`,
-		tenantID, schoolFeeID, descricao, valor, dataVencimento,
-	).Scan(&arID)
-	if err != nil {
-		return err
-	}
-
-	// 2. Registar pagamento imediato (a propina foi paga no módulo escolar).
-	// O número é gerado localmente (PAG-ESC-<tenant>-<ar_id>) para não depender
-	// da sequência interna do módulo Financeiro (financeiro.payments_id_seq).
-	_, err = tx.Exec(ctx, `
-		INSERT INTO financeiro.payments
-		(tenant_id, numero, tipo, data_pagamento, valor,
-		 referencia_tipo, referencia_id, criado_por)
-		VALUES ($1, 'PAG-ESC-'||LPAD($1::text,5,'0')||'-'||LPAD($3::text,8,'0'),
-		'recebimento', CURRENT_DATE, $2, 'escolar', $3, $4)
-		ON CONFLICT (tenant_id, numero) DO NOTHING`,
-		tenantID, valor, arID, createdBy,
-	)
-	if err != nil {
-		return err
-	}
-
-	// 3. Actualizar saldo da conta a receber
-	_, err = tx.Exec(ctx, `
-		UPDATE financeiro.accounts_receivable
-		SET valor_pago    = valor_total,
-		    valor_pendente = 0,
-		    status        = 'pago'
-		WHERE id = $1 AND tenant_id = $2`, arID, tenantID)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit(ctx)
 }
 
 // GetStudentClientID devolve o client_id (gestao_clientes) do aluno, ou 0 se não estiver ligado.

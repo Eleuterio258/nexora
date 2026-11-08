@@ -13,7 +13,6 @@ import (
 
 	mw "nexora/internal/middleware"
 	"nexora/internal/modules/auth/models"
-	"nexora/internal/modules/recursos-humanos/service/funcionario"
 )
 
 const (
@@ -196,17 +195,7 @@ func (h *Handler) LoginPorPIN(w http.ResponseWriter, r *http.Request) {
 
 	h.logAuthAttempt(r, u, body.Email, true, nil)
 
-	// Resolve funcionario_id para uniformizar a identidade do utilizador no
-	// contexto de assiduidade.
-	var funcionarioID *int64
-	if u.tenantID > 0 {
-		svc := funcionario.NewService(h.db)
-		if f, err := svc.PorUserID(r.Context(), u.tenantID, u.id); err == nil {
-			funcionarioID = &f.ID
-		}
-	}
-
-	h.issueFuncionarioTokens(w, r, u, funcionarioID)
+	h.issueFuncionarioTokens(w, r, u, nil)
 }
 
 // ── Verificação de PIN/TOTP para prova de presença (assiduidade) ───────────

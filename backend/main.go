@@ -12,8 +12,6 @@ import (
 	"nexora/config"
 	"nexora/internal/background"
 	"nexora/internal/db"
-	hardwaremqtt "nexora/internal/modules/hardware/mqtt"
-	hardwareservice "nexora/internal/modules/hardware/service"
 	"nexora/internal/pkg/nexorapay"
 	"nexora/internal/push"
 	"nexora/internal/router"
@@ -54,25 +52,7 @@ func main() {
 	// RUN_BACKGROUND_JOBS / Fase 2 de docs/analise-transactional-outbox-backends.md.
 	if cfg.RunBackgroundJobs {
 		paySvc := nexorapay.NewPaymentService(pool, nexorapay.NewClient(cfg.NexoraPayBaseURL, cfg.NexoraPayAPIKey, cfg.NexoraPayPublicKey))
-		background.StartJobs(ctx, pool, adapters.NewNotificationAdapter(pool), push.New(pool, cfg.FirebaseCredentialsFile), paySvc, hardwareservice.NewProcessor(pool), cfg, store)
-	}
-
-	// Worker MQTT do módulo hardware — opcional, só liga se MQTT_BROKER_URL estiver definida.
-	var mqttWorker *hardwaremqtt.Worker
-	if cfg.MQTTBrokerURL != "" {
-		w, err := hardwaremqtt.NewWorker(pool, hardwaremqtt.Config{
-			BrokerURL: cfg.MQTTBrokerURL,
-			ClientID:  cfg.MQTTClientID,
-			Username:  cfg.MQTTUsername,
-			Password:  cfg.MQTTPassword,
-		})
-		if err != nil {
-			log.Printf("[nexora] falha ao ligar ao broker MQTT: %v", err)
-		} else if err := w.Start(ctx); err != nil {
-			log.Printf("[nexora] falha ao subscrever dispositivos MQTT: %v", err)
-		} else {
-			mqttWorker = w
-		}
+		background.StartJobs(ctx, pool, adapters.NewNotificationAdapter(pool), push.New(pool, cfg.FirebaseCredentialsFile), paySvc, cfg, store)
 	}
 
 	srv := &http.Server{
@@ -95,9 +75,6 @@ func main() {
 
 	<-quit
 	cancelJobs() // Parar jobs antes do shutdown
-	if mqttWorker != nil {
-		mqttWorker.Stop()
-	}
 	shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	srv.Shutdown(shutCtx)

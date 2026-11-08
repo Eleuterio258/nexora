@@ -13,8 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
-	hardwareservice "nexora/internal/modules/hardware/service"
-	"nexora/internal/modules/recursos-humanos/service/assiduidade"
 	"nexora/internal/pkg/nexorapay"
 	"nexora/internal/push"
 	"nexora/internal/shared/contracts"
@@ -39,7 +37,7 @@ type pushSender interface {
 }
 
 // StartJobs lança os jobs em background e retorna quando ctx é cancelado.
-func StartJobs(ctx context.Context, db *pgxpool.Pool, notif contracts.NotificationPort, pushSvc *push.Service, paySvc *nexorapay.PaymentService, hwProcessor *hardwareservice.Processor, cfg *config.Config, store storage.Provider) {
+func StartJobs(ctx context.Context, db *pgxpool.Pool, notif contracts.NotificationPort, pushSvc *push.Service, paySvc *nexorapay.PaymentService, cfg *config.Config, store storage.Provider) {
 	mailer := newMailer(cfg)
 	sms := newSMSSender(cfg)
 	workerID := notificationWorkerID()
@@ -59,17 +57,6 @@ func StartJobs(ctx context.Context, db *pgxpool.Pool, notif contracts.Notificati
 		reconcilePaymentIntents(paySvc, workerID)
 	})
 
-	// Retry automático de hardware.device_events não processados (falhas
-	// transitórias — employee_no ainda não mapeado, funcionário inactivo,
-	// etc.) — a cada 1min. Fase 5 de
-	// docs/analise-transactional-outbox-backends.md, item 1.
-	go runInterval(ctx, "retry-hardware-events", time.Minute, func() {
-		if hwProcessor == nil {
-			return
-		}
-		retryHardwareEvents(hwProcessor, workerID)
-	})
-
 	// Reminders de cobranças escolares — diário
 	go runDaily(ctx, "notif-cobrancas-vencidas", func() {
 		notifCobrancasVencidas(db, notif)
@@ -80,36 +67,11 @@ func StartJobs(ctx context.Context, db *pgxpool.Pool, notif contracts.Notificati
 		cleanExpiredSessions(db)
 	})
 
-	// Alertas de stock mínimo — diário
-	go runDaily(ctx, "stock-alerts", func() {
-		checkStockAlerts(db)
-	})
-
 	// Geração de propinas escolares mensais — diário
 	go runDaily(ctx, "generate-monthly-fees", func() {
 		generateMonthlyFees(db)
 	})
 
-	// Renovação de assinaturas vencidas — diário
-	go runDaily(ctx, "process-subscription-renewals", func() {
-		processSubscriptionRenewals(db)
-	})
-
-	// Marcação de faltas (ausência de evento num dia útil) — diário.
-	// Mantido em paralelo com o job novo abaixo: opera sobre o modelo antigo
-	// (rh.presencas), que o self-service e outros leitores ainda consultam
-	// enquanto a Fase F (migração de dados) não os move para o novo modelo.
-	go runDaily(ctx, "process-daily-absences", func() {
-		processDailyAbsences(db)
-	})
-
-	// Recálculo diário de resultados de assiduidade (modelo de eventos) —
-	// diário. Complementa o job acima: escreve em rh.resultados_diarios via
-	// assiduidade.RecalcularDia, incluindo a detecção de falta por ausência
-	// de eventos num dia com horário configurado.
-	go runDaily(ctx, "recalcular-resultados-assiduidade", func() {
-		recalcularResultadosAssiduidade(db)
-	})
 }
 
 // ── reconciliação de pagamentos ──────────────────────────────────────────────
@@ -148,42 +110,6 @@ func reconcilePaymentIntents(svc paymentReconciler, workerID string) {
 	for _, intent := range intents {
 		if err := svc.Reconcile(ctx, intent); err != nil {
 			log.Printf("[background] reconciliar-pagamentos: reconciliar intent %s: %v", intent.ID, err)
-		}
-	}
-}
-
-const hardwareEventLeaseTimeout = 5 * time.Minute
-
-// hardwareRetrier é a interface mínima do processor de hardware usada pelo
-// job de retry — satisfeita por *hardware/service.Processor; permite testar
-// com um stub, sem precisar de BD real. Fase 5 de
-// docs/analise-transactional-outbox-backends.md, item 1.
-type hardwareRetrier interface {
-	RecoverExpiredLeases(ctx context.Context, leaseTimeout time.Duration) (int64, error)
-	ClaimForRetry(ctx context.Context, workerID string, limit int) ([]hardwareservice.DeviceEventRetry, error)
-	Retry(ctx context.Context, ev hardwareservice.DeviceEventRetry) error
-}
-
-// retryHardwareEvents resolve hardware.device_events não processados e não
-// permanentemente falhados: recupera leases expiradas, reserva um lote
-// atomicamente e chama Retry (que repete processEntity a partir do
-// NormalizedEvent persistido) por cada um.
-func retryHardwareEvents(p hardwareRetrier, workerID string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-	defer cancel()
-
-	if _, err := p.RecoverExpiredLeases(ctx, hardwareEventLeaseTimeout); err != nil {
-		log.Printf("[background] retry-hardware-events: recuperar leases expiradas: %v", err)
-	}
-
-	events, err := p.ClaimForRetry(ctx, workerID, 50)
-	if err != nil {
-		log.Printf("[background] retry-hardware-events: reservar eventos: %v", err)
-		return
-	}
-	for _, ev := range events {
-		if err := p.Retry(ctx, ev); err != nil {
-			log.Printf("[background] retry-hardware-events: reprocessar evento %d: %v", ev.ID, err)
 		}
 	}
 }
@@ -673,353 +599,9 @@ func logAmbiguousFeePlans(ctx context.Context, db *pgxpool.Pool) {
 
 // ── renovação de assinaturas ──────────────────────────────────────────────────
 
-// processSubscriptionRenewals gera facturas de renovação para assinaturas
-// com next_billing_date <= hoje, auto_renew=true e status='activo'.
-func processSubscriptionRenewals(db *pgxpool.Pool) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	rows, err := db.Query(ctx, `
-		SELECT s.id, s.tenant_id, s.plan_id, s.unit_price, s.moeda,
-		       s.next_billing_date, p.billing_period
-		  FROM assinaturas.subscriptions s
-		  JOIN assinaturas.subscription_plans p ON p.id = s.plan_id
-		 WHERE s.status = 'activo'
-		   AND s.auto_renew = TRUE
-		   AND s.next_billing_date <= CURRENT_DATE
-		   AND NOT EXISTS (
-		       SELECT 1 FROM assinaturas.subscription_invoices si
-		        WHERE si.subscription_id = s.id
-		          AND si.billing_period_start = s.next_billing_date
-		   )`)
-	if err != nil {
-		log.Printf("[background] process-subscription-renewals: query: %v", err)
-		return
-	}
-	defer rows.Close()
-
-	var processed int
-	for rows.Next() {
-		var subID, tenantID, planID int64
-		var unitPrice float64
-		var moeda, billingPeriod string
-		var nextBilling time.Time
-		if err := rows.Scan(&subID, &tenantID, &planID, &unitPrice, &moeda, &nextBilling, &billingPeriod); err != nil {
-			continue
-		}
-
-		// Calcular próximo período de faturação
-		var periodEnd, nextDate time.Time
-		switch billingPeriod {
-		case "anual":
-			periodEnd = nextBilling.AddDate(1, 0, -1)
-			nextDate = nextBilling.AddDate(1, 0, 0)
-		default: // mensal
-			periodEnd = nextBilling.AddDate(0, 1, -1)
-			nextDate = nextBilling.AddDate(0, 1, 0)
-		}
-		dueDate := nextBilling.AddDate(0, 0, 7) // 7 dias para pagar
-		numero := fmt.Sprintf("INV-%d-%s", subID, nextBilling.Format("200601"))
-
-		tx, err := db.Begin(ctx)
-		if err != nil {
-			continue
-		}
-
-		_, err = tx.Exec(ctx, `
-			INSERT INTO assinaturas.subscription_invoices
-				(tenant_id, subscription_id, numero, billing_period_start, billing_period_end,
-				 due_date, valor_total, valor_pago, moeda, status)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,0,$8,'pendente')`,
-			tenantID, subID, numero, nextBilling, periodEnd, dueDate, unitPrice, moeda)
-		if err != nil {
-			tx.Rollback(ctx)
-			log.Printf("[background] process-subscription-renewals: insert invoice: %v", err)
-			continue
-		}
-
-		_, err = tx.Exec(ctx, `
-			UPDATE assinaturas.subscriptions
-			   SET next_billing_date = $1, updated_at = NOW()
-			 WHERE id = $2`, nextDate, subID)
-		if err != nil {
-			tx.Rollback(ctx)
-			continue
-		}
-
-		if err := tx.Commit(ctx); err == nil {
-			processed++
-		}
-	}
-
-	if processed > 0 {
-		log.Printf("[background] process-subscription-renewals: %d assinaturas renovadas", processed)
-	}
-}
-
 // ── faltas por ausência de evento (tipo='falta') ─────────────────────────────
-
-// processDailyAbsences marca tipo='falta' em rh.presencas para funcionários
-// com horário de trabalho configurado que, no dia útil anterior (segundo
-// horarios_trabalho.dias_semana), não tiveram qualquer entrada registada e
-// não têm uma ausência aprovada (férias/doença/etc.) a cobrir esse dia.
-//
-// Corre sempre referente ao dia ANTERIOR: no dia corrente ainda pode surgir
-// um evento de entrada mais tarde, por isso só faz sentido decidir 'falta'
-// depois do dia útil ter terminado por completo.
-//
-// Complementa calcularTipoPresenca em hardware/service/processor.go, que só
-// decide 'presente'/'atraso' a partir de um evento já recebido — 'falta' só
-// é detectável pela AUSÊNCIA de qualquer evento, o que exigia esta rotina
-// diária (documentado como pendente em CONTRATO-INTEGRACAO-ERP.md e no
-// comentário da Fase 4 em processor.go).
-//
-// dias_semana usa convenção ISO (1=segunda ... 7=domingo), consistente com o
-// valor por omissão '1,2,3,4,5' (segunda a sexta) usado em toda a BD.
-func processDailyAbsences(db *pgxpool.Pool) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	data := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
-	marcadas, err := processAbsencesForDate(ctx, db, data)
-	if err != nil {
-		log.Printf("[background] process-daily-absences: %v", err)
-		return
-	}
-	if marcadas > 0 {
-		log.Printf("[background] process-daily-absences: %d faltas marcadas (%s)", marcadas, data)
-	}
-}
-
-// processAbsencesForDate aplica a lógica de processDailyAbsences a uma data
-// específica (formato "2006-01-02"), devolvendo quantas faltas foram
-// marcadas. Extraído para ser exercitável em testes sem depender de
-// time.Now() — a lógica de produção (processDailyAbsences) chama isto
-// sempre com "ontem".
-func processAbsencesForDate(ctx context.Context, db *pgxpool.Pool, data string) (int, error) {
-	dataRef, err := time.Parse("2006-01-02", data)
-	if err != nil {
-		return 0, fmt.Errorf("data inválida: %w", err)
-	}
-	isoWeekday := int(dataRef.Weekday())
-	if isoWeekday == 0 {
-		isoWeekday = 7
-	}
-	diaSemana := fmt.Sprintf("%d", isoWeekday)
-
-	// O horário efectivo é o do funcionário quando ele tem um, senão o padrão
-	// do tenant (rh.horarios_trabalho.padrao, ver migration 20260729000003).
-	// Antes o JOIN era directo por f.horario_id, pelo que quem fosse admitido
-	// sem horário escolhido no formulário simplesmente não era considerado —
-	// nem faltas nem cálculo, e sem qualquer erro visível.
-	rows, err := db.Query(ctx, `
-		SELECT f.id, f.tenant_id
-		  FROM rh.funcionarios f
-		  JOIN LATERAL (
-		      SELECT ht.*
-		        FROM rh.horarios_trabalho ht
-		       WHERE ht.tenant_id = f.tenant_id
-		         AND ht.ativo = TRUE
-		         AND (ht.id = f.horario_id OR (f.horario_id IS NULL AND ht.padrao))
-		       ORDER BY (ht.id = f.horario_id) DESC
-		       LIMIT 1
-		  ) h ON TRUE
-		 WHERE f.estado = 'ativo'
-		   AND f.data_admissao <= $1::date
-		   AND (f.data_saida IS NULL OR f.data_saida >= $1::date)
-		   AND $2 = ANY (SELECT trim(dia) FROM unnest(string_to_array(h.dias_semana, ',')) AS dia)
-		   AND NOT EXISTS (
-		       SELECT 1 FROM rh.presencas p
-		        WHERE p.funcionario_id = f.id AND p.data = $1::date
-		          AND p.hora_entrada IS NOT NULL AND p.hora_entrada <> ''
-		   )
-		   AND NOT EXISTS (
-		       SELECT 1 FROM rh.ausencias a
-		        WHERE a.funcionario_id = f.id
-		          AND a.estado = 'aprovado'
-		          AND $1::date BETWEEN a.data_inicio AND a.data_fim
-		   )`,
-		data, diaSemana)
-	if err != nil {
-		return 0, fmt.Errorf("query: %w", err)
-	}
-	defer rows.Close()
-
-	type funcTenant struct {
-		funcionarioID int64
-		tenantID      int64
-	}
-	var alvos []funcTenant
-	for rows.Next() {
-		var ft funcTenant
-		if err := rows.Scan(&ft.funcionarioID, &ft.tenantID); err != nil {
-			continue
-		}
-		alvos = append(alvos, ft)
-	}
-	rows.Close()
-
-	var marcadas int
-	for _, ft := range alvos {
-		_, err := db.Exec(ctx, `
-			INSERT INTO rh.presencas (tenant_id, funcionario_id, data, tipo, observacoes)
-			VALUES ($1, $2, $3::date, 'falta', 'Falta detectada automaticamente (sem registo de entrada)')
-			ON CONFLICT (funcionario_id, data)
-			DO UPDATE SET tipo = 'falta',
-			              observacoes = 'Falta detectada automaticamente (sem registo de entrada)'`,
-			ft.tenantID, ft.funcionarioID, data)
-		if err != nil {
-			log.Printf("[background] process-daily-absences: insert funcionario_id=%d: %v", ft.funcionarioID, err)
-			continue
-		}
-		marcadas++
-	}
-
-	return marcadas, nil
-}
 
 // ── recálculo diário de resultados de assiduidade (modelo de eventos) ───────
 
-// recalcularResultadosAssiduidade chama assiduidade.RecalcularDia para todos
-// os funcionários com horário vigente ou eventos registados no dia ANTERIOR
-// (mesma razão do process-daily-absences: o dia corrente ainda pode receber
-// eventos mais tarde). RecalcularDia já trata a detecção de falta por
-// ausência de eventos num dia com horário configurado (ver calculo.go).
-func recalcularResultadosAssiduidade(db *pgxpool.Pool) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-
-	data := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
-	recalculados, err := recalcularResultadosParaData(ctx, db, data)
-	if err != nil {
-		log.Printf("[background] recalcular-resultados-assiduidade: %v", err)
-		return
-	}
-	if recalculados > 0 {
-		log.Printf("[background] recalcular-resultados-assiduidade: %d funcionários recalculados (%s)", recalculados, data)
-	}
-}
-
-// recalcularResultadosParaData aplica a lógica de
-// recalcularResultadosAssiduidade a uma data específica (formato
-// "2006-01-02"), devolvendo quantos funcionários foram recalculados.
-// Extraído para ser exercitável em testes sem depender de time.Now(), mesmo
-// padrão de processAbsencesForDate.
-func recalcularResultadosParaData(ctx context.Context, db *pgxpool.Pool, data string) (int, error) {
-	dataRef, err := time.Parse("2006-01-02", data)
-	if err != nil {
-		return 0, fmt.Errorf("data inválida: %w", err)
-	}
-
-	rows, err := db.Query(ctx, `
-		SELECT DISTINCT f.id, f.tenant_id
-		  FROM rh.funcionarios f
-		 WHERE f.estado = 'ativo'
-		   AND f.data_admissao <= $1::date
-		   AND (f.data_saida IS NULL OR f.data_saida >= $1::date)
-		   AND (
-		       EXISTS (
-		           SELECT 1 FROM rh.funcionario_horarios fh
-			         JOIN rh.horarios_trabalho h ON h.id = fh.horario_id
-			        WHERE fh.funcionario_id = f.id
-			          AND fh.data_inicio <= $1::date
-			          AND (fh.data_fim IS NULL OR fh.data_fim >= $1::date)
-			          AND h.ativo = TRUE
-		       )
-		       OR EXISTS (
-		           SELECT 1 FROM rh.eventos_assiduidade e
-			        WHERE e.funcionario_id = f.id AND e.data_referencia = $1::date
-		       )
-		   )`,
-		data)
-	if err != nil {
-		return 0, fmt.Errorf("query: %w", err)
-	}
-
-	type funcTenant struct {
-		funcionarioID int64
-		tenantID      int64
-	}
-	var alvos []funcTenant
-	for rows.Next() {
-		var ft funcTenant
-		if err := rows.Scan(&ft.funcionarioID, &ft.tenantID); err != nil {
-			continue
-		}
-		alvos = append(alvos, ft)
-	}
-	rows.Close()
-
-	svc := assiduidade.NewService(db)
-	var recalculados int
-	for _, ft := range alvos {
-		if _, err := svc.RecalcularDia(ctx, ft.tenantID, ft.funcionarioID, dataRef); err != nil {
-			log.Printf("[background] recalcular-resultados-assiduidade: funcionario_id=%d: %v", ft.funcionarioID, err)
-			continue
-		}
-		recalculados++
-	}
-
-	return recalculados, nil
-}
-
 // ── alertas de stock mínimo ───────────────────────────────────────────────────
-
-// checkStockAlerts cria alertas para itens abaixo do stock mínimo
-// e resolve alertas de itens que voltaram ao nível normal.
-func checkStockAlerts(db *pgxpool.Pool) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-
-	// Resolver alertas de itens que voltaram ao nível normal
-	_, err := db.Exec(ctx, `
-		UPDATE stock.stock_alerts sa
-		   SET status = 'resolvido', updated_at = NOW()
-		  FROM stock.stock_items si
-		 WHERE sa.stock_item_id = si.id
-		   AND sa.status = 'ativo'
-		   AND sa.alert_type = 'stock_minimo'
-		   AND si.available_quantity > si.minimum_quantity`)
-	if err != nil {
-		log.Printf("[background] stock-alerts: resolver alertas: %v", err)
-	}
-
-	// Criar alertas para itens abaixo do mínimo (sem alerta activo)
-	rows, err := db.Query(ctx, `
-		SELECT si.id, si.tenant_id, p.nome, si.available_quantity, si.minimum_quantity
-		  FROM stock.stock_items si
-		  JOIN produtos.products p ON p.id = si.product_id
-		 WHERE si.minimum_quantity > 0
-		   AND si.available_quantity <= si.minimum_quantity
-		   AND NOT EXISTS (
-		       SELECT 1 FROM stock.stock_alerts sa
-		        WHERE sa.stock_item_id = si.id
-		          AND sa.status = 'ativo'
-		          AND sa.alert_type = 'stock_minimo'
-		   )`)
-	if err != nil {
-		log.Printf("[background] stock-alerts: query itens: %v", err)
-		return
-	}
-	defer rows.Close()
-
-	var created int
-	for rows.Next() {
-		var itemID, tenantID int64
-		var nome string
-		var disponivel, minimo float64
-		if err := rows.Scan(&itemID, &tenantID, &nome, &disponivel, &minimo); err != nil {
-			continue
-		}
-		mensagem := fmt.Sprintf("Stock de \"%s\" abaixo do mínimo: %.0f unidades (mínimo: %.0f)", nome, disponivel, minimo)
-		_, _ = db.Exec(ctx, `
-			INSERT INTO stock.stock_alerts (tenant_id, stock_item_id, alert_type, status, mensagem)
-			VALUES ($1, $2, 'stock_minimo', 'ativo', $3)`,
-			tenantID, itemID, mensagem)
-		created++
-	}
-
-	if created > 0 {
-		log.Printf("[background] stock-alerts: %d novos alertas criados", created)
-	}
-}
+

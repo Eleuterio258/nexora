@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -70,6 +71,10 @@ func (h *Handler) EnviarMatriculaParaAssinatura(w http.ResponseWriter, r *http.R
 	}
 
 	docID, err := h.signature.CreateForSigning(r.Context(), req)
+	if errors.Is(err, contracts.ErrIntegracaoERPDesactivada) {
+		jsonErr(w, "Assinatura digital indisponivel: a integracao com o ERP ainda nao esta activa", http.StatusServiceUnavailable)
+		return
+	}
 	if err != nil {
 		jsonErr(w, "Erro ao criar documento de assinatura", http.StatusInternalServerError)
 		return

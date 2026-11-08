@@ -8,7 +8,6 @@ import (
 
 	"github.com/pashagolub/pgxmock/v4"
 
-	hardwareservice "nexora/internal/modules/hardware/service"
 	"nexora/internal/pkg/nexorapay"
 )
 
@@ -295,50 +294,5 @@ func TestReconcilePaymentIntents_ErroAoReservarNaoTentaReconciliar(t *testing.T)
 
 	if len(svc.reconciled) != 0 {
 		t.Fatalf("reconciled = %v, want vazio (claim falhou)", svc.reconciled)
-	}
-}
-
-// stubHardwareRetrier substitui *hardware/service.Processor no teste do job
-// de retry — Fase 5 de docs/analise-transactional-outbox-backends.md.
-type stubHardwareRetrier struct {
-	claimed  []hardwareservice.DeviceEventRetry
-	retried  []int64
-	claimErr error
-	retryErr error
-}
-
-func (s *stubHardwareRetrier) RecoverExpiredLeases(ctx context.Context, leaseTimeout time.Duration) (int64, error) {
-	return 0, nil
-}
-
-func (s *stubHardwareRetrier) ClaimForRetry(ctx context.Context, workerID string, limit int) ([]hardwareservice.DeviceEventRetry, error) {
-	if s.claimErr != nil {
-		return nil, s.claimErr
-	}
-	return s.claimed, nil
-}
-
-func (s *stubHardwareRetrier) Retry(ctx context.Context, ev hardwareservice.DeviceEventRetry) error {
-	s.retried = append(s.retried, ev.ID)
-	return s.retryErr
-}
-
-func TestRetryHardwareEvents_TentaCadaEventoReservado(t *testing.T) {
-	p := &stubHardwareRetrier{
-		claimed: []hardwareservice.DeviceEventRetry{{ID: 1}, {ID: 2}},
-	}
-	retryHardwareEvents(p, "worker-1")
-
-	if len(p.retried) != 2 || p.retried[0] != 1 || p.retried[1] != 2 {
-		t.Fatalf("retried = %v, want [1 2]", p.retried)
-	}
-}
-
-func TestRetryHardwareEvents_ErroAoReservarNaoTentaReprocessar(t *testing.T) {
-	p := &stubHardwareRetrier{claimErr: errors.New("falha de ligação")}
-	retryHardwareEvents(p, "worker-1")
-
-	if len(p.retried) != 0 {
-		t.Fatalf("retried = %v, want vazio (claim falhou)", p.retried)
 	}
 }

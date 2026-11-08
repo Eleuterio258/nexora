@@ -37,21 +37,8 @@ func (h *Handler) LigarRH(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Valida que o funcionário RH pertence ao mesmo tenant (se fornecido)
-	if body.RHEmployeeID != nil && h.hr != nil {
-		empID, err := h.hr.GetEmployeeID(r.Context(), u.TenantID, 0)
-		// Verificação directa pelo ID
-		_ = empID
-		_ = err
-		var exists bool
-		_ = h.db.QueryRow(r.Context(), `
-			SELECT EXISTS(SELECT 1 FROM rh.funcionarios WHERE id = $1 AND tenant_id = $2)`,
-			*body.RHEmployeeID, u.TenantID).Scan(&exists)
-		if !exists {
-			jsonErr(w, "Funcionario RH nao encontrado neste tenant", http.StatusUnprocessableEntity)
-			return
-		}
-	}
+	// O RH vive no ERP externo: rh_employee_id é o id do funcionário lá e
+	// não pode ser validado localmente enquanto a integração não existir.
 
 	tag, err := h.db.Exec(r.Context(), `
 		UPDATE gestao_escolar.school_teachers

@@ -9,8 +9,14 @@ package contracts
 
 import (
 	"context"
+	"errors"
 	"time"
 )
+
+// ErrIntegracaoERPDesactivada é devolvido pelos adaptadores dos ports que
+// dependem do ERP externo (Laravel) enquanto essa integração não existe.
+// Quem chama deve tratar a operação como não realizada, nunca como sucesso.
+var ErrIntegracaoERPDesactivada = errors.New("integração com o ERP desactivada")
 
 // ── Tesouraria ──────────────────────────────────────────────────────────────
 
