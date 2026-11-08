@@ -31,6 +31,11 @@ async def lifespan(app_instance: FastAPI):
     logger.info("Database: %s", settings.database_url)
     logger.info("Docs: %s", settings.docs_url)
     settings.assert_production_secrets()
+    if settings.environment == "production" and settings.liveness_challenge_store == "memory":
+        logger.warning(
+            "LIVENESS_CHALLENGE_STORE=memory em producao: os desafios de prova de vida "
+            "so funcionam com uma unica instancia/worker. Com mais de uma, use redis."
+        )
     if settings.environment == "production":
         warmup_biometric_models()
     ensure_pgvector_extension()

@@ -1,41 +1,45 @@
 # Métodos de registo de assiduidade — como funcionam
 
-Documenta os 7 métodos de registo de presença do funcionário (`ui/funcionario/attendance/*Fragment.kt`) e o pipeline comum que todos partilham no backend.
+Documenta os métodos de registo de presença do funcionário (`ui/funcionario/attendance/*Fragment.kt`) e o pipeline comum que todos partilham no backend.
 
-## Pipeline comum (depois da prova de identidade validada)
+## Pipeline comum (estado em 2026-09-26)
 
-Todos os métodos convergem no mesmo caminho final:
+Todos os métodos marcam ponto no Nexora ERP **com o JWT do colaborador**, em `POST /api/self-service/assiduidade/ponto` ([ponto.go](../../backend/internal/modules/self-service/handlers/ponto.go)). A app já não chama `/api/hardware/*` e não traz nenhuma API Key de device (`DEVICE_API_KEY` removida do `build.gradle.kts`).
 
 ```
-ClockRegisterRequest
-  → AttendanceRepository.registerClock()
-  → POST /api/hardware/events/generic  (Nexora ERP, autenticado por X-API-Key de device)
-  → processor.go:
-      1. Dedup por hash (device_id+employee_no+event_time+raw)
-      2. INSERT em hardware.device_events (log bruto)
-      3. Mapeamento hardware.device_users(device_id, employee_no) → rh.funcionarios.id
-      4. inferirTipoEventoCodigo decide entrada/saída sozinho (Constants.EVENT_AUTO)
+Ecrã do método
+  → POST /api/self-service/assiduidade/ponto  { metodo, pin?, dados{...} }
+  → MarcarPonto (ERP):
+      1. funcionário resolvido pelo JWT (nunca pelo cliente) e tem de estar activo
+      2. método activo na configuração do tenant (rh.assiduidade.configuracao.metodos)
+      3. prova do método verificada NA MESMA transacção que grava o evento
+      4. entrada/saída inferida pela paridade do dia quando o cliente não a indica
       5. INSERT em rh.eventos_assiduidade
 ```
 
-Se não houver rede: o evento é guardado em Room local (`PendingEventEntity`) e sincronizado depois pelo `SyncAttendanceWorker`.
+**Sem rede** (só PIN e impressão digital, via [AttendanceRepository.kt](../app/src/main/java/tech/e258tech/nexora_assiduidade/data/repository/AttendanceRepository.kt)): a marcação fica em Room (`PendingEventEntity`, campos cifrados com o Android Keystore, incluindo o PIN) e o [SyncAttendanceWorker.kt](../app/src/main/java/tech/e258tech/nexora_assiduidade/work/SyncAttendanceWorker.kt) envia-a depois em lote para `POST /api/self-service/assiduidade/ponto/batch` ([ponto_lote.go](../../backend/internal/modules/self-service/handlers/ponto_lote.go)):
 
-Ficheiros-chave:
-- [AttendanceRepository.kt](../app/src/main/java/tech/e258tech/nexora_assiduidade/data/repository/AttendanceRepository.kt)
-- [processor.go](../../backend/internal/modules/hardware/service/processor.go)
-- [generic_rest.go](../../backend/internal/modules/hardware/adapters/generic_rest.go)
+- a hora enviada é a do telemóvel no momento da marcação; o ERP aceita-a até **72h** no passado (nunca no futuro, com 5 min de folga) e escreve `offline | registado_no_dispositivo=… | sincronizado_em=…` nas observações do evento para o RH poder rever;
+- o PIN é verificado na sincronização; um PIN errado faz rejeitar os restantes PINs do mesmo lote (impede tentar vários PINs num pedido) e a rota tem rate limit;
+- cada marcação tem uma `idempotency_key` guardada em `rh.marcacoes_offline_sincronizadas`: reenviar o lote nunca duplica pontos;
+- a resposta é por marcação: `registado`/`duplicado` apagam o evento local; `rejeitado` fica como `REJECTED` com o motivo e não volta a ser enviado;
+- só são enviadas as marcações do utilizador com sessão iniciada — as de outra pessoa que usou o mesmo telemóvel esperam que essa pessoa volte a entrar.
 
-## O que cada método valida *antes* de chegar a esse pipeline
+Facial, QR e NFC dependem de provas de uso único com validade curta e **não** podem ser feitos offline.
 
-| Método | Prova capturada | Onde é validada | Fica registado como |
+## O que cada método prova
+
+| Método | Prova capturada | Onde é validada | `origem` no evento |
 |---|---|---|---|
-| **Manual** | Nenhuma — só a sessão JWT já autenticada | Não há validação nenhuma | `source=MANUAL` |
-| **Facial** | Foto (auto-capturada por MediaPipe on-device) | `POST /biometric/verify` (FaceClock) — embedding + cosine similarity contra `FaceTemplate` + liveness score | `source=FACIAL`, só se `match=true` |
-| **Impressão Digital** | Nada enviado ao servidor — `BiometricPrompt` local do Android só confirma "é o dono do telemóvel" | Nenhuma verificação servidor-side (a API BiometricPrompt nunca expõe o template) | `source=FINGERPRINT`, `confidence_score` fixo em `1.0` |
-| **QR Code** | Token lido por câmara (ZXing) | `POST /api/hardware/assiduidade/qr/validar` — token de uso único, TTL 60-300s, gerado à parte por `qr/gerar` | `source=QR_CODE` |
-| **NFC** | UID do cartão lido por foreground dispatch | `GET /api/hardware/assiduidade/nfc/validar?tag_uid=` — contra `rh.nfc_tags`, pré-registado por funcionário via admin | `source=NFC` |
-| **PIN** | 4+ dígitos | `POST /api/authcode/pin/validate` — devolve um login completo (tokens+utilizador), a sessão é actualizada antes de registar | `source=PIN` |
-| **Selfie + GPS** | Foto (câmara nativa do sistema) + última localização conhecida | Nenhuma — o endpoint de geofence existe (`/geofence/validar`) mas exige `unidade_id` que este ecrã não recolhe | `source=GEOLOCATION` (não `SELFIE_GPS`) |
+| **Facial** | Desafio de prova de vida activo ([LivenessChallengeFragment.kt](../app/src/main/java/tech/e258tech/nexora_assiduidade/ui/funcionario/attendance/LivenessChallengeFragment.kt)) | FaceClock emite um comprovativo assinado e de uso único; o ERP valida-o e consome o `jti` em `rh.facial_verification_uses` | `reconhecimento_facial` |
+| **Impressão digital** | `BiometricPrompt` local — só confirma "é o dono do telemóvel" | Nenhuma do lado do servidor (a API nunca expõe o template) | `impressao_digital` |
+| **QR Code** | Token do terminal lido por câmara | `ValidarEUsarQRToken` — uso único, expira no mesmo pedido | `qr` |
+| **NFC** | UID do cartão | Tem de existir activo em `rh.nfc_tags` para o próprio funcionário | `nfc` |
+| **PIN** | 4-6 dígitos | bcrypt contra `auth.user_auth_codes` no mesmo pedido (ou na sincronização, se offline) | `app` |
+| **Selfie + GPS** | Foto + coordenadas | Coordenadas e foto obrigatórias; foto guardada no storage | `selfie` |
+| **Manual** | — | Não existe na app do funcionário (ecrã removido em 2026-09-26); é operação de gestor em `POST /api/rh/assiduidade/ponto` | `manual` |
+
+> As secções seguintes são histórico: descrevem o tempo em que os métodos convergiam em `POST /api/hardware/events/generic`.
 
 ## ✅ Resolvido: "Configurar Métodos" agora vale para os 7 métodos
 

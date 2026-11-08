@@ -1,0 +1,4 @@
+docker run -d --name jenkins -p 8080:8080 -p 50000:50000  -v jenkins_home:/var/jenkins_home jenkins/jenkins:lts
+cf64cec3f0e762ce7c5d5690d60b2c450ebe85ebd1681c0add0ab265c2e8131b
+
+

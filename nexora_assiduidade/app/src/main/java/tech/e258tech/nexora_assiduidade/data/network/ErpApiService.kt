@@ -34,7 +34,6 @@ import tech.e258tech.nexora_assiduidade.data.model.DispositivoErp
 import tech.e258tech.nexora_assiduidade.data.model.Funcionario
 import tech.e258tech.nexora_assiduidade.data.model.FuncionarioDetalhe
 import tech.e258tech.nexora_assiduidade.data.model.FuncionarioListResponse
-import tech.e258tech.nexora_assiduidade.data.model.GenericHardwareEventRequest
 import tech.e258tech.nexora_assiduidade.data.model.JustificacaoRequest
 import tech.e258tech.nexora_assiduidade.data.model.Lead
 import tech.e258tech.nexora_assiduidade.data.model.LivenessChallengeRequest
@@ -57,6 +56,9 @@ import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoSelfServiceRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoFacialSelfServiceRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoNfcSelfServiceRequest
 import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoQrSelfServiceRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoSimplesRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoLoteRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoLoteResponse
 import tech.e258tech.nexora_assiduidade.data.model.PinVerifyRequest
 import tech.e258tech.nexora_assiduidade.data.model.TotpVerifyRequest
 import tech.e258tech.nexora_assiduidade.data.model.PresencaOcorrencia
@@ -81,15 +83,12 @@ import tech.e258tech.nexora_assiduidade.data.model.response.ErpLoginResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.ErpMeResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.OAuthTokenResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.EventoAssiduidadeResponse
-import tech.e258tech.nexora_assiduidade.data.model.response.GeofenceDeviceResponse
-import tech.e258tech.nexora_assiduidade.data.model.response.HardwareEventResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.HomeResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.JustificacaoPendenteResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.JustificacaoCreateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.JustificacaoResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.LeadConverterResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.LeadCreateResponse
-import tech.e258tech.nexora_assiduidade.data.model.response.NFCDeviceResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.OkResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.OportunidadeCreateResponse
 import tech.e258tech.nexora_assiduidade.data.model.response.PresencaResponse
@@ -217,42 +216,11 @@ interface ErpApiService {
         @Body request: QRGenerateDeviceRequest
     ): Response<QRGenerateDeviceResponse>
 
-    // ── Endpoints de device (X-API-Key, nao Authorization) ──────────────────
-    // Chamados directamente pela app desde 2026-07-13 com a API Key de device
-    // do FaceClock embutida no APK (BuildConfig.DEVICE_API_KEY) — risco de
-    // seguranca aceite explicitamente para os metodos alternativos de
-    // assiduidade, ver comentario em app/build.gradle.kts.
-
-    @GET("api/hardware/assiduidade/config")
-    suspend fun getAttendanceConfigDevice(
-        @Header("X-API-Key") apiKey: String
-    ): Response<Map<String, Any>>
-
-    @POST("api/hardware/events/generic")
-    suspend fun registerEventDevice(
-        @Header("X-API-Key") apiKey: String,
-        @Body request: GenericHardwareEventRequest
-    ): Response<HardwareEventResponse>
-
     @POST("api/self-service/assiduidade/qr/validar")
     suspend fun validateQrSelfService(
         @Header("Authorization") token: String,
         @Body request: QRValidateDeviceRequest
     ): Response<QRValidateDeviceResponse>
-
-    @GET("api/hardware/assiduidade/nfc/validar")
-    suspend fun validateNfcDevice(
-        @Header("X-API-Key") apiKey: String,
-        @Query("tag_uid") tagUid: String
-    ): Response<NFCDeviceResponse>
-
-    @GET("api/hardware/assiduidade/geofence/validar")
-    suspend fun validateGeofenceDevice(
-        @Header("X-API-Key") apiKey: String,
-        @Query("unidade_id") unidadeId: String,
-        @Query("latitude") latitude: Double,
-        @Query("longitude") longitude: Double
-    ): Response<GeofenceDeviceResponse>
 
     // Notificações do próprio utilizador (utilizadores/handlers/notificacoes.go)
     @GET("api/utilizadores/{userId}/notifications")
@@ -502,6 +470,21 @@ interface ErpApiService {
         @Header("Authorization") token: String,
         @Body request: MarcarPontoQrSelfServiceRequest
     ): Response<EventoAssiduidadeResponse>
+
+    // PIN e impressão digital (AttendanceRepository). Substituem
+    // POST /api/hardware/events/generic com a API Key de device.
+    @POST("api/self-service/assiduidade/ponto")
+    suspend fun marcarPontoSimplesSelfService(
+        @Header("Authorization") token: String,
+        @Body request: MarcarPontoSimplesRequest
+    ): Response<EventoAssiduidadeResponse>
+
+    // Sincronização das marcações guardadas offline (SyncAttendanceWorker).
+    @POST("api/self-service/assiduidade/ponto/batch")
+    suspend fun marcarPontoLote(
+        @Header("Authorization") token: String,
+        @Body request: MarcarPontoLoteRequest
+    ): Response<MarcarPontoLoteResponse>
 
     // Pedidos de férias/ausências (rh.go:1090, ListarAusencias)
     @GET("api/rh/ausencias")

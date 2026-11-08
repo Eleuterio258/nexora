@@ -2842,6 +2842,11 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 				// device partilhada por todas as instalacoes da app. Ver MarcarPonto
 				// (self-service/handlers/ponto.go).
 				r.Post("/ponto", ss.MarcarPonto)
+				// Sincronizacao das marcacoes feitas offline na app (PIN e
+				// impressao digital), com a hora do telemovel limitada a 72h.
+				// Rate limit porque cada lote pode trazer varios PINs. Ver
+				// MarcarPontoLote (self-service/handlers/ponto_lote.go).
+				r.With(mw.RateLimit(10, time.Minute)).Post("/ponto/batch", ss.MarcarPontoLote)
 			})
 			r.Group(func(r chi.Router) {
 				r.Use(mw.RequirePermission(db, "assiduidade", "justificar"))

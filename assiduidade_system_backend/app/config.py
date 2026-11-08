@@ -29,6 +29,14 @@ class Settings:
     biometric_match_threshold: float = float(
         os.getenv("BIOMETRIC_MATCH_THRESHOLD", "0.85")
     )
+    # Semelhanca minima entre cada frame do desafio de prova de vida e o frame
+    # usado no match — garante que a accao (piscar/sorrir/virar) foi feita pela
+    # MESMA pessoa que deu match, e nao por outra com uma foto da vitima
+    # intercalada. Mais baixo que o match_threshold porque a propria accao
+    # (olhos fechados, rosto virado) degrada ligeiramente o embedding.
+    biometric_continuity_threshold: float = float(
+        os.getenv("BIOMETRIC_CONTINUITY_THRESHOLD", "0.75")
+    )
     biometric_model: str = os.getenv("BIOMETRIC_MODEL", "facenet")
     liveness_model: str = os.getenv("LIVENESS_MODEL", "heuristic")
     biometric_key_provider: str = "environment"

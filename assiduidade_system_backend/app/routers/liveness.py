@@ -12,11 +12,13 @@ from app.config import settings
 from app.database import get_db
 from app.deps import ActorContext, apply_tenant, require_self_or_manager
 from app.security import require_nexora_signature
+from app.security.facial_verification import issue_facial_verification_token
 from app.limiter import limiter
 from app.models import FaceTemplate
 from app.schemas.common import SourceType, TemplateStatus
 from app.schemas.requests import LivenessChallengeRequest, LivenessVerifyRequest
 from app.services.attendance_validation import validar_metodo_assiduidade
+from app.services.embedding_models import get_model_version
 from app.services.biometric import (
     _get_cancelable_transform,
     apply_cancelable_transform,
@@ -27,6 +29,7 @@ from app.services.biometric import (
     estimate_liveness,
 )
 from app.services.liveness_challenge import (
+    check_identity_continuity,
     consume_challenge,
     create_challenge,
     get_challenge,
@@ -71,7 +74,10 @@ async def verify_liveness_challenge(
     actor: ActorContext = require_nexora_signature("liveness:verify"),
 ) -> dict:
     """Confirma a acção do desafio e faz match facial contra o template local."""
-    await validar_metodo_assiduidade(SourceType.SELFIE_GPS)
+    # FACIAL e nao SELFIE_GPS: o que este endpoint emite e um comprovativo de
+    # marcacao facial (o mesmo que /biometric/verify, com prova de vida mais
+    # forte), e o ERP valida o metodo "facial" ao gravar o ponto.
+    await validar_metodo_assiduidade(SourceType.FACIAL)
 
     erp_user_id = str(payload.user_id)
     require_self_or_manager(actor, erp_user_id)
@@ -177,6 +183,31 @@ async def verify_liveness_challenge(
             "reason": "liveness_failed",
         }
 
+    # A accao e o match tem de vir da mesma pessoa — ver check_identity_continuity.
+    # Compara-se contra o probe ANTES da transformacao cancelavel (espacos
+    # diferentes nao sao comparaveis).
+    same_person, _continuity_details = check_identity_continuity(
+        payload.frames_base64, probe_embedding, settings.biometric_continuity_threshold
+    )
+    if not same_person:
+        biometric_metrics.record_verify_rejection("identity_discontinuity", 0.0, liveness_score, liveness_passed=True)
+        record_verify_failure(actor.tenant_id, erp_user_id, str(payload.device_id), "identity_discontinuity")
+        record_audit_event(
+            db, actor.tenant_id, "liveness_verify_rejection", erp_user_id=erp_user_id,
+            device_id=str(payload.device_id), reason="identity_discontinuity", liveness_score=liveness_score,
+        )
+        db.commit()
+        return {
+            "match": False,
+            "user_id": payload.user_id,
+            "action": challenge.action.value,
+            "action_passed": True,
+            "confidence_score": 0.0,
+            "liveness_score": liveness_score,
+            "timestamp": utc_now().isoformat(),
+            "reason": "identity_discontinuity",
+        }
+
     active_template = db.scalar(
         apply_tenant(
             select(FaceTemplate).where(
@@ -203,6 +234,27 @@ async def verify_liveness_challenge(
             "liveness_score": liveness_score,
             "timestamp": utc_now().isoformat(),
             "reason": "user_not_enrolled",
+        }
+
+    # Template gerado por outro modelo de embedding: o cosseno entre espacos
+    # diferentes nao significa nada (ou falha, se a dimensao diferir). O
+    # re-enrolamento e sinalizado ao ERP por /biometric/verify; aqui so recusa.
+    if active_template.model_version != get_model_version():
+        record_verify_failure(actor.tenant_id, erp_user_id, str(payload.device_id), "model_version_mismatch")
+        record_audit_event(
+            db, actor.tenant_id, "liveness_verify_rejection", erp_user_id=erp_user_id,
+            device_id=str(payload.device_id), reason="model_version_mismatch", liveness_score=liveness_score,
+        )
+        db.commit()
+        return {
+            "match": False,
+            "user_id": payload.user_id,
+            "action": challenge.action.value,
+            "action_passed": True,
+            "confidence_score": 0.0,
+            "liveness_score": liveness_score,
+            "timestamp": utc_now().isoformat(),
+            "reason": "model_version_mismatch",
         }
 
     # Se o template foi guardado com transformacao cancelavel, aplicar a mesma
@@ -252,6 +304,18 @@ async def verify_liveness_challenge(
         )
     db.commit()
 
+    verification_token = None
+    verification_tenant_id = active_template.tenant_id or actor.tenant_id
+    if is_match and verification_tenant_id:
+        verification_token = issue_facial_verification_token(
+            tenant_id=str(verification_tenant_id),
+            user_id=erp_user_id,
+            device_id=str(payload.device_id),
+            confidence_score=confidence_score,
+            liveness_score=liveness_score,
+            liveness_method="active_challenge",
+        )
+
     return {
         "match": is_match,
         "user_id": payload.user_id,
@@ -261,4 +325,5 @@ async def verify_liveness_challenge(
         "liveness_score": liveness_score,
         "timestamp": utc_now().isoformat(),
         "reason": None if is_match else "match_below_threshold",
+        "verification_token": verification_token,
     }

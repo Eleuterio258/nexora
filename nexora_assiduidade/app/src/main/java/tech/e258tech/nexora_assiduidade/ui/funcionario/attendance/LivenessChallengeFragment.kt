@@ -70,7 +70,10 @@ class LivenessChallengeFragment : Fragment() {
     private lateinit var tvInstruction: TextView
 
     private var challenge: LivenessChallengeResponse? = null
-    private var recording = false
+    @Volatile private var recording = false
+    @Volatile private var lastFrameAt = 0L
+    // Escrita na thread do analisador da câmara, lida na main thread — todo o
+    // acesso passa por synchronized(frames).
     private val frames = mutableListOf<String>()
 
     private var cameraProvider: ProcessCameraProvider? = null
@@ -171,8 +174,9 @@ class LivenessChallengeFragment : Fragment() {
         val prompt = challenge?.prompt ?: "Siga a instrucao"
         tvInstruction.text = prompt
         btnStart.isEnabled = false
+        synchronized(frames) { frames.clear() }
+        lastFrameAt = 0L
         recording = true
-        frames.clear()
 
         uiScope.launch {
             delay(RECORDING_DURATION_MS)
@@ -230,17 +234,23 @@ class LivenessChallengeFragment : Fragment() {
 
     private fun analyzeFrame(imageProxy: ImageProxy) {
         try {
-            if (recording && frames.size < MAX_FRAMES) {
-                val bitmap = imageProxy.toBitmap()
-                val rotated = rotateBitmap(bitmap, imageProxy.imageInfo.rotationDegrees)
-                frames.add(bitmapToBase64(rotated))
+            if (!recording) return
+            val now = SystemClock.uptimeMillis()
+            val bitmap = imageProxy.toBitmap()
+            val rotated = rotateBitmap(bitmap, imageProxy.imageInfo.rotationDegrees)
+            // Espaça os frames ao longo de toda a gravação: à cadência da câmara
+            // (~30 fps) os MAX_FRAMES enchiam-se no primeiro meio segundo e a
+            // acção pedida (piscar/sorrir/virar), feita depois, nunca era captada.
+            if (now - lastFrameAt >= FRAME_INTERVAL_MS) {
+                synchronized(frames) {
+                    if (frames.size < MAX_FRAMES) {
+                        frames.add(bitmapToBase64(rotated))
+                        lastFrameAt = now
+                    }
+                }
             }
-            if (recording) {
-                val bitmap = imageProxy.toBitmap()
-                val rotated = rotateBitmap(bitmap, imageProxy.imageInfo.rotationDegrees)
-                val mpImage = BitmapImageBuilder(rotated).build()
-                faceDetectorHelper?.detectAsync(mpImage, SystemClock.uptimeMillis())
-            }
+            val mpImage = BitmapImageBuilder(rotated).build()
+            faceDetectorHelper?.detectAsync(mpImage, now)
         } catch (e: Exception) {
             // Ignora frames ilegíveis.
         } finally {
@@ -264,9 +274,15 @@ class LivenessChallengeFragment : Fragment() {
     private fun submitVerify() {
         val token = sessionManager.getToken()
         val currentChallenge = challenge
-        if (token.isNullOrBlank() || currentChallenge == null || frames.isEmpty()) {
+        val capturedFrames = synchronized(frames) { frames.toList() }
+        if (token.isNullOrBlank() || currentChallenge == null || capturedFrames.size < MIN_FRAMES) {
             setLoading(false)
-            Toast.makeText(context, "Dados insuficientes para validar o desafio.", Toast.LENGTH_LONG).show()
+            tvInstruction.text = ""
+            Toast.makeText(
+                context,
+                "Nao foi possivel captar imagens suficientes. Mantenha o rosto visivel e tente novamente.",
+                Toast.LENGTH_LONG
+            ).show()
             return
         }
 
@@ -279,7 +295,7 @@ class LivenessChallengeFragment : Fragment() {
                         LivenessVerifyRequest(
                             challenge_id = currentChallenge.challenge_id ?: "",
                             device_id = deviceId,
-                            frames_base64 = frames.toList()
+                            frames_base64 = capturedFrames
                         )
                     )
                     if (response.isSuccessful && response.body() != null) {
@@ -303,11 +319,8 @@ class LivenessChallengeFragment : Fragment() {
 
             if (verifyResponse.match != true) {
                 setLoading(false)
-                Toast.makeText(
-                    context,
-                    "Desafio falhou: ${verifyResponse.reason ?: "tenta novamente"}",
-                    Toast.LENGTH_LONG
-                ).show()
+                tvInstruction.text = ""
+                Toast.makeText(context, failureMessage(verifyResponse.reason), Toast.LENGTH_LONG).show()
                 return@launch
             }
 
@@ -324,7 +337,10 @@ class LivenessChallengeFragment : Fragment() {
                     MarcarPontoFacialSelfServiceRequest(
                         dados = FacialPontoDados(
                             verification_token = verificationToken,
-                            device_id = sessionManager.getOrCreateDeviceId()
+                            device_id = sessionManager.getOrCreateDeviceId(),
+                            // Evidência para o histórico/ocorrências: o primeiro
+                            // frame (rosto neutro, antes da acção pedida).
+                            foto_url = "data:image/jpeg;base64," + capturedFrames.first()
                         )
                     )
                 )
@@ -338,6 +354,17 @@ class LivenessChallengeFragment : Fragment() {
                 Toast.makeText(context, ApiUtils.errorMessage(registerResponse), Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private fun failureMessage(reason: String?): String = when (reason) {
+        "liveness_challenge_failed" -> "Nao detectamos a accao pedida. Siga a instrucao durante a gravacao e tente novamente."
+        "identity_discontinuity" -> "O rosto mudou durante a gravacao. Mantenha apenas o seu rosto em frente a camara."
+        "liveness_failed" -> "Prova de vida nao confirmada. Use a camara directamente, sem fotos nem ecras."
+        "low_quality_capture" -> "Imagem com pouca qualidade. Procure mais luz e segure o telemovel firme."
+        "match_below_threshold" -> "Rosto nao reconhecido. Tente novamente."
+        "user_not_enrolled" -> "Nao tem biometria facial registada. Contacte o RH."
+        "model_version_mismatch" -> "A sua biometria facial precisa de ser registada de novo. Contacte o RH."
+        else -> "Desafio falhou: ${reason ?: "tente novamente"}"
     }
 
     private fun stopCamera() {
@@ -355,6 +382,9 @@ class LivenessChallengeFragment : Fragment() {
     companion object {
         private const val RECORDING_DURATION_MS = 3500L
         private const val MAX_FRAMES = 16
+        // O FaceClock exige pelo menos 4 frames (LivenessVerifyRequest).
+        private const val MIN_FRAMES = 4
+        private const val FRAME_INTERVAL_MS = RECORDING_DURATION_MS / MAX_FRAMES
     }
 }
 

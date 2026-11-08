@@ -141,6 +141,13 @@ type Config struct {
 	// FacialVerificationSecret valida os comprovativos HS256 emitidos pelo
 	// FaceClock depois de um match. Deve ser exclusivo desta integracao.
 	FacialVerificationSecret string
+	// Scores minimos exigidos num comprovativo facial, alem da assinatura —
+	// defesa em profundidade: um FaceClock mal configurado (limiar baixo) nao
+	// deve conseguir, sozinho, fazer o ERP aceitar uma marcacao. Os defaults
+	// igualam os limiares do FaceClock (BIOMETRIC_MATCH_THRESHOLD e
+	// BIOMETRIC_LIVENESS_THRESHOLD).
+	FacialMinConfidenceScore float64
+	FacialMinLivenessScore   float64
 	// FaceClockAccessKeyID e FaceClockSecretAccessKey autenticam o ERP perante
 	// o FaceClock via HMAC Nexora (X-Nexora-*). A chave secreta nunca transita.
 	FaceClockAccessKeyID     string
@@ -296,6 +303,8 @@ func Load() *Config {
 
 		FaceClockBaseURL:         env("FACECLOCK_BASE_URL", "https://asseduidade.e258tech.tech"),
 		FacialVerificationSecret: env("FACIAL_VERIFICATION_SECRET", defaultFacialVerificationSecret),
+		FacialMinConfidenceScore: envFloat("FACIAL_MIN_CONFIDENCE_SCORE", 0.85),
+		FacialMinLivenessScore:   envFloat("FACIAL_MIN_LIVENESS_SCORE", 0.68),
 		FaceClockAccessKeyID:     env("FACECLOCK_ACCESS_KEY_ID", ""),
 		FaceClockSecretAccessKey: env("FACECLOCK_SECRET_ACCESS_KEY", defaultFaceClockSecretAccessKey),
 
@@ -337,6 +346,15 @@ func envBool(key string, fallback bool) bool {
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func envFloat(key string, fallback float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
 	}
 	return fallback
 }

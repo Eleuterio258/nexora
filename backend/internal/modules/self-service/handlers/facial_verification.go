@@ -30,7 +30,17 @@ type facialVerificationClaims struct {
 	Purpose         string  `json:"purpose"`
 	ConfidenceScore float64 `json:"confidence_score"`
 	LivenessScore   float64 `json:"liveness_score"`
+	// LivenessMethod: "passive" (imagem unica) ou "active_challenge" (desafio
+	// de accao). Vazio em comprovativos emitidos antes deste campo existir.
+	LivenessMethod string `json:"liveness_method"`
 	jwt.RegisteredClaims
+}
+
+// facialProofPolicy sao os scores minimos que o ERP exige num comprovativo,
+// independentemente do limiar que o FaceClock aplicou ao emiti-lo.
+type facialProofPolicy struct {
+	MinConfidence float64
+	MinLiveness   float64
 }
 
 // consumeFacialVerification valida a assinatura e os vinculos do comprovativo
@@ -47,6 +57,10 @@ func (h *Handler) consumeFacialVerification(
 ) (*facialVerificationClaims, error) {
 	claims, err := parseFacialVerification(
 		rawToken, h.cfg.FacialVerificationSecret, userID, tenantID, deviceID,
+		facialProofPolicy{
+			MinConfidence: h.cfg.FacialMinConfidenceScore,
+			MinLiveness:   h.cfg.FacialMinLivenessScore,
+		},
 	)
 	if err != nil {
 		return nil, err
@@ -76,6 +90,7 @@ func parseFacialVerification(
 	rawToken, secret string,
 	userID, tenantID int64,
 	deviceID string,
+	policy facialProofPolicy,
 ) (*facialVerificationClaims, error) {
 	if rawToken == "" || deviceID == "" {
 		return nil, errFacialProofMissing
@@ -101,6 +116,9 @@ func parseFacialVerification(
 		claims.Subject != strconv.FormatInt(userID, 10) ||
 		claims.TenantID != strconv.FormatInt(tenantID, 10) ||
 		claims.DeviceID != deviceID || claims.ID == "" || claims.ExpiresAt == nil {
+		return nil, errFacialProofInvalid
+	}
+	if claims.ConfidenceScore < policy.MinConfidence || claims.LivenessScore < policy.MinLiveness {
 		return nil, errFacialProofInvalid
 	}
 

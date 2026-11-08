@@ -2,30 +2,30 @@ package tech.e258tech.nexora_assiduidade.data.repository
 
 import android.content.Context
 import java.io.IOException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
-import tech.e258tech.nexora_assiduidade.BuildConfig
+import java.util.UUID
 import tech.e258tech.nexora_assiduidade.data.local.AppDatabase
 import tech.e258tech.nexora_assiduidade.data.local.PendingEventEntity
-import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
-import tech.e258tech.nexora_assiduidade.data.model.response.HardwareEventResponse
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoSimplesRequest
+import tech.e258tech.nexora_assiduidade.data.model.response.EventoAssiduidadeResponse
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
-import tech.e258tech.nexora_assiduidade.utils.HardwareEventMapper
+import tech.e258tech.nexora_assiduidade.utils.ApiUtils
+import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
 import tech.e258tech.nexora_assiduidade.utils.OfflineEventCrypto
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 import tech.e258tech.nexora_assiduidade.work.SyncAttendanceWorker
 
 /**
- * Repositorio responsavel pelo registo de presenca.
+ * Registo de presenca por PIN e impressao digital.
  *
- * Desde 2026-07-13 chama directamente `POST /api/hardware/events/generic` no
- * Nexora ERP (API Key de device embutida no APK, `BuildConfig.DEVICE_API_KEY`)
- * — deixou de passar pelo proxy do FaceClock. Ver o aviso de risco em
- * app/build.gradle.kts.
+ * Chama `POST /api/self-service/assiduidade/ponto` com o JWT do colaborador
+ * (o ERP verifica o PIN no mesmo pedido que grava o evento). Ate 2026-09-26
+ * usava `POST /api/hardware/events/generic` com a API Key de device embutida
+ * no APK.
  *
- * Tenta enviar o evento para o ERP imediatamente. Se nao houver conectividade
- * ou o servidor nao responder, o evento e guardado localmente (Room) e sincronizado
- * mais tarde via WorkManager.
+ * Sem conectividade, ou com o servidor indisponivel, a marcacao fica na fila
+ * local (Room, campos cifrados) e o [SyncAttendanceWorker] envia-a depois em
+ * lote para `POST /api/self-service/assiduidade/ponto/batch`, com a hora real
+ * da marcacao (o ERP aceita ate 72h e assinala o evento como offline).
  */
 class AttendanceRepository(context: Context) {
 
@@ -34,81 +34,78 @@ class AttendanceRepository(context: Context) {
     private val sessionManager = SessionManager(appContext)
     private val pendingEventDao = AppDatabase.getInstance(appContext).pendingEventDao()
 
+    /** Metodos que podem ser marcados por este repositorio (e sincronizados offline). */
+    object Metodo {
+        const val PIN = "pin"
+        const val FINGERPRINT = "fingerprint"
+    }
+
     sealed class RegisterResult {
-        data class Success(val response: HardwareEventResponse) : RegisterResult()
+        data class Success(val response: EventoAssiduidadeResponse) : RegisterResult()
         data class SavedOffline(val pendingId: Long) : RegisterResult()
         data class Error(val message: String) : RegisterResult()
     }
 
-    suspend fun registerClock(request: ClockRegisterRequest, employeeCodeOverride: String? = null): RegisterResult {
+    /**
+     * @param tipoEventoCodigo "entrada", "saida", "intervalo_inicio" ou
+     * "intervalo_fim"; null deixa o ERP alternar entrada/saida.
+     */
+    suspend fun marcarPonto(
+        metodo: String,
+        pin: String? = null,
+        tipoEventoCodigo: String? = null
+    ): RegisterResult {
         val token = sessionManager.getToken()
         if (token.isNullOrBlank()) {
             return RegisterResult.Error("Sessao invalida. Faca login novamente.")
         }
+        val userId = sessionManager.getUserId()
+            ?: return RegisterResult.Error("Sessao invalida. Faca login novamente.")
 
-        // employeeCodeOverride e usado quando quem regista nao e quem esta a
-        // fazer o pedido (ex.: gestor le o QR pessoal do funcionario) — sem
-        // isto, resolveEmployeeCode() identificaria sempre a sessao actual
-        // (o gestor), nunca o funcionario que o QR representa.
-        val employeeCode = employeeCodeOverride
-            ?: HardwareEventMapper.resolveEmployeeCode(sessionManager)
-            ?: return RegisterResult.Error("Nao foi possivel identificar o funcionario no ERP.")
+        // A hora e fixada aqui, antes do pedido: se ficar offline, e esta a
+        // hora que o lote envia, nao a da sincronizacao.
+        val ocorridoEm = DateTimeUtils.nowForApi()
 
         return try {
-            val eventRequest = HardwareEventMapper.toGenericHardwareEvent(request, employeeCode)
-            val response = erpApiService.registerEventDevice(BuildConfig.DEVICE_API_KEY, eventRequest)
-
+            val response = erpApiService.marcarPontoSimplesSelfService(
+                ApiUtils.bearerToken(token),
+                MarcarPontoSimplesRequest(metodo = metodo, pin = pin, tipo_evento_codigo = tipoEventoCodigo)
+            )
             val body = response.body()
-            if (response.isSuccessful && body != null) {
-                if (body.processed) {
-                    RegisterResult.Success(body)
-                } else {
-                    // HTTP 200 com processed=false: o ERP recebeu o evento mas
-                    // recusou-o (ex.: metodo desactivado para o tenant, ou
-                    // employee_no nao mapeado) — nao e sucesso, mesmo com HTTP 2xx.
-                    RegisterResult.Error(body.error ?: "Nao foi possivel registar o ponto.")
-                }
-            } else {
-                val errorMessage = errorMessageDevice(response.code(), response.errorBody()?.string())
-                if (shouldSaveOffline(response.code())) {
-                    saveOffline(request, errorMessage)
-                } else {
-                    RegisterResult.Error(errorMessage)
-                }
+            when {
+                response.isSuccessful && body != null -> RegisterResult.Success(body)
+                shouldSaveOffline(response.code()) ->
+                    saveOffline(userId, metodo, pin, tipoEventoCodigo, ocorridoEm, ApiUtils.errorMessage(response))
+                else -> RegisterResult.Error(ApiUtils.errorMessage(response))
             }
+        } catch (e: IOException) {
+            // Inclui SocketTimeoutException e UnknownHostException.
+            saveOffline(userId, metodo, pin, tipoEventoCodigo, ocorridoEm, e.message)
         } catch (e: Exception) {
-            when (e) {
-                is IOException,
-                is SocketTimeoutException,
-                is UnknownHostException -> saveOffline(request, e.message)
-                else -> RegisterResult.Error(e.message ?: "Erro desconhecido")
-            }
+            RegisterResult.Error(e.message ?: "Erro desconhecido")
         }
     }
 
-    private fun errorMessageDevice(code: Int, body: String?): String {
-        return body?.takeIf { it.isNotBlank() } ?: "Erro ao registar ponto (HTTP $code)."
-    }
-
-    /**
-     * Guarda o evento na fila local para sincronizacao futura.
-     */
     private suspend fun saveOffline(
-        request: ClockRegisterRequest,
+        userId: String,
+        metodo: String,
+        pin: String?,
+        tipoEventoCodigo: String?,
+        ocorridoEm: String,
         errorMessage: String?
     ): RegisterResult {
+        val deviceId = sessionManager.getOrCreateDeviceId()
+        val idempotencyKey = UUID.randomUUID().toString()
         val entity = PendingEventEntity(
-            userId = OfflineEventCrypto.encrypt(request.user_id) ?: request.user_id,
-            deviceId = OfflineEventCrypto.encrypt(request.device_id) ?: request.device_id,
-            eventType = OfflineEventCrypto.encrypt(request.event_type) ?: request.event_type,
-            recordedAt = OfflineEventCrypto.encrypt(request.recorded_at) ?: request.recorded_at,
-            source = OfflineEventCrypto.encrypt(request.source) ?: request.source,
-            confidenceScore = request.confidence_score,
-            livenessScore = request.liveness_score,
-            geoLat = request.geo_lat,
-            geoLng = request.geo_lng,
-            imageBase64 = OfflineEventCrypto.encrypt(request.image_base64),
-            idempotencyKey = OfflineEventCrypto.encrypt(request.idempotency_key) ?: request.idempotency_key,
+            userId = OfflineEventCrypto.encrypt(userId) ?: userId,
+            deviceId = OfflineEventCrypto.encrypt(deviceId) ?: deviceId,
+            eventType = OfflineEventCrypto.encrypt(tipoEventoCodigo.orEmpty()) ?: tipoEventoCodigo.orEmpty(),
+            recordedAt = OfflineEventCrypto.encrypt(ocorridoEm) ?: ocorridoEm,
+            source = OfflineEventCrypto.encrypt(metodo) ?: metodo,
+            // Nunca em claro: o ERP so aceita a marcacao depois de verificar
+            // este PIN na sincronizacao; a linha e apagada a seguir.
+            pin = OfflineEventCrypto.encrypt(pin),
+            idempotencyKey = OfflineEventCrypto.encrypt(idempotencyKey) ?: idempotencyKey,
             syncStatus = PendingEventEntity.SyncStatus.PENDING,
             errorMessage = errorMessage
         )
@@ -117,10 +114,7 @@ class AttendanceRepository(context: Context) {
         return RegisterResult.SavedOffline(id)
     }
 
-    /**
-     * Determina se um erro HTTP deve resultar em guardar offline.
-     * Apenas erros de cliente 4xx (exceto 408/429) e 5xx nao sao guardados offline.
-     */
+    /** So falhas transitorias (timeout, rate limit, 5xx) vao para a fila offline. */
     private fun shouldSaveOffline(code: Int): Boolean {
         return code == 408 || code == 429 || code >= 500
     }

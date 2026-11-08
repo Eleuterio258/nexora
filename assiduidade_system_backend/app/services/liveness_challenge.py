@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-from app.services.biometric import _base64_to_numpy
+from app.services.biometric import _base64_to_numpy, build_embedding, cosine_similarity
 
 log = logging.getLogger("faceclock.liveness_challenge")
 
@@ -106,11 +106,13 @@ class LivenessChallenge:
 
 def create_challenge(user_id: str) -> LivenessChallenge:
     """Gera um desafio aleatório para o utilizador, válido por um curto período."""
-    import random
+    import secrets
 
     from app.services.challenge_store import get_challenge_store
 
-    action = random.choice(list(ChallengeAction))
+    # secrets e nao random: o desafio nao deve ser previsivel a partir do
+    # estado do PRNG (quem antecipe a accao pode pre-gravar o video).
+    action = secrets.choice(list(ChallengeAction))
     challenge = LivenessChallenge(
         challenge_id=str(uuid.uuid4()),
         action=action,
@@ -265,3 +267,31 @@ def verify_challenge_sequence(
         return turned, {"turn_ratios": turns, "baseline": baseline, "max_deviation": max_dev}
 
     return False, {"reason": "acao_desconhecida"}
+
+
+def check_identity_continuity(
+    frames_base64: list[str],
+    reference_embedding: list[float],
+    threshold: float,
+) -> tuple[bool, dict]:
+    """Confirma que todos os frames com rosto sao da mesma pessoa que o frame
+    de referencia (o usado no match).
+
+    Sem isto, a accao do desafio e o match facial eram avaliados em frames
+    diferentes: bastava gravar outra pessoa a piscar e intercalar uma foto
+    nitida da vitima — a accao passava nos frames do atacante e o match no
+    frame da foto. Frames onde o detector nao encontra rosto sao ignorados,
+    mas tem de sobrar pelo menos _MIN_FRAMES comparaveis.
+    """
+    similarities: list[float] = []
+    for frame in frames_base64[:_MAX_FRAMES]:
+        try:
+            embedding = build_embedding(frame)
+        except ValueError:
+            continue
+        similarities.append(cosine_similarity(embedding, reference_embedding))
+
+    if len(similarities) < _MIN_FRAMES:
+        return False, {"reason": "frames_comparaveis_insuficientes", "frames_comparaveis": len(similarities)}
+    min_similarity = min(similarities)
+    return min_similarity >= threshold, {"similarities": similarities, "min_similarity": min_similarity}

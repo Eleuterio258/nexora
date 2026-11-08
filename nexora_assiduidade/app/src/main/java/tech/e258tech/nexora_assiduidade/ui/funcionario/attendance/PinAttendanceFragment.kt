@@ -9,7 +9,6 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,15 +16,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
-import tech.e258tech.nexora_assiduidade.data.model.PinValidateRequest
-import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.data.repository.AttendanceRepository
-import tech.e258tech.nexora_assiduidade.utils.ApiUtils
-import tech.e258tech.nexora_assiduidade.utils.Constants
-import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
-import tech.e258tech.nexora_assiduidade.utils.RoleUtils
-import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
  * Tela de registo de presenca por PIN.
@@ -40,7 +31,6 @@ class PinAttendanceFragment : Fragment() {
 
     private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    private lateinit var sessionManager: SessionManager
     private lateinit var attendanceRepository: AttendanceRepository
 
     private lateinit var etPin: EditText
@@ -63,7 +53,6 @@ class PinAttendanceFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        sessionManager = SessionManager(requireContext())
         attendanceRepository = AttendanceRepository(requireContext())
 
         etPin = view.findViewById(R.id.etPin)
@@ -140,69 +129,21 @@ class PinAttendanceFragment : Fragment() {
         }
     }
 
+    /**
+     * Marca o ponto por PIN num unico pedido: o ERP verifica o PIN e grava o
+     * evento na mesma transaccao (POST /api/self-service/assiduidade/ponto).
+     * Antes havia um login por PIN seguido de um registo separado pela rota de
+     * hardware, que um cliente modificado podia saltar.
+     */
     private fun validatePinAndRegister(pin: String) {
-        val email = sessionManager.getUserEmail()
-        if (email.isNullOrBlank()) {
-            Toast.makeText(context, "Sessao invalida. Faca login novamente.", Toast.LENGTH_LONG).show()
-            return
-        }
-
         btnValidatePin.isEnabled = false
 
         uiScope.launch {
-            val validateResult: Pair<Boolean, String?> = withContext(Dispatchers.IO) {
-                try {
-                    val response = RetrofitClient.erpApiService.validatePin(
-                        PinValidateRequest(email = email, pin = pin)
-                    )
-                    if (response.isSuccessful && response.body() != null) {
-                        val payload = response.body()!!
-                        val role = RoleUtils.fromErpLogin(payload.modulos)
-                        sessionManager.saveSession(
-                            token = payload.access_token,
-                            refreshToken = payload.refresh_token,
-                            userId = payload.user.id.toString(),
-                            userName = payload.user.nome,
-                            userEmail = payload.user.email,
-                            userRole = role,
-                            employeeCode = payload.user.email,
-                            modulos = payload.modulos
-                        )
-                        true to null
-                    } else {
-                        false to ApiUtils.errorMessage(response)
-                    }
-                } catch (e: Exception) {
-                    false to (e.message ?: "Erro na validacao do PIN")
-                }
-            }
-
-            val valid = validateResult.first
-            val message = validateResult.second
-
-            if (!valid) {
-                btnValidatePin.isEnabled = true
-                Toast.makeText(context, message ?: "PIN invalido.", Toast.LENGTH_LONG).show()
-                return@launch
-            }
-
-            val userId = sessionManager.getUserId() ?: run {
-                btnValidatePin.isEnabled = true
-                Toast.makeText(context, "Sessao invalida apos validacao do PIN.", Toast.LENGTH_LONG).show()
-                return@launch
-            }
-
-            val request = ClockRegisterRequest(
-                idempotency_key = UUID.randomUUID().toString(),
-                user_id = userId,
-                device_id = sessionManager.getOrCreateDeviceId(),
-                event_type = Constants.EVENT_AUTO,
-                recorded_at = DateTimeUtils.nowForApi(),
-                source = Constants.SOURCE_PIN
-            )
-
             val registerResult = withContext(Dispatchers.IO) {
-                attendanceRepository.registerClock(request)
+                attendanceRepository.marcarPonto(
+                    metodo = AttendanceRepository.Metodo.PIN,
+                    pin = pin
+                )
             }
 
             btnValidatePin.isEnabled = true
@@ -213,10 +154,16 @@ class PinAttendanceFragment : Fragment() {
                     parentFragmentManager.popBackStack()
                 }
                 is AttendanceRepository.RegisterResult.SavedOffline -> {
-                    Toast.makeText(context, "Sem internet. Registo guardado e sera sincronizado automaticamente.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        context,
+                        "Sem internet. O registo e o PIN serão verificados quando houver ligação.",
+                        Toast.LENGTH_LONG
+                    ).show()
                     parentFragmentManager.popBackStack()
                 }
                 is AttendanceRepository.RegisterResult.Error -> {
+                    etPin.text.clear()
+                    atualizarPontosPin()
                     Toast.makeText(context, registerResult.message, Toast.LENGTH_LONG).show()
                 }
             }

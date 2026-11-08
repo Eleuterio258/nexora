@@ -1,0 +1,2651 @@
+{
+  "scope": "Código próprio Go; baseline e ALTER COLUMN lexicais em migrações ativas; nenhuma ligação à BD.",
+  "limitations": "Não é parser SQL/Go completo. DO dinâmico, ALTER não reconhecido, schemas reais, triggers e wrappers podem alterar o resultado. Uma correspondência de nome no router não prova alcance nem permissões.",
+  "go_files": 437,
+  "test_files": 59,
+  "modules": [
+    {
+      "module": "aprovacoes",
+      "go_files": 5,
+      "test_files": 0,
+      "lines": 803
+    },
+    {
+      "module": "assinatura-digital",
+      "go_files": 32,
+      "test_files": 16,
+      "lines": 5671
+    },
+    {
+      "module": "assinaturas",
+      "go_files": 2,
+      "test_files": 0,
+      "lines": 218
+    },
+    {
+      "module": "auditoria",
+      "go_files": 4,
+      "test_files": 0,
+      "lines": 630
+    },
+    {
+      "module": "auth",
+      "go_files": 29,
+      "test_files": 6,
+      "lines": 5028
+    },
+    {
+      "module": "centros-custo",
+      "go_files": 4,
+      "test_files": 0,
+      "lines": 598
+    },
+    {
+      "module": "compras",
+      "go_files": 6,
+      "test_files": 1,
+      "lines": 782
+    },
+    {
+      "module": "contabilidade",
+      "go_files": 16,
+      "test_files": 0,
+      "lines": 3979
+    },
+    {
+      "module": "crm",
+      "go_files": 4,
+      "test_files": 0,
+      "lines": 1251
+    },
+    {
+      "module": "empresas",
+      "go_files": 6,
+      "test_files": 1,
+      "lines": 924
+    },
+    {
+      "module": "financeiro",
+      "go_files": 2,
+      "test_files": 0,
+      "lines": 345
+    },
+    {
+      "module": "gestao-clientes",
+      "go_files": 4,
+      "test_files": 0,
+      "lines": 1323
+    },
+    {
+      "module": "gestao-escolar",
+      "go_files": 63,
+      "test_files": 6,
+      "lines": 11956
+    },
+    {
+      "module": "gestao-produtos",
+      "go_files": 3,
+      "test_files": 0,
+      "lines": 1455
+    },
+    {
+      "module": "gestao-stock",
+      "go_files": 3,
+      "test_files": 0,
+      "lines": 1785
+    },
+    {
+      "module": "hardware",
+      "go_files": 15,
+      "test_files": 2,
+      "lines": 2657
+    },
+    {
+      "module": "impostos",
+      "go_files": 3,
+      "test_files": 0,
+      "lines": 644
+    },
+    {
+      "module": "logistica",
+      "go_files": 2,
+      "test_files": 0,
+      "lines": 279
+    },
+    {
+      "module": "modulo-faturacao",
+      "go_files": 10,
+      "test_files": 2,
+      "lines": 2166
+    },
+    {
+      "module": "monitoring",
+      "go_files": 1,
+      "test_files": 0,
+      "lines": 60
+    },
+    {
+      "module": "multi-moeda",
+      "go_files": 2,
+      "test_files": 0,
+      "lines": 195
+    },
+    {
+      "module": "notifications",
+      "go_files": 2,
+      "test_files": 0,
+      "lines": 294
+    },
+    {
+      "module": "pessoas",
+      "go_files": 2,
+      "test_files": 0,
+      "lines": 88
+    },
+    {
+      "module": "pos",
+      "go_files": 14,
+      "test_files": 1,
+      "lines": 4036
+    },
+    {
+      "module": "recrutamento",
+      "go_files": 17,
+      "test_files": 0,
+      "lines": 4972
+    },
+    {
+      "module": "recursos-humanos",
+      "go_files": 58,
+      "test_files": 6,
+      "lines": 12786
+    },
+    {
+      "module": "seguranca",
+      "go_files": 3,
+      "test_files": 0,
+      "lines": 259
+    },
+    {
+      "module": "self-service",
+      "go_files": 14,
+      "test_files": 2,
+      "lines": 2455
+    },
+    {
+      "module": "sistema-configuracao",
+      "go_files": 4,
+      "test_files": 0,
+      "lines": 705
+    },
+    {
+      "module": "superadmin",
+      "go_files": 11,
+      "test_files": 0,
+      "lines": 1725
+    },
+    {
+      "module": "tarefas",
+      "go_files": 4,
+      "test_files": 0,
+      "lines": 613
+    },
+    {
+      "module": "tesouraria",
+      "go_files": 3,
+      "test_files": 0,
+      "lines": 352
+    },
+    {
+      "module": "utilizadores",
+      "go_files": 11,
+      "test_files": 0,
+      "lines": 998
+    }
+  ],
+  "active_migrations": [
+    "20260724000001_assinatura_digital_fase1_hardening.up.sql",
+    "20260724000002_assinatura_digital_fase0_estabilizacao.up.sql",
+    "20260724000003_assinatura_digital_fase1_logs_append_only.up.sql",
+    "20260724000004_assinatura_digital_fase3_webhook.up.sql",
+    "20260724080001_baseline_schema.up.sql",
+    "20260724090001_pos_terminals_user_id.up.sql",
+    "20260725140001_hardware_restore.up.sql",
+    "20260725150000_rh_qr_tokens_restore.up.sql",
+    "20260725150001_qr_tokens_funcionario_id.up.sql",
+    "20260726140401_candidato_cv_notificacoes.up.sql",
+    "20260727000001_oauth2_authorization_server.up.sql",
+    "20260727000002_cargos_padrao_restore.up.sql",
+    "20260727000003_drop_dead_auth_api_keys.up.sql",
+    "20260727090000_uniformizar_funcionario_identificacao.up.sql",
+    "20260727093000_permissoes_cargos_padrao_finas.up.sql",
+    "20260727110000_rh_funcionarios_criado_por.up.sql",
+    "20260727120000_permissoes_granulares_fase3.up.sql",
+    "20260727130000_garantir_feature_catalog_fase4.up.sql",
+    "20260728000001_rh_presencas_justificado.up.sql",
+    "20260728000002_assinatura_digital_webhook_events_restore.up.sql",
+    "20260728000003_memberships_principal.up.sql",
+    "20260728000004_permissao_marcar_ponto.up.sql",
+    "20260729000001_pessoas_backfill_identidade.up.sql",
+    "20260729000002_view_pessoa_tipos.up.sql",
+    "20260729000003_horario_padrao_tenant.up.sql",
+    "20260730000001_metodo_marcacao_pin.up.sql",
+    "20260730000002_interpretacao_marcacoes.up.sql",
+    "20260802000001_facial_verification_proofs.up.sql",
+    "20260808120000_pos_sales_client_reference.up.sql",
+    "20260808130000_pos_sales_invoice_id.up.sql",
+    "20260808140000_pos_payment_confirmations.up.sql",
+    "20260808150000_pos_caixa_detalhado.up.sql",
+    "20260808170000_pos_estorno_parcial.up.sql",
+    "20260808180000_pos_supervisor_permissions.up.sql",
+    "20260808190000_hardware_device_hmac.up.sql",
+    "20260808190001_recrutamento_tenant_hmac.up.sql",
+    "20260810100000_rh_funcionarios_dados_bancarios.up.sql",
+    "20260810110000_faturacao_contabilidade_config.up.sql",
+    "20260810120000_compras_contabilidade_config.up.sql",
+    "20260810130000_faturacao_pdf_assinatura.up.sql",
+    "20260810150000_pos_add_funcionario_id.up.sql",
+    "20260810151000_pos_terminal_funcionarios.up.sql",
+    "20260810152000_fix_terminal_emails.up.sql",
+    "20260810153000_terminal_nao_e_funcionario.up.sql",
+    "20260812060000_pos_terminals_deleted_at.up.sql",
+    "20260812070000_pos_permissoes_granulares.up.sql",
+    "20260812070001_cargos_padrao_pos.up.sql",
+    "20260812080000_pos_configuracao.up.sql",
+    "20260814140000_faturacao_fr_vd.up.sql",
+    "20260903090000_integration_inbox_events.up.sql",
+    "20260903100000_notification_messages_outbox.up.sql",
+    "20260903110000_payment_intents.up.sql",
+    "20260903120000_hardware_device_events_retry.up.sql",
+    "20260903120001_permissao_hardware_gerir_eventos.up.sql",
+    "20260904090000_school_fees_ultima_notif_vencimento.up.sql",
+    "20260904100000_utilizadores_user_agenda.up.sql",
+    "20260926120000_marcacoes_offline_sincronizadas.up.sql"
+  ],
+  "missing_down": [
+    "20260727093000_permissoes_cargos_padrao_finas.up.sql",
+    "20260727110000_rh_funcionarios_criado_por.up.sql"
+  ],
+  "sql_contract_candidates": [
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/assinatura_digital.go",
+      "line": 279,
+      "table": "assinatura_digital.signatarios",
+      "columns_not_found": [
+        "user_id"
+      ],
+      "mandatory_columns_omitted": [],
+      "function_guess": "AdicionarSignatario",
+      "handler_name_in_router": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/assinatura_transacao.go",
+      "line": 241,
+      "table": "assinatura_digital.versoes_assinadas",
+      "columns_not_found": [
+        "algoritmo_assinatura",
+        "algoritmo_digest",
+        "certificado_emissor",
+        "certificado_fingerprint",
+        "certificado_serie",
+        "certificado_subject",
+        "certificado_validade_fim",
+        "certificado_validade_inicio",
+        "legal_valido",
+        "localizacao",
+        "motivo",
+        "nivel_assinatura",
+        "provider",
+        "timestamp_autoridade"
+      ],
+      "mandatory_columns_omitted": [],
+      "function_guess": "gerarVersaoPAdESTx",
+      "handler_name_in_router": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/webhooks.go",
+      "line": 378,
+      "table": "assinatura_digital.versoes_assinadas",
+      "columns_not_found": [
+        "algoritmo_assinatura",
+        "algoritmo_digest",
+        "certificado_emissor",
+        "certificado_fingerprint",
+        "certificado_serie",
+        "certificado_subject",
+        "certificado_validade_fim",
+        "certificado_validade_inicio",
+        "legal_valido",
+        "localizacao",
+        "motivo",
+        "nivel_assinatura",
+        "provider",
+        "timestamp_autoridade"
+      ],
+      "mandatory_columns_omitted": [],
+      "function_guess": "gerarVersaoAPartirDoProviderTx",
+      "handler_name_in_router": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-clientes/handlers/cliente_data.go",
+      "line": 255,
+      "table": "clientes.customer_credit_limits",
+      "columns_not_found": [
+        "limite"
+      ],
+      "mandatory_columns_omitted": [],
+      "function_guess": "ActualizarLimiteCredito",
+      "handler_name_in_router": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/fase6.go",
+      "line": 166,
+      "table": "gestao_escolar.school_student_fee_discounts",
+      "columns_not_found": [
+        "criado_por",
+        "estado"
+      ],
+      "mandatory_columns_omitted": [],
+      "function_guess": "CriarBolsa",
+      "handler_name_in_router": true
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/portal_professor.go",
+      "line": 581,
+      "table": "gestao_escolar.school_grades",
+      "columns_not_found": [
+        "class_id"
+      ],
+      "mandatory_columns_omitted": [],
+      "function_guess": "ProfessorPortalSalvarNotas",
+      "handler_name_in_router": true
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/repositories/enrollment.go",
+      "line": 24,
+      "table": "gestao_escolar.school_enrollments",
+      "columns_not_found": [
+        "tipo"
+      ],
+      "mandatory_columns_omitted": [],
+      "function_guess": "Create",
+      "handler_name_in_router": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/repositories/fee.go",
+      "line": 231,
+      "table": "financeiro.accounts_receivable",
+      "columns_not_found": [],
+      "mandatory_columns_omitted": [
+        "customer_id"
+      ],
+      "function_guess": "CreateFinancialReceivable",
+      "handler_name_in_router": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-produtos/handlers/produtos.go",
+      "line": 116,
+      "table": "produtos.product_brands",
+      "columns_not_found": [
+        "descricao"
+      ],
+      "mandatory_columns_omitted": [],
+      "function_guess": "CriarMarca",
+      "handler_name_in_router": true
+    },
+    {
+      "path": "backend/internal/modules/notifications/handlers/notificacoes.go",
+      "line": 47,
+      "table": "notifications.notification_channels",
+      "columns_not_found": [],
+      "mandatory_columns_omitted": [
+        "codigo"
+      ],
+      "function_guess": "CriarCanal",
+      "handler_name_in_router": true
+    },
+    {
+      "path": "backend/internal/shared/adapters/financial.go",
+      "line": 34,
+      "table": "financeiro.accounts_receivable",
+      "columns_not_found": [],
+      "mandatory_columns_omitted": [
+        "customer_id"
+      ],
+      "function_guess": "RecordReceivable",
+      "handler_name_in_router": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/invoicing.go",
+      "line": 76,
+      "table": "faturacao.invoice_items",
+      "columns_not_found": [],
+      "mandatory_columns_omitted": [
+        "product_id"
+      ],
+      "function_guess": "CreateReceipt",
+      "handler_name_in_router": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/signature.go",
+      "line": 28,
+      "table": "assinatura_digital.documentos",
+      "columns_not_found": [
+        "origem_id",
+        "origem_modulo"
+      ],
+      "mandatory_columns_omitted": [],
+      "function_guess": "CreateForSigning",
+      "handler_name_in_router": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/signature.go",
+      "line": 38,
+      "table": "assinatura_digital.signatarios",
+      "columns_not_found": [
+        "user_id"
+      ],
+      "mandatory_columns_omitted": [],
+      "function_guess": "CreateForSigning",
+      "handler_name_in_router": false
+    },
+    {
+      "path": "backend/internal/ws/client.go",
+      "line": 292,
+      "table": "public.chat_mensagens",
+      "columns_not_found": [
+        "client_id"
+      ],
+      "mandatory_columns_omitted": [],
+      "function_guess": "persistMessage",
+      "handler_name_in_router": false
+    }
+  ],
+  "files": [
+    {
+      "path": "backend/cmd/analyze-schema/main.go",
+      "lines": 443,
+      "test": false
+    },
+    {
+      "path": "backend/cmd/broadcast_push/main.go",
+      "lines": 65,
+      "test": false
+    },
+    {
+      "path": "backend/cmd/migrate-presencas-eventos/main.go",
+      "lines": 168,
+      "test": false
+    },
+    {
+      "path": "backend/cmd/migrate-storage/main.go",
+      "lines": 239,
+      "test": false
+    },
+    {
+      "path": "backend/cmd/send-test-email/main.go",
+      "lines": 32,
+      "test": false
+    },
+    {
+      "path": "backend/cmd/testrouter/main.go",
+      "lines": 29,
+      "test": false
+    },
+    {
+      "path": "backend/cmd/traefik-tenants/main.go",
+      "lines": 227,
+      "test": false
+    },
+    {
+      "path": "backend/cmd/traefik-tenants/main_test.go",
+      "lines": 79,
+      "test": true
+    },
+    {
+      "path": "backend/cmd/verify-recalculo/main.go",
+      "lines": 51,
+      "test": false
+    },
+    {
+      "path": "backend/cmd/worker/main.go",
+      "lines": 64,
+      "test": false
+    },
+    {
+      "path": "backend/config/config.go",
+      "lines": 381,
+      "test": false
+    },
+    {
+      "path": "backend/internal/background/jobs.go",
+      "lines": 1025,
+      "test": false
+    },
+    {
+      "path": "backend/internal/background/jobs_test.go",
+      "lines": 344,
+      "test": true
+    },
+    {
+      "path": "backend/internal/background/mailer_ses.go",
+      "lines": 194,
+      "test": false
+    },
+    {
+      "path": "backend/internal/background/sms.go",
+      "lines": 95,
+      "test": false
+    },
+    {
+      "path": "backend/internal/db/db.go",
+      "lines": 20,
+      "test": false
+    },
+    {
+      "path": "backend/internal/idhash/idhash.go",
+      "lines": 150,
+      "test": false
+    },
+    {
+      "path": "backend/internal/middleware/audit.go",
+      "lines": 134,
+      "test": false
+    },
+    {
+      "path": "backend/internal/middleware/audit_module.go",
+      "lines": 67,
+      "test": false
+    },
+    {
+      "path": "backend/internal/middleware/auth.go",
+      "lines": 485,
+      "test": false
+    },
+    {
+      "path": "backend/internal/middleware/auth_test.go",
+      "lines": 159,
+      "test": true
+    },
+    {
+      "path": "backend/internal/middleware/candidato_auth.go",
+      "lines": 63,
+      "test": false
+    },
+    {
+      "path": "backend/internal/middleware/device_auth.go",
+      "lines": 134,
+      "test": false
+    },
+    {
+      "path": "backend/internal/middleware/feature_test.go",
+      "lines": 81,
+      "test": true
+    },
+    {
+      "path": "backend/internal/middleware/portal_auth.go",
+      "lines": 99,
+      "test": false
+    },
+    {
+      "path": "backend/internal/middleware/portal_encarregado_auth.go",
+      "lines": 90,
+      "test": false
+    },
+    {
+      "path": "backend/internal/middleware/portal_professor_auth.go",
+      "lines": 59,
+      "test": false
+    },
+    {
+      "path": "backend/internal/middleware/ratelimit.go",
+      "lines": 43,
+      "test": false
+    },
+    {
+      "path": "backend/internal/middleware/superadmin_security.go",
+      "lines": 104,
+      "test": false
+    },
+    {
+      "path": "backend/internal/middleware/superadmin_security_test.go",
+      "lines": 136,
+      "test": true
+    },
+    {
+      "path": "backend/internal/middleware/tenant_host.go",
+      "lines": 57,
+      "test": false
+    },
+    {
+      "path": "backend/internal/middleware/tenant_host_test.go",
+      "lines": 101,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/aprovacoes/aprovacoes.go",
+      "lines": 88,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/aprovacoes/handlers/assinatura.go",
+      "lines": 91,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/aprovacoes/handlers/flows.go",
+      "lines": 184,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/aprovacoes/handlers/handler.go",
+      "lines": 35,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/aprovacoes/handlers/requests.go",
+      "lines": 405,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/antimalware.go",
+      "lines": 37,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/antimalware_test.go",
+      "lines": 34,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/assinatura_digital.go",
+      "lines": 739,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/assinatura_digital_test.go",
+      "lines": 181,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/assinatura_transacao.go",
+      "lines": 303,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/convites.go",
+      "lines": 399,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/handler.go",
+      "lines": 63,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/otp_test.go",
+      "lines": 240,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/pagina_verificacao.go",
+      "lines": 19,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/pagina_verificacao_test.go",
+      "lines": 31,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/portal_assinatura.go",
+      "lines": 46,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/portal_assinatura_test.go",
+      "lines": 377,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/validacao.go",
+      "lines": 453,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/validacao_test.go",
+      "lines": 278,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/verificacao.go",
+      "lines": 118,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/verificacao_test.go",
+      "lines": 57,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/webhooks.go",
+      "lines": 488,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/handlers/webhooks_test.go",
+      "lines": 449,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/dev_provider.go",
+      "lines": 122,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/dev_provider_test.go",
+      "lines": 67,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/intic_provider.go",
+      "lines": 152,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/intic_provider_test.go",
+      "lines": 43,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/pades_verify.go",
+      "lines": 161,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/pades_verify_expiry_test.go",
+      "lines": 112,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/pades_verify_malformed_test.go",
+      "lines": 76,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/pades_verify_test.go",
+      "lines": 105,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/provider.go",
+      "lines": 41,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/signer.go",
+      "lines": 115,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/signer_test.go",
+      "lines": 126,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/tsa_indisponivel_test.go",
+      "lines": 35,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/validator.go",
+      "lines": 144,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinatura-digital/pki/validator_test.go",
+      "lines": 60,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/assinaturas/handlers/assinaturas.go",
+      "lines": 186,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/assinaturas/handlers/handler.go",
+      "lines": 32,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auditoria/handlers/assinatura.go",
+      "lines": 87,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auditoria/handlers/audit_events.go",
+      "lines": 298,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auditoria/handlers/auditoria.go",
+      "lines": 200,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auditoria/handlers/handler.go",
+      "lines": 45,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/audit/audit.go",
+      "lines": 59,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/auth.go",
+      "lines": 1028,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/authcode.go",
+      "lines": 579,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/cargos.go",
+      "lines": 258,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/handler.go",
+      "lines": 72,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/historico.go",
+      "lines": 76,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/oauth_authorize.go",
+      "lines": 191,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/oauth_authorize_test.go",
+      "lines": 41,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/oauth_jwks.go",
+      "lines": 16,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/oauth_pkce.go",
+      "lines": 16,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/oauth_pkce_test.go",
+      "lines": 28,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/oauth_scope_test.go",
+      "lines": 32,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/oauth_signing.go",
+      "lines": 69,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/oauth_token.go",
+      "lines": 423,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/papel.go",
+      "lines": 107,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/paycore_users.go",
+      "lines": 289,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/permissoes.go",
+      "lines": 163,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/pos_login.go",
+      "lines": 253,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/pos_pin_login.go",
+      "lines": 88,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/push_token.go",
+      "lines": 32,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/sessoes.go",
+      "lines": 66,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/handlers/utilizadores.go",
+      "lines": 378,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/models/oauth_clients.go",
+      "lines": 53,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/models/oauth_clients_test.go",
+      "lines": 27,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/auth/models/rbac.go",
+      "lines": 274,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/models/rbac_test.go",
+      "lines": 154,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/auth/oauthkeys/jwks.go",
+      "lines": 23,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/oauthkeys/provider.go",
+      "lines": 167,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/auth/oauthkeys/provider_test.go",
+      "lines": 66,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/centros-custo/handlers/allocations.go",
+      "lines": 141,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/centros-custo/handlers/budgets.go",
+      "lines": 230,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/centros-custo/handlers/cost_centers.go",
+      "lines": 175,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/centros-custo/handlers/handler.go",
+      "lines": 52,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/compras/handlers/assinatura.go",
+      "lines": 87,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/compras/handlers/assinatura_test.go",
+      "lines": 117,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/compras/handlers/compras.go",
+      "lines": 179,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/compras/handlers/financeiro.go",
+      "lines": 169,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/compras/handlers/handler.go",
+      "lines": 45,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/compras/handlers/operacoes.go",
+      "lines": 185,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/account_types.go",
+      "lines": 172,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/assinatura.go",
+      "lines": 87,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/budgets.go",
+      "lines": 246,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/contas.go",
+      "lines": 178,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/depreciation.go",
+      "lines": 331,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/fiscal_periods.go",
+      "lines": 137,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/fiscal_years.go",
+      "lines": 190,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/fixed_assets.go",
+      "lines": 288,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/handler.go",
+      "lines": 57,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/journal_entries.go",
+      "lines": 595,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/journals.go",
+      "lines": 114,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/period_closings.go",
+      "lines": 402,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/reports.go",
+      "lines": 675,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/tax_groups.go",
+      "lines": 100,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/tax_transactions.go",
+      "lines": 155,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/contabilidade/handlers/taxes.go",
+      "lines": 252,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/crm/handlers/atividades.go",
+      "lines": 286,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/crm/handlers/handler.go",
+      "lines": 94,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/crm/handlers/leads.go",
+      "lines": 413,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/crm/handlers/oportunidades.go",
+      "lines": 458,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/empresas/handlers/assinatura.go",
+      "lines": 85,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/empresas/handlers/branches.go",
+      "lines": 130,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/empresas/handlers/companies.go",
+      "lines": 143,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/empresas/handlers/company_data.go",
+      "lines": 431,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/empresas/handlers/cross_tenant_test.go",
+      "lines": 72,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/empresas/handlers/handler.go",
+      "lines": 63,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/financeiro/handlers/financeiro.go",
+      "lines": 306,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/financeiro/handlers/handler.go",
+      "lines": 39,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-clientes/handlers/cliente_data.go",
+      "lines": 372,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-clientes/handlers/clientes.go",
+      "lines": 255,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-clientes/handlers/clientes_api_ext.go",
+      "lines": 645,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-clientes/handlers/handler.go",
+      "lines": 51,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/academico.go",
+      "lines": 170,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/assinatura.go",
+      "lines": 86,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/calendar.go",
+      "lines": 155,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/comunicacao.go",
+      "lines": 301,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/config.go",
+      "lines": 64,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/escolar.go",
+      "lines": 570,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/estrutura_academica.go",
+      "lines": 599,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/fase6.go",
+      "lines": 190,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/fees.go",
+      "lines": 215,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/grades.go",
+      "lines": 241,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/handler.go",
+      "lines": 98,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/incidents.go",
+      "lines": 170,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/incidents_uploads.go",
+      "lines": 208,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/ligacoes.go",
+      "lines": 118,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/operacoes.go",
+      "lines": 270,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/portal_admin.go",
+      "lines": 354,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/portal_auth.go",
+      "lines": 217,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/portal_data.go",
+      "lines": 716,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/portal_encarregado_auth.go",
+      "lines": 297,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/portal_encarregado_data.go",
+      "lines": 217,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/portal_mobile.go",
+      "lines": 396,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/portal_pagamento.go",
+      "lines": 233,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/portal_professor.go",
+      "lines": 665,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/portal_user_helper.go",
+      "lines": 120,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/professores.go",
+      "lines": 209,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/tasks.go",
+      "lines": 151,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/timetable.go",
+      "lines": 140,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/handlers/turmas_matriculas.go",
+      "lines": 259,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/models/academic_structure.go",
+      "lines": 92,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/models/class.go",
+      "lines": 58,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/models/discipline.go",
+      "lines": 75,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/models/enrollment.go",
+      "lines": 39,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/models/fee.go",
+      "lines": 64,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/models/grade.go",
+      "lines": 43,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/models/models.go",
+      "lines": 16,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/models/teacher.go",
+      "lines": 55,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/models/timetable.go",
+      "lines": 68,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/repositories/academic_structure.go",
+      "lines": 502,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/repositories/calendar.go",
+      "lines": 141,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/repositories/class.go",
+      "lines": 71,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/repositories/db.go",
+      "lines": 18,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/repositories/enrollment.go",
+      "lines": 106,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/repositories/fee.go",
+      "lines": 285,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/repositories/grade.go",
+      "lines": 160,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/repositories/incident.go",
+      "lines": 157,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/repositories/teacher.go",
+      "lines": 210,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/repositories/timetable.go",
+      "lines": 216,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/academic_structure.go",
+      "lines": 413,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/academic_structure_test.go",
+      "lines": 168,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/calendar.go",
+      "lines": 107,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/class.go",
+      "lines": 94,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/class_test.go",
+      "lines": 68,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/enrollment.go",
+      "lines": 142,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/enrollment_test.go",
+      "lines": 91,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/fee.go",
+      "lines": 287,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/fee_test.go",
+      "lines": 69,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/grade.go",
+      "lines": 117,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/grade_test.go",
+      "lines": 67,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/incident.go",
+      "lines": 118,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/notificacao.go",
+      "lines": 9,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/teacher.go",
+      "lines": 174,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/teacher_test.go",
+      "lines": 99,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/gestao-escolar/services/timetable.go",
+      "lines": 128,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-produtos/handlers/catalogo_ext.go",
+      "lines": 977,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-produtos/handlers/handler.go",
+      "lines": 51,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-produtos/handlers/produtos.go",
+      "lines": 427,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-stock/handlers/handler.go",
+      "lines": 51,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-stock/handlers/stock.go",
+      "lines": 408,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/gestao-stock/handlers/stock_ext.go",
+      "lines": 1326,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/adapters/adapter.go",
+      "lines": 21,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/adapters/generic_rest.go",
+      "lines": 124,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/adapters/generic_rest_test.go",
+      "lines": 37,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/hardware/adapters/hikvision.go",
+      "lines": 85,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/adapters/registry.go",
+      "lines": 51,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/adapters/zkteco.go",
+      "lines": 85,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/handlers/devices.go",
+      "lines": 537,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/handlers/events.go",
+      "lines": 405,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/handlers/fingerprint.go",
+      "lines": 266,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/handlers/handler.go",
+      "lines": 38,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/models/device.go",
+      "lines": 22,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/models/event.go",
+      "lines": 42,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/mqtt/worker.go",
+      "lines": 204,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/service/processor.go",
+      "lines": 504,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/hardware/service/processor_test.go",
+      "lines": 236,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/impostos/handlers/handler.go",
+      "lines": 32,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/impostos/handlers/impostos.go",
+      "lines": 516,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/impostos/handlers/uploads.go",
+      "lines": 96,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/logistica/handlers/handler.go",
+      "lines": 39,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/logistica/handlers/logistica.go",
+      "lines": 240,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/modulo-faturacao/handlers/assinatura.go",
+      "lines": 120,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/modulo-faturacao/handlers/assinatura_test.go",
+      "lines": 146,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/modulo-faturacao/handlers/contabilidade.go",
+      "lines": 22,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/modulo-faturacao/handlers/credit_notes_fiscal.go",
+      "lines": 207,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/modulo-faturacao/handlers/cross_tenant_test.go",
+      "lines": 75,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/modulo-faturacao/handlers/email.go",
+      "lines": 119,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/modulo-faturacao/handlers/faturacao.go",
+      "lines": 848,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/modulo-faturacao/handlers/fiscal.go",
+      "lines": 166,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/modulo-faturacao/handlers/handler.go",
+      "lines": 80,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/modulo-faturacao/handlers/pdf.go",
+      "lines": 383,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/monitoring/handlers/faceclock.go",
+      "lines": 60,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/multi-moeda/handlers/handler.go",
+      "lines": 30,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/multi-moeda/handlers/multi_moeda.go",
+      "lines": 165,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/notifications/handlers/handler.go",
+      "lines": 32,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/notifications/handlers/notificacoes.go",
+      "lines": 262,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pessoas/handlers/handler.go",
+      "lines": 28,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pessoas/handlers/relacoes.go",
+      "lines": 60,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/configuracao.go",
+      "lines": 76,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/descontos.go",
+      "lines": 184,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/estorno_parcial.go",
+      "lines": 278,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/faturacao.go",
+      "lines": 165,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/handler.go",
+      "lines": 78,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/licenca.go",
+      "lines": 146,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/movimentacoes.go",
+      "lines": 92,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/pagamentos.go",
+      "lines": 273,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/paycore_transactions.go",
+      "lines": 361,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/pos.go",
+      "lines": 1628,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/pos_test.go",
+      "lines": 194,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/recibo.go",
+      "lines": 106,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/relatorios.go",
+      "lines": 262,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/pos/handlers/sync.go",
+      "lines": 193,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/assinatura.go",
+      "lines": 85,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/campos_custom.go",
+      "lines": 207,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/candidato_cv.go",
+      "lines": 448,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/candidato_mensagens.go",
+      "lines": 152,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/candidato_portal.go",
+      "lines": 189,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/candidato_push.go",
+      "lines": 96,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/candidaturas.go",
+      "lines": 579,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/contactos.go",
+      "lines": 80,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/contratar.go",
+      "lines": 749,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/dashboard.go",
+      "lines": 101,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/handler.go",
+      "lines": 117,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/notificacoes.go",
+      "lines": 337,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/public.go",
+      "lines": 916,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/realtime.go",
+      "lines": 208,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/tenant_signature.go",
+      "lines": 70,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/vaga_campos.go",
+      "lines": 218,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recrutamento/handlers/vagas.go",
+      "lines": 420,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/adiantamentos.go",
+      "lines": 190,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/assiduidade_integracao.go",
+      "lines": 201,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/assiduidade_qr.go",
+      "lines": 363,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/avaliacoes.go",
+      "lines": 210,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/beneficios.go",
+      "lines": 135,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/beneficios_funcionario.go",
+      "lines": 126,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/biometria_reenroll.go",
+      "lines": 218,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/biometria_reenroll_test.go",
+      "lines": 169,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/cargos.go",
+      "lines": 140,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/catalogos_assiduidade.go",
+      "lines": 240,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/componentes_funcionario.go",
+      "lines": 110,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/componentes_salariais.go",
+      "lines": 168,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/contratos_assinatura.go",
+      "lines": 83,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/contratos_pdf.go",
+      "lines": 82,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/correcoes_evento.go",
+      "lines": 230,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/correcoes_ponto.go",
+      "lines": 133,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/dados_complementares.go",
+      "lines": 137,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/eventos_assiduidade.go",
+      "lines": 236,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/ferias_licencas.go",
+      "lines": 318,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/fingerprint.go",
+      "lines": 90,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/formacoes.go",
+      "lines": 160,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/formacoes_funcionario.go",
+      "lines": 172,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/funcionarios_biometria.go",
+      "lines": 266,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/handler.go",
+      "lines": 75,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/hierarquia.go",
+      "lines": 118,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/historico_salarial.go",
+      "lines": 114,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/horarios.go",
+      "lines": 216,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/irps.go",
+      "lines": 151,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/justificacoes.go",
+      "lines": 176,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/lgpd_consentimentos.go",
+      "lines": 316,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/nfc_tags.go",
+      "lines": 146,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/pedido_ferias.go",
+      "lines": 142,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/permissoes_tipo.go",
+      "lines": 21,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/presencas.go",
+      "lines": 197,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/processamento_salarial.go",
+      "lines": 1388,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/processos_disciplinares.go",
+      "lines": 185,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/recibos_pdf.go",
+      "lines": 82,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/regras_assiduidade.go",
+      "lines": 222,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/relatorios.go",
+      "lines": 203,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/resultados_assiduidade.go",
+      "lines": 107,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/rh.go",
+      "lines": 1573,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/unidades_hierarquia.go",
+      "lines": 260,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/handlers/uploads.go",
+      "lines": 206,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/models/assiduidade.go",
+      "lines": 357,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/assiduidade/auditoria.go",
+      "lines": 46,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/assiduidade/calculo.go",
+      "lines": 351,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/assiduidade/eventos.go",
+      "lines": 379,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/assiduidade/eventos_test.go",
+      "lines": 326,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/assiduidade/interpretacao.go",
+      "lines": 177,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/assiduidade/pairing.go",
+      "lines": 146,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/assiduidade/pairing_test.go",
+      "lines": 185,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/assiduidade/qr.go",
+      "lines": 59,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/assiduidade/regras.go",
+      "lines": 114,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/assiduidade/regras_test.go",
+      "lines": 94,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/assiduidade/service.go",
+      "lines": 83,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/assiduidade/service_test.go",
+      "lines": 85,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/funcionario/funcionario.go",
+      "lines": 154,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/recursos-humanos/service/funcionario/funcionario_test.go",
+      "lines": 155,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/seguranca/handlers/assinatura.go",
+      "lines": 87,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/seguranca/handlers/handler.go",
+      "lines": 34,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/seguranca/handlers/seguranca.go",
+      "lines": 138,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/assiduidade.go",
+      "lines": 226,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/biometria.go",
+      "lines": 183,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/chat.go",
+      "lines": 191,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/correcoes_ponto.go",
+      "lines": 129,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/facial_verification.go",
+      "lines": 126,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/facial_verification_test.go",
+      "lines": 82,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/handler.go",
+      "lines": 48,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/home.go",
+      "lines": 187,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/liveness.go",
+      "lines": 99,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/perfil.go",
+      "lines": 137,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/ponto.go",
+      "lines": 458,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/ponto_lote.go",
+      "lines": 317,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/ponto_lote_test.go",
+      "lines": 71,
+      "test": true
+    },
+    {
+      "path": "backend/internal/modules/self-service/handlers/recibos.go",
+      "lines": 201,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/sistema-configuracao/handlers/assiduidade.go",
+      "lines": 64,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/sistema-configuracao/handlers/handler.go",
+      "lines": 41,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/sistema-configuracao/handlers/sistema.go",
+      "lines": 452,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/sistema-configuracao/handlers/tenant_config.go",
+      "lines": 148,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/superadmin/handlers/dashboard.go",
+      "lines": 47,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/superadmin/handlers/features.go",
+      "lines": 150,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/superadmin/handlers/funcionarios.go",
+      "lines": 171,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/superadmin/handlers/handler.go",
+      "lines": 41,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/superadmin/handlers/module_deps.go",
+      "lines": 157,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/superadmin/handlers/modules.go",
+      "lines": 224,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/superadmin/handlers/plans.go",
+      "lines": 259,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/superadmin/handlers/security.go",
+      "lines": 95,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/superadmin/handlers/settings.go",
+      "lines": 74,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/superadmin/handlers/tenants.go",
+      "lines": 419,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/superadmin/handlers/users.go",
+      "lines": 88,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/tarefas/handlers/cartoes.go",
+      "lines": 219,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/tarefas/handlers/handler.go",
+      "lines": 44,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/tarefas/handlers/listas.go",
+      "lines": 141,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/tarefas/handlers/quadros.go",
+      "lines": 209,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/tesouraria/handlers/assinatura.go",
+      "lines": 87,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/tesouraria/handlers/handler.go",
+      "lines": 34,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/tesouraria/handlers/tesouraria.go",
+      "lines": 231,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/utilizadores/handlers/actividade.go",
+      "lines": 79,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/utilizadores/handlers/agenda.go",
+      "lines": 109,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/utilizadores/handlers/avatar.go",
+      "lines": 105,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/utilizadores/handlers/decode.go",
+      "lines": 10,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/utilizadores/handlers/dispositivos.go",
+      "lines": 99,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/utilizadores/handlers/handler.go",
+      "lines": 63,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/utilizadores/handlers/notificacoes.go",
+      "lines": 133,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/utilizadores/handlers/perfis.go",
+      "lines": 122,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/utilizadores/handlers/preferencias.go",
+      "lines": 126,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/utilizadores/handlers/seguranca.go",
+      "lines": 56,
+      "test": false
+    },
+    {
+      "path": "backend/internal/modules/utilizadores/handlers/tokens.go",
+      "lines": 96,
+      "test": false
+    },
+    {
+      "path": "backend/internal/pkg/antivirus/antivirus.go",
+      "lines": 117,
+      "test": false
+    },
+    {
+      "path": "backend/internal/pkg/antivirus/antivirus_test.go",
+      "lines": 40,
+      "test": true
+    },
+    {
+      "path": "backend/internal/pkg/devicehmac/constants.go",
+      "lines": 17,
+      "test": false
+    },
+    {
+      "path": "backend/internal/pkg/devicehmac/signer.go",
+      "lines": 188,
+      "test": false
+    },
+    {
+      "path": "backend/internal/pkg/devicehmac/verifier.go",
+      "lines": 81,
+      "test": false
+    },
+    {
+      "path": "backend/internal/pkg/faceclock/client.go",
+      "lines": 126,
+      "test": false
+    },
+    {
+      "path": "backend/internal/pkg/geo/haversine.go",
+      "lines": 20,
+      "test": false
+    },
+    {
+      "path": "backend/internal/pkg/nexorapay/client.go",
+      "lines": 66,
+      "test": false
+    },
+    {
+      "path": "backend/internal/pkg/nexorapay/client_test.go",
+      "lines": 35,
+      "test": true
+    },
+    {
+      "path": "backend/internal/pkg/nexorapay/service.go",
+      "lines": 488,
+      "test": false
+    },
+    {
+      "path": "backend/internal/pkg/nexorapay/service_test.go",
+      "lines": 385,
+      "test": true
+    },
+    {
+      "path": "backend/internal/pkg/nexorasign/signer.go",
+      "lines": 211,
+      "test": false
+    },
+    {
+      "path": "backend/internal/pkg/nexorasign/signer_test.go",
+      "lines": 131,
+      "test": true
+    },
+    {
+      "path": "backend/internal/pkg/tenantid/resolve.go",
+      "lines": 35,
+      "test": false
+    },
+    {
+      "path": "backend/internal/push/push.go",
+      "lines": 233,
+      "test": false
+    },
+    {
+      "path": "backend/internal/push/push_test.go",
+      "lines": 148,
+      "test": true
+    },
+    {
+      "path": "backend/internal/router/router.go",
+      "lines": 3147,
+      "test": false
+    },
+    {
+      "path": "backend/internal/router/tenant_origin.go",
+      "lines": 31,
+      "test": false
+    },
+    {
+      "path": "backend/internal/router/tenant_origin_test.go",
+      "lines": 30,
+      "test": true
+    },
+    {
+      "path": "backend/internal/shared/adapters/accounting.go",
+      "lines": 98,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/approval.go",
+      "lines": 38,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/client.go",
+      "lines": 87,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/financial.go",
+      "lines": 76,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/hr.go",
+      "lines": 81,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/invoice_accounting.go",
+      "lines": 198,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/invoicing.go",
+      "lines": 87,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/legal_audit.go",
+      "lines": 97,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/notification.go",
+      "lines": 87,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/notification_test.go",
+      "lines": 155,
+      "test": true
+    },
+    {
+      "path": "backend/internal/shared/adapters/purchase_accounting.go",
+      "lines": 96,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/signature.go",
+      "lines": 45,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/system_config.go",
+      "lines": 45,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/adapters/treasury.go",
+      "lines": 39,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/contracts/erp_ports.go",
+      "lines": 284,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/pessoas/pessoas.go",
+      "lines": 219,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/tenanthost/tenanthost.go",
+      "lines": 161,
+      "test": false
+    },
+    {
+      "path": "backend/internal/shared/tenanthost/tenanthost_test.go",
+      "lines": 46,
+      "test": true
+    },
+    {
+      "path": "backend/internal/storage/local.go",
+      "lines": 202,
+      "test": false
+    },
+    {
+      "path": "backend/internal/storage/local_test.go",
+      "lines": 126,
+      "test": true
+    },
+    {
+      "path": "backend/internal/storage/minio.go",
+      "lines": 182,
+      "test": false
+    },
+    {
+      "path": "backend/internal/storage/storage.go",
+      "lines": 104,
+      "test": false
+    },
+    {
+      "path": "backend/internal/ws/client.go",
+      "lines": 312,
+      "test": false
+    },
+    {
+      "path": "backend/internal/ws/hub.go",
+      "lines": 151,
+      "test": false
+    },
+    {
+      "path": "backend/main.go",
+      "lines": 105,
+      "test": false
+    },
+    {
+      "path": "backend/migrations/assinatura_digital_hardening_test.go",
+      "lines": 450,
+      "test": true
+    },
+    {
+      "path": "backend/scripts/apply_migrations_assinatura_digital.go",
+      "lines": 79,
+      "test": false
+    }
+  ]
+}

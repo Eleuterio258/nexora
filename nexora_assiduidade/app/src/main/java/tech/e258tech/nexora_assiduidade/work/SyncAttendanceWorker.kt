@@ -12,25 +12,25 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
-import tech.e258tech.nexora_assiduidade.BuildConfig
 import tech.e258tech.nexora_assiduidade.data.local.AppDatabase
 import tech.e258tech.nexora_assiduidade.data.local.PendingEventEntity
-import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcacaoOfflineRequest
+import tech.e258tech.nexora_assiduidade.data.model.MarcarPontoLoteRequest
 import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
-import tech.e258tech.nexora_assiduidade.utils.HardwareEventMapper
+import tech.e258tech.nexora_assiduidade.utils.ApiUtils
 import tech.e258tech.nexora_assiduidade.utils.OfflineEventCrypto
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
- * Reenvia eventos de ponto guardados offline.
+ * Reenvia as marcacoes guardadas offline num unico pedido a
+ * `POST /api/self-service/assiduidade/ponto/batch`, com o JWT do colaborador.
+ * Ate 2026-09-26 enviava uma a uma para `POST /api/hardware/events/generic`
+ * com a API Key de device.
  *
- * Desde 2026-07-13 chama `POST /api/hardware/events/generic` directamente no
- * Nexora ERP, um por um (API Key de device) — deixou de usar o
- * `clock/register/batch` do FaceClock (removido). O ERP não expõe hoje um
- * lote autenticado por device com o mesmo contrato simples, por isso o
- * "lote" é agora um ciclo de chamadas individuais em vez de um único pedido
- * HTTP; o volume é baixo (só acumula depois de períodos offline) por isso
- * não é um problema de desempenho real.
+ * O ERP responde por marcacao: "registado" e "duplicado" (idempotency_key ja
+ * sincronizada num envio anterior) apagam o evento local; "rejeitado" e
+ * definitivo e fica marcado como REJECTED com o motivo, sem voltar a ser
+ * enviado. So as falhas de rede ou do servidor voltam a tentar.
  */
 class SyncAttendanceWorker(
     context: Context,
@@ -42,76 +42,98 @@ class SyncAttendanceWorker(
 
     override suspend fun doWork(): Result {
         val token = sessionManager.getToken()
-        if (token.isNullOrBlank()) {
+        val sessionUserId = sessionManager.getUserId()
+        if (token.isNullOrBlank() || sessionUserId.isNullOrBlank()) {
             return Result.retry()
         }
 
+        // SYNCING tambem entra: se o worker foi morto a meio de um envio, o
+        // evento ficava preso nesse estado. Reenviar e seguro porque o ERP
+        // deduplica pela idempotency_key.
         val pendingEvents = dao.getByStatuses(
-            listOf(PendingEventEntity.SyncStatus.PENDING, PendingEventEntity.SyncStatus.FAILED),
+            listOf(
+                PendingEventEntity.SyncStatus.PENDING,
+                PendingEventEntity.SyncStatus.FAILED,
+                PendingEventEntity.SyncStatus.SYNCING
+            ),
             100
         )
         if (pendingEvents.isEmpty()) {
             return Result.success()
         }
 
-        pendingEvents.forEach { event ->
-            dao.update(event.copy(syncStatus = PendingEventEntity.SyncStatus.SYNCING))
-        }
-
-        val employeeCode = HardwareEventMapper.resolveEmployeeCode(sessionManager)
-        if (employeeCode == null) {
-            markBatchFailed(pendingEvents, "Nao foi possivel identificar o funcionario no ERP.")
-            return Result.retry()
-        }
-
-        var anyFailed = false
+        // Cada marcacao so pode ser enviada com a sessao de quem a fez: o ERP
+        // grava o ponto no utilizador do JWT. As de outro utilizador que usou
+        // este telemovel ficam na fila ate essa pessoa voltar a entrar.
+        val porChave = LinkedHashMap<String, PendingEventEntity>()
+        val itens = mutableListOf<MarcacaoOfflineRequest>()
         for (event in pendingEvents) {
-            val request = event.toClockRegisterRequest()
+            val request = event.toMarcacaoOffline()
             if (request == null) {
                 dao.update(
                     event.copy(
-                        syncStatus = PendingEventEntity.SyncStatus.FAILED,
+                        syncStatus = PendingEventEntity.SyncStatus.REJECTED,
                         errorMessage = "Falha ao decifrar evento offline."
                     )
                 )
-                anyFailed = true
                 continue
             }
-
-            try {
-                val eventRequest = HardwareEventMapper.toGenericHardwareEvent(request, employeeCode)
-                val response = RetrofitClient.erpApiService.registerEventDevice(
-                    BuildConfig.DEVICE_API_KEY,
-                    eventRequest
-                )
-                if (response.isSuccessful && response.body()?.processed == true) {
-                    dao.delete(event)
-                } else {
-                    dao.update(
-                        event.copy(
-                            syncStatus = PendingEventEntity.SyncStatus.FAILED,
-                            errorMessage = response.body()?.error
-                                ?: response.errorBody()?.string()
-                                ?: "Evento rejeitado pelo ERP (HTTP ${response.code()})."
-                        )
-                    )
-                    anyFailed = true
-                }
-            } catch (e: Exception) {
-                dao.update(
-                    event.copy(
-                        syncStatus = PendingEventEntity.SyncStatus.FAILED,
-                        errorMessage = e.message ?: "Erro desconhecido"
-                    )
-                )
-                anyFailed = true
+            if (OfflineEventCrypto.decrypt(event.userId) != sessionUserId) {
+                continue
             }
+            porChave[request.idempotency_key] = event
+            itens += request
+        }
+        if (itens.isEmpty()) {
+            return Result.success()
         }
 
-        return if (anyFailed) Result.retry() else Result.success()
+        porChave.values.forEach { dao.update(it.copy(syncStatus = PendingEventEntity.SyncStatus.SYNCING)) }
+
+        val response = try {
+            RetrofitClient.erpApiService.marcarPontoLote(
+                ApiUtils.bearerToken(token),
+                MarcarPontoLoteRequest(eventos = itens)
+            )
+        } catch (e: Exception) {
+            markFailed(porChave.values, e.message ?: "Erro desconhecido")
+            return Result.retry()
+        }
+
+        val body = response.body()
+        if (!response.isSuccessful || body == null) {
+            markFailed(porChave.values, ApiUtils.errorMessage(response))
+            return Result.retry()
+        }
+
+        var anyPending = false
+        val respondidos = mutableSetOf<String>()
+        for (resultado in body.resultados) {
+            val event = porChave[resultado.idempotency_key] ?: continue
+            respondidos += resultado.idempotency_key
+            if (resultado.sincronizado) {
+                dao.delete(event)
+            } else {
+                dao.update(
+                    event.copy(
+                        syncStatus = PendingEventEntity.SyncStatus.REJECTED,
+                        // O PIN deixa de ser util: nao o manter guardado.
+                        pin = null,
+                        errorMessage = resultado.erro ?: "Marcacao rejeitada pelo ERP."
+                    )
+                )
+            }
+        }
+        val semResposta = porChave.filterKeys { it !in respondidos }.values
+        if (semResposta.isNotEmpty()) {
+            markFailed(semResposta, "Sem resposta do ERP para esta marcacao.")
+            anyPending = true
+        }
+
+        return if (anyPending) Result.retry() else Result.success()
     }
 
-    private suspend fun markBatchFailed(events: List<PendingEventEntity>, message: String) {
+    private suspend fun markFailed(events: Collection<PendingEventEntity>, message: String) {
         events.forEach { event ->
             dao.update(
                 event.copy(
@@ -122,32 +144,53 @@ class SyncAttendanceWorker(
         }
     }
 
-    private fun PendingEventEntity.toClockRegisterRequest(): ClockRegisterRequest? {
+    private fun PendingEventEntity.toMarcacaoOffline(): MarcacaoOfflineRequest? {
         val idempotency = OfflineEventCrypto.decrypt(idempotencyKey) ?: return null
-        val user = OfflineEventCrypto.decrypt(userId) ?: return null
         val device = OfflineEventCrypto.decrypt(deviceId) ?: return null
-        val type = OfflineEventCrypto.decrypt(eventType) ?: return null
         val recorded = OfflineEventCrypto.decrypt(recordedAt) ?: return null
-        val eventSource = OfflineEventCrypto.decrypt(source) ?: return null
+        val metodo = metodoDaFonte(OfflineEventCrypto.decrypt(source) ?: return null)
+        val tipo = tipoEventoCodigo(OfflineEventCrypto.decrypt(eventType).orEmpty())
 
-        return ClockRegisterRequest(
+        return MarcacaoOfflineRequest(
             idempotency_key = idempotency,
-            user_id = user,
+            metodo = metodo,
+            ocorrido_em = recorded,
             device_id = device,
-            event_type = type,
-            recorded_at = recorded,
-            source = eventSource,
-            confidence_score = confidenceScore,
-            liveness_score = livenessScore,
-            geo_lat = geoLat,
-            geo_lng = geoLng,
-            image_base64 = OfflineEventCrypto.decrypt(imageBase64)
+            pin = OfflineEventCrypto.decrypt(pin),
+            tipo_evento_codigo = tipo,
+            latitude = geoLat,
+            longitude = geoLng
         )
     }
 
     companion object {
         private const val SYNC_WORK_NAME = "sync_attendance_work"
         private const val PERIODIC_SYNC_WORK_NAME = "periodic_sync_attendance_work"
+
+        /**
+         * Eventos guardados por versoes anteriores da app tinham `source` no
+         * formato do contrato de hardware (PIN, FINGERPRINT, ...). O ERP recusa
+         * os que nao sao PIN/impressao digital com uma mensagem clara.
+         */
+        internal fun metodoDaFonte(source: String): String = when (source.uppercase()) {
+            "PIN" -> "pin"
+            "FINGERPRINT" -> "fingerprint"
+            "FACIAL" -> "facial"
+            "QR_CODE" -> "qr_code"
+            "NFC" -> "nfc"
+            "SELFIE_GPS", "GEOLOCATION" -> "selfie_gps"
+            else -> source.lowercase()
+        }
+
+        /** Converte os tipos antigos (ENTRY/EXIT/AUTO) para os codigos do ERP. */
+        internal fun tipoEventoCodigo(eventType: String): String? = when (eventType.uppercase()) {
+            "", "AUTO" -> null
+            "ENTRY" -> "entrada"
+            "EXIT" -> "saida"
+            "BREAK_START" -> "intervalo_inicio"
+            "BREAK_END" -> "intervalo_fim"
+            else -> eventType
+        }
 
         fun scheduleImmediate(context: Context) {
             val constraints = Constraints.Builder()

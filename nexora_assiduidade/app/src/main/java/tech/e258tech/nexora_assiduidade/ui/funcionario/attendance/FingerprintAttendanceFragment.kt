@@ -9,7 +9,6 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.fragment.app.Fragment
-import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,11 +16,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import tech.e258tech.nexora_assiduidade.R
-import tech.e258tech.nexora_assiduidade.data.model.ClockRegisterRequest
 import tech.e258tech.nexora_assiduidade.data.repository.AttendanceRepository
 import tech.e258tech.nexora_assiduidade.utils.BiometricHelper
-import tech.e258tech.nexora_assiduidade.utils.Constants
-import tech.e258tech.nexora_assiduidade.utils.DateTimeUtils
 import tech.e258tech.nexora_assiduidade.utils.SessionManager
 
 /**
@@ -128,19 +124,11 @@ class FingerprintAttendanceFragment : Fragment() {
 
         setLoading(true, "A registar o ponto...")
 
-        val request = ClockRegisterRequest(
-            idempotency_key = UUID.randomUUID().toString(),
-            user_id = userId,
-            device_id = sessionManager.getOrCreateDeviceId(),
-            event_type = Constants.EVENT_AUTO,
-            recorded_at = DateTimeUtils.nowForApi(),
-            source = Constants.SOURCE_FINGERPRINT,
-            confidence_score = 1.0
-        )
-
         uiScope.launch {
             val result = withContext(Dispatchers.IO) {
-                attendanceRepository.registerClock(request)
+                // Sem prova do lado do servidor: a biometria do telemovel so
+                // desbloqueia o pedido (mesmo tratamento de POST /ponto no ERP).
+                attendanceRepository.marcarPonto(metodo = AttendanceRepository.Metodo.FINGERPRINT)
             }
 
             setLoading(false)

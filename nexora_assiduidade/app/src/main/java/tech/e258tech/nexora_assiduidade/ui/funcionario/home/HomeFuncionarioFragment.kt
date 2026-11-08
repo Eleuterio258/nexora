@@ -26,7 +26,7 @@ import tech.e258tech.nexora_assiduidade.data.network.RetrofitClient
 import tech.e258tech.nexora_assiduidade.ui.auth.LoginActivity
 import tech.e258tech.nexora_assiduidade.ui.funcionario.agenda.AgendaFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.agenda.AgendaItemDetailFragment
-import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.FacialAttendanceFragment
+import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.LivenessChallengeFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.FingerprintAttendanceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.NfcAttendanceFragment
 import tech.e258tech.nexora_assiduidade.ui.funcionario.attendance.PinAttendanceFragment
@@ -134,7 +134,10 @@ class HomeFuncionarioFragment : Fragment() {
 
         cardManual.setOnClickListener { openFragment(RegistoManualFragment()) }
         cardQrCode.setOnClickListener { openFragment(QrCodeAttendanceFragment()) }
-        cardFacial.setOnClickListener { openFragment(FacialAttendanceFragment()) }
+        // Prova de vida activa (desafio de accao + continuidade de identidade):
+        // o fluxo de imagem unica (FacialAttendanceFragment) so tinha a
+        // heuristica passiva, que uma foto nitida ou um ecra podem enganar.
+        cardFacial.setOnClickListener { openFragment(LivenessChallengeFragment()) }
         cardSelfieGps.setOnClickListener { openFragment(SelfieGpsAttendanceFragment()) }
         cardPin.setOnClickListener { openFragment(PinAttendanceFragment()) }
         cardNfc.setOnClickListener { openFragment(NfcAttendanceFragment()) }

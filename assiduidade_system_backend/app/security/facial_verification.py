@@ -17,6 +17,7 @@ def issue_facial_verification_token(
     device_id: str,
     confidence_score: float,
     liveness_score: float,
+    liveness_method: str = "passive",
 ) -> str:
     """Assina uma prova de match vinculada ao actor, tenant e dispositivo."""
     if not tenant_id:
@@ -33,6 +34,9 @@ def issue_facial_verification_token(
         "purpose": "facial_attendance",
         "confidence_score": float(confidence_score),
         "liveness_score": float(liveness_score),
+        # "passive" = heuristica/modelo sobre uma imagem (/biometric/verify);
+        # "active_challenge" = desafio de accao + continuidade (/liveness/verify).
+        "liveness_method": liveness_method,
         "jti": str(uuid4()),
         "iat": now,
         "nbf": now,

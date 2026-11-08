@@ -287,6 +287,9 @@ func (h *Handler) MarcarPonto(w http.ResponseWriter, r *http.Request) {
 		body.Dados["device_id"] = clientDeviceID
 		body.Dados["confidence_score"] = claims.ConfidenceScore
 		body.Dados["liveness_score"] = claims.LivenessScore
+		if claims.LivenessMethod != "" {
+			body.Dados["liveness_method"] = claims.LivenessMethod
+		}
 	}
 
 	agora := time.Now()

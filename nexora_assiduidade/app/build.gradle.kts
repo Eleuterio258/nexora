@@ -1,26 +1,8 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
 }
-
-// Chave de device do Nexora ERP (hardware.devices) — usada pelos endpoints
-// /api/hardware/* chamados directamente pela app desde 2026-07-13. Nao
-// commitar o valor real: define DEVICE_API_KEY em local.properties (nao
-// versionado) ou na variavel de ambiente DEVICE_API_KEY (CI de release).
-// AVISO: uma vez publicada no APK, esta chave e extraivel por descompilacao —
-// risco aceite explicitamente para os metodos alternativos de assiduidade
-// (qr/nfc/geolocation/registo de ponto), ver CONTRATO-INTEGRACAO-ERP.md.
-val localProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) file.inputStream().use { load(it) }
-}
-fun deviceApiKey(): String =
-    (localProperties.getProperty("DEVICE_API_KEY") ?: System.getenv("DEVICE_API_KEY") ?: "").let {
-        "\"$it\""
-    }
 
 android {
     namespace = "tech.e258tech.nexora_assiduidade"
@@ -35,15 +17,13 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "ERP_BASE_URL", "\"https://api.nexora.e258tech.tech/\"")
-        buildConfigField("String", "DEVICE_API_KEY", deviceApiKey())
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             buildConfigField("String", "ERP_BASE_URL", "\"https://api.nexora.e258tech.tech/\"")
-            buildConfigField("String", "DEVICE_API_KEY", deviceApiKey())
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+                proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
             // 10.0.2.2 so resolve dentro do emulador Android (alias para o
@@ -53,8 +33,7 @@ android {
             // fisico; para apontar a um backend local a correr na tua
             // maquina, substitui pelo IP da tua rede local (ex.: 192.168.x.x).
             buildConfigField("String", "ERP_BASE_URL", "\"https://api.nexora.e258tech.tech/\"")
-            buildConfigField("String", "DEVICE_API_KEY", deviceApiKey())
-        }
+            }
     }
 
     compileOptions {
