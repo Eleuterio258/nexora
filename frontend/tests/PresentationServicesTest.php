@@ -51,7 +51,7 @@ presentationExpect(
 );
 
 $routes = new AdminRoutes();
-presentationExpect(150, count($routes->names()), 'Deve registrar todas as paginas administrativas.');
+presentationExpect(39, count($routes->names()), 'Deve registrar todas as paginas administrativas.');
 foreach ($routes->names() as $routeName) {
     $definition = $routes->definition($routeName);
     presentationExpect(
@@ -60,16 +60,21 @@ foreach ($routes->names() as $routeName) {
         "A rota $routeName deve apontar para uma view existente."
     );
 }
-presentationExpect('/nexora/', $routes->path('dashboard'), 'Deve resolver o dashboard.');
+presentationExpect('/escola/dashboard', $routes->path('escolar_dashboard'), 'Deve resolver o dashboard escolar.');
 presentationExpect(
-    '/nexora/recrutamento/vagas/form?id=12',
-    $routes->path('vaga_form', ['id' => 12]),
+    '/escola/admin/utilizadores/form?id=12',
+    $routes->path('utilizador_form', ['id' => 12]),
     'Deve construir URLs administrativas com query.'
+);
+presentationExpect(
+    'utilizadores',
+    $routes->resolveByPath('/escola/admin/utilizadores'),
+    'Deve resolver as paginas de administracao do painel escolar.'
 );
 $apiRoutes = new \E258Tech\Routing\AdminApiRoutes();
 presentationExpect(
-    '/nexora/api/vaga_save',
-    $apiRoutes->path('vaga_save'),
+    '/nexora/api/escolar_operacao',
+    $apiRoutes->path('escolar_operacao'),
     'Deve construir URLs da API administrativa.'
 );
 

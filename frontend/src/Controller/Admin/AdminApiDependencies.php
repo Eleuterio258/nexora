@@ -3,76 +3,20 @@ declare(strict_types=1);
 
 namespace E258Tech\Controller\Admin;
 
-use E258Tech\Model\Service\Authorization\AuthorizationAdminService;
-use E258Tech\Model\Service\CentrosCusto\CentrosCustoService;
-use E258Tech\Model\Service\Company\CompanyAdminService;
-use E258Tech\Model\Service\Contabilidade\ContabilidadeService;
-use E258Tech\Model\Service\Crm\ActivityService;
-use E258Tech\Model\Service\Crm\LeadService;
-use E258Tech\Model\Service\Crm\OpportunityService;
-use E258Tech\Model\Service\Customer\CustomerService;
-use E258Tech\Model\Service\Faturacao\FaturacaoService;
-use E258Tech\Model\Service\Pos\PosService;
-use E258Tech\Model\Service\Product\ProductService;
-use E258Tech\Model\Service\Purchase\PurchaseService;
-use E258Tech\Model\Service\Recruitment\RecruitmentAdminService;
-use E258Tech\Model\Service\RH\RecursosHumanosService;
-use E258Tech\Model\Service\School\SchoolService;
-use E258Tech\Model\Service\Sistema\SistemaConfiguracaoService;
-use E258Tech\Model\Service\Logistica\LogisticaService;
-use E258Tech\Model\Service\Stock\StockService;
-use E258Tech\Model\Service\Tax\AdvancedTaxService;
-use E258Tech\Model\Service\Tesouraria\TesourariaService;
-use E258Tech\Model\Service\Assinaturas\AssinaturasService;
-use E258Tech\Model\Service\Financeiro\FinanceiroService;
-use E258Tech\Model\Service\MultiMoeda\MultiMoedaService;
-use E258Tech\Model\Service\Notificacoes\NotificacoesService;
-use E258Tech\Model\Service\Seguranca\SegurancaService;
-use E258Tech\Model\Service\SelfService\SelfServiceService;
-use E258Tech\Model\Service\SuperAdmin\SuperAdminService;
-use E258Tech\Model\Service\Aprovacao\AprovacaoService;
-use E258Tech\Model\Service\Tarefas\TarefasService;
-use E258Tech\Model\Service\AssinaturaDigital\AssinaturaDigitalService;
+use E258Tech\Http\ApiResult;
+use E258Tech\Infrastructure\Security\IdHasher;
 use E258Tech\Model\Contract\NexoraGateway;
 use E258Tech\Model\Exception\OperationException;
-use E258Tech\Infrastructure\Security\IdHasher;
-use E258Tech\Http\ApiResult;
+use E258Tech\Model\Service\Authorization\AuthorizationAdminService;
+use E258Tech\Model\Service\School\SchoolService;
 
 final readonly class AdminApiDependencies
 {
     public function __construct(
         public AdminApiKernel $kernel,
         public NexoraGateway $gateway,
-        public LeadService $leads,
-        public OpportunityService $opportunities,
-        public ActivityService $activities,
-        public RecruitmentAdminService $recruitment,
         public AuthorizationAdminService $authorization,
-        public CompanyAdminService $companies,
-        public CustomerService $customers,
-        public FaturacaoService $faturacao,
-        public ProductService $products,
-        public PosService $pos,
-        public SistemaConfiguracaoService $sistema,
-        public RecursosHumanosService $rh,
-        public ContabilidadeService $contabilidade,
-        public CentrosCustoService $centrosCusto,
-        public PurchaseService $purchases,
-        public StockService $stock,
-        public AdvancedTaxService $taxes,
         public SchoolService $school,
-        public TesourariaService $tesouraria,
-        public LogisticaService $logistica,
-        public AssinaturasService $assinaturas,
-        public FinanceiroService $financeiro,
-        public MultiMoedaService $multiMoeda,
-        public NotificacoesService $notificacoes,
-        public SegurancaService $seguranca,
-        public SelfServiceService $selfService,
-        public SuperAdminService $superAdmin,
-        public AprovacaoService $aprovacao,
-        public TarefasService $tarefas,
-        public AssinaturaDigitalService $assinaturaDigital,
         public IdHasher $id,
     ) {
     }

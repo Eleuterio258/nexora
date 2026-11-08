@@ -38,72 +38,6 @@ final readonly class AdminAuthController
         require $this->viewRoot . '/pages/login.php';
     }
 
-    /**
-     * Login de terminal POS: o dispositivo identifica-se pelo código do
-     * terminal e prova-o com o código de activação, sem email nem password.
-     * Até aqui este fluxo só existia na app PayCore — quem opera o POS pelo
-     * navegador não tinha por onde entrar sem credenciais de uma pessoa.
-     */
-    public function loginTerminal(): void
-    {
-        if ($this->session->isAuthenticated()) {
-            header('Location: /nexora/pos');
-            exit;
-        }
-
-        $erro = '';
-
-        if ($this->request->isPost()) {
-            $erro = $this->attemptLoginTerminal();
-        }
-
-        $csrf = $this->security->csrfToken();
-        $app = Application::instance();
-
-        require $this->viewRoot . '/pages/login_terminal.php';
-    }
-
-    private function attemptLoginTerminal(): string
-    {
-        if (!$this->security->hasValidCsrf($this->request->csrfToken())) {
-            return 'Token de segurança inválido. Recarregue a página.';
-        }
-
-        // Limite próprio: um terminal enganado a repetir o código não deve
-        // gastar as tentativas de quem faz login com email.
-        if (!$this->security->allow('terminal_login', 5, 300)) {
-            return 'Demasiadas tentativas. Aguarde 5 minutos.';
-        }
-
-        $codigo = trim($this->request->postString('codigo_terminal'));
-        $activacao = trim((string) $this->request->postValue('activation_code', ''));
-        $tenant = trim($this->request->postString('tenant_slug'));
-
-        if ($codigo === '' || $activacao === '') {
-            return 'Preencha o código do terminal e o código de activação.';
-        }
-
-        try {
-            $resp = $this->session->loginTerminal($codigo, $activacao, $tenant);
-
-            if ($resp['status'] === 200 && !empty($resp['body']['terminal_token'])) {
-                session_regenerate_id(true);
-                $this->session->storeTerminal($resp['body']);
-                header('Location: /nexora/pos');
-                exit;
-            }
-
-            // A API responde 401 tanto a código errado como a terminal
-            // inexistente, de propósito: dizer qual dos dois falhou deixaria
-            // descobrir que códigos de terminal existem.
-            return (string) ($resp['body']['error'] ?? 'Código de terminal ou de activação inválido.');
-        } catch (HttpClientException $exception) {
-            error_log('[terminal-login] Falha na API Nexora: ' . $exception->getMessage());
-
-            return 'Não foi possível contactar o servidor. Tente novamente.';
-        }
-    }
-
     public function logout(): never
     {
         try {
@@ -131,10 +65,9 @@ final readonly class AdminAuthController
         }
 
         $urlDoTipo = [
-            'candidato'   => '/carreira/candidato/area',
             'aluno'       => '/portal/aluno',
             'encarregado' => '/portal/encarregado',
-            'funcionario' => '/nexora/',
+            'funcionario' => '/escola',
         ];
         if (!isset($urlDoTipo[$tipo]) || !$this->session->trocarPapel($tipo)) {
             header('Location: /nexora/destino?erro=papel');
@@ -152,22 +85,17 @@ final readonly class AdminAuthController
             exit;
         }
 
+        // O ERP já não vive neste frontend: funcionários com escopo 'erp' e o
+        // superadmin entram também pelo Painel Escolar.
         $destinos = [
-            [
-                'escopo' => 'erp',
-                'titulo' => 'ERP',
-                'descricao' => 'Area restrita para funcionarios do ERP.',
-                'url' => '/nexora/',
-                'icone' => 'briefcase',
-                'ativo' => $this->session->hasEscopo('erp'),
-            ],
             [
                 'escopo' => 'escola',
                 'titulo' => 'Escola',
                 'descricao' => 'Area restrita para funcionarios da escola.',
                 'url' => '/escola',
                 'icone' => 'school',
-                'ativo' => $this->session->hasEscopo('escola') && !$this->session->isProfessor(),
+                'ativo' => ($this->session->hasEscopo('escola') || $this->session->hasEscopo('erp') || $this->session->isSuperAdmin())
+                    && !$this->session->isProfessor(),
             ],
             [
                 'escopo' => 'portal_professor',
@@ -193,22 +121,6 @@ final readonly class AdminAuthController
                 'icone' => 'users',
                 'ativo' => $this->session->hasEscopo('portal_encarregado'),
             ],
-            [
-                'escopo' => 'portal_candidato',
-                'titulo' => 'Area do Candidato',
-                'descricao' => 'Acompanhe as suas candidaturas a vagas.',
-                'url' => '/carreira/candidato/area',
-                'icone' => 'briefcase',
-                'ativo' => $this->session->hasEscopo('portal_candidato'),
-            ],
-            [
-                'escopo' => 'superadmin',
-                'titulo' => 'Superadmin',
-                'descricao' => 'Area de administracao e configuracao global.',
-                'url' => '/nexora/superadmin',
-                'icone' => 'shield',
-                'ativo' => $this->session->isSuperAdmin(),
-            ],
         ];
 
         // Papéis que a pessoa tem mas para os quais a sessão actual não tem
@@ -221,10 +133,9 @@ final readonly class AdminAuthController
         // fica o texto que se mostra. Um mapa tipo→escopo do lado do PHP
         // dessincronizava-se assim que um papel novo aparecesse.
         $rotulos = [
-            'candidato'   => ['Área do Candidato',     'Acompanhe as suas candidaturas a vagas.',      'briefcase'],
             'aluno'       => ['Portal do Aluno',       'Área dedicada aos alunos.',                    'graduation'],
             'encarregado' => ['Portal do Encarregado', 'Área dedicada aos encarregados de educação.',  'users'],
-            'funcionario' => ['ERP',                   'Área restrita para funcionários do ERP.',      'briefcase'],
+            'funcionario' => ['Escola',                'Área restrita para funcionários da escola.',   'school'],
             'professor'   => ['Portal do Professor',   'Área dedicada aos professores.',               'chalkboard'],
         ];
         $escoposJaActivos = array_column(array_filter($destinos, static fn(array $d): bool => $d['ativo']), 'escopo');
@@ -294,22 +205,21 @@ final readonly class AdminAuthController
 
                 $next = $this->request->queryString('next', '/nexora/destino');
                 // Só aceita redireccionamentos internos conhecidos.
-                if (!preg_match('#^/(nexora|escola|portal/aluno|portal/encarregado|portal/professor|carreira|vagas)(/|\?|$)#', $next)) {
+                if (!preg_match('#^/(nexora|escola|portal/aluno|portal/encarregado|portal/professor)(/|\?|$)#', $next)) {
                     $next = '/nexora/destino';
                 }
                 // Restringir ao escopo do utilizador.
                 if ($next !== '/nexora/destino') {
                     if ($this->session->isProfessor() && !str_starts_with($next, '/portal/professor')) {
                         $next = '/nexora/destino';
-                    } elseif ($this->session->isSchoolOnly() && !$this->session->isProfessor() && !str_starts_with($next, '/escola')) {
-                        $next = '/nexora/destino';
-                    } elseif ($this->session->isErpOnly() && !str_starts_with($next, '/nexora')) {
-                        $next = '/nexora/destino';
                     } elseif ($this->session->hasEscopo('portal_aluno') && !str_starts_with($next, '/portal/aluno')) {
                         $next = '/nexora/destino';
                     } elseif ($this->session->hasEscopo('portal_encarregado') && !str_starts_with($next, '/portal/encarregado')) {
                         $next = '/nexora/destino';
-                    } elseif ($this->session->hasEscopo('portal_candidato') && !str_starts_with($next, '/carreira') && !str_starts_with($next, '/vagas')) {
+                    } elseif (!$this->session->isProfessor()
+                        && !$this->session->hasEscopo('portal_aluno')
+                        && !$this->session->hasEscopo('portal_encarregado')
+                        && !str_starts_with($next, '/escola')) {
                         $next = '/nexora/destino';
                     }
                 }

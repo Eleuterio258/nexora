@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 if (!$app->session->canModule('autorizacao')) {
-    header('Location: /nexora');
+    header('Location: /escola');
     exit;
 }
 
@@ -31,7 +31,7 @@ try {
 
 $pageTitle  = 'Utilizadores';
 $activePage = 'utilizadores';
-$breadcrumb = [['Admin', '/nexora/'], ['Utilizadores', '']];
+$breadcrumb = [['Escola', '/escola'], ['Utilizadores', '']];
 $csrf       = $app->security->csrfToken();
 
 $roleLabel = static fn(string $role): string => match ($role) {

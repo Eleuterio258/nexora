@@ -6,7 +6,7 @@ $sessoes  = $resp['body'] ?? [];
 $csrf       = $app->security->csrfToken();
 $pageTitle  = 'Sessões';
 $activePage = 'sessoes';
-$breadcrumb = [['Admin', '/nexora/'], ['Administração', ''], ['Sessões', '']];
+$breadcrumb = [['Escola', '/escola'], ['Administração', ''], ['Sessões', '']];
 
 $temOutras = (bool) array_filter($sessoes, fn($s) => empty($s['atual']));
 

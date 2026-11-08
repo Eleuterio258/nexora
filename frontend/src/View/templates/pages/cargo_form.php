@@ -8,7 +8,7 @@ $permsCurrent = [];
 if ($isEdit) {
     $resp = $app->nexora->call('GET', "/api/auth/cargos/$idHash");
     if ($resp['status'] !== 200) {
-        header('Location: /nexora/admin/cargos');
+        header('Location: /escola/admin/cargos');
         exit;
     }
     $cargo = $resp['body'];
@@ -20,7 +20,7 @@ if ($isEdit) {
 $csrf       = $app->security->csrfToken();
 $pageTitle  = $isEdit ? 'Editar Cargo' : 'Novo Cargo';
 $activePage = 'cargos';
-$breadcrumb = [['Admin', '/nexora/'], ['Administração', ''], ['Cargos & Permissões', '/nexora/admin/cargos'], [$pageTitle, '']];
+$breadcrumb = [['Escola', '/escola'], ['Administração', ''], ['Cargos & Permissões', '/escola/admin/cargos'], [$pageTitle, '']];
 
 include dirname(__DIR__) . '/layouts/top.php';
 ?>
@@ -88,7 +88,7 @@ include dirname(__DIR__) . '/layouts/top.php';
     </div>
 
     <div style="display:flex;gap:var(--adm-sp-3);justify-content:flex-end;padding-bottom:var(--adm-sp-8)">
-        <a href="/nexora/admin/cargos" class="adm-btn adm-btn-outline">Cancelar</a>
+        <a href="/escola/admin/cargos" class="adm-btn adm-btn-outline">Cancelar</a>
         <button type="submit" class="adm-btn adm-btn-primary" id="btnSave">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -191,7 +191,7 @@ document.getElementById('cargoForm').addEventListener('submit', async function(e
             btn.disabled = false;
             btn.innerHTML = originalHtml;
             <?php else: ?>
-            window.location.href = '/nexora/admin/cargos/form?id=' + nexoraEncodeId(data.id) + '&msg=' + encodeURIComponent(data.msg || 'Cargo criado com sucesso.');
+            window.location.href = '/escola/admin/cargos/form?id=' + nexoraEncodeId(data.id) + '&msg=' + encodeURIComponent(data.msg || 'Cargo criado com sucesso.');
             <?php endif; ?>
         } else {
             msgEl.innerHTML = `<div class="adm-alert adm-alert--error">${data.error || 'Erro ao guardar.'}</div>`;

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 if (!$app->session->canModule('autorizacao')) {
-    header('Location: /nexora');
+    header('Location: /escola');
     exit;
 }
 
@@ -59,7 +59,7 @@ if ($isEdit && $utilizador === null) {
 
 $pageTitle  = $isEdit ? 'Editar Utilizador' : 'Novo Utilizador';
 $activePage = 'utilizadores';
-$breadcrumb = [['Admin', '/nexora/'], ['Utilizadores', '/nexora/admin/utilizadores'], [$pageTitle, '']];
+$breadcrumb = [['Escola', '/escola'], ['Utilizadores', '/escola/admin/utilizadores'], [$pageTitle, '']];
 $csrf       = $app->security->csrfToken();
 
 include dirname(__DIR__) . '/layouts/top.php';

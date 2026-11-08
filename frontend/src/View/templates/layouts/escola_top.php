@@ -198,6 +198,19 @@ $apPortal     = in_array($ap, ['aluno_portal'], true);
                 <i class="fa-solid fa-display fa-fw"></i> Portal do Aluno
             </a>
 
+            <?php $canContas = $app->session->canModule('autorizacao'); $canSessoes = $app->session->canModule('auth'); ?>
+            <?php if ($canContas || $canSessoes): ?>
+            <!-- ADMINISTRAÇÃO -->
+            <p class="adm-nav-label">Administração</p>
+            <?php if ($canContas): ?>
+            <a href="/escola/admin/utilizadores" class="adm-nav-item <?= $ap === 'utilizadores' ? 'active' : '' ?>"><i class="fa-solid fa-users-gear fa-fw"></i> Utilizadores</a>
+            <a href="/escola/admin/cargos" class="adm-nav-item <?= $ap === 'cargos' ? 'active' : '' ?>"><i class="fa-solid fa-user-shield fa-fw"></i> Cargos &amp; Permissões</a>
+            <?php endif; ?>
+            <?php if ($canSessoes): ?>
+            <a href="/escola/admin/sessoes" class="adm-nav-item <?= $ap === 'sessoes' ? 'active' : '' ?>"><i class="fa-solid fa-key fa-fw"></i> Sessões</a>
+            <?php endif; ?>
+            <?php endif; ?>
+
         </nav>
 
         <!-- Utilizador + Logout -->
@@ -212,11 +225,6 @@ $apPortal     = in_array($ap, ['aluno_portal'], true);
             <a href="/nexora/logout" style="display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:#64748B;text-decoration:none;padding:.35rem .5rem;border-radius:6px;transition:color .12s" onmouseover="this.style.color='#94A3B8'" onmouseout="this.style.color='#64748B'">
                 <i class="fa-solid fa-arrow-right-from-bracket fa-fw"></i> Sair
             </a>
-            <?php if ($app->session->isSuperAdmin() || $app->session->isBoth()): ?>
-            <a href="/nexora/" class="escola-back-btn">
-                <i class="fa-solid fa-grid-2 fa-fw"></i> Painel ERP Geral
-            </a>
-            <?php endif; ?>
         </div>
 
     </aside>

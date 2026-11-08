@@ -7,19 +7,12 @@ $csrf = $app->security->csrfToken();
 $cfgResp = $app->nexora->call('GET', '/api/escolar/config/financial');
 $cfg = is_array($cfgResp['body'] ?? null) ? $cfgResp['body'] : [];
 
-// Contas bancárias (tesouraria)
-$bancosResp = $app->nexora->call('GET', '/api/tesouraria/contas-bancarias');
-$bancos = is_array($bancosResp['body'] ?? null) ? (array_is_list($bancosResp['body']) ? $bancosResp['body'] : []) : [];
-
-// Centros de custo
-$ccResp = $app->nexora->call('GET', '/api/centros-custo/cost-centers');
-$centros = is_array($ccResp['body']['data'] ?? null) ? $ccResp['body']['data'] : (is_array($ccResp['body'] ?? null) && array_is_list($ccResp['body']) ? $ccResp['body'] : []);
-
-// Plano de contas (contabilidade)
-$contasResp = $app->nexora->call('GET', '/api/contabilidade/contas');
-$contasContab = is_array($contasResp['body']['data'] ?? null) ? $contasResp['body']['data'] : (is_array($contasResp['body'] ?? null) && array_is_list($contasResp['body']) ? $contasResp['body'] : []);
-// Filtrar apenas contas de movimento (folha)
-$contasMovimento = array_filter($contasContab, fn($c) => !empty($c['tipo_conta']) || !empty($c['codigo']));
+// Contas bancárias, centros de custo e plano de contas pertencem ao ERP
+// externo. Enquanto a integração não existir, as listas ficam vazias e o
+// backend não executa as integrações, mesmo que as opções estejam ligadas.
+$bancos          = [];
+$centros         = [];
+$contasMovimento = [];
 
 $pageTitle  = 'Configuração Financeira Escolar';
 $activePage = 'escolar_config_financeira';
@@ -39,6 +32,11 @@ include dirname(__DIR__) . '/layouts/' . (!empty($GLOBALS['_escolarPanel']) ? 'e
             Voltar ao Dashboard
         </a>
     </div>
+</div>
+
+<div class="adm-alert adm-alert--info" style="margin-bottom:1.5rem">
+    A integração com o ERP (tesouraria, financeiro, contabilidade e facturação) ainda não está activa.
+    As opções abaixo ficam guardadas, mas os pagamentos escolares só são registados no módulo escolar.
 </div>
 
 <div id="formMsg"></div>

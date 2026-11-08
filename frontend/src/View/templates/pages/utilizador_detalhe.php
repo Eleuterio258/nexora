@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 if (!$app->session->canModule('autorizacao')) {
-    header('Location: /nexora');
+    header('Location: /escola');
     exit;
 }
 
@@ -29,7 +29,7 @@ if ($utilizador === null) {
 
 $pageTitle  = 'Detalhe do Utilizador';
 $activePage = 'utilizadores';
-$breadcrumb = [['Admin', '/nexora/'], ['Utilizadores', '/nexora/admin/utilizadores'], ['Detalhe', '']];
+$breadcrumb = [['Escola', '/escola'], ['Utilizadores', '/escola/admin/utilizadores'], ['Detalhe', '']];
 
 $roleLabel = match ($utilizador['role'] ?? '') {
     'SUPER_ADMIN' => 'Super Admin',

@@ -8,18 +8,6 @@ final class AuthApiRoutes
     public static function endpoints(): array
     {
         return [
-            // ── Self-service ──────────────────────────────────────────────────────
-            'pedido_ferias_criar'         => ['module' => 'pedido-ferias', 'action' => ''],
-            'pedido_ferias_cancelar'      => ['module' => 'pedido-ferias', 'action' => ''],
-            'self_service_chat_conversas' => ['module' => 'chat', 'action' => '', 'method' => 'GET'],
-            'self_service_chat_criar'     => ['module' => 'chat', 'action' => ''],
-            'self_service_chat_mensagens' => ['module' => 'chat', 'action' => '', 'method' => 'GET'],
-            'self_service_chat_enviar'    => ['module' => 'chat', 'action' => ''],
-            'self_service_justificacao'   => ['module' => 'assiduidade', 'action' => ''],
-            'self_service_perfil_update'  => ['module' => 'perfil', 'action' => ''],
-            'self_service_senha'          => ['module' => 'perfil', 'action' => ''],
-            'self_service_utilizadores'   => ['module' => 'chat', 'action' => '', 'method' => 'GET'],
-
             // ── Autorização (IT admin) ────────────────────────────────────────────
             'utilizador_tipo'             => ['module' => 'autorizacao', 'action' => 'gerir_utilizadores'],
             'utilizador_reset_password'   => ['module' => 'autorizacao', 'action' => 'gerir_utilizadores'],

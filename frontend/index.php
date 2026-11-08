@@ -5,8 +5,6 @@ require_once __DIR__ . '/src/autoload.php';
 require_once __DIR__ . '/vendor/autoload.php';
 
 use E258Tech\Controller\Admin\AdminApiRuntime;
-use E258Tech\Controller\Admin\Api\ApiProxyController;
-use E258Tech\Controller\Admin\Api\PosPaymentApiController;
 use E258Tech\Controller\Portal\PortalAlunoController;
 use E258Tech\Controller\Portal\PortalEncarregadoController;
 use E258Tech\Controller\Portal\PortalProfessorController;
@@ -48,26 +46,6 @@ if (str_starts_with($uri, '/admin')) {
     $target = '/nexora' . substr($uri, strlen('/admin'));
     header('Location: ' . $target, true, 301);
     exit;
-} elseif (preg_match('#^/nexora/api/recrutamento/vagas/(\d+)/campos(?:/(\d+))?$#', $uri, $m)) {
-    // Proxy REST para Form Builder (campos por vaga)
-    $app    = Application::bootstrap();
-    $path   = '/api/recrutamento/vagas/' . $m[1] . '/campos' . (isset($m[2]) ? '/' . $m[2] : '');
-    $method = $_SERVER['REQUEST_METHOD'];
-    $body   = in_array($method, ['POST','PUT']) ? json_decode(file_get_contents('php://input'), true) : null;
-    $resp   = $app->nexora->call($method, $path, $body);
-    header('Content-Type: application/json');
-    http_response_code($resp['status'] ?: 200);
-    echo json_encode($resp['body']);
-    exit;
-} elseif ($uri === '/nexora/api/v1/pos/pagamentos/iniciar') {
-    PosPaymentApiController::iniciarPagamento();
-} elseif ($uri === '/nexora/api/v1/pos/pagamentos/status') {
-    PosPaymentApiController::statusPagamento();
-} elseif ($uri === '/nexora/api/v1/pos/vendas') {
-    PosPaymentApiController::registarVenda();
-} elseif (str_starts_with($uri, '/nexora/api/v1/')) {
-    // Proxy REST genérico para paths compostos (ex.: /nexora/api/v1/pos/sessoes).
-    ApiProxyController::handle();
 } elseif (str_starts_with($uri, '/nexora/api/')) {
     (new AdminApiRuntime(Application::bootstrap()))->dispatch(basename($uri, '.php'));
 } elseif (str_starts_with($uri, '/aluno')) {
@@ -80,7 +58,7 @@ if (str_starts_with($uri, '/admin')) {
         header('Location: /nexora/login?next=' . urlencode($uri));
         exit;
     }
-    if (!$app->session->isSuperAdmin() && !$app->session->isSchoolOnly() && !$app->session->isBoth()) {
+    if (!$app->session->isSuperAdmin() && !$app->session->hasEscopo('escola') && !$app->session->hasEscopo('erp')) {
         renderAccessDenied('Este painel é reservado a utilizadores com acesso à Escola.');
     }
     // Sincronizar permissões caso o cargo/permissoes tenham sido alterados
@@ -121,7 +99,7 @@ if (str_starts_with($uri, '/admin')) {
         header('Location: /nexora/login?next=' . urlencode($uri));
         exit;
     }
-    if (!$app->session->isSuperAdmin() && !$app->session->isSchoolOnly() && !$app->session->isBoth()) {
+    if (!$app->session->isSuperAdmin() && !$app->session->hasEscopo('escola') && !$app->session->hasEscopo('erp')) {
         renderAccessDenied('Este painel é reservado a utilizadores com acesso à Escola.');
     }
     // Sincronizar permissões caso o cargo/permissoes tenham sido alterados
@@ -173,19 +151,15 @@ if (str_starts_with($uri, '/admin')) {
         '/escola/config-financeira'  => 'escolar_config_financeira',
     ];
 
-    $pageKey = $escolaRoutes[$path] ?? null;
+    // Fora do mapa ficam as páginas de administração de contas
+    // (/escola/admin/...), definidas em AdministracaoPageRoutes.
+    $pageKey = $escolaRoutes[$path] ?? $app->routes->resolveByPath($path);
     if ($pageKey !== null) {
         $app->adminPages->dispatch($pageKey);
     } else {
         http_response_code(404);
         echo 'Página não encontrada no painel escolar.';
     }
-} elseif ($uri === '/nexora-recrutamento/politica-de-privacidade') {
-    $app = Application::bootstrap();
-    $activePage = 'privacidade';
-    $app = (object) ['openVacancies' => $app->openVacancies];
-    require __DIR__ . '/src/View/templates/public/politica_privacidade_recrutamento.php';
-    exit;
 } elseif (str_starts_with($uri, '/nexora')) {
     $app  = Application::bootstrap();
 
@@ -219,10 +193,6 @@ if (str_starts_with($uri, '/admin')) {
     $path = rtrim($uri, '/') ?: '/nexora';
     if ($path === '/nexora/login') {
         $app->adminAuth->login();
-    } elseif ($path === '/nexora/login/terminal') {
-        // Entrada dos terminais POS: código do terminal + código de activação,
-        // sem credenciais de pessoa (ver AdminAuthController::loginTerminal).
-        $app->adminAuth->loginTerminal();
     } elseif ($path === '/nexora/destino') {
         $app->adminAuth->destino();
     } elseif (str_starts_with($path, '/nexora/papel/')) {
@@ -230,18 +200,11 @@ if (str_starts_with($uri, '/admin')) {
         $app->adminAuth->papel(substr($path, strlen('/nexora/papel/')));
     } elseif ($path === '/nexora/logout') {
         $app->adminAuth->logout();
-    } elseif ($path === '/nexora/download') {
-        $app->adminDownload->download();
-    } elseif ($path === '/nexora' || $path === '/nexora/index') {
-        $app->adminPages->dispatch('dashboard');
     } else {
-        $route = $app->routes->resolveByPath($path);
-        if ($route === null) {
-            http_response_code(404);
-            echo 'Página não encontrada.';
-        } else {
-            $app->adminPages->dispatch($route);
-        }
+        // O ERP já não vive neste frontend: qualquer outra rota /nexora leva
+        // à escolha de área, que encaminha para a escola ou para um portal.
+        header('Location: /nexora/destino');
+        exit;
     }
 } elseif (str_starts_with($uri, '/portal/professor')) {
     $app      = Application::bootstrap();
@@ -544,48 +507,16 @@ if (str_starts_with($uri, '/admin')) {
         })(),
         default => (function () { http_response_code(404); echo 'Página não encontrada.'; })(),
     };
-} elseif (preg_match('#^/carreira/candidato/api/mensagens/(\d+)$#', $uri, $m) && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $app = Application::bootstrap();
-    $app->carreira->apiEnviarMensagem((int) $m[1]);
-    exit;
-} elseif ($uri === '/carreira/candidato/api/perfil' && $_SERVER['REQUEST_METHOD'] === 'PUT') {
-    $app = Application::bootstrap();
-    $app->carreira->apiActualizarPerfil();
-    exit;
-} elseif (str_starts_with($uri, '/api/public/recrutamento/candidaturas') && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    $app = Application::bootstrap();
-    $app->publicApi->submitApplication();
-} elseif (str_starts_with($uri, '/api/public/')) {
-    // Proxy genérico (GET/POST/PUT) para o backend Go — reencaminha corpo JSON
-    // e o cabeçalho Authorization, usado pelo portal do candidato autenticado.
-    $app = Application::bootstrap();
-    $app->publicApi->proxyJson($uri, $_SERVER['REQUEST_METHOD']);
 } elseif ($uri === '/api/auth/login' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // Login unificado (funcionário/aluno/encarregado/candidato) — proxy directo ao backend Go.
     $app = Application::bootstrap();
     $app->publicApi->proxyJson($uri, 'POST');
-} elseif (str_starts_with($uri, '/api/')) {
-    $app = Application::bootstrap();
-    match (basename($uri, '.php')) {
-        'contacto'    => $app->publicApi->submitContact(),
-        'candidatura' => $app->publicApi->submitApplication(),
-        default       => http_response_code(404),
-    };
 } else {
-    $app = Application::bootstrap();
     $path = rtrim($uri, '/') ?: '/';
-
-    match ($path) {
-        '/vagas'                      => $app->carreira->render(),
-        '/carreira'                   => $app->carreira->render(),
-        '/carreira/estado'            => $app->carreira->estado(),
-        '/carreira/candidato/login'        => $app->carreira->loginCandidato(),
-        '/carreira/candidato/registar'     => $app->carreira->registarCandidato(),
-        '/carreira/candidato/area'         => $app->carreira->areaCandidato(),
-        '/carreira/candidato/candidaturas' => $app->carreira->candidaturasCandidato(),
-        '/carreira/candidato/mensagens'    => $app->carreira->mensagensCandidato(),
-        '/carreira/candidato/perfil'       => $app->carreira->perfilCandidato(),
-        '/carreira/candidato/logout'       => $app->carreira->logoutCandidato(),
-        default                       => $app->home->render(),
-    };
+    if ($path === '/') {
+        header('Location: /nexora/login');
+        exit;
+    }
+    http_response_code(404);
+    echo 'Página não encontrada.';
 }

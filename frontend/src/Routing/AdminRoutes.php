@@ -3,11 +3,7 @@ declare(strict_types=1);
 
 namespace E258Tech\Routing;
 
-use E258Tech\Routing\Pages\ComercialPageRoutes;
-use E258Tech\Routing\Pages\FinanceiroPageRoutes;
-use E258Tech\Routing\Pages\PosPageRoutes;
-use E258Tech\Routing\Pages\RhPageRoutes;
-use E258Tech\Routing\Pages\SistemaPageRoutes;
+use E258Tech\Routing\Pages\AdministracaoPageRoutes;
 
 final class AdminRoutes
 {
@@ -15,13 +11,7 @@ final class AdminRoutes
 
     private static function pages(): array
     {
-        return self::$pages ??= array_merge(
-            ComercialPageRoutes::pages(),
-            FinanceiroPageRoutes::pages(),
-            PosPageRoutes::pages(),
-            RhPageRoutes::pages(),
-            SistemaPageRoutes::pages(),
-        );
+        return self::$pages ??= AdministracaoPageRoutes::pages();
     }
 
     private readonly SchoolAdminRoutes $schoolRoutes;

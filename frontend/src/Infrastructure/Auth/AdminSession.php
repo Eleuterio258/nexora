@@ -24,15 +24,6 @@ final class AdminSession
     }
 
     /**
-     * Autentica um terminal POS pelo código e código de activação.
-     */
-    public function loginTerminal(string $codigoTerminal, string $activationCode, string $tenantSlug = ''): array
-    {
-        $response = $this->client->authenticateTerminal($codigoTerminal, $activationCode, $tenantSlug);
-        return ['status' => $response->status, 'body' => $response->body];
-    }
-
-    /**
      * Guarda a sessão de um terminal. A resposta do /api/pos/login não tem a
      * forma do login normal — o token vem em terminal_token e não há objecto
      * `user` —, por isso normaliza-se aqui antes de reutilizar o store comum,

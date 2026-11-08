@@ -7,7 +7,7 @@ $csrf       = $app->security->csrfToken();
 $canGerirPerfis = $app->session->can('autorizacao', 'gerir_perfis');
 $pageTitle  = 'Cargos & Permissões';
 $activePage = 'cargos';
-$breadcrumb = [['Admin', '/nexora/'], ['Administração', ''], ['Cargos & Permissões', '']];
+$breadcrumb = [['Escola', '/escola'], ['Administração', ''], ['Cargos & Permissões', '']];
 
 include dirname(__DIR__) . '/layouts/top.php';
 ?>
@@ -16,7 +16,7 @@ include dirname(__DIR__) . '/layouts/top.php';
     <h1 class="adm-page-title">Cargos &amp; Permissões</h1>
     <?php if ($canGerirPerfis): ?>
     <div class="adm-page-header-actions">
-        <a href="/nexora/admin/cargos/form" class="adm-btn adm-btn-primary">
+        <a href="/escola/admin/cargos/form" class="adm-btn adm-btn-primary">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
@@ -62,7 +62,7 @@ include dirname(__DIR__) . '/layouts/top.php';
                 <?php if ($canGerirPerfis): ?>
                 <td>
                     <div class="adm-actions">
-                        <a href="/nexora/admin/cargos/form?id=<?= $app->id->encode((int)$c['id']) ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Editar">
+                        <a href="/escola/admin/cargos/form?id=<?= $app->id->encode((int)$c['id']) ?>" class="adm-btn adm-btn-ghost adm-btn-sm adm-btn-icon" title="Editar">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
