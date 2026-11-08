@@ -2,15 +2,15 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"nexora/config"
 	"nexora/internal/modules/auth/oauthkeys"
 	"nexora/internal/push"
 	"nexora/internal/shared/contracts"
+
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Handler struct {
@@ -36,25 +36,6 @@ func jsonErr(w http.ResponseWriter, msg string, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": msg})
-}
-
-func itoa(n int64) string {
-	return fmt.Sprintf("%d", n)
-}
-
-// tenantFromHeader lê X-Tenant-ID do header — tenant_id nunca deve vir do body.
-func tenantFromHeader(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	raw := r.Header.Get("X-Tenant-ID")
-	if raw == "" {
-		jsonErr(w, "header X-Tenant-ID é obrigatório", http.StatusBadRequest)
-		return 0, false
-	}
-	var id int64
-	if _, err := fmt.Sscanf(raw, "%d", &id); err != nil || id <= 0 {
-		jsonErr(w, "X-Tenant-ID inválido", http.StatusBadRequest)
-		return 0, false
-	}
-	return id, true
 }
 
 func isPgUniqueViolation(err error) bool {

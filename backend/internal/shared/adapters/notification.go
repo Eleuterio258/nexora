@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"time"
 
+	"nexora/internal/shared/contracts"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"nexora/internal/shared/contracts"
 )
 
 const notifWriteTimeout = 10 * time.Second
@@ -35,14 +36,6 @@ type NotificationAdapter struct {
 // de ligações.
 func NewNotificationAdapter(db DBTX) *NotificationAdapter {
 	return &NotificationAdapter{db: db}
-}
-
-// NewNotificationAdapterWithTx cria um adaptador cujo Send() grava dentro da
-// transacção recebida — nunca faz Commit/Rollback, essa continua a ser
-// responsabilidade do chamador (mesmo padrão de
-// assiduidade.NewServiceWithTx, Fase 0).
-func NewNotificationAdapterWithTx(tx pgx.Tx) *NotificationAdapter {
-	return NewNotificationAdapter(tx)
 }
 
 // Send insere uma notificação na tabela de mensagens com status 'pendente'.

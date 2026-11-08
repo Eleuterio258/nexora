@@ -68,15 +68,6 @@ func (s *TimetableService) ListTimeSlots(ctx context.Context, tenantID int64) ([
 	return s.repo.ListTimeSlots(ctx, tenantID)
 }
 
-// GetTimeSlot obtém slot.
-func (s *TimetableService) GetTimeSlot(ctx context.Context, id, tenantID int64) (*models.TimeSlot, error) {
-	ts, err := s.repo.GetTimeSlotByID(ctx, id, tenantID)
-	if err == pgx.ErrNoRows {
-		return nil, ErrTimetableNotFound
-	}
-	return ts, err
-}
-
 // CreateEntry cria entrada de horário com validação de conflitos.
 func (s *TimetableService) CreateEntry(ctx context.Context, e *models.TimetableEntry) error {
 	s.normalizeEntry(e)

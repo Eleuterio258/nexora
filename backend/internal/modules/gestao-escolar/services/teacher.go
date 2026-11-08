@@ -156,19 +156,3 @@ func (s *TeacherService) Delete(ctx context.Context, id, tenantID int64) error {
 	}
 	return nil
 }
-
-// ValidateWorkload verifica se uma nova atribuição de horário respeita a carga máxima.
-func (s *TeacherService) ValidateWorkload(ctx context.Context, teacherID, tenantID int64, additionalHours int) error {
-	teacher, err := s.GetByID(ctx, teacherID, tenantID)
-	if err != nil {
-		return err
-	}
-	workload, err := s.repo.WeeklyWorkload(ctx, teacherID, tenantID)
-	if err != nil {
-		return err
-	}
-	if workload+additionalHours > teacher.CargaHorariaMaximaSemanal {
-		return ErrTeacherOverloaded
-	}
-	return nil
-}

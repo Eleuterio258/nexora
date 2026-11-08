@@ -61,14 +61,6 @@ func (r *TeacherRepository) GetByID(ctx context.Context, id, tenantID int64) (*m
 		WHERE id = $1 AND tenant_id = $2`, id, tenantID))
 }
 
-// GetByCode obtém um professor pelo código e tenant.
-func (r *TeacherRepository) GetByCode(ctx context.Context, code string, tenantID int64) (*models.Teacher, error) {
-	return scanTeacher(r.db.QueryRow(ctx, `
-		SELECT `+teacherColumns+`
-		FROM gestao_escolar.school_teachers
-		WHERE codigo = $1 AND tenant_id = $2`, code, tenantID))
-}
-
 // List lista professores com filtros opcionais e paginação.
 func (r *TeacherRepository) List(ctx context.Context, tenantID int64, status, search string, page, limit int) ([]models.Teacher, int64, error) {
 	if page < 1 {
@@ -196,15 +188,4 @@ func (r *TeacherRepository) ExistsByCode(ctx context.Context, code string, tenan
 		SELECT EXISTS(SELECT 1 FROM gestao_escolar.school_teachers
 		WHERE codigo = $1 AND tenant_id = $2`+where+")", args...).Scan(&exists)
 	return exists, err
-}
-
-// WeeklyWorkload retorna a carga horária semanal atribuída a um professor.
-func (r *TeacherRepository) WeeklyWorkload(ctx context.Context, teacherID, tenantID int64) (int, error) {
-	var workload int
-	err := r.db.QueryRow(ctx, `
-		SELECT COALESCE(SUM(Extract(EPOCH FROM (ts.hora_fim - ts.hora_inicio)) / 3600), 0)::int
-		FROM gestao_escolar.school_timetable_entries te
-		JOIN gestao_escolar.school_time_slots ts ON ts.id = te.time_slot_id
-		WHERE te.teacher_id = $1 AND te.tenant_id = $2 AND te.activo`, teacherID, tenantID).Scan(&workload)
-	return workload, err
 }

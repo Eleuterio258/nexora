@@ -7,7 +7,6 @@ package idhash
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -30,15 +29,6 @@ func New(secret string) *Hasher {
 	}
 }
 
-// Encode turns a positive integer into a short opaque URL-safe string.
-func (h *Hasher) Encode(id int64) string {
-	if id <= 0 {
-		return "0"
-	}
-	v := rotl32(uint32(id)^h.k1, 13) ^ h.k2
-	return toBase36(uint64(v))
-}
-
 // Decode reverses Encode. Returns error on invalid input.
 func (h *Hasher) Decode(s string) (int64, error) {
 	if s == "0" || s == "" {
@@ -50,18 +40,6 @@ func (h *Hasher) Decode(s string) (int64, error) {
 	}
 	v := rotl32(uint32(n)^h.k2, 19) ^ h.k1
 	return int64(v), nil
-}
-
-// decodeOrInt tries to decode as a hash; falls back to integer parsing.
-// This allows backward compatibility during a gradual migration.
-func (h *Hasher) decodeOrInt(s string) (int64, error) {
-	if s == "" {
-		return 0, errors.New("empty id")
-	}
-	if id, err := strconv.ParseInt(s, 10, 64); err == nil {
-		return id, nil
-	}
-	return h.Decode(s)
 }
 
 // Middleware returns a chi middleware that transparently decodes hashed path
@@ -122,20 +100,6 @@ func rotl32(x uint32, n int) uint32 {
 }
 
 const base36Alphabet = "0123456789abcdefghijklmnopqrstuvwxyz"
-
-func toBase36(n uint64) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [13]byte
-	pos := len(buf)
-	for n > 0 {
-		pos--
-		buf[pos] = base36Alphabet[n%36]
-		n /= 36
-	}
-	return string(buf[pos:])
-}
 
 func fromBase36(s string) (uint64, error) {
 	var n uint64

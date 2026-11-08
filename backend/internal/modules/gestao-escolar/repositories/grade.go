@@ -108,16 +108,6 @@ func (r *GradeRepository) UpsertGrade(ctx context.Context, g *models.Grade) erro
 	).Scan(&g.ID, &g.CreatedAt, &g.UpdatedAt)
 }
 
-// GetGradeByID obtém nota.
-func (r *GradeRepository) GetGradeByID(ctx context.Context, id, tenantID int64) (*models.Grade, error) {
-	var g models.Grade
-	err := r.db.QueryRow(ctx, `
-		SELECT id, tenant_id, grade_item_id, student_id, enrollment_id, nota, observacoes, lancado_por, created_at, updated_at
-		FROM gestao_escolar.school_grades WHERE id=$1 AND tenant_id=$2`, id, tenantID).Scan(
-		&g.ID, &g.TenantID, &g.GradeItemID, &g.StudentID, &g.EnrollmentID, &g.Nota, &g.Observacoes, &g.LancadoPor, &g.CreatedAt, &g.UpdatedAt)
-	return &g, err
-}
-
 // StudentAverages calcula médias por disciplina para um aluno num período.
 func (r *GradeRepository) StudentAverages(ctx context.Context, studentID, termID, tenantID int64) ([]map[string]any, error) {
 	query := `

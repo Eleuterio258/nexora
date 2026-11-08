@@ -94,15 +94,6 @@ func (s *GradeService) UpsertGrade(ctx context.Context, g *models.Grade) error {
 	return s.repo.UpsertGrade(ctx, g)
 }
 
-// GetGrade obtém nota.
-func (s *GradeService) GetGrade(ctx context.Context, id, tenantID int64) (*models.Grade, error) {
-	g, err := s.repo.GetGradeByID(ctx, id, tenantID)
-	if err == pgx.ErrNoRows {
-		return nil, ErrGradeNotFound
-	}
-	return g, err
-}
-
 // StudentReport devolve médias por disciplina (apenas itens publicados).
 func (s *GradeService) StudentReport(ctx context.Context, studentID, termID, tenantID int64) (map[string]any, error) {
 	averages, err := s.repo.StudentAverages(ctx, studentID, termID, tenantID)

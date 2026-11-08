@@ -9,8 +9,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	mw "nexora/internal/middleware"
+
+	"github.com/go-chi/chi/v5"
 )
 
 func (h *Handler) ListarPlanosPropinas(w http.ResponseWriter, r *http.Request) {
@@ -84,12 +85,6 @@ func (h *Handler) ObterCobrancaAluno(w http.ResponseWriter, r *http.Request) {
 		FROM gestao_escolar.school_payments p WHERE p.school_fee_id=f.id),'[]'))
 		FROM gestao_escolar.school_fees f JOIN gestao_escolar.school_students s ON s.id=f.student_id
 		WHERE f.id=$1 AND f.tenant_id=$2`, chi.URLParam(r, "id"), u.TenantID)
-}
-
-func (h *Handler) EmitirCobrancaAluno(w http.ResponseWriter, r *http.Request) {
-	u := mw.GetUser(r)
-	h.schoolUpdate(w, r, `UPDATE gestao_escolar.school_fees SET status='emitida',emitida_em=NOW(),updated_at=NOW()
-		WHERE id=$1 AND tenant_id=$2 AND status='pendente'`, chi.URLParam(r, "id"), u.TenantID)
 }
 
 func (h *Handler) CallbackPagamentoEscolar(w http.ResponseWriter, r *http.Request) {

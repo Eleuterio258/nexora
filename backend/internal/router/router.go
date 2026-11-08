@@ -406,7 +406,6 @@ func New(db *pgxpool.Pool, cfg *config.Config) http.Handler {
 			r.Post("/fee-plans", escolar.CriarPlanoPropina)
 			r.Post("/fee-plans/{id}/generate", escolar.GerarCobrancasPlano)
 			r.Post("/student-invoices", escolar.GerarCobrancaAluno)
-			r.Post("/student-invoices/{id}/emit", escolar.EmitirCobrancaAluno)
 			r.Post("/student-invoices/{id}/discount", escolar.AplicarDescontoCobrancaV2)
 			r.Post("/payments", escolar.RegistarPagamentoEscolarV2)
 			r.Get("/config/financial", escolar.ObterConfigFinanceira)

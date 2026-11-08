@@ -99,19 +99,6 @@ func (h *Handler) updatePortalUserPassword(ctx context.Context, userID int64, pa
 	return err
 }
 
-// getPortalUserByEmail devolve id, tipo e estado de um utilizador pelo email.
-func (h *Handler) getPortalUserByEmail(ctx context.Context, email string) (int64, string, string, error) {
-	var userID int64
-	var tipo, estado string
-	err := h.db.QueryRow(ctx, `
-		SELECT id, tipo, estado
-		  FROM auth.users
-		 WHERE LOWER(email) = LOWER($1)`,
-		email,
-	).Scan(&userID, &tipo, &estado)
-	return userID, tipo, estado, err
-}
-
 func estadoFromAtivo(ativo bool) string {
 	if ativo {
 		return "ativo"

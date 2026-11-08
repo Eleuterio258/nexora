@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
+
+	"nexora/internal/modules/gestao-escolar/models"
 
 	"github.com/jackc/pgx/v5"
-	"nexora/internal/modules/gestao-escolar/models"
 )
 
 // TimetableRepository acesso a dados de horários.
@@ -42,14 +42,6 @@ func (r *TimetableRepository) Create(ctx context.Context, e *models.TimetableEnt
 		&e.ID, &e.TenantID, &e.SchoolYearID, &e.ClassID, &e.SubjectID, &e.TeacherID,
 		&e.TimeSlotID, &e.DiaSemana, &e.Sala, &e.DataInicio, &e.DataFim, &e.Activo, &e.CreatedAt, &e.UpdatedAt,
 	)
-}
-
-// GetByID obtém entrada.
-func (r *TimetableRepository) GetByID(ctx context.Context, id, tenantID int64) (*models.TimetableEntry, error) {
-	return scanTimetableEntry(r.db.QueryRow(ctx, `
-		SELECT id, tenant_id, school_year_id, class_id, subject_id, teacher_id, time_slot_id, dia_semana, sala, data_inicio, data_fim, activo, created_at, updated_at
-		FROM gestao_escolar.school_timetable_entries
-		WHERE id=$1 AND tenant_id=$2`, id, tenantID))
 }
 
 // ListByClass lista horário de uma turma.
@@ -185,32 +177,4 @@ func (r *TimetableRepository) ListTimeSlots(ctx context.Context, tenantID int64)
 		slots = append(slots, ts)
 	}
 	return slots, rows.Err()
-}
-
-// GetTimeSlotByID obtém slot.
-func (r *TimetableRepository) GetTimeSlotByID(ctx context.Context, id, tenantID int64) (*models.TimeSlot, error) {
-	var ts models.TimeSlot
-	err := r.db.QueryRow(ctx, `
-		SELECT id, tenant_id, codigo, nome, hora_inicio, hora_fim, ordem, activo, created_at, updated_at
-		FROM gestao_escolar.school_time_slots
-		WHERE id=$1 AND tenant_id=$2`, id, tenantID).Scan(&ts.ID, &ts.TenantID, &ts.Codigo, &ts.Nome, &ts.HoraInicio, &ts.HoraFim, &ts.Ordem, &ts.Activo, &ts.CreatedAt, &ts.UpdatedAt)
-	return &ts, err
-}
-
-// parseTime auxiliar para converter string HH:MM em time.Time.
-func parseTime(value string) (time.Time, error) {
-	return time.Parse("15:04", value)
-}
-
-// durationMinutes calcula duração em minutos entre duas strings HH:MM.
-func durationMinutes(start, end string) (int, error) {
-	s, err := parseTime(start)
-	if err != nil {
-		return 0, err
-	}
-	e, err := parseTime(end)
-	if err != nil {
-		return 0, err
-	}
-	return int(e.Sub(s).Minutes()), nil
 }

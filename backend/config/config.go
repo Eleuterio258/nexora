@@ -36,14 +36,9 @@ type Config struct {
 	// desperdiça trabalho.
 	RunBackgroundJobs bool
 
-	// Avatar
-	AvatarMaxMB int64
-	AvatarDir   string
-
-	// Recrutamento
-	RecruitmentTenantID int64
-	UploadsDir          string
-	UploadMaxMB         int64
+	// Ficheiros locais
+	AvatarDir  string
+	UploadsDir string
 
 	// Multi-tenant — domínio base da plataforma. Um pedido a
 	// <codigo>.<PlatformBaseDomain> resolve para o tenant com esse código.
@@ -82,42 +77,9 @@ type Config struct {
 	MinioRegion       string
 	MinioBucketLookup string // auto | dns | path
 
-	// Hardware — worker MQTT (opcional; desligado se MQTTBrokerURL vazio)
-	MQTTBrokerURL string
-	MQTTClientID  string
-	MQTTUsername  string
-	MQTTPassword  string
-
-	// Assinatura digital — convite de assinatura (opcional; sem link clicável se vazio)
-	SignatureInviteBaseURL string
-
 	// Recuperação de senha — página do frontend que lê ?token= e chama
-	// POST /api/auth/reset-password (opcional; sem link clicável se vazio,
-	// igual ao padrão de SignatureInviteBaseURL).
+	// POST /api/auth/reset-password (opcional; sem link clicável se vazio).
 	PasswordResetBaseURL string
-
-	// Assinatura digital — provider PKI/PAdES. "dev" gera um certificado
-	// auto-assinado local; NUNCA é juridicamente válido. Um provider real
-	// (ex. INTIC) substituiria este valor quando existirem credenciais.
-	SignatureProvider   string
-	SignatureDevKeyPath string
-	SignatureTSAURL     string
-
-	// Assinatura digital — os providers "dev" e "intic" (stub) usam uma
-	// chave partilhada e autoassinada, nunca a chave pessoal do titular.
-	// Por omissão o servidor RECUSA arrancar com qualquer um destes dois
-	// providers — é preciso reconhecer explicitamente que não há ainda um
-	// provider real ligado (ver Fase 6 do plano de robustecimento).
-	SignatureAllowInsecureProvider bool
-
-	// Assinatura digital — webhook de providers. Fica sempre desligado (503)
-	// enquanto SignatureWebhookEnabled não for true. Cada provider tem de
-	// estar na lista de permitidos (SIGNATURE_WEBHOOK_PROVIDERS, separados
-	// por vírgula) e tem o seu próprio segredo HMAC — nunca partilhado entre
-	// providers — em SIGNATURE_WEBHOOK_SECRET_<PROVIDER-EM-MAIÚSCULAS>.
-	SignatureWebhookEnabled   bool
-	SignatureWebhookProviders []string
-	SignatureWebhookSecrets   map[string]string
 
 	// SMS — envio de notificações por SMS (opcional; "noop" ou vazio desativa).
 	SMSProvider    string
@@ -125,39 +87,11 @@ type Config struct {
 	SMSTwilioToken string
 	SMSTwilioFrom  string
 
-	// Antivírus — verificação de ficheiros no upload (opcional).
-	AntivirusProvider      string
-	AntivirusClamAVNetwork string
-	AntivirusClamAVAddress string
-
-	// Provider de assinatura real (INTIC stub).
-	SignatureINTICKeyPath       string
-	SignatureCARootsPEM         string
-	SignatureCAIntermediatesPEM string
-
-	// FaceClock — gateway de biometria facial/digital (assiduidade_system_backend).
-	// Usado pelo ERP para enrollment biométrico iniciado por gestores RH.
-	FaceClockBaseURL string
-	// FacialVerificationSecret valida os comprovativos HS256 emitidos pelo
-	// FaceClock depois de um match. Deve ser exclusivo desta integracao.
-	FacialVerificationSecret string
-	// Scores minimos exigidos num comprovativo facial, alem da assinatura —
-	// defesa em profundidade: um FaceClock mal configurado (limiar baixo) nao
-	// deve conseguir, sozinho, fazer o ERP aceitar uma marcacao. Os defaults
-	// igualam os limiares do FaceClock (BIOMETRIC_MATCH_THRESHOLD e
-	// BIOMETRIC_LIVENESS_THRESHOLD).
-	FacialMinConfidenceScore float64
-	FacialMinLivenessScore   float64
-	// FaceClockAccessKeyID e FaceClockSecretAccessKey autenticam o ERP perante
-	// o FaceClock via HMAC Nexora (X-Nexora-*). A chave secreta nunca transita.
-	FaceClockAccessKeyID     string
-	FaceClockSecretAccessKey string
-
 	// Authorization Server OAuth2 — chave(s) RS256 que assinam os access
 	// tokens emitidos por /oauth/token. Ver internal/modules/auth/oauthkeys.
 	// Por omissão o servidor RECUSA arrancar sem uma chave válida já
-	// presente em OAuthSigningKeysDir — mesmo padrão de reconhecimento
-	// explícito usado por SignatureAllowInsecureProvider.
+	// presente em OAuthSigningKeysDir, a menos que OAuthAllowGeneratedKey
+	// reconheça explicitamente o uso de uma chave gerada.
 	OAuthSigningKeysDir    string
 	OAuthAllowGeneratedKey bool
 	OAuthIssuer            string
@@ -169,19 +103,15 @@ type Config struct {
 // mantidos como constantes para AssertProductionSecrets() os comparar sem
 // depender de duplicar as strings.
 const (
-	defaultJWTSecret                = "change-me-secret"
-	defaultJWTRefreshSecret         = "change-me-refresh-secret"
-	defaultMinioAccessKey           = "histories"
-	defaultMinioSecretKey           = "histories"
-	defaultFacialVerificationSecret = "change-me-facial-verification-secret"
-	defaultFaceClockSecretAccessKey = "change-me-faceclock-secret-access-key"
+	defaultJWTSecret        = "change-me-secret"
+	defaultJWTRefreshSecret = "change-me-refresh-secret"
+	defaultMinioAccessKey   = "histories"
+	defaultMinioSecretKey   = "histories"
 )
 
 // AssertProductionSecrets falha o arranque (log.Fatal, chamado pelo caller)
 // se Environment=="production" e algum segredo crítico ainda tiver o valor
-// por omissão versionado no repositório — mesmo padrão já aplicado no
-// FaceClock (assert_production_secrets(), app/config.py), agora replicado
-// aqui porque o ERP é a fonte de identidade de todo o SaaS: um JWT_SECRET
+// por omissão versionado no repositório: um JWT_SECRET
 // por omissão esquecido permite forjar tokens válidos para qualquer
 // utilizador/tenant. Sem ENVIRONMENT=production explícito, o comportamento
 // por omissão mantém-se inalterado (dev/staging não são afectados).
@@ -202,15 +132,6 @@ func (c *Config) AssertProductionSecrets() error {
 	if c.MinioSecretKey == defaultMinioSecretKey {
 		bad = append(bad, "MINIO_SECRET_KEY")
 	}
-	if c.FacialVerificationSecret == "" || c.FacialVerificationSecret == defaultFacialVerificationSecret {
-		bad = append(bad, "FACIAL_VERIFICATION_SECRET")
-	}
-	if c.FaceClockAccessKeyID == "" {
-		bad = append(bad, "FACECLOCK_ACCESS_KEY_ID")
-	}
-	if c.FaceClockSecretAccessKey == "" || c.FaceClockSecretAccessKey == defaultFaceClockSecretAccessKey {
-		bad = append(bad, "FACECLOCK_SECRET_ACCESS_KEY")
-	}
 	if len(bad) > 0 {
 		return fmt.Errorf("ENVIRONMENT=production exige segredos reais para: %s (valores por omissão do repositório não são seguros)", strings.Join(bad, ", "))
 	}
@@ -218,7 +139,6 @@ func (c *Config) AssertProductionSecrets() error {
 }
 
 func Load() *Config {
-	webhookProviders, webhookSecrets := loadSignatureWebhookProviders()
 	return &Config{
 		DatabaseURL: env("DATABASE_URL",
 			"postgres://postgres:Plane@mento1@209.126.86.55:5432/nexora_erp?sslmode=disable"+
@@ -240,12 +160,9 @@ func Load() *Config {
 		Port:                env("PORT", "8080"),
 		CORSOrigin:          env("CORS_ORIGIN", "*"),
 		RunBackgroundJobs:   envBool("RUN_BACKGROUND_JOBS", true),
-		AvatarMaxMB:         envInt("AVATAR_MAX_MB", 2),
 		AvatarDir:           env("AVATAR_DIR", "./avatars"),
 
-		RecruitmentTenantID:     envInt("RECRUITMENT_TENANT_ID", 1),
 		UploadsDir:              env("UPLOADS_DIR", "./uploads"),
-		UploadMaxMB:             envInt("UPLOAD_MAX_MB", 3),
 		PlatformBaseDomain:      strings.ToLower(strings.TrimSpace(env("PLATFORM_BASE_DOMAIN", ""))),
 		IDHashSalt:              env("JWT_SECRET", "change-me-secret"),
 		GatewayWebhookSecret:    env("GATEWAY_WEBHOOK_SECRET", ""),
@@ -270,68 +187,18 @@ func Load() *Config {
 		MinioRegion:       env("MINIO_REGION", "us-east-1"),
 		MinioBucketLookup: env("MINIO_BUCKET_LOOKUP", "auto"),
 
-		MQTTBrokerURL: env("MQTT_BROKER_URL", ""),
-		MQTTClientID:  env("MQTT_CLIENT_ID", "nexora-hardware-worker"),
-		MQTTUsername:  env("MQTT_USERNAME", ""),
-		MQTTPassword:  env("MQTT_PASSWORD", ""),
-
-		SignatureInviteBaseURL: env("SIGNATURE_INVITE_BASE_URL", ""),
-		PasswordResetBaseURL:   env("PASSWORD_RESET_BASE_URL", ""),
-
-		SignatureProvider:   env("SIGNATURE_PROVIDER", "dev"),
-		SignatureDevKeyPath: env("SIGNATURE_DEV_KEY_PATH", "./data/assinatura-dev.pem"),
-		SignatureTSAURL:     env("SIGNATURE_TSA_URL", ""),
-
-		SignatureAllowInsecureProvider: envBool("SIGNATURE_ALLOW_INSECURE_PROVIDER", false),
-
-		SignatureWebhookEnabled:   envBool("SIGNATURE_WEBHOOK_ENABLED", false),
-		SignatureWebhookProviders: webhookProviders,
-		SignatureWebhookSecrets:   webhookSecrets,
+		PasswordResetBaseURL: env("PASSWORD_RESET_BASE_URL", ""),
 
 		SMSProvider:    env("SMS_PROVIDER", "noop"),
 		SMSTwilioSID:   env("SMS_TWILIO_SID", ""),
 		SMSTwilioToken: env("SMS_TWILIO_TOKEN", ""),
 		SMSTwilioFrom:  env("SMS_TWILIO_FROM", ""),
 
-		AntivirusProvider:      env("ANTIVIRUS_PROVIDER", "noop"),
-		AntivirusClamAVNetwork: env("ANTIVIRUS_CLAMAV_NETWORK", "tcp"),
-		AntivirusClamAVAddress: env("ANTIVIRUS_CLAMAV_ADDRESS", "localhost:3310"),
-
-		SignatureINTICKeyPath:       env("SIGNATURE_INTIC_KEY_PATH", ""),
-		SignatureCARootsPEM:         env("SIGNATURE_CA_ROOTS_PEM", ""),
-		SignatureCAIntermediatesPEM: env("SIGNATURE_CA_INTERMEDIATES_PEM", ""),
-
-		FaceClockBaseURL:         env("FACECLOCK_BASE_URL", "https://asseduidade.e258tech.tech"),
-		FacialVerificationSecret: env("FACIAL_VERIFICATION_SECRET", defaultFacialVerificationSecret),
-		FacialMinConfidenceScore: envFloat("FACIAL_MIN_CONFIDENCE_SCORE", 0.85),
-		FacialMinLivenessScore:   envFloat("FACIAL_MIN_LIVENESS_SCORE", 0.68),
-		FaceClockAccessKeyID:     env("FACECLOCK_ACCESS_KEY_ID", ""),
-		FaceClockSecretAccessKey: env("FACECLOCK_SECRET_ACCESS_KEY", defaultFaceClockSecretAccessKey),
-
 		OAuthSigningKeysDir:    env("OAUTH_SIGNING_KEYS_DIR", "./data/oauth-keys"),
 		OAuthAllowGeneratedKey: envBool("OAUTH_ALLOW_GENERATED_KEY", false),
 		OAuthIssuer:            env("OAUTH_ISSUER", "nexora-erp"),
 		OAuthAudience:          env("OAUTH_AUDIENCE", "nexora-api"),
 	}
-}
-
-// loadSignatureWebhookProviders lê a lista de providers de webhook permitidos
-// (SIGNATURE_WEBHOOK_PROVIDERS, separados por vírgula) e o segredo HMAC de
-// cada um (SIGNATURE_WEBHOOK_SECRET_<PROVIDER>). Um provider sem segredo
-// configurado fica na lista de permitidos mas o webhook responde 501 para
-// ele (ver ReceberWebhook) — nunca cai para um segredo partilhado.
-func loadSignatureWebhookProviders() ([]string, map[string]string) {
-	var providers []string
-	secrets := map[string]string{}
-	for _, p := range strings.Split(env("SIGNATURE_WEBHOOK_PROVIDERS", ""), ",") {
-		p = strings.ToLower(strings.TrimSpace(p))
-		if p == "" {
-			continue
-		}
-		providers = append(providers, p)
-		secrets[p] = env("SIGNATURE_WEBHOOK_SECRET_"+strings.ToUpper(p), "")
-	}
-	return providers, secrets
 }
 
 func envBool(key string, fallback bool) bool {
@@ -350,15 +217,6 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-func envFloat(key string, fallback float64) float64 {
-	if v := os.Getenv(key); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil {
-			return f
-		}
-	}
-	return fallback
-}
-
 func parseDuration(s string) time.Duration {
 	if len(s) >= 2 && s[len(s)-1] == 'd' {
 		n, _ := strconv.Atoi(s[:len(s)-1])
@@ -369,13 +227,4 @@ func parseDuration(s string) time.Duration {
 		return 15 * time.Minute
 	}
 	return d
-}
-
-func envInt(key string, fallback int64) int64 {
-	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			return n
-		}
-	}
-	return fallback
 }
